@@ -134,7 +134,13 @@ function createApp(input?: {
           }
           return null;
         },
-        all: async () => ({ results: [] }),
+        all: async () => ({
+          results:
+            sql.includes("registration IN (SELECT value FROM json_each(?1))") &&
+            input?.existingAircraft
+              ? [input.existingAircraft]
+              : [],
+        }),
       };
       prepared.push(statement);
       return statement;
@@ -303,6 +309,36 @@ describe("admin master-data template routes", () => {
       errors: [{ path: "aircraft.0" }],
       warnings: [expect.stringContaining("1 bestehende Flugzeuge")],
     });
+  });
+
+  it("validates the maximum aircraft template with one registration query", async () => {
+    const template = emptyTemplate({
+      aircraft: Array.from({ length: 200 }, (_, index) => ({
+        key: `aircraft-${index}`,
+        registration: `D-S${String(index).padStart(3, "0")}`,
+        aircraftType: "C172",
+        passengerSeats: 4,
+        maximumPassengerPayloadKg: 320,
+        refuelReminderThreshold: 5,
+      })),
+    });
+    const { app, env, prepared } = createApp();
+
+    const response = await app.request(
+      `https://worker.test/api/admin/events/${EVENT_ID}/master-data-template/validate`,
+      jsonRequest({ template }),
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      valid: true,
+      counts: { aircraft: 200 },
+    });
+    const aircraftReads = prepared.filter((statement) => statement.sql.includes("FROM aircraft"));
+    expect(aircraftReads).toHaveLength(1);
+    expect(aircraftReads[0]?.sql).toContain("json_each(?1)");
+    expect(JSON.parse(String(aircraftReads[0]?.bindings[0]))).toHaveLength(200);
   });
 
   it("replays a matching import receipt and rejects a foreign command owner", async () => {

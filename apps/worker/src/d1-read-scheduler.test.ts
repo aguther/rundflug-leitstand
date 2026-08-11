@@ -1,8 +1,32 @@
-import { describe, expect, it } from "vitest";
-import { runD1ReadsSequentially } from "./d1-read-scheduler";
+import { describe, expect, it, vi } from "vitest";
+import { d1All, d1First, runD1ReadsInBatch, runD1ReadsSequentially } from "./d1-read-scheduler";
 
-describe("runD1ReadsSequentially", () => {
-  it("öffnet auch bei vielen Abfragen nur eine Verbindung gleichzeitig", async () => {
+describe("D1 read batch scheduler", () => {
+  it("loads all and first projections in exactly one database batch", async () => {
+    const statements = [{ id: "all" }, { id: "first" }] as unknown as readonly [
+      D1PreparedStatement,
+      D1PreparedStatement,
+    ];
+    const batch = vi.fn(async (received: D1PreparedStatement[]) => {
+      expect(received).toEqual(statements);
+      return [
+        { results: [{ id: "a" }, { id: "b" }] },
+        { results: [{ count: 7 }] },
+      ] as D1Result<unknown>[];
+    });
+    const database = { batch } as unknown as D1Database;
+
+    const [rows, first] = await runD1ReadsInBatch(database, [
+      d1All<{ id: string }>(statements[0]),
+      d1First<{ count: number }>(statements[1]),
+    ] as const);
+
+    expect(batch).toHaveBeenCalledOnce();
+    expect(rows.results).toEqual([{ id: "a" }, { id: "b" }]);
+    expect(first).toEqual({ count: 7 });
+  });
+
+  it("keeps compatibility reads sequential", async () => {
     let active = 0;
     let maximumActive = 0;
     const completionOrder: number[] = [];

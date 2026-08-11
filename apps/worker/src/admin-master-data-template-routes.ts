@@ -7,6 +7,7 @@ import {
   masterDataTemplateValidationSchema,
 } from "@rundflug/contracts";
 import type { Hono } from "hono";
+import { validateTemplateAircraft } from "./admin-master-data-template-aircraft-validation";
 import { loadAdminMasterDataTemplate } from "./admin-master-data-template-export";
 import type { SessionActor } from "./auth";
 import { authorizeDevice } from "./device-authorization";
@@ -89,50 +90,6 @@ async function loadTemplateTarget(
     )
     .bind(eventId)
     .first<MasterDataTemplateTargetRow>();
-}
-
-interface ExistingTemplateAircraftRow {
-  id: string;
-  registration: string;
-  aircraft_type: string;
-  passenger_seats: number;
-  maximum_passenger_payload_kg: number | null;
-  refuel_reminder_threshold: number;
-}
-
-async function validateTemplateAircraft(
-  database: D1Database,
-  template: MasterDataTemplate,
-): Promise<{
-  existingByRegistration: Map<string, ExistingTemplateAircraftRow>;
-  errors: Array<{ path: string; message: string }>;
-}> {
-  const existingByRegistration = new Map<string, ExistingTemplateAircraftRow>();
-  const errors: Array<{ path: string; message: string }> = [];
-  for (const [index, aircraft] of template.aircraft.entries()) {
-    const existing = await database
-      .prepare(
-        `SELECT id, registration, aircraft_type, passenger_seats,
-                maximum_passenger_payload_kg, refuel_reminder_threshold
-           FROM aircraft WHERE registration = ?1`,
-      )
-      .bind(aircraft.registration)
-      .first<ExistingTemplateAircraftRow>();
-    if (!existing) continue;
-    existingByRegistration.set(existing.registration, existing);
-    if (
-      existing.aircraft_type !== aircraft.aircraftType ||
-      existing.passenger_seats !== aircraft.passengerSeats ||
-      existing.maximum_passenger_payload_kg !== aircraft.maximumPassengerPayloadKg ||
-      existing.refuel_reminder_threshold !== aircraft.refuelReminderThreshold
-    ) {
-      errors.push({
-        path: `aircraft.${index}`,
-        message: `Flugzeug ${aircraft.registration} existiert bereits mit abweichenden Stammdaten.`,
-      });
-    }
-  }
-  return { existingByRegistration, errors };
 }
 
 function invalidTemplateResponse(cause: unknown) {

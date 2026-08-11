@@ -12,6 +12,10 @@ import {
 import type { Hono } from "hono";
 import type { SessionActor } from "./auth";
 import { authorizeDevice } from "./device-authorization";
+import {
+  compositeIndexKey,
+  createOperationsProjectionIndexes,
+} from "./operations-projection-indexes";
 import { loadOperationsReadModels } from "./operations-read-service";
 import {
   activeTicketGroupRecallProjection,
@@ -83,6 +87,8 @@ export function registerOperationsRoutes(
     }
     const projectionReadAt = dependencies.nowIso();
 
+    const loadReadModels = dependencies.loadOperationsReadModels;
+    const readModels = await loadReadModels(context.env.DB, eventId, projectionReadAt);
     const {
       products,
       aircraftProductTurnaroundOverrideRows,
@@ -90,7 +96,6 @@ export function registerOperationsRoutes(
       queueGroupRows,
       dispatchLeaseRows,
       durationRows,
-      aircraftRows,
       fleetRows,
       pilotRows,
       gatesRows,
@@ -99,7 +104,7 @@ export function registerOperationsRoutes(
       recurringRuleRows,
       metricsRow,
       assistClaims,
-    } = await dependencies.loadOperationsReadModels(context.env.DB, eventId, projectionReadAt);
+    } = readModels;
 
     const actualDurations = [...durationRows.results].reverse().map((row) => row.duration_minutes);
     const activePilotCount = pilotRows.results.filter(
@@ -109,6 +114,26 @@ export function registerOperationsRoutes(
     const forecastReferenceMs = Date.parse(forecastReadAt);
     const operationsEnd = eventRow.operations_end_at ? Date.parse(eventRow.operations_end_at) : 0;
     const operationsEndMinutes = Math.max(0, (operationsEnd - forecastReferenceMs) / 60_000);
+    const {
+      productsById,
+      productsByCode,
+      aircraftRowsByResourceGroupId,
+      fleetById,
+      fleetByResourceGroupId,
+      pilotsById,
+      rotationsById,
+      rotationsByResourceGroupId,
+      rotationsByResourceGroupAircraftId,
+      resourceGroupsById,
+      turnaroundOverridesByAircraftProduct,
+      activePlanOrderById,
+      planScopeIndexKey,
+      activePlansByScope,
+      activeRecurringRuleOrderById,
+      activeRecurringRulesByScope,
+      firstQueuedRotationByResourceGroupId,
+      availablePilotsFor,
+    } = createOperationsProjectionIndexes(readModels, forecastReferenceMs);
     const dispatchReservationByGroupId = new Map<string, "OWN" | "OTHER">();
     for (const lease of dispatchLeaseRows.results) {
       const reservation =
@@ -140,9 +165,8 @@ export function registerOperationsRoutes(
             bufferMinutes: product.planned_buffer_minutes_override,
           },
         });
-        const assignedGroupAircraft = aircraftRows.results.filter(
-          (aircraft) => aircraft.resource_group_id === product.resource_group_id,
-        );
+        const assignedGroupAircraft =
+          aircraftRowsByResourceGroupId.get(product.resource_group_id) ?? [];
         const operationalGroupAircraft = assignedGroupAircraft.filter(
           (aircraft) =>
             !["INACTIVE", "PAUSED", "REFUELING"].includes(aircraft.operational_state) &&
@@ -174,12 +198,8 @@ export function registerOperationsRoutes(
           activeCapacity: activeAircraft,
         });
         const fallbackForecast = forecastQueueWindows({ queueSequence, activeAircraft, duration });
-        const firstQueuedRotation = rotations.results.find(
-          (rotation) =>
-            rotation.resource_group_id === product.resource_group_id &&
-            rotation.status === "DRAFT" &&
-            rotation.prediction_lower_minutes !== null &&
-            rotation.prediction_upper_minutes !== null,
+        const firstQueuedRotation = firstQueuedRotationByResourceGroupId.get(
+          product.resource_group_id,
         );
         const preOperationsOffset = eventRow.operations_start_at
           ? Math.max(0, (Date.parse(eventRow.operations_start_at) - forecastReferenceMs) / 60_000)
@@ -219,9 +239,8 @@ export function registerOperationsRoutes(
                 ) +
                   Math.max(0, forecast.upperMinutes - forecast.lowerMinutes) * 60_000,
               ).toISOString();
-        const resourceGroupRotations = rotations.results.filter(
-          (rotation) => rotation.resource_group_id === product.resource_group_id,
-        );
+        const resourceGroupRotations =
+          rotationsByResourceGroupId.get(product.resource_group_id) ?? [];
         const blockingUnprojectedQueue = resourceGroupRotations.some(
           (rotation) =>
             rotation.status === "DRAFT" &&
@@ -231,35 +250,11 @@ export function registerOperationsRoutes(
               rotation.dispatch_unplanned_reason ?? "",
             ),
         );
-        const availablePilots = pilotRows.results
-          .flatMap((pilot) => {
-            if (pilot.active !== 1) return [];
-            const activeRotation = pilot.current_rotation_id
-              ? resourceGroupRotations.find((rotation) => rotation.id === pilot.current_rotation_id)
-              : undefined;
-            const availableAt = activeRotation?.predicted_completion_at
-              ? Date.parse(activeRotation.predicted_completion_at)
-              : pilot.paused === 1
-                ? pilot.pause_expected_review_at
-                  ? Date.parse(pilot.pause_expected_review_at)
-                  : Number.NaN
-                : forecastReferenceMs;
-            if (!Number.isFinite(availableAt)) return [];
-            return [
-              {
-                id: pilot.id,
-                availableMinutes: Math.max(0, (availableAt - forecastReferenceMs) / 60_000),
-              },
-            ];
-          })
-          .sort(
-            (left, right) =>
-              left.availableMinutes - right.availableMinutes || left.id.localeCompare(right.id),
-          );
+        const availablePilots = availablePilotsFor(product.resource_group_id);
         const compatibleAircraftTypes = new Set(
           JSON.parse(
-            resourceGroupRows.results.find((group) => group.id === product.resource_group_id)
-              ?.compatible_aircraft_types_json ?? "[]",
+            resourceGroupsById.get(product.resource_group_id)?.compatible_aircraft_types_json ??
+              "[]",
           ) as string[],
         );
         const capacityLanes =
@@ -267,20 +262,18 @@ export function registerOperationsRoutes(
           product.resource_group_status !== "ACTIVE" ||
           blockingUnprojectedQueue
             ? []
-            : fleetRows.results
+            : (fleetByResourceGroupId.get(product.resource_group_id) ?? [])
                 .filter(
                   (aircraft) =>
-                    aircraft.resource_group_id === product.resource_group_id &&
                     aircraft.operational_state !== "INACTIVE" &&
                     (compatibleAircraftTypes.size === 0 ||
                       compatibleAircraftTypes.has(aircraft.aircraft_type)),
                 )
                 .flatMap((aircraft) => {
-                  const assignedRotations = resourceGroupRotations.filter(
-                    (rotation) =>
-                      rotation.aircraft_id === aircraft.id ||
-                      rotation.forecast_assumed_aircraft_id === aircraft.id,
-                  );
+                  const assignedRotations =
+                    rotationsByResourceGroupAircraftId.get(
+                      compositeIndexKey(product.resource_group_id, aircraft.id),
+                    ) ?? [];
                   const unknownReturn =
                     (aircraft.operational_interrupted === 1 ||
                       ["PAUSED", "REFUELING"].includes(aircraft.operational_state)) &&
@@ -341,28 +334,35 @@ export function registerOperationsRoutes(
                 .flatMap((lane, index) => {
                   const pilot = availablePilots[index];
                   if (!pilot) return [];
-                  const applicablePlans = plannedOperationRows.results.filter(
-                    (plan) =>
-                      plan.status !== "CLEARED" &&
-                      plan.status !== "CANCELED" &&
-                      (plan.scope_type === "EVENT" ||
-                        (plan.scope_type === "RESOURCE_GROUP" &&
-                          plan.scope_id === product.resource_group_id) ||
-                        (plan.scope_type === "AIRCRAFT" && plan.scope_id === lane.aircraft.id) ||
-                        (plan.scope_type === "PILOT" && plan.scope_id === pilot.id)),
+                  const predictedCompletionForRelevantRotation = (rotationId: string | null) => {
+                    const rotation = rotationsById.get(rotationId ?? "");
+                    return rotation?.resource_group_id === product.resource_group_id
+                      ? rotation.predicted_completion_at
+                      : null;
+                  };
+                  const applicablePlans = [
+                    ...(activePlansByScope.get(planScopeIndexKey("EVENT", eventId)) ?? []),
+                    ...(activePlansByScope.get(
+                      planScopeIndexKey("RESOURCE_GROUP", product.resource_group_id),
+                    ) ?? []),
+                    ...(activePlansByScope.get(planScopeIndexKey("AIRCRAFT", lane.aircraft.id)) ??
+                      []),
+                    ...(activePlansByScope.get(planScopeIndexKey("PILOT", pilot.id)) ?? []),
+                  ].sort(
+                    (left, right) =>
+                      (activePlanOrderById.get(left.id) ?? 0) -
+                      (activePlanOrderById.get(right.id) ?? 0),
                   );
                   const unknownConstraintStart = applicablePlans.some(
                     (plan) =>
                       plan.start_mode === "AFTER_CURRENT_ROTATION" &&
-                      !resourceGroupRotations.find(
-                        (rotation) => rotation.id === plan.after_rotation_id,
-                      )?.predicted_completion_at,
+                      !predictedCompletionForRelevantRotation(plan.after_rotation_id),
                   );
                   if (unknownConstraintStart) return [];
                   const constraints = applicablePlans.map((plan) => {
-                    const afterRotationCompletion = resourceGroupRotations.find(
-                      (rotation) => rotation.id === plan.after_rotation_id,
-                    )?.predicted_completion_at;
+                    const afterRotationCompletion = predictedCompletionForRelevantRotation(
+                      plan.after_rotation_id,
+                    );
                     const earliestStart =
                       plan.start_mode === "AFTER_CURRENT_ROTATION"
                         ? Date.parse(afterRotationCompletion ?? forecastReadAt)
@@ -394,12 +394,17 @@ export function registerOperationsRoutes(
                       active: plan.status === "ACTIVE",
                     };
                   });
-                  const recurringConstraints = recurringRuleRows.results
-                    .filter(
-                      (rule) =>
-                        rule.status === "ACTIVE" &&
-                        ((rule.scope_type === "AIRCRAFT" && rule.scope_id === lane.aircraft.id) ||
-                          (rule.scope_type === "PILOT" && rule.scope_id === pilot.id)),
+                  const recurringConstraints = [
+                    ...(activeRecurringRulesByScope.get(
+                      compositeIndexKey("AIRCRAFT", lane.aircraft.id),
+                    ) ?? []),
+                    ...(activeRecurringRulesByScope.get(compositeIndexKey("PILOT", pilot.id)) ??
+                      []),
+                  ]
+                    .sort(
+                      (left, right) =>
+                        (activeRecurringRuleOrderById.get(left.id) ?? 0) -
+                        (activeRecurringRuleOrderById.get(right.id) ?? 0),
                     )
                     .map((rule) => ({
                       id: rule.id,
@@ -433,8 +438,8 @@ export function registerOperationsRoutes(
         });
         const durationByAircraftId = new Map(
           capacityLanes.map((lane) => {
-            const override = aircraftProductTurnaroundOverrideRows.results.find(
-              (entry) => entry.aircraft_id === lane.aircraftId && entry.product_id === product.id,
+            const override = turnaroundOverridesByAircraftProduct.get(
+              compositeIndexKey(lane.aircraftId, product.id),
             );
             const aircraftProfile = resolveTurnaroundProfile({
               event: {
@@ -543,9 +548,7 @@ export function registerOperationsRoutes(
       }),
       aircraftProductTurnaroundOverrides: aircraftProductTurnaroundOverrideRows.results.flatMap(
         (override) => {
-          const product = products.results.find(
-            (candidate) => candidate.id === override.product_id,
-          );
+          const product = productsById.get(override.product_id);
           if (!product) return [];
           return [
             {
@@ -580,47 +583,42 @@ export function registerOperationsRoutes(
         },
       ),
       rotations: rotations.results.map((rotation, index) => {
-        const activeAircraft = aircraftRows.results.filter(
+        const activeAircraft = (
+          aircraftRowsByResourceGroupId.get(rotation.resource_group_id) ?? []
+        ).filter(
           (aircraft) =>
-            aircraft.resource_group_id === rotation.resource_group_id &&
             !["INACTIVE", "PAUSED", "REFUELING"].includes(aircraft.operational_state) &&
             aircraft.operational_interrupted === 0,
         ).length;
         const effectiveActiveCapacity = Math.min(activeAircraft, activePilotCount);
-        const suggestedAircraft = fleetRows.results.find(
-          (aircraft) => aircraft.id === rotation.suggested_aircraft_id,
-        );
+        const suggestedAircraft = fleetById.get(rotation.suggested_aircraft_id ?? "");
         const dispatchPlanFresh = rotation.dispatch_operation_day_version === eventRow.version;
         const dispatchAircraft = dispatchPlanFresh
-          ? fleetRows.results.find(
-              (aircraft) => aircraft.id === rotation.forecast_assumed_aircraft_id,
-            )
+          ? fleetById.get(rotation.forecast_assumed_aircraft_id ?? "")
           : undefined;
         const dispatchPilotId = rotation.dispatch_lane_id?.split(":")[1] ?? null;
-        const dispatchPilot = dispatchPlanFresh
-          ? pilotRows.results.find(
-              (pilot) => pilot.id === dispatchPilotId && pilot.active === 1 && pilot.paused === 0,
-            )
-          : undefined;
-        const rememberedPilot = pilotRows.results.find(
-          (pilot) =>
-            pilot.id === suggestedAircraft?.current_pilot_id &&
-            pilot.active === 1 &&
-            pilot.paused === 0 &&
-            pilot.current_rotation_id === null,
-        );
-        const rotationProduct = products.results.find(
-          (product) => product.code === rotation.product_code,
-        );
+        const dispatchPilotCandidate = pilotsById.get(dispatchPilotId ?? "");
+        const dispatchPilot =
+          dispatchPlanFresh &&
+          dispatchPilotCandidate?.active === 1 &&
+          dispatchPilotCandidate.paused === 0
+            ? dispatchPilotCandidate
+            : undefined;
+        const rememberedPilotCandidate = pilotsById.get(suggestedAircraft?.current_pilot_id ?? "");
+        const rememberedPilot =
+          rememberedPilotCandidate?.active === 1 &&
+          rememberedPilotCandidate.paused === 0 &&
+          rememberedPilotCandidate.current_rotation_id === null
+            ? rememberedPilotCandidate
+            : undefined;
+        const rotationProduct = productsByCode.get(rotation.product_code);
         const profileAircraftId =
           rotation.aircraft_id ??
           (dispatchPlanFresh ? rotation.forecast_assumed_aircraft_id : null) ??
           null;
         const aircraftProductOverride = profileAircraftId
-          ? aircraftProductTurnaroundOverrideRows.results.find(
-              (override) =>
-                override.product_id === rotationProduct?.id &&
-                override.aircraft_id === profileAircraftId,
+          ? turnaroundOverridesByAircraftProduct.get(
+              compositeIndexKey(profileAircraftId, rotationProduct?.id ?? null),
             )
           : undefined;
         const resolvedTurnaroundProfile = resolveTurnaroundProfile({
@@ -999,9 +997,10 @@ export function registerOperationsRoutes(
         const effectiveReferenceCapacity = Math.max(
           1,
           deriveResourceGroupCapacity(
-            fleetRows.results
-              .filter((aircraft) => activeAircraftIds.includes(aircraft.id))
-              .map((aircraft) => aircraft.passenger_seats),
+            activeAircraftIds.flatMap((aircraftId) => {
+              const aircraft = fleetById.get(aircraftId);
+              return aircraft ? [aircraft.passenger_seats] : [];
+            }),
           ),
         );
         return {

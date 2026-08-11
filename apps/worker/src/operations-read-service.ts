@@ -1,5 +1,5 @@
 import { withBookingGroupPartProjection } from "./booking-group-part-projection";
-import { runD1ReadsSequentially } from "./d1-read-scheduler";
+import { d1Read, runD1ReadsInBatch } from "./d1-read-scheduler";
 import {
   EMPTY_GATE_DISPLAY_FILTER_JSON,
   withGateDisplayFilterFallback,
@@ -25,11 +25,16 @@ export async function loadOperationsReadModels(
     plannedOperationRows,
     recurringRuleRows,
     metricsRow,
-  ] = await runD1ReadsSequentially([
-    () =>
-      database
-        .prepare(
-          `SELECT p.id, p.code, p.name, p.public_description, p.resource_group_id, rg.name AS resource_group_name,
+  ] = await withGateDisplayFilterFallback((gateDisplayFilterMode) => {
+    const displayFilterProjection =
+      gateDisplayFilterMode === "current"
+        ? "g.display_filter_json"
+        : `'${EMPTY_GATE_DISPLAY_FILTER_JSON}' AS display_filter_json`;
+    return runD1ReadsInBatch(database, [
+      d1Read(
+        database
+          .prepare(
+            `SELECT p.id, p.code, p.name, p.public_description, p.resource_group_id, rg.name AS resource_group_name,
               rg.status AS resource_group_status, rg.operational_note AS resource_group_operational_note,
               p.price_cents, p.sale_enabled, p.reference_capacity, p.reference_duration_minutes,
               p.promised_flight_minutes,
@@ -52,59 +57,59 @@ export async function loadOperationsReadModels(
         WHERE p.operation_day_id = ?1
         GROUP BY p.id
         ORDER BY p.sort_order, p.name, p.id`,
-        )
-        .bind(eventId)
-        .all<{
-          id: string;
-          code: string;
-          name: string;
-          public_description: string;
-          resource_group_id: string;
-          resource_group_name: string;
-          resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
-          resource_group_operational_note: string;
-          price_cents: number;
-          gate_id: string;
-          gate_label: string;
-          child_companion_required: number;
-          weight_classes_json: string;
-          sort_order: number;
-          sale_enabled: number;
-          reference_capacity: number;
-          reference_duration_minutes: number;
-          promised_flight_minutes: number;
-          planned_boarding_minutes_override: number | null;
-          planned_deboarding_minutes_override: number | null;
-          planned_buffer_minutes_override: number | null;
-          queued_tickets: number;
-          resource_group_open_tickets: number;
-          sale_closes_at: string | null;
-          capacity_warning_threshold: number;
-          capacity_critical_threshold: number;
-        }>(),
-    () =>
-      database
-        .prepare(
-          `SELECT aircraft_id, product_id, planned_boarding_minutes_override,
+          )
+          .bind(eventId),
+      ).all<{
+        id: string;
+        code: string;
+        name: string;
+        public_description: string;
+        resource_group_id: string;
+        resource_group_name: string;
+        resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+        resource_group_operational_note: string;
+        price_cents: number;
+        gate_id: string;
+        gate_label: string;
+        child_companion_required: number;
+        weight_classes_json: string;
+        sort_order: number;
+        sale_enabled: number;
+        reference_capacity: number;
+        reference_duration_minutes: number;
+        promised_flight_minutes: number;
+        planned_boarding_minutes_override: number | null;
+        planned_deboarding_minutes_override: number | null;
+        planned_buffer_minutes_override: number | null;
+        queued_tickets: number;
+        resource_group_open_tickets: number;
+        sale_closes_at: string | null;
+        capacity_warning_threshold: number;
+        capacity_critical_threshold: number;
+      }>(),
+      d1Read(
+        database
+          .prepare(
+            `SELECT aircraft_id, product_id, planned_boarding_minutes_override,
                 planned_deboarding_minutes_override, planned_buffer_minutes_override, version
            FROM aircraft_product_turnaround_overrides
           WHERE operation_day_id = ?1
           ORDER BY product_id, aircraft_id`,
-        )
-        .bind(eventId)
-        .all<{
-          aircraft_id: string;
-          product_id: string;
-          planned_boarding_minutes_override: number | null;
-          planned_deboarding_minutes_override: number | null;
-          planned_buffer_minutes_override: number | null;
-          version: number;
-        }>(),
-    () =>
-      database
-        .prepare(
-          withBookingGroupPartProjection(
-            `SELECT r.id, r.version, r.flight_group_id, fg.resource_group_id,
+          )
+          .bind(eventId),
+      ).all<{
+        aircraft_id: string;
+        product_id: string;
+        planned_boarding_minutes_override: number | null;
+        planned_deboarding_minutes_override: number | null;
+        planned_buffer_minutes_override: number | null;
+        version: number;
+      }>(),
+      d1Read(
+        database
+          .prepare(
+            withBookingGroupPartProjection(
+              `SELECT r.id, r.version, r.flight_group_id, fg.resource_group_id,
               rotation_rg.short_code AS resource_group_short_code, fg.communication_number,
               COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
               r.status, r.aircraft_id, r.usable_capacity, fg.precalled_at,
@@ -284,121 +289,121 @@ export async function loadOperationsReadModels(
         GROUP BY r.id
         ORDER BY CASE WHEN r.status = 'DRAFT' THEN 1 ELSE 0 END,
                  COALESCE(fg.queue_position, fg.communication_number), fg.communication_number`,
-          ),
-        )
-        .bind(eventId)
-        .all<{
-          id: string;
-          version: number;
-          flight_group_id: string;
-          resource_group_id: string;
-          resource_group_short_code: string;
-          communication_number: number;
-          queue_position: number;
-          status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
-          precalled_at: string | null;
-          precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
-          precall_decision_reason:
-            | "ELIGIBLE"
-            | "DISABLED"
-            | "OPERATIONS_BLOCKED"
-            | "NOT_QUEUE_FRONT"
-            | "ALREADY_PRECALLED"
-            | "NO_FORECAST_CAPACITY"
-            | "NO_FITTING_AIRCRAFT"
-            | "TOO_EARLY"
-            | null;
-          precall_dispatch_reason:
-            | "NOT_IN_NEAR_DISPATCH_BATCH"
-            | "GATE_CAPACITY_COVERED"
-            | "WAITING_FOR_PRODUCT_FAIRNESS"
-            | "WAITING_FOR_FITTING_LANE"
-            | "COMMITMENT_LOCKED"
-            | "DISPATCH_PLAN_STALE"
-            | null;
-          precall_decision_at: string | null;
-          precall_predicted_boarding_at: string | null;
-          precall_adaptive_lead_minutes: number | null;
-          precall_gate_id: string | null;
-          precall_adaptive_base_lead_minutes: number | null;
-          precall_gate_travel_lead_minutes: number | null;
-          precall_effective_lead_minutes: number | null;
-          precall_boarding_window_lower_at: string | null;
-          precall_boarding_window_upper_at: string | null;
-          gate_id: string;
-          gate_label: string;
-          operational_note: string;
-          aircraft_id: string | null;
-          aircraft_registration: string | null;
-          pilot_id: string | null;
-          pilot_operational_code: string | null;
-          suggested_pilot_id: string | null;
-          suggested_pilot_operational_code: string | null;
-          suggested_aircraft_id: string | null;
-          suggested_aircraft_registration: string | null;
-          ticket_group_id: string;
-          deferral_count: number;
-          ticket_count: number;
-          baseline_capacity: number;
-          usable_capacity: number | null;
-          estimated_passenger_payload_kg: number | null;
-          product_code: string;
-          product_name: string;
-          reference_duration_minutes: number;
-          called_at: string | null;
-          departed_at: string | null;
-          landed_at: string | null;
-          completed_at: string | null;
-          planned_boarding_at: string | null;
-          planned_departure_at: string | null;
-          planned_landing_at: string | null;
-          planned_completion_at: string | null;
-          predicted_boarding_at: string | null;
-          predicted_departure_at: string | null;
-          predicted_landing_at: string | null;
-          predicted_completion_at: string | null;
-          prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;
-          prediction_lower_minutes: number | null;
-          prediction_upper_minutes: number | null;
-          prediction_updated_at: string | null;
-          forecast_assumed_aircraft_id: string | null;
-          dispatch_plan_id: string | null;
-          dispatch_plan_revision: string | null;
-          dispatch_batch_id: string | null;
-          dispatch_operation_day_version: number | null;
-          dispatch_order: number | null;
-          dispatch_wave: number | null;
-          dispatch_lane_id: string | null;
-          dispatch_group_ids_json: string;
-          dispatch_occupied_seats: number | null;
-          dispatch_available_seats: number | null;
-          dispatch_commitment_level: "WAITING" | "PREPARE" | "COME_TO_FLIGHT_LINE" | null;
-          dispatch_decision_reasons_json: string;
-          dispatch_confirmed_overtake_count: number;
-          dispatch_projected_overtake_count: number;
-          dispatch_unplanned_reason:
-            | "NO_FORECAST_CAPACITY"
-            | "WAITING_FOR_FITTING_LANE"
-            | "WAITING_FOR_PRODUCT_FAIRNESS"
-            | "NOT_IN_NEAR_DISPATCH_BATCH"
-            | "COMMITMENT_LOCKED"
-            | "ATTENDANCE_MISSING"
-            | "ATTENDANCE_CLARIFICATION"
-            | "UNKNOWN_RESOURCE_RETURN"
-            | null;
-          turnaround_boarding_minutes: number | null;
-          turnaround_deboarding_minutes: number | null;
-          turnaround_buffer_minutes: number | null;
-          turnaround_boarding_source: string | null;
-          turnaround_deboarding_source: string | null;
-          turnaround_buffer_source: string | null;
-          tickets_json: string;
-          booking_groups_json: string;
-        }>(),
-    () =>
-      database
-        .prepare(
-          `WITH segment_stats AS (
+            ),
+          )
+          .bind(eventId),
+      ).all<{
+        id: string;
+        version: number;
+        flight_group_id: string;
+        resource_group_id: string;
+        resource_group_short_code: string;
+        communication_number: number;
+        queue_position: number;
+        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        precalled_at: string | null;
+        precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
+        precall_decision_reason:
+          | "ELIGIBLE"
+          | "DISABLED"
+          | "OPERATIONS_BLOCKED"
+          | "NOT_QUEUE_FRONT"
+          | "ALREADY_PRECALLED"
+          | "NO_FORECAST_CAPACITY"
+          | "NO_FITTING_AIRCRAFT"
+          | "TOO_EARLY"
+          | null;
+        precall_dispatch_reason:
+          | "NOT_IN_NEAR_DISPATCH_BATCH"
+          | "GATE_CAPACITY_COVERED"
+          | "WAITING_FOR_PRODUCT_FAIRNESS"
+          | "WAITING_FOR_FITTING_LANE"
+          | "COMMITMENT_LOCKED"
+          | "DISPATCH_PLAN_STALE"
+          | null;
+        precall_decision_at: string | null;
+        precall_predicted_boarding_at: string | null;
+        precall_adaptive_lead_minutes: number | null;
+        precall_gate_id: string | null;
+        precall_adaptive_base_lead_minutes: number | null;
+        precall_gate_travel_lead_minutes: number | null;
+        precall_effective_lead_minutes: number | null;
+        precall_boarding_window_lower_at: string | null;
+        precall_boarding_window_upper_at: string | null;
+        gate_id: string;
+        gate_label: string;
+        operational_note: string;
+        aircraft_id: string | null;
+        aircraft_registration: string | null;
+        pilot_id: string | null;
+        pilot_operational_code: string | null;
+        suggested_pilot_id: string | null;
+        suggested_pilot_operational_code: string | null;
+        suggested_aircraft_id: string | null;
+        suggested_aircraft_registration: string | null;
+        ticket_group_id: string;
+        deferral_count: number;
+        ticket_count: number;
+        baseline_capacity: number;
+        usable_capacity: number | null;
+        estimated_passenger_payload_kg: number | null;
+        product_code: string;
+        product_name: string;
+        reference_duration_minutes: number;
+        called_at: string | null;
+        departed_at: string | null;
+        landed_at: string | null;
+        completed_at: string | null;
+        planned_boarding_at: string | null;
+        planned_departure_at: string | null;
+        planned_landing_at: string | null;
+        planned_completion_at: string | null;
+        predicted_boarding_at: string | null;
+        predicted_departure_at: string | null;
+        predicted_landing_at: string | null;
+        predicted_completion_at: string | null;
+        prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;
+        prediction_lower_minutes: number | null;
+        prediction_upper_minutes: number | null;
+        prediction_updated_at: string | null;
+        forecast_assumed_aircraft_id: string | null;
+        dispatch_plan_id: string | null;
+        dispatch_plan_revision: string | null;
+        dispatch_batch_id: string | null;
+        dispatch_operation_day_version: number | null;
+        dispatch_order: number | null;
+        dispatch_wave: number | null;
+        dispatch_lane_id: string | null;
+        dispatch_group_ids_json: string;
+        dispatch_occupied_seats: number | null;
+        dispatch_available_seats: number | null;
+        dispatch_commitment_level: "WAITING" | "PREPARE" | "COME_TO_FLIGHT_LINE" | null;
+        dispatch_decision_reasons_json: string;
+        dispatch_confirmed_overtake_count: number;
+        dispatch_projected_overtake_count: number;
+        dispatch_unplanned_reason:
+          | "NO_FORECAST_CAPACITY"
+          | "WAITING_FOR_FITTING_LANE"
+          | "WAITING_FOR_PRODUCT_FAIRNESS"
+          | "NOT_IN_NEAR_DISPATCH_BATCH"
+          | "COMMITMENT_LOCKED"
+          | "ATTENDANCE_MISSING"
+          | "ATTENDANCE_CLARIFICATION"
+          | "UNKNOWN_RESOURCE_RETURN"
+          | null;
+        turnaround_boarding_minutes: number | null;
+        turnaround_deboarding_minutes: number | null;
+        turnaround_buffer_minutes: number | null;
+        turnaround_boarding_source: string | null;
+        turnaround_deboarding_source: string | null;
+        turnaround_buffer_source: string | null;
+        tickets_json: string;
+        booking_groups_json: string;
+      }>(),
+      d1Read(
+        database
+          .prepare(
+            `WITH segment_stats AS (
            SELECT segment_ticket.ticket_group_id, segment_rotation.id AS rotation_id,
                   segment_rotation.status,
                   COALESCE(segment_group.queue_position, segment_group.communication_number)
@@ -474,79 +479,79 @@ export async function loadOperationsReadModels(
                    active_recall.id, active_recall.sequence, active_recall.started_at,
                    active_recall.expires_at
           ORDER BY tg.queue_sequence`,
-        )
-        .bind(eventId, projectionReadAt)
-        .all<{
-          id: string;
-          communication_number: number;
-          queue_sequence: number;
-          status: string;
-          recall_count: number;
-          recall_id: string | null;
-          recall_sequence: number | null;
-          recall_started_at: string | null;
-          recall_expires_at: string | null;
-          product_id: string;
-          product_code: string;
-          product_name: string;
-          resource_group_id: string;
-          gate_id: string;
-          gate_label: string;
-          ticket_count: number;
-          present_count: number;
-          next_segment_ticket_count: number;
-          next_segment_present_count: number;
-          segment_index: number;
-          segment_count: number;
-          precalled_at: string | null;
-        }>(),
-    () =>
-      database
-        .prepare(
-          `SELECT reserved_group.value AS ticket_group_id, lease.operator_account_id, lease.device_id
+          )
+          .bind(eventId, projectionReadAt),
+      ).all<{
+        id: string;
+        communication_number: number;
+        queue_sequence: number;
+        status: string;
+        recall_count: number;
+        recall_id: string | null;
+        recall_sequence: number | null;
+        recall_started_at: string | null;
+        recall_expires_at: string | null;
+        product_id: string;
+        product_code: string;
+        product_name: string;
+        resource_group_id: string;
+        gate_id: string;
+        gate_label: string;
+        ticket_count: number;
+        present_count: number;
+        next_segment_ticket_count: number;
+        next_segment_present_count: number;
+        segment_index: number;
+        segment_count: number;
+        precalled_at: string | null;
+      }>(),
+      d1Read(
+        database
+          .prepare(
+            `SELECT reserved_group.value AS ticket_group_id, lease.operator_account_id, lease.device_id
            FROM dispatch_recommendation_leases lease
            JOIN json_each(lease.ticket_group_ids_json) reserved_group
           WHERE lease.operation_day_id = ?1 AND lease.status = 'ACTIVE'
             AND lease.expires_at > ?2
           ORDER BY lease.acquired_at, lease.id`,
-        )
-        .bind(eventId, projectionReadAt)
-        .all<{
-          ticket_group_id: string;
-          operator_account_id: string;
-          device_id: string;
-        }>(),
-    () =>
-      database
-        .prepare(
-          `SELECT (julianday(landed_at) - julianday(departed_at)) * 1440.0 AS duration_minutes
+          )
+          .bind(eventId, projectionReadAt),
+      ).all<{
+        ticket_group_id: string;
+        operator_account_id: string;
+        device_id: string;
+      }>(),
+      d1Read(
+        database
+          .prepare(
+            `SELECT (julianday(landed_at) - julianday(departed_at)) * 1440.0 AS duration_minutes
          FROM rotations
         WHERE operation_day_id = ?1 AND departed_at IS NOT NULL AND landed_at IS NOT NULL
         ORDER BY landed_at DESC LIMIT 12`,
-        )
-        .bind(eventId)
-        .all<{ duration_minutes: number }>(),
-    () =>
-      database
-        .prepare(
-          `SELECT m.resource_group_id, a.passenger_seats, a.refuel_planned,
+          )
+          .bind(eventId),
+      ).all<{ duration_minutes: number }>(),
+      d1Read(
+        database
+          .prepare(
+            `SELECT m.resource_group_id, a.passenger_seats, a.refuel_planned,
                 a.operational_state, a.operational_interrupted
            FROM aircraft a
          JOIN resource_group_memberships m ON m.aircraft_id = a.id
         WHERE m.operation_day_id = ?1 AND m.active_until IS NULL`,
-        )
-        .bind(eventId)
-        .all<{
-          resource_group_id: string;
-          passenger_seats: number;
-          refuel_planned: number;
-          operational_state: string;
-          operational_interrupted: number;
-        }>(),
-    () =>
-      database
-        .prepare(
-          `SELECT a.id, a.version, a.registration, a.aircraft_type, a.passenger_seats,
+          )
+          .bind(eventId),
+      ).all<{
+        resource_group_id: string;
+        passenger_seats: number;
+        refuel_planned: number;
+        operational_state: string;
+        operational_interrupted: number;
+      }>(),
+      d1Read(
+        database
+          .prepare(
+            `SELECT a.id, a.version, a.registration, a.aircraft_type, a.passenger_seats,
               a.maximum_passenger_payload_kg, a.operational_state,
               COALESCE(a.operational_state_changed_at, a.updated_at) AS operational_state_changed_at,
               a.refuel_planned, a.rotations_since_refuel, a.refuel_reminder_threshold,
@@ -564,32 +569,32 @@ export async function loadOperationsReadModels(
          LEFT JOIN resource_groups rg ON rg.id = m.resource_group_id
          LEFT JOIN pilots current_pilot ON current_pilot.id = m.current_pilot_id
         ORDER BY a.registration`,
-        )
-        .bind(eventId)
-        .all<{
-          id: string;
-          version: number;
-          registration: string;
-          aircraft_type: string;
-          passenger_seats: number;
-          maximum_passenger_payload_kg: number | null;
-          operational_state: string;
-          operational_state_changed_at: string;
-          refuel_planned: number;
-          rotations_since_refuel: number;
-          refuel_reminder_threshold: number;
-          operational_interrupted: number;
-          resource_group_id: string | null;
-          resource_group_name: string | null;
-          resource_group_short_code: string | null;
-          current_pilot_id: string | null;
-          current_pilot_operational_code: string | null;
-          expected_review_at: string | null;
-        }>(),
-    () =>
-      database
-        .prepare(
-          `SELECT p.id, p.operational_code, p.operational_note, p.active, p.paused,
+          )
+          .bind(eventId),
+      ).all<{
+        id: string;
+        version: number;
+        registration: string;
+        aircraft_type: string;
+        passenger_seats: number;
+        maximum_passenger_payload_kg: number | null;
+        operational_state: string;
+        operational_state_changed_at: string;
+        refuel_planned: number;
+        rotations_since_refuel: number;
+        refuel_reminder_threshold: number;
+        operational_interrupted: number;
+        resource_group_id: string | null;
+        resource_group_name: string | null;
+        resource_group_short_code: string | null;
+        current_pilot_id: string | null;
+        current_pilot_operational_code: string | null;
+        expected_review_at: string | null;
+      }>(),
+      d1Read(
+        database
+          .prepare(
+            `SELECT p.id, p.operational_code, p.operational_note, p.active, p.paused,
               p.pause_expected_review_at,
               (SELECT r.id FROM rotations r WHERE r.operation_day_id = p.operation_day_id
                 AND r.pilot_id = p.id AND r.status IN ('CALLED', 'IN_FLIGHT', 'LANDED')
@@ -600,25 +605,20 @@ export async function loadOperationsReadModels(
                   AND r.status IN ('CALLED', 'IN_FLIGHT', 'LANDED')
                 ORDER BY r.updated_at DESC LIMIT 1) AS current_communication_number
          FROM pilots p WHERE p.operation_day_id = ?1 ORDER BY p.operational_code`,
-        )
-        .bind(eventId)
-        .all<{
-          id: string;
-          operational_code: string;
-          operational_note: string;
-          active: number;
-          paused: number;
-          pause_expected_review_at: string | null;
-          current_rotation_id: string | null;
-          current_communication_number: number | null;
-        }>(),
-    () =>
-      withGateDisplayFilterFallback((mode) => {
-        const displayFilterProjection =
-          mode === "current"
-            ? "g.display_filter_json"
-            : `'${EMPTY_GATE_DISPLAY_FILTER_JSON}' AS display_filter_json`;
-        return database
+          )
+          .bind(eventId),
+      ).all<{
+        id: string;
+        operational_code: string;
+        operational_note: string;
+        active: number;
+        paused: number;
+        pause_expected_review_at: string | null;
+        current_rotation_id: string | null;
+        current_communication_number: number | null;
+      }>(),
+      d1Read(
+        database
           .prepare(
             `SELECT g.id, g.label, g.gate_type, g.active, g.sort_order,
                 g.travel_lead_minutes, ${displayFilterProjection},
@@ -627,22 +627,21 @@ export async function loadOperationsReadModels(
                   AS assigned_resource_group_ids_json
              FROM gates g WHERE g.operation_day_id = ?1 ORDER BY g.sort_order, g.label`,
           )
-          .bind(eventId)
-          .all<{
-            id: string;
-            label: string;
-            gate_type: "FLIGHT_LINE" | "BOARDING" | "DISPLAY_ONLY";
-            active: number;
-            sort_order: number;
-            travel_lead_minutes: number;
-            display_filter_json: string;
-            assigned_resource_group_ids_json: string;
-          }>();
-      }),
-    () =>
-      database
-        .prepare(
-          `SELECT rg.id, rg.version, rg.name, rg.short_code, rg.status, rg.operational_note,
+          .bind(eventId),
+      ).all<{
+        id: string;
+        label: string;
+        gate_type: "FLIGHT_LINE" | "BOARDING" | "DISPLAY_ONLY";
+        active: number;
+        sort_order: number;
+        travel_lead_minutes: number;
+        display_filter_json: string;
+        assigned_resource_group_ids_json: string;
+      }>(),
+      d1Read(
+        database
+          .prepare(
+            `SELECT rg.id, rg.version, rg.name, rg.short_code, rg.status, rg.operational_note,
               rg.gate_id, g.label AS gate_label,
               rg.reference_capacity,
               rg.compatible_aircraft_types_json, rg.automatic_precall_enabled,
@@ -652,26 +651,26 @@ export async function loadOperationsReadModels(
                  AND m.resource_group_id = rg.id AND m.active_until IS NULL), '[]') AS aircraft_ids_json
          FROM resource_groups rg JOIN gates g ON g.id = rg.gate_id
         WHERE rg.operation_day_id = ?1 ORDER BY rg.name`,
-        )
-        .bind(eventId)
-        .all<{
-          id: string;
-          version: number;
-          name: string;
-          short_code: string;
-          status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
-          operational_note: string;
-          gate_id: string;
-          gate_label: string;
-          reference_capacity: number;
-          compatible_aircraft_types_json: string;
-          automatic_precall_enabled: number;
-          aircraft_ids_json: string;
-        }>(),
-    () =>
-      database
-        .prepare(
-          `SELECT plan.id, plan.version, plan.scope_type, plan.scope_id,
+          )
+          .bind(eventId),
+      ).all<{
+        id: string;
+        version: number;
+        name: string;
+        short_code: string;
+        status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+        operational_note: string;
+        gate_id: string;
+        gate_label: string;
+        reference_capacity: number;
+        compatible_aircraft_types_json: string;
+        automatic_precall_enabled: number;
+        aircraft_ids_json: string;
+      }>(),
+      d1Read(
+        database
+          .prepare(
+            `SELECT plan.id, plan.version, plan.scope_type, plan.scope_id,
                 plan.constraint_kind, plan.effect_mode, plan.duration_multiplier_percent,
                 plan.start_mode, plan.earliest_start_at,
                 plan.latest_start_at, plan.after_rotation_id,
@@ -686,44 +685,38 @@ export async function loadOperationsReadModels(
           ORDER BY
             CASE plan.status WHEN 'ACTIVE' THEN 0 WHEN 'PLANNED' THEN 1 ELSE 2 END,
             COALESCE(plan.earliest_start_at, plan.created_at), plan.created_at`,
-        )
-        .bind(eventId)
-        .all<{
-          id: string;
-          version: number;
-          scope_type: "EVENT" | "RESOURCE_GROUP" | "AIRCRAFT" | "PILOT";
-          scope_id: string;
-          constraint_kind:
-            | "PAUSE"
-            | "REFUELING"
-            | "FLIGHT_SHOW"
-            | "WEATHER"
-            | "TECHNICAL"
-            | "OTHER";
-          effect_mode: "BLOCKING" | "SLOWDOWN";
-          duration_multiplier_percent: number | null;
-          start_mode: "TIME_WINDOW" | "AFTER_CURRENT_ROTATION";
-          earliest_start_at: string | null;
-          latest_start_at: string | null;
-          after_rotation_id: string | null;
-          minimum_duration_minutes: number;
-          typical_duration_minutes: number;
-          maximum_duration_minutes: number;
-          status: "PLANNED" | "ACTIVE" | "CLEARED" | "CANCELED";
-          public_note: string;
-          created_at: string;
-          updated_at: string;
-          activated_at: string | null;
-          cleared_at: string | null;
-          canceled_at: string | null;
-          recurring_rule_id: string | null;
-          recurrence_sequence: number | null;
-          after_rotation_status: string | null;
-        }>(),
-    () =>
-      database
-        .prepare(
-          `SELECT rule.id, rule.operation_day_id, rule.version, rule.scope_type, rule.scope_id,
+          )
+          .bind(eventId),
+      ).all<{
+        id: string;
+        version: number;
+        scope_type: "EVENT" | "RESOURCE_GROUP" | "AIRCRAFT" | "PILOT";
+        scope_id: string;
+        constraint_kind: "PAUSE" | "REFUELING" | "FLIGHT_SHOW" | "WEATHER" | "TECHNICAL" | "OTHER";
+        effect_mode: "BLOCKING" | "SLOWDOWN";
+        duration_multiplier_percent: number | null;
+        start_mode: "TIME_WINDOW" | "AFTER_CURRENT_ROTATION";
+        earliest_start_at: string | null;
+        latest_start_at: string | null;
+        after_rotation_id: string | null;
+        minimum_duration_minutes: number;
+        typical_duration_minutes: number;
+        maximum_duration_minutes: number;
+        status: "PLANNED" | "ACTIVE" | "CLEARED" | "CANCELED";
+        public_note: string;
+        created_at: string;
+        updated_at: string;
+        activated_at: string | null;
+        cleared_at: string | null;
+        canceled_at: string | null;
+        recurring_rule_id: string | null;
+        recurrence_sequence: number | null;
+        after_rotation_status: string | null;
+      }>(),
+      d1Read(
+        database
+          .prepare(
+            `SELECT rule.id, rule.operation_day_id, rule.version, rule.scope_type, rule.scope_id,
                 rule.operation_kind, rule.trigger_metric, rule.interval_value,
                 rule.progress_value, rule.minimum_duration_minutes,
                 rule.typical_duration_minutes, rule.maximum_duration_minutes,
@@ -737,33 +730,33 @@ export async function loadOperationsReadModels(
           WHERE rule.operation_day_id = ?1
           ORDER BY CASE rule.status WHEN 'ACTIVE' THEN 0 ELSE 1 END,
                    rule.scope_type, rule.scope_id, rule.operation_kind`,
-        )
-        .bind(eventId)
-        .all<{
-          id: string;
-          operation_day_id: string;
-          version: number;
-          scope_type: "AIRCRAFT" | "PILOT";
-          scope_id: string;
-          operation_kind: "PAUSE" | "REFUELING";
-          trigger_metric: "COMPLETED_ROTATIONS" | "OPERATING_MINUTES";
-          interval_value: number;
-          progress_value: number;
-          minimum_duration_minutes: number;
-          typical_duration_minutes: number;
-          maximum_duration_minutes: number;
-          status: "ACTIVE" | "DISABLED";
-          sequence_number: number;
-          reason: string;
-          last_reset_at: string;
-          created_at: string;
-          updated_at: string;
-          open_plan_id: string | null;
-        }>(),
-    () =>
-      database
-        .prepare(
-          `SELECT
+          )
+          .bind(eventId),
+      ).all<{
+        id: string;
+        operation_day_id: string;
+        version: number;
+        scope_type: "AIRCRAFT" | "PILOT";
+        scope_id: string;
+        operation_kind: "PAUSE" | "REFUELING";
+        trigger_metric: "COMPLETED_ROTATIONS" | "OPERATING_MINUTES";
+        interval_value: number;
+        progress_value: number;
+        minimum_duration_minutes: number;
+        typical_duration_minutes: number;
+        maximum_duration_minutes: number;
+        status: "ACTIVE" | "DISABLED";
+        sequence_number: number;
+        reason: string;
+        last_reset_at: string;
+        created_at: string;
+        updated_at: string;
+        open_plan_id: string | null;
+      }>(),
+      d1Read(
+        database
+          .prepare(
+            `SELECT
           (SELECT COUNT(*) FROM tickets t JOIN ticket_groups tg ON tg.id = t.ticket_group_id
             WHERE tg.operation_day_id = ?1
               AND t.status NOT IN ('COMPLETED', 'CANCELED', 'NO_SHOW')) AS open_tickets,
@@ -797,23 +790,24 @@ export async function loadOperationsReadModels(
             AND last_seen_at >= ?2) AS active_devices,
           (SELECT COUNT(*) FROM web_push_subscriptions WHERE operation_day_id = ?1
             AND status = 'ACTIVE' AND delete_after > ?3) AS active_push_subscriptions`,
-        )
-        .bind(eventId, new Date(Date.now() - 120_000).toISOString(), new Date().toISOString())
-        .first<{
-          open_tickets: number;
-          sold_tickets: number;
-          completed_rotations: number;
-          active_rotations: number;
-          average_boarding_minutes: number | null;
-          average_flight_minutes: number | null;
-          average_turnaround_minutes: number | null;
-          average_rotation_minutes: number | null;
-          average_wait_minutes: number | null;
-          informational_revenue_cents: number;
-          active_devices: number;
-          active_push_subscriptions: number;
-        }>(),
-  ] as const);
+          )
+          .bind(eventId, new Date(Date.now() - 120_000).toISOString(), new Date().toISOString()),
+      ).first<{
+        open_tickets: number;
+        sold_tickets: number;
+        completed_rotations: number;
+        active_rotations: number;
+        average_boarding_minutes: number | null;
+        average_flight_minutes: number | null;
+        average_turnaround_minutes: number | null;
+        average_rotation_minutes: number | null;
+        average_wait_minutes: number | null;
+        informational_revenue_cents: number;
+        active_devices: number;
+        active_push_subscriptions: number;
+      }>(),
+    ] as const);
+  });
 
   let assistClaims: Array<{
     aircraft_id: string;

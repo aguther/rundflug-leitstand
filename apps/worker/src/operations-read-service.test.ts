@@ -4,7 +4,10 @@ import { loadOperationsReadModels } from "./operations-read-service";
 const EVENT_ID = "synthetic-event";
 const PROJECTION_READ_AT = "2026-08-10T12:00:00.000Z";
 
-function createDatabase(input?: { missingAssistClaimsTable?: boolean }) {
+function createDatabase(input?: {
+  missingAssistClaimsTable?: boolean;
+  missingGateDisplayFilterColumn?: boolean;
+}) {
   const statements: string[] = [];
   const bindings: unknown[][] = [];
   const prepare = vi.fn((sql: string) => {
@@ -14,6 +17,7 @@ function createDatabase(input?: { missingAssistClaimsTable?: boolean }) {
       bind: (...values: unknown[]) => {
         bindings[statementIndex] = values;
         return {
+          sql,
           all: async () => {
             if (input?.missingAssistClaimsTable && sql.includes("FROM flight_line_assist_claims")) {
               throw new Error("no such table: flight_line_assist_claims");
@@ -25,10 +29,28 @@ function createDatabase(input?: { missingAssistClaimsTable?: boolean }) {
       },
     };
   });
+  const batches: D1PreparedStatement[][] = [];
+  const batch = vi.fn(async (preparedStatements: D1PreparedStatement[]) => {
+    batches.push(preparedStatements);
+    if (
+      input?.missingGateDisplayFilterColumn &&
+      preparedStatements.some((statement) =>
+        (statement as unknown as { sql: string }).sql.includes("g.display_filter_json"),
+      )
+    ) {
+      throw new Error("no such column: g.display_filter_json");
+    }
+    return Promise.all(
+      preparedStatements.map((statement) =>
+        (statement as unknown as { all: () => Promise<D1Result<unknown>> }).all(),
+      ),
+    );
+  });
   return {
-    database: { prepare } as unknown as D1Database,
+    database: { prepare, batch } as unknown as D1Database,
     statements,
     bindings,
+    batches,
   };
 }
 
@@ -38,6 +60,8 @@ describe("operations read service", () => {
     const result = await loadOperationsReadModels(context.database, EVENT_ID, PROJECTION_READ_AT);
 
     expect(context.statements).toHaveLength(15);
+    expect(context.batches).toHaveLength(1);
+    expect(context.batches[0]).toHaveLength(14);
     expect(result.metricsRow).toBeNull();
     expect(result.assistClaims).toEqual([]);
     for (const [index, sql] of context.statements.entries()) {
@@ -71,5 +95,26 @@ describe("operations read service", () => {
     const result = await loadOperationsReadModels(context.database, EVENT_ID, PROJECTION_READ_AT);
 
     expect(result.assistClaims).toEqual([]);
+  });
+
+  it("retries the read batch once for the legacy gate display schema", async () => {
+    const context = createDatabase({ missingGateDisplayFilterColumn: true });
+
+    await expect(
+      loadOperationsReadModels(context.database, EVENT_ID, PROJECTION_READ_AT),
+    ).resolves.toBeDefined();
+
+    expect(context.batches).toHaveLength(2);
+    const fallbackSql = context.batches[1]?.map(
+      (statement) => (statement as unknown as { sql: string }).sql,
+    );
+    expect(fallbackSql).toContainEqual(
+      expect.stringContaining(
+        `'${JSON.stringify({
+          productIds: [],
+          rotationStatuses: [],
+        })}' AS display_filter_json`,
+      ),
+    );
   });
 });

@@ -72,8 +72,14 @@ Jedes Schreibkommando trägt mindestens `commandId`, `eventId`, `deviceId`, `exp
   Fremdschlüssel und partielle Unique-Indizes abgesichert.
 - `operational_events` und `forecast_snapshots` sind append-only; D1-Trigger verbieten `UPDATE` und
   `DELETE`. Korrekturen entstehen als neue Ereignisse.
-- Der `d1-read-scheduler` bündelt Leseabfragen, damit Prognose- und Boardprojektionen im Mengengerüst
-  innerhalb der Budgets bleiben.
+- Der `d1-read-scheduler` bündelt unabhängige Leseabfragen als typisierte D1-Batches. Das
+  Operations-Board lädt seine 14 Kernmodelle in einem Batch; positionsgleiche Projektoren erhalten
+  dabei die konkreten Resultattypen. Kompatibilitätsabfragen bleiben explizit getrennt.
+- Master-Data-Templates prüfen bis zu 200 Flugzeugregistrierungen mit einer parametrierten
+  `json_each`-Abfrage statt mit einem Lookup je Registrierung.
+- Boardprojektionen indexieren wiederverwendete Produkte, Umläufe, Ressourcen, Pläne und Regeln
+  einmalig in Maps. Wiederholte lineare Gesamtsuchen innerhalb von Rotations- und
+  Ressourcengruppenschleifen sind dadurch ausgeschlossen.
 
 ## 8.4 Echtzeit, Offline und degradierter Betrieb
 

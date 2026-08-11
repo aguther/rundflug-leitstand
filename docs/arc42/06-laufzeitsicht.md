@@ -181,3 +181,31 @@ durchläuft `STAGED`/`CONFLICTED` → `APPROVED` (Vier-Augen-Prinzip) → `APPLI
 Anwendung prüfen erneut die Veranstaltungsversion; doppelte Belegfolgen, doppelte Ticketcodes,
 zukünftige Zeitpunkte, fehlende Referenzen und ungültige Umlaufübergänge blockieren den gesamten
 Batch, statt Teilzustände zu erzeugen.
+
+## 6.8 Lesen und Projizieren des Operations-Boards
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Operativer Client
+    participant W as Worker (Operations-Route)
+    participant D as D1
+
+    C->>W: GET /api/control/:eventId/operations
+    W->>D: ein D1-Batch mit 14 vorbereiteten Leseabfragen
+    D-->>W: positionsgleiche Read-Model-Ergebnisse
+    opt optionale Kompatibilitätstabelle vorhanden
+        W->>D: Flight-Line-Assist-Claims lesen
+        D-->>W: Assist-Claims
+    end
+    W->>W: Produkte, Umläufe, Ressourcen, Pläne und Regeln einmalig indexieren
+    W->>W: DTOs ohne wiederholte lineare Gesamtsuchen projizieren
+    W-->>C: vollständige berechtigte Boardprojektion
+```
+
+Der Normalpfad benötigt für die 14 unabhängigen Kernabfragen genau einen D1-Roundtrip. Die optionale
+Assist-Claims-Abfrage bleibt bis zum Ende ihres Kompatibilitätsfensters getrennt. Fehlt in einem
+älteren Schema `gates.display_filter_json`, wird der vollständige Read-Batch einmal mit der
+kompatiblen Leerprojektion wiederholt; andere Fehler werden nicht verschluckt. Die Projektion baut
+vor der DTO-Erzeugung Lookup- und Gruppierungsindizes auf und verändert weder Fachregeln noch den
+bestätigten D1-Zustand.

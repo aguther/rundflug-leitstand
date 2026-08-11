@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthorizedDevice } from "./device-authorization";
+import { OPERATIONS_PROJECTION_MAXIMUM_MILLISECONDS } from "./operations-projection-indexes";
 import { type OperationsRouteDependencies, registerOperationsRoutes } from "./operations-routes";
 import type { Env, StoredEventRow } from "./types";
 
@@ -328,14 +329,14 @@ function representativeReadModels() {
           id: "plan-a",
           version: 1,
           scope_type: "EVENT",
-          scope_id: null,
+          scope_id: EVENT_ID,
           constraint_kind: "PAUSE",
           effect_mode: "BLOCKING",
           duration_multiplier_percent: null,
           start_mode: "TIME_WINDOW",
           earliest_start_at: "2026-08-10T11:30:00.000Z",
           latest_start_at: "2026-08-10T11:45:00.000Z",
-          after_rotation_id: null,
+          after_rotation_id: null as string | null,
           after_rotation_status: null,
           minimum_duration_minutes: 5,
           typical_duration_minutes: 10,
@@ -402,6 +403,36 @@ function representativeReadModels() {
       },
     ],
   };
+}
+
+function maximumReadModels() {
+  const models = representativeReadModels();
+  const baseRotation = models.rotations.results[0];
+  if (!baseRotation) throw new Error("Representative rotation fixture is missing.");
+  models.rotations = {
+    results: Array.from({ length: 300 }, (_, rotationIndex) => {
+      const sequence = rotationIndex + 1;
+      const tickets = Array.from({ length: 4 }, (_, ticketIndex) => ({
+        id: `ticket-${sequence}-${ticketIndex + 1}`,
+        status: "QUEUED",
+        attendanceStatus: "CHECKED_IN",
+      }));
+      return {
+        ...baseRotation,
+        id: `rotation-${sequence}`,
+        flight_group_id: `flight-group-${sequence}`,
+        communication_number: sequence,
+        queue_position: sequence,
+        ticket_group_id: `ticket-group-${sequence}`,
+        dispatch_plan_id: `dispatch-plan-${sequence}`,
+        dispatch_batch_id: `dispatch-batch-${sequence}`,
+        tickets_json: JSON.stringify(tickets),
+        booking_groups_json: JSON.stringify([{ id: `booking-${sequence}` }]),
+        ticket_count: tickets.length,
+      };
+    }),
+  };
+  return models;
 }
 
 function eventDatabase(row: StoredEventRow | null) {
@@ -622,6 +653,49 @@ describe("operations routes", () => {
       informationalRevenueCents: 25_000,
       activeDevices: 2,
     });
+  });
+
+  it("keeps the synthetic maximum operations projection within its time budget", async () => {
+    const route = createRoute({ readModels: maximumReadModels() });
+
+    const startedAt = performance.now();
+    const response = await request(route);
+    const body = (await response.json()) as { rotations: unknown[] };
+    const elapsedMilliseconds = performance.now() - startedAt;
+
+    expect(response.status).toBe(200);
+    expect(body.rotations).toHaveLength(300);
+    expect(elapsedMilliseconds).toBeLessThan(OPERATIONS_PROJECTION_MAXIMUM_MILLISECONDS);
+  });
+
+  it("applies event-wide plans from their persisted event scope", async () => {
+    const readModels = representativeReadModels();
+    const [eventPlan] = readModels.plannedOperationRows.results;
+    if (!eventPlan) throw new Error("Representative event plan fixture is missing.");
+    eventPlan.start_mode = "AFTER_CURRENT_ROTATION";
+    eventPlan.after_rotation_id = "missing-rotation";
+    const extendedEvent = { ...eventRow, operations_end_at: "2026-08-10T16:00:00.000Z" };
+    const route = createRoute({ event: extendedEvent, readModels });
+    const baselineReadModels = representativeReadModels();
+    baselineReadModels.plannedOperationRows.results = [];
+    const baselineRoute = createRoute({ event: extendedEvent, readModels: baselineReadModels });
+
+    const [response, baselineResponse] = await Promise.all([
+      request(route),
+      request(baselineRoute),
+    ]);
+    const body = (await response.json()) as {
+      products: Array<{ projectedSeats: number; saleRecommended: boolean }>;
+    };
+    const baselineBody = (await baselineResponse.json()) as {
+      products: Array<{ projectedSeats: number }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.products[0]).toMatchObject({ projectedSeats: 2, saleRecommended: false });
+    expect(body.products[0]?.projectedSeats).toBeLessThan(
+      baselineBody.products[0]?.projectedSeats ?? 0,
+    );
   });
 
   it("does not register the legacy event URL", async () => {
