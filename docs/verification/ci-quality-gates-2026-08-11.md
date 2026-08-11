@@ -45,3 +45,7 @@ Umgebung. Der lokale synthetische Skalierungstest bleibt Teil der V1-Kernintegra
 Die parallelen Jobs ersetzen den vollständigen lokalen Nachweis `npm run check` nicht. Sie machen
 in Pull Requests jedoch Worker-Laufzeit, D1-Kernabläufe, Restore und Dokumentation als getrennte,
 referenzierbare Statusprüfungen sichtbar.
+
+Der Dokumentations-Job installiert `pypdf` in der festgelegten Version `6.10.0`, weil
+`docs:guides:check` die eingecheckten Rollen-PDFs auch in einem frischen GitHub-Runner semantisch
+prüft. Die Abhängigkeit bleibt auf dieses Gate beschränkt und wird nicht Teil der Anwendung.
