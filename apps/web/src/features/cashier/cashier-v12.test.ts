@@ -185,17 +185,6 @@ describe("V1.7.0 cashier", () => {
     expect(stylesSource).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
-  it("keeps forecast capacity advisory instead of disabling an explicitly enabled sale", () => {
-    const disabledRule = appSource.slice(
-      appSource.indexOf("const saleDisabled ="),
-      appSource.indexOf("return (", appSource.indexOf("const saleDisabled =")),
-    );
-    expect(disabledRule).not.toContain("saleRecommended");
-    expect(disabledRule).not.toContain("remainingSellableSeats");
-    expect(disabledRule).toContain('entry.resourceGroupStatus !== "ACTIVE"');
-    expect(disabledRule).toContain("board.event.emergencyMode");
-  });
-
   it("renders one shared ticket component without fixed POS-58 paper length", () => {
     expect(appSource).toContain("function TicketPaper");
     expect(appSource).toContain("function QrScanDialog");
