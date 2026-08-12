@@ -16,7 +16,7 @@ function snapshotForPilot(draft: PilotEditorDraft): string {
 
 export function usePilotEditorState(pilots: OperationBoard["pilots"] | undefined) {
   const [editorId, setEditorId] = useState("new");
-  const [code, setCodeState] = useState("P-01");
+  const [code, setCode] = useState("P-01");
   const [note, setNote] = useState("");
 
   const draft: PilotEditorDraft = { code, editorId, note };
@@ -32,7 +32,7 @@ export function usePilotEditorState(pilots: OperationBoard["pilots"] | undefined
         note: entry?.operationalNote ?? "",
       };
       setEditorId(nextDraft.editorId);
-      setCodeState(nextDraft.code);
+      setCode(nextDraft.code);
       setNote(nextDraft.note);
       return snapshotForPilot(nextDraft);
     },
@@ -41,12 +41,12 @@ export function usePilotEditorState(pilots: OperationBoard["pilots"] | undefined
 
   const resetAfterSave = useCallback(() => {
     setEditorId("new");
-    setCodeState("P-01");
+    setCode("P-01");
     setNote("");
   }, []);
 
-  const setCode = useCallback((value: string) => {
-    setCodeState(value.toUpperCase());
+  const updateCode = useCallback((value: string) => {
+    setCode(value.toUpperCase());
   }, []);
 
   return {
@@ -54,7 +54,7 @@ export function usePilotEditorState(pilots: OperationBoard["pilots"] | undefined
     currentPilot,
     resetAfterSave,
     select,
-    setCode,
+    setCode: updateCode,
     setNote,
     snapshot,
   };

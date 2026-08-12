@@ -68,7 +68,7 @@ export function useFidsExperience(input: {
     input.dataSource.initialConnection,
   );
   const [page, setPage] = useState(() => input.locationAdapter.getPage());
-  const [setupMode, setSetupModeState] = useState(() => input.locationAdapter.isSetupMode());
+  const [setupMode, setSetupMode] = useState(() => input.locationAdapter.isSetupMode());
   const [lowerPage, setLowerPage] = useState(1);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [clock, setClock] = useState(new Date());
@@ -92,7 +92,7 @@ export function useFidsExperience(input: {
     () =>
       input.locationAdapter.subscribe(() => {
         setPage(input.locationAdapter.getPage());
-        setSetupModeState(input.locationAdapter.isSetupMode());
+        setSetupMode(input.locationAdapter.isSetupMode());
       }),
     [input.locationAdapter],
   );
@@ -274,7 +274,7 @@ export function useFidsExperience(input: {
     return () => window.clearInterval(timer);
   }, [board?.viewMode, preferences.rotationIntervalSeconds, totalLowerPages]);
 
-  const setSetupMode = useCallback(
+  const updateSetupMode = useCallback(
     (active: boolean) => input.locationAdapter.setSetupMode(active),
     [input.locationAdapter],
   );
@@ -333,7 +333,7 @@ export function useFidsExperience(input: {
     savePreferences,
     setPage: input.locationAdapter.setPage,
     setSettingsOpen,
-    setSetupMode,
+    setSetupMode: updateSetupMode,
     settingsOpen,
     setupMode,
   };

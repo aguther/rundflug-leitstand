@@ -45,7 +45,7 @@ function snapshotForProduct(draft: ProductEditorDraft): string {
 export function useProductEditorState(board: OperationBoard | null | undefined) {
   const [editorId, setEditorId] = useState("new");
   const [name, setName] = useState("");
-  const [code, setCodeState] = useState("");
+  const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
   const [resourceGroupId, setResourceGroupId] = useState("");
   const [gateId, setGateId] = useState("");
@@ -98,7 +98,7 @@ export function useProductEditorState(board: OperationBoard | null | undefined) 
       };
       setEditorId(nextDraft.editorId);
       setName(nextDraft.name);
-      setCodeState(nextDraft.code);
+      setCode(nextDraft.code);
       setDescription(nextDraft.description);
       setResourceGroupId(nextDraft.resourceGroupId);
       setGateId(nextDraft.gateId);
@@ -115,8 +115,8 @@ export function useProductEditorState(board: OperationBoard | null | undefined) 
     [board],
   );
 
-  const setCode = useCallback((value: string) => {
-    setCodeState(value.toUpperCase());
+  const updateCode = useCallback((value: string) => {
+    setCode(value.toUpperCase());
   }, []);
 
   const normalizePrice = useCallback(() => {
@@ -132,7 +132,7 @@ export function useProductEditorState(board: OperationBoard | null | undefined) 
     setBoardingOverride,
     setBufferOverride,
     setChildCompanion,
-    setCode,
+    setCode: updateCode,
     setDeboardingOverride,
     setDescription,
     setGateId,

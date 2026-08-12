@@ -21,7 +21,7 @@ export function useAdminAuthorization({
     deviceToken: ADMIN_DEVICE_TOKEN,
   } = useAdminOperationIdentity();
   const initialPin = accountIsAdministrator ? "000000" : "";
-  const [pin, setPinState] = useState(initialPin);
+  const [pin, setPin] = useState(initialPin);
   const pinRef = useRef(initialPin);
   const [modeUnlocked, setModeUnlocked] = useState(accountIsAdministrator);
   const [dialogMode, setDialogMode] = useState<"unlock" | "action" | null>(null);
@@ -30,35 +30,35 @@ export function useAdminAuthorization({
   const pendingActionRef = useRef<PendingAdminAction | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const setPin = useCallback((value: string) => {
+  const updatePin = useCallback((value: string) => {
     pinRef.current = value;
-    setPinState(value);
+    setPin(value);
   }, []);
 
   const getPin = useCallback(() => pinRef.current, []);
 
   const clearPinWhenLocked = useCallback(() => {
-    if (!modeUnlocked) setPin("");
-  }, [modeUnlocked, setPin]);
+    if (!modeUnlocked) updatePin("");
+  }, [modeUnlocked, updatePin]);
 
   const lockMode = useCallback(
     (message = "Bearbeitungsmodus gesperrt.") => {
       setModeUnlocked(false);
-      setPin("");
+      updatePin("");
       setDialogMode(null);
       pendingActionRef.current = null;
       onMessage(message);
     },
-    [onMessage, setPin],
+    [onMessage, updatePin],
   );
 
   const closeDialog = useCallback(() => {
     if (busy) return;
     setDialogMode(null);
     setError(null);
-    setPin("");
+    updatePin("");
     pendingActionRef.current = null;
-  }, [busy, setPin]);
+  }, [busy, updatePin]);
 
   const requestAction = useCallback(
     (action: PendingAdminAction): void | Promise<void> => {
@@ -70,11 +70,11 @@ export function useAdminAuthorization({
         return action();
       }
       pendingActionRef.current = action;
-      setPin("");
+      updatePin("");
       setError(null);
       setDialogMode("action");
     },
-    [accountIsAdministrator, administrator, modeUnlocked, onMessage, setPin],
+    [accountIsAdministrator, administrator, modeUnlocked, onMessage, updatePin],
   );
 
   const requestModeUnlock = useCallback(() => {
@@ -84,14 +84,14 @@ export function useAdminAuthorization({
     }
     if (accountIsAdministrator) {
       setModeUnlocked(true);
-      setPin("000000");
+      updatePin("000000");
       return;
     }
     pendingActionRef.current = null;
-    setPin("");
+    updatePin("");
     setError(null);
     setDialogMode("unlock");
-  }, [accountIsAdministrator, administrator, onMessage, setPin]);
+  }, [accountIsAdministrator, administrator, onMessage, updatePin]);
 
   const confirmDialog = useCallback(async () => {
     if (!dialogMode || busy || pin.length < 4) return;
@@ -109,7 +109,7 @@ export function useAdminAuthorization({
       pendingActionRef.current = null;
       setDialogMode(null);
       if (action) await action();
-      setPin("");
+      updatePin("");
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Administrator-PIN konnte nicht geprüft werden.",
@@ -118,7 +118,7 @@ export function useAdminAuthorization({
     } finally {
       setBusy(false);
     }
-  }, [busy, dialogMode, onMessage, pin, setPin, EVENT_ID, ADMIN_DEVICE_TOKEN, ADMIN_DEVICE_ID]);
+  }, [busy, dialogMode, onMessage, pin, updatePin, EVENT_ID, ADMIN_DEVICE_TOKEN, ADMIN_DEVICE_ID]);
 
   useEffect(() => {
     if (!dialogMode) return;
@@ -129,14 +129,14 @@ export function useAdminAuthorization({
   useEffect(() => {
     if (!accountIsAdministrator) return;
     setModeUnlocked(true);
-    setPin("000000");
-  }, [accountIsAdministrator, setPin]);
+    updatePin("000000");
+  }, [accountIsAdministrator, updatePin]);
 
   useEffect(() => {
     if (administrator) return;
     setModeUnlocked(false);
-    setPin("");
-  }, [administrator, setPin]);
+    updatePin("");
+  }, [administrator, updatePin]);
 
   return {
     busy,
@@ -152,6 +152,6 @@ export function useAdminAuthorization({
     pin,
     requestAction,
     requestModeUnlock,
-    setPin,
+    setPin: updatePin,
   };
 }

@@ -25,7 +25,7 @@ function snapshotForResourceGroup(draft: ResourceGroupEditorDraft): string {
 export function useResourceGroupEditorState(board: OperationBoard | null | undefined) {
   const [editorId, setEditorId] = useState("new");
   const [name, setName] = useState("");
-  const [shortCode, setShortCodeState] = useState("");
+  const [shortCode, setShortCode] = useState("");
   const [gateId, setGateId] = useState("");
   const [automaticPrecall, setAutomaticPrecall] = useState(true);
 
@@ -53,7 +53,7 @@ export function useResourceGroupEditorState(board: OperationBoard | null | undef
       };
       setEditorId(nextDraft.editorId);
       setName(nextDraft.name);
-      setShortCodeState(nextDraft.shortCode);
+      setShortCode(nextDraft.shortCode);
       setGateId(nextDraft.gateId);
       setAutomaticPrecall(nextDraft.automaticPrecall);
       return snapshotForResourceGroup(nextDraft);
@@ -61,8 +61,8 @@ export function useResourceGroupEditorState(board: OperationBoard | null | undef
     [board],
   );
 
-  const setShortCode = useCallback((value: string) => {
-    setShortCodeState(value.toUpperCase().replace(/[^A-Z0-9-]/g, ""));
+  const updateShortCode = useCallback((value: string) => {
+    setShortCode(value.toUpperCase().replace(/[^A-Z0-9-]/g, ""));
   }, []);
 
   return {
@@ -72,7 +72,7 @@ export function useResourceGroupEditorState(board: OperationBoard | null | undef
     setAutomaticPrecall,
     setGateId,
     setName,
-    setShortCode,
+    setShortCode: updateShortCode,
     snapshot,
   };
 }

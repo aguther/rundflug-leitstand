@@ -24,7 +24,7 @@ function snapshotForAircraft(draft: AircraftEditorDraft): string {
 
 export function useAircraftEditorState(board: OperationBoard | null | undefined) {
   const [editorId, setEditorId] = useState("new");
-  const [registration, setRegistrationState] = useState("");
+  const [registration, setRegistration] = useState("");
   const [type, setType] = useState("");
   const [passengerSeats, setPassengerSeats] = useState(3);
   const [maximumPassengerPayloadKg, setMaximumPassengerPayloadKg] = useState("");
@@ -52,7 +52,7 @@ export function useAircraftEditorState(board: OperationBoard | null | undefined)
         type: entry?.aircraftType ?? "",
       };
       setEditorId(nextDraft.editorId);
-      setRegistrationState(nextDraft.registration);
+      setRegistration(nextDraft.registration);
       setType(nextDraft.type);
       setPassengerSeats(nextDraft.passengerSeats);
       setMaximumPassengerPayloadKg(nextDraft.maximumPassengerPayloadKg);
@@ -61,8 +61,8 @@ export function useAircraftEditorState(board: OperationBoard | null | undefined)
     [board],
   );
 
-  const setRegistration = useCallback((value: string) => {
-    setRegistrationState(value.toUpperCase());
+  const updateRegistration = useCallback((value: string) => {
+    setRegistration(value.toUpperCase());
   }, []);
 
   return {
@@ -71,7 +71,7 @@ export function useAircraftEditorState(board: OperationBoard | null | undefined)
     select,
     setMaximumPassengerPayloadKg,
     setPassengerSeats,
-    setRegistration,
+    setRegistration: updateRegistration,
     setType,
     snapshot,
   };
