@@ -83,10 +83,10 @@ const command = async (
 };
 const admin = (version, type, payload) =>
   command("technical-scaffold", tokens.admin, version, type, payload);
-const sell = (version) =>
+const sell = (version, productId = "panorama-20", ticketCount = 4) =>
   command("cashier-tablet-1", tokens.cashier, version, "SELL_TICKET_GROUP", {
-    productId: "panorama-20",
-    ticketCount: 4,
+    productId,
+    ticketCount,
     standby: false,
     paymentStatus: "PAID",
     paymentMethod: "CASH",
@@ -255,7 +255,7 @@ try {
   if (undersizedCall.error?.code !== "AIRCRAFT_CAPACITY_EXCEEDED") {
     throw new Error("Konkrete Flugzeugkapazität wurde beim NEXT nicht hart durchgesetzt.");
   }
-  const secondSale = await sell(firstSale.event.version);
+  const secondSale = await sell(firstSale.event.version, "panorama-30", 3);
   const firstPilotAssignment = await admin(secondSale.event.version, "ASSIGN_AIRCRAFT_PILOT", {
     aircraftId: "aircraft-b",
     pilotId: "550e8400-e29b-41d4-a716-446655440100",
@@ -270,6 +270,7 @@ try {
       ticketGroupIds: [secondSale.aggregate.id],
       aircraftId: "aircraft-b",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
+      queueDeviationReason: "Synthetisch unterschiedliche Umlaufdauern",
     },
   );
   const conflict = await command(
@@ -294,7 +295,6 @@ try {
     pilotId: "550e8400-e29b-41d4-a716-446655440200",
     reassign: false,
   });
-  await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
   const secondCall = await command(
     "flight-line-tablet-1",
     tokens.flightLine,
