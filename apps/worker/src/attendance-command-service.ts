@@ -21,6 +21,16 @@ function json(data: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(data), { ...init, headers });
 }
 
+function ticketStatusForAttendance(checkedIn: boolean, rotationStatus: string): string {
+  if (checkedIn) return rotationStatus === "CALLED" ? "BOARDING" : "CHECKED_IN";
+  return rotationStatus === "CALLED" ? "CALLED" : "QUEUED";
+}
+
+function ticketGroupStatusForAttendance(checkedIn: boolean, rotationStatus: string): string {
+  if (checkedIn) return rotationStatus === "DRAFT" ? "CHECKED_IN" : "BOARDING";
+  return rotationStatus === "DRAFT" ? "QUEUED" : "CALLED";
+}
+
 export class AttendanceCommandService {
   constructor(
     private readonly env: Env,
@@ -73,13 +83,10 @@ export class AttendanceCommandService {
       );
     }
     const nextAttendance = command.payload.checkedIn ? "CHECKED_IN" : "NOT_CHECKED_IN";
-    const nextTicketStatus = command.payload.checkedIn
-      ? ticket.rotation_status === "CALLED"
-        ? "BOARDING"
-        : "CHECKED_IN"
-      : ticket.rotation_status === "CALLED"
-        ? "CALLED"
-        : "QUEUED";
+    const nextTicketStatus = ticketStatusForAttendance(
+      command.payload.checkedIn,
+      ticket.rotation_status,
+    );
     const now = new Date().toISOString();
     const nextVersion = current.version + 1;
     const eventType = command.payload.checkedIn ? "TICKET_CHECKED_IN" : "TICKET_CHECK_IN_REVOKED";
@@ -172,13 +179,7 @@ export class AttendanceCommandService {
     const now = new Date().toISOString();
     const nextVersion = current.version + 1;
     const checkedIn = command.payload.checkedIn;
-    const ticketStatus = checkedIn
-      ? group.rotation_status === "DRAFT"
-        ? "CHECKED_IN"
-        : "BOARDING"
-      : group.rotation_status === "DRAFT"
-        ? "QUEUED"
-        : "CALLED";
+    const ticketStatus = ticketGroupStatusForAttendance(checkedIn, group.rotation_status);
     const eventType = checkedIn ? "TICKET_GROUP_CHECKED_IN" : "TICKET_GROUP_CHECK_IN_REVOKED";
     const result: CommandResult = {
       accepted: true,
@@ -558,8 +559,17 @@ export class AttendanceCommandService {
     current: StoredEventRow,
   ): Promise<Response> {
     if (command.type === "MARK_TICKET_NO_SHOW") {
-      const ticket = await this.env.DB.prepare(
-        `SELECT t.id, t.ticket_group_id, t.attendance_status, tg.version AS group_version,
+      return this.handleTicketNoShow(command, current);
+    }
+    return this.handleAttendanceDecision(command, current);
+  }
+
+  private async handleTicketNoShow(
+    command: Extract<CommandEnvelope, { type: "MARK_TICKET_NO_SHOW" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const ticket = await this.env.DB.prepare(
+      `SELECT t.id, t.ticket_group_id, t.attendance_status, tg.version AS group_version,
                 r.id AS rotation_id, r.status AS rotation_status, r.called_at, r.aircraft_id,
                 (SELECT COUNT(*) FROM rotation_tickets group_rt
                   JOIN tickets group_ticket ON group_ticket.id = group_rt.ticket_id
@@ -574,138 +584,142 @@ export class AttendanceCommandService {
            JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
            JOIN rotations r ON r.id = rt.rotation_id
           WHERE t.id = ?1 AND tg.operation_day_id = ?2`,
-      )
-        .bind(command.payload.ticketId, command.eventId)
-        .first<{
-          id: string;
-          ticket_group_id: string;
-          attendance_status: "NOT_CHECKED_IN" | "CHECKED_IN";
-          group_version: number;
-          rotation_id: string;
-          rotation_status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
-          called_at: string | null;
-          aircraft_id: string | null;
-          remaining_group_tickets: number;
-          remaining_rotation_tickets: number;
-        }>();
-      if (!ticket) {
-        return json(
-          { error: { code: "TICKET_NOT_FOUND", message: "Ticket nicht gefunden." } },
-          { status: 404 },
-        );
+    )
+      .bind(command.payload.ticketId, command.eventId)
+      .first<{
+        id: string;
+        ticket_group_id: string;
+        attendance_status: "NOT_CHECKED_IN" | "CHECKED_IN";
+        group_version: number;
+        rotation_id: string;
+        rotation_status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        called_at: string | null;
+        aircraft_id: string | null;
+        remaining_group_tickets: number;
+        remaining_rotation_tickets: number;
+      }>();
+    if (!ticket) {
+      return json(
+        { error: { code: "TICKET_NOT_FOUND", message: "Ticket nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    const now = new Date().toISOString();
+    try {
+      assertTicketNoShowAllowed({
+        rotationState: ticket.rotation_status,
+        calledAt: ticket.called_at,
+        attendanceStatus: ticket.attendance_status,
+        noShowAfterMinutes: current.no_show_after_minutes ?? 10,
+        now,
+      });
+    } catch (reason: unknown) {
+      if (reason instanceof DomainRuleError) {
+        return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
       }
-      const now = new Date().toISOString();
-      try {
-        assertTicketNoShowAllowed({
-          rotationState: ticket.rotation_status,
-          calledAt: ticket.called_at,
-          attendanceStatus: ticket.attendance_status,
-          noShowAfterMinutes: current.no_show_after_minutes ?? 10,
+      throw reason;
+    }
+    const nextVersion = current.version + 1;
+    const rotationEmptied = ticket.remaining_rotation_tickets === 0;
+    const groupEmptied = ticket.remaining_group_tickets === 0;
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType: "TICKET_NO_SHOW",
+      aggregate: { type: "TICKET", id: ticket.id, relatedRotationId: ticket.rotation_id },
+    };
+    const recallClosures = groupEmptied
+      ? await this.loadOpenTicketGroupRecalls(command.eventId, [ticket.ticket_group_id], now)
+      : [];
+    const statements: D1PreparedStatement[] = [
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      this.env.DB.prepare(
+        "UPDATE rotation_tickets SET released_at = ?1 WHERE ticket_id = ?2 AND released_at IS NULL",
+      ).bind(now, ticket.id),
+      this.env.DB.prepare("UPDATE tickets SET status = 'NO_SHOW' WHERE id = ?1").bind(ticket.id),
+    ];
+    if (groupEmptied) {
+      statements.push(
+        this.env.DB.prepare(
+          "UPDATE ticket_groups SET status = 'NO_SHOW', version = version + 1 WHERE id = ?1 AND version = ?2",
+        ).bind(ticket.ticket_group_id, ticket.group_version),
+        ...this.ticketGroupRecallClosureStatements({
+          recalls: recallClosures,
+          eventId: command.eventId,
+          reason: "NO_SHOW",
+          deviceId: command.deviceId,
           now,
-        });
-      } catch (reason: unknown) {
-        if (reason instanceof DomainRuleError) {
-          return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
-        }
-        throw reason;
-      }
-      const nextVersion = current.version + 1;
-      const rotationEmptied = ticket.remaining_rotation_tickets === 0;
-      const groupEmptied = ticket.remaining_group_tickets === 0;
-      const result: CommandResult = {
-        accepted: true,
-        duplicate: false,
-        event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
-        eventType: "TICKET_NO_SHOW",
-        aggregate: { type: "TICKET", id: ticket.id, relatedRotationId: ticket.rotation_id },
-      };
-      const recallClosures = groupEmptied
-        ? await this.loadOpenTicketGroupRecalls(command.eventId, [ticket.ticket_group_id], now)
-        : [];
-      const statements: D1PreparedStatement[] = [
+          event: result.event,
+        }),
+      );
+    }
+    if (rotationEmptied) {
+      statements.push(
         this.env.DB.prepare(
-          "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
-        ).bind(nextVersion, now, command.eventId, current.version),
-        this.env.DB.prepare(
-          "UPDATE rotation_tickets SET released_at = ?1 WHERE ticket_id = ?2 AND released_at IS NULL",
-        ).bind(now, ticket.id),
-        this.env.DB.prepare("UPDATE tickets SET status = 'NO_SHOW' WHERE id = ?1").bind(ticket.id),
-      ];
-      if (groupEmptied) {
+          "UPDATE rotations SET status = 'CANCELED', version = version + 1, updated_at = ?1 WHERE id = ?2",
+        ).bind(now, ticket.rotation_id),
+      );
+      if (ticket.aircraft_id) {
         statements.push(
           this.env.DB.prepare(
-            "UPDATE ticket_groups SET status = 'NO_SHOW', version = version + 1 WHERE id = ?1 AND version = ?2",
-          ).bind(ticket.ticket_group_id, ticket.group_version),
-          ...this.ticketGroupRecallClosureStatements({
-            recalls: recallClosures,
-            eventId: command.eventId,
-            reason: "NO_SHOW",
-            deviceId: command.deviceId,
-            now,
-            event: result.event,
-          }),
-        );
-      }
-      if (rotationEmptied) {
-        statements.push(
-          this.env.DB.prepare(
-            "UPDATE rotations SET status = 'CANCELED', version = version + 1, updated_at = ?1 WHERE id = ?2",
-          ).bind(now, ticket.rotation_id),
-        );
-        if (ticket.aircraft_id) {
-          statements.push(
-            this.env.DB.prepare(
-              `UPDATE aircraft SET operational_state = 'AVAILABLE',
+            `UPDATE aircraft SET operational_state = 'AVAILABLE',
                       operational_state_changed_at = CASE
                         WHEN operational_state <> 'AVAILABLE' THEN ?1
                         ELSE operational_state_changed_at END,
                       version = version + 1, updated_at = ?1 WHERE id = ?2`,
-            ).bind(now, ticket.aircraft_id),
-          );
-        }
+          ).bind(now, ticket.aircraft_id),
+        );
       }
-      statements.push(
-        this.env.DB.prepare(
-          `INSERT INTO operational_events
+    }
+    statements.push(
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
             (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
              aggregate_id, aggregate_version, payload_json)
            VALUES (?1, ?2, 'TICKET_NO_SHOW', ?3, ?4, 'TICKET', ?5, ?6, ?7)`,
-        ).bind(
-          crypto.randomUUID(),
-          command.eventId,
-          now,
-          command.deviceId,
-          ticket.id,
-          nextVersion,
-          JSON.stringify({
-            reason: command.payload.reason,
-            ticketGroupId: ticket.ticket_group_id,
-            rotationId: ticket.rotation_id,
-            groupEmptied,
-            rotationEmptied,
-          }),
-        ),
-        this.env.DB.prepare(
-          `INSERT INTO idempotency_receipts
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        now,
+        command.deviceId,
+        ticket.id,
+        nextVersion,
+        JSON.stringify({
+          reason: command.payload.reason,
+          ticketGroupId: ticket.ticket_group_id,
+          rotationId: ticket.rotation_id,
+          groupEmptied,
+          rotationEmptied,
+        }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
             (command_id, operation_day_id, device_id, command_type, received_at, response_json)
            VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
-        ).bind(
-          command.commandId,
-          command.eventId,
-          command.deviceId,
-          command.type,
-          now,
-          JSON.stringify(result),
-        ),
-        this.env.DB.prepare(
-          "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
-        ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
-      );
-      await this.env.DB.batch(statements);
-      this.broadcast(result);
-      return json(result);
-    }
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    );
+    await this.env.DB.batch(statements);
+    this.broadcast(result);
+    return json(result);
+  }
 
+  private async handleAttendanceDecision(
+    command: Extract<CommandEnvelope, { type: "CONFIRM_ATTENDANCE_DECISION" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
     const rotation = await this.env.DB.prepare(
       `SELECT r.id, r.status,
               COUNT(rt.ticket_id) AS ticket_count,
