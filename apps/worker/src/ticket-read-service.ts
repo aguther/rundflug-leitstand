@@ -92,7 +92,7 @@ export async function searchTicketGroups(
   let query = rawQuery;
   try {
     const url = new URL(rawQuery);
-    query = decodeURIComponent(url.pathname.split("/").filter(Boolean).at(-1) ?? rawQuery);
+    query = decodeURIComponent(url.pathname.split("/").findLast(Boolean) ?? rawQuery);
   } catch {
     // Plain ticket, group or communication identifier.
   }

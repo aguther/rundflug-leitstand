@@ -36,11 +36,9 @@ function latestSnapshot(
   rotationId: string,
   nowMs: number,
 ) {
-  return snapshots
-    .filter(
-      (snapshot) => snapshot.rotationId === rotationId && Date.parse(snapshot.capturedAt) <= nowMs,
-    )
-    .at(-1);
+  return snapshots.findLast(
+    (snapshot) => snapshot.rotationId === rotationId && Date.parse(snapshot.capturedAt) <= nowMs,
+  );
 }
 
 function percent(value: number, start: number, end: number): number {

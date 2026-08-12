@@ -109,14 +109,12 @@ function latestSnapshotBefore(
   before: string,
   status: SimulationForecastSnapshot["status"],
 ) {
-  return snapshots
-    .filter(
-      (snapshot) =>
-        snapshot.rotationId === rotationId &&
-        snapshot.status === status &&
-        Date.parse(snapshot.capturedAt) < Date.parse(before),
-    )
-    .at(-1);
+  return snapshots.findLast(
+    (snapshot) =>
+      snapshot.rotationId === rotationId &&
+      snapshot.status === status &&
+      Date.parse(snapshot.capturedAt) < Date.parse(before),
+  );
 }
 
 function ErrorChart({

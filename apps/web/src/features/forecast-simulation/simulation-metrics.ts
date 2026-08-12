@@ -65,15 +65,13 @@ function latestSnapshotBefore(
   status: ForecastRotationStatus,
   notAfterMs = Date.parse(actualAt) - 1,
 ): SimulationForecastSnapshot | undefined {
-  return snapshots
-    .filter(
-      (snapshot) =>
-        snapshot.status === status &&
-        (snapshot.status !== "DRAFT" || snapshot.forecastState !== "UNAVAILABLE") &&
-        Date.parse(snapshot.capturedAt) < Date.parse(actualAt) &&
-        Date.parse(snapshot.capturedAt) <= notAfterMs,
-    )
-    .at(-1);
+  return snapshots.findLast(
+    (snapshot) =>
+      snapshot.status === status &&
+      (snapshot.status !== "DRAFT" || snapshot.forecastState !== "UNAVAILABLE") &&
+      Date.parse(snapshot.capturedAt) < Date.parse(actualAt) &&
+      Date.parse(snapshot.capturedAt) <= notAfterMs,
+  );
 }
 
 export function calculateSimulationMetrics(input: {

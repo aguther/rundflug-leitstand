@@ -486,7 +486,7 @@ export function SimulationHistoryDialog({
   );
   const defaultRotationId =
     visibleRotations.find((rotation) => rotation.id === initialRotationId)?.id ??
-    visibleRotations.filter((rotation) => rotation.completedAt).at(-1)?.id ??
+    visibleRotations.findLast((rotation) => rotation.completedAt)?.id ??
     visibleRotations.at(-1)?.id ??
     null;
   const defaultAircraftId =
