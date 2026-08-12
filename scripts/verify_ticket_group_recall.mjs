@@ -71,20 +71,37 @@ const server = spawn(
     "--inspector-port",
     String(port + 1_000),
   ],
-  { cwd: root, stdio: "ignore", windowsHide: true },
+  { cwd: root, stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
 );
+const serverOutputLimit = 16 * 1024;
+let serverOutput = "";
+let serverExit;
+const captureServerOutput = (chunk) => {
+  serverOutput = `${serverOutput}${chunk.toString()}`.slice(-serverOutputLimit);
+};
+server.stdout.on("data", captureServerOutput);
+server.stderr.on("data", captureServerOutput);
+server.on("exit", (code, signal) => {
+  serverExit = { code, signal };
+});
 const base = `http://127.0.0.1:${port}`;
 const wait = (milliseconds) =>
   new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
 
 async function waitForWorker() {
   for (let attempt = 0; attempt < 120; attempt += 1) {
+    if (serverExit) break;
     try {
       if ((await fetch(`${base}/api/health`)).ok) return;
     } catch {}
     await wait(250);
   }
-  throw new Error("Lokaler Worker für den Nachruf wurde nicht rechtzeitig bereit.");
+  const exitDetails = serverExit
+    ? `exited with code ${serverExit.code ?? "null"} and signal ${serverExit.signal ?? "none"}`
+    : "did not become ready within 30 seconds";
+  throw new Error(
+    `Recall test worker ${exitDetails}. Wrangler output (last ${serverOutputLimit} bytes):\n${serverOutput}`,
+  );
 }
 
 async function commandRequest(actorName, command) {
