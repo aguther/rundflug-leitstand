@@ -44,7 +44,7 @@ function AutoFitText({ children }: Readonly<{ children: string }>) {
 
   useLayoutEffect(() => {
     const element = textRef.current;
-    if (!element || element.textContent !== text) return;
+    if (element?.textContent !== text) return;
     element.style.removeProperty("font-size");
     const baseFontSize = Number.parseFloat(getComputedStyle(element).fontSize);
     let lastWidth = -1;

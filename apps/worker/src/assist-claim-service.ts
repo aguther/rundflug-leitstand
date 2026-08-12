@@ -80,8 +80,7 @@ export class AssistClaimService {
       current?.expires_at && Date.parse(current.expires_at) > now.getTime() ? current : null;
 
     if (request.method === "DELETE") {
-      if (!active || active.operator_account_id !== accountId)
-        return new Response(null, { status: 204 });
+      if (active?.operator_account_id !== accountId) return new Response(null, { status: 204 });
       const nextRevision = active.revision + 1;
       const payload = {
         action: "RELEASED",

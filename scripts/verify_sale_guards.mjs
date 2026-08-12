@@ -237,7 +237,7 @@ try {
   const rotation = current.rotations.find(
     (entry) => entry.id === sold.aggregate?.relatedRotationId,
   );
-  if (!rotation || rotation.aircraftId !== null || rotation.pilotId !== null) {
+  if (rotation?.aircraftId !== null || rotation.pilotId !== null) {
     throw new Error("Kassenverkauf hat unzulässig Flugzeug oder Pilot fest zugeordnet.");
   }
 

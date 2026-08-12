@@ -957,7 +957,7 @@ function normalizeDispatchGroups(
   for (const group of groups) {
     for (const predecessorId of group.predecessorMemberIds ?? []) {
       const predecessor = groups.find((entry) => entry.id === predecessorId);
-      if (!predecessor || predecessor.resourceGroupId !== group.resourceGroupId) {
+      if (predecessor?.resourceGroupId !== group.resourceGroupId) {
         throw new Error(`Dispatch group ${group.id} has an invalid predecessor ${predecessorId}.`);
       }
     }

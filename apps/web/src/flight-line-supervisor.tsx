@@ -118,7 +118,7 @@ const ticketColumns: Array<{ key: TicketSortKey; label: string; Icon: LucideIcon
 const ticketCollator = new Intl.Collator("de-DE", { numeric: true, sensitivity: "base" });
 
 export function nextTicketSort(current: TicketSort, key: TicketSortKey): TicketSort {
-  if (!current || current.key !== key) return { key, direction: "ascending" };
+  if (current?.key !== key) return { key, direction: "ascending" };
   if (current.direction === "ascending") return { key, direction: "descending" };
   return null;
 }

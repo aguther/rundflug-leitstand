@@ -63,8 +63,7 @@ interface MasterDataTemplateTargetRow {
 
 function templateTargetEligible(target: MasterDataTemplateTargetRow | null): boolean {
   return Boolean(
-    target &&
-      target.status === "PREPARATION" &&
+    target?.status === "PREPARATION" &&
       target.gates === 0 &&
       target.resource_groups === 0 &&
       target.memberships === 0 &&

@@ -401,8 +401,7 @@ export class OutageRecoveryCommandService {
           const payload = storedOutageCallPayloadSchema.parse(JSON.parse(entry.payload_json));
           const aircraft = aircraftById.get(payload.aircraftId);
           if (
-            !aircraft ||
-            aircraft.resource_group_id !== reference.resourceGroupId ||
+            aircraft?.resource_group_id !== reference.resourceGroupId ||
             aircraft.passenger_seats < reference.ticketCount
           ) {
             throw new DomainRuleError(

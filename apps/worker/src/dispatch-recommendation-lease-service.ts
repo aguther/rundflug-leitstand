@@ -322,8 +322,7 @@ export class DispatchRecommendationLeaseService {
         .bind(leaseId, eventId)
         .first<StoredDispatchRecommendationLease>();
       if (
-        !lease ||
-        lease.operator_account_id !== accountId ||
+        lease?.operator_account_id !== accountId ||
         lease.device_id !== deviceId ||
         lease.status !== "ACTIVE"
       ) {

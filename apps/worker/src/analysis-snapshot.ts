@@ -187,7 +187,7 @@ export async function buildAnalysisSnapshot(input: {
   )
     .bind(input.eventId)
     .first<AnalysisEventRow>();
-  if (!event || event.version !== input.expectedEventVersion) {
+  if (event?.version !== input.expectedEventVersion) {
     throw new Error("ANALYSIS_SNAPSHOT_CHANGED");
   }
   const dispatchRevision = currentDispatchPlanRevision(input.operationBoard);
@@ -228,8 +228,7 @@ export async function buildAnalysisSnapshot(input: {
       .bind(lineageRunId, input.eventId)
       .first<PlanningRunLineageRow>();
     if (
-      !lineageRow ||
-      lineageRow.operation_day_version !== input.expectedEventVersion ||
+      lineageRow?.operation_day_version !== input.expectedEventVersion ||
       lineageRow.anchor_run_id !== run.anchor_run_id
     ) {
       throw new Error("ANALYSIS_SNAPSHOT_DATA_INCOMPLETE");
@@ -251,7 +250,7 @@ export async function buildAnalysisSnapshot(input: {
   )
     .bind(run.context_id, input.eventId)
     .first<PlanningContextExportRow>();
-  if (!context || context.operation_day_version !== input.expectedEventVersion) {
+  if (context?.operation_day_version !== input.expectedEventVersion) {
     throw new Error("ANALYSIS_SNAPSHOT_DATA_INCOMPLETE");
   }
   const manifest = parseJson(

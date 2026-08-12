@@ -274,7 +274,7 @@ try {
     if (reconnect) realtimeReconnects += 1;
   };
   const ensureRealtimeHealthy = async () => {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
+    if (socket?.readyState !== WebSocket.OPEN) {
       await openRealtimeSocket(true);
     }
     let previousPongs = realtimePongs;

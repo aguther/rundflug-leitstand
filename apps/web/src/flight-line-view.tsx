@@ -1024,7 +1024,7 @@ export function FlightLineView() {
   }
 
   async function setRotationCapacity() {
-    if (!board || !selected || selected.status !== "DRAFT") return;
+    if (!board || selected?.status !== "DRAFT") return;
     try {
       await sendCommand(
         {
@@ -1117,7 +1117,7 @@ export function FlightLineView() {
   }
 
   async function revokeCall() {
-    if (!board || !selected || selected.status !== "CALLED") return;
+    if (!board || selected?.status !== "CALLED") return;
     try {
       await sendCommand(
         {
@@ -1141,8 +1141,7 @@ export function FlightLineView() {
   }
 
   async function abortRotation() {
-    if (!board || !selected || selected.status !== "CALLED" || queueReason.trim().length < 3)
-      return;
+    if (!board || selected?.status !== "CALLED" || queueReason.trim().length < 3) return;
     try {
       await sendCommand(
         {

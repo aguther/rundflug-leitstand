@@ -578,8 +578,7 @@ export function BookingGroupAssignmentDialog({
   const recommendationIsCurrent = dispatchLease.mode === "RESERVED";
   const recommendationMatchesSelection = Boolean(
     recommendationIsCurrent &&
-      dispatchRecommendation &&
-      dispatchRecommendation.groupIds.length === selectedQueueGroupIds.length &&
+      dispatchRecommendation?.groupIds.length === selectedQueueGroupIds.length &&
       [...dispatchRecommendation.groupIds]
         .sort(compareTechnicalStrings)
         .every((groupId, index) => groupId === sortedSelectedQueueGroupIds[index]),

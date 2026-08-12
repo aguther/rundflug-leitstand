@@ -128,7 +128,7 @@ export class AnalysisSnapshotCaptureService {
     const event = await this.env.DB.prepare("SELECT version FROM operation_days WHERE id = ?1")
       .bind(input.eventId)
       .first<{ version: number }>();
-    if (!event || event.version !== input.expectedEventVersion) {
+    if (event?.version !== input.expectedEventVersion) {
       return {
         ok: false,
         code: "ANALYSIS_SNAPSHOT_STALE_VERSION",

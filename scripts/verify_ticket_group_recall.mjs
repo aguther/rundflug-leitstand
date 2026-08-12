@@ -303,8 +303,7 @@ try {
   if (
     ticketProjection.activeRecall?.id !== firstRecallId ||
     groupProjection.activeRecall?.id !== firstRecallId ||
-    !fidsGroup ||
-    !fidsGroup.activeRecall.fidsMessage.startsWith("NACHRUF · G-PAN20-")
+    !fidsGroup?.activeRecall?.fidsMessage.startsWith("NACHRUF · G-PAN20-")
   ) {
     throw new Error("Nachruf fehlt in Ticket-, Gruppen- oder FIDS-Projektion.");
   }
