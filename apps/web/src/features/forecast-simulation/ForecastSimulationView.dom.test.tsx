@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ForecastSimulationView } from "./ForecastSimulationView";
+import type { SimulationConfig } from "./model";
 
 const mocks = vi.hoisted(() => ({
   fidsOpen: vi.fn(),
@@ -22,6 +23,15 @@ class MockWorker {
 }
 
 vi.mock("../../design-system/ThemeToggle", () => ({ ThemeToggle: () => null }));
+vi.mock("./engine", async () => {
+  const actual = await vi.importActual<typeof import("./engine")>("./engine");
+  const model = await vi.importActual<typeof import("./model")>("./model");
+  const baselineResult = actual.runSimulation(model.simulationConfigForPreset("NORMAL"));
+  return {
+    ...actual,
+    runSimulation: vi.fn((config: SimulationConfig) => ({ ...baselineResult, config })),
+  };
+});
 vi.mock("./ForecastTimeline", () => ({
   ForecastTimeline: ({
     onSelectRotation,
