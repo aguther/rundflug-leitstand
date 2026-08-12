@@ -99,6 +99,27 @@ function EditorHarness() {
 }
 
 describe("product demand editor", () => {
+  it("updates admin planning values and automatic precall switches", async () => {
+    const user = userEvent.setup();
+    render(<EditorHarness />);
+
+    const boarding = screen.getByLabelText("Plan Boarding in Minuten") as HTMLInputElement;
+    fireEvent.change(boarding, { target: { value: "7" } });
+    expect(boarding.value).toBe("7");
+
+    const aircraftType = screen.getByLabelText("Flugzeugtyp") as HTMLInputElement;
+    await user.clear(aircraftType);
+    await user.type(aircraftType, "Cessna 172");
+    expect(aircraftType.value).toBe("Cessna 172");
+
+    const eventPrecall = screen.getByLabelText(
+      "Automatischen Voraufruf für Veranstaltung aktivieren",
+    ) as HTMLInputElement;
+    const priorChecked = eventPrecall.checked;
+    await user.click(eventPrecall);
+    expect(eventPrecall.checked).toBe(!priorChecked);
+  });
+
   it("edits the selected product without changing another product", async () => {
     const user = userEvent.setup();
     render(<EditorHarness />);
@@ -123,5 +144,80 @@ describe("product demand editor", () => {
     expect(
       (screen.getByLabelText("Nachfragefenster 1, Personen je Stunde") as HTMLInputElement).value,
     ).toBe("6");
+  });
+
+  it("edits demand windows, phase distributions, incidents, and the seed", async () => {
+    const user = userEvent.setup();
+    render(<EditorHarness />);
+    await user.click(screen.getByRole("button", { name: "Simulierte Realität" }));
+
+    const salesStart = screen.getAllByLabelText("Von, Uhrzeit")[0] as HTMLInputElement;
+    const originalStart = salesStart.value;
+    fireEvent.change(salesStart, { target: { value: "invalid" } });
+    fireEvent.blur(salesStart);
+    expect(salesStart.value).toBe(originalStart);
+    fireEvent.change(salesStart, { target: { value: "07:30" } });
+    fireEvent.keyDown(salesStart, { key: "Enter" });
+    expect(salesStart.value).toBe("07:30");
+
+    const profile = screen.getByRole("combobox", { name: "Vorlage" });
+    fireEvent.change(profile, { target: { value: "OPENING_RUSH" } });
+    expect((profile as HTMLSelectElement).value).toBe("OPENING_RUSH");
+
+    await user.click(screen.getByRole("button", { name: /Zeitfenster hinzufügen/ }));
+    expect(screen.getAllByLabelText(/Nachfragefenster \d+, Personen je Stunde/).length).toBe(3);
+    await user.click(screen.getByRole("button", { name: "Nachfragefenster 3 entfernen" }));
+    expect(screen.getAllByLabelText(/Nachfragefenster \d+, Personen je Stunde/)).toHaveLength(2);
+
+    const boardingMinimum = screen.getByLabelText("Boarding, Minimum") as HTMLInputElement;
+    fireEvent.change(boardingMinimum, { target: { value: "3" } });
+    expect(boardingMinimum.value).toBe("3");
+
+    const refueling = screen.getByLabelText("Tanken aktiv") as HTMLInputElement;
+    await user.click(refueling);
+    expect(refueling.checked).toBe(false);
+    const defectProbability = screen.getByLabelText(
+      "Wahrscheinlichkeit Tagesausfall in Prozent",
+    ) as HTMLInputElement;
+    fireEvent.change(defectProbability, { target: { value: "25" } });
+    expect(defectProbability.value).toBe("25");
+
+    const seed = screen.getByLabelText("Seed") as HTMLInputElement;
+    fireEvent.change(seed, { target: { value: "42" } });
+    expect(seed.value).toBe("42");
+  });
+
+  it("edits and resets forecast and precall laboratory profiles", async () => {
+    const user = userEvent.setup();
+    render(<EditorHarness />);
+    await user.click(screen.getByRole("button", { name: "Prognose-Labor" }));
+
+    expect(screen.getByText(/nur lokal/)).toBeTruthy();
+    const maximumSamples = screen.getByLabelText(
+      "Maximale Lernwerte, Kandidat",
+    ) as HTMLInputElement;
+    fireEvent.change(maximumSamples, { target: { value: "37" } });
+    expect(maximumSamples.value).toBe("37");
+    await user.click(screen.getByRole("button", { name: "Maximale Lernwerte zurücksetzen" }));
+    expect(maximumSamples.value).not.toBe("37");
+
+    const leadMinutes = screen.getByLabelText(
+      "Gewünschte Gate-Wartezeit, Kandidat",
+    ) as HTMLInputElement;
+    fireEvent.change(leadMinutes, { target: { value: "19" } });
+    expect(leadMinutes.value).toBe("19");
+    await user.click(
+      screen.getByRole("button", { name: "Gewünschte Gate-Wartezeit zurücksetzen" }),
+    );
+    expect(leadMinutes.value).not.toBe("19");
+
+    const runs = screen.getByLabelText("Anzahl A/B-Läufe") as HTMLInputElement;
+    fireEvent.change(runs, { target: { value: "25" } });
+    expect(runs.value).toBe("25");
+
+    const resetAll = screen.getAllByRole("button", { name: /Alle zurücksetzen/ });
+    expect(resetAll).toHaveLength(2);
+    await user.click(resetAll[0] as HTMLButtonElement);
+    await user.click(resetAll[1] as HTMLButtonElement);
   });
 });
