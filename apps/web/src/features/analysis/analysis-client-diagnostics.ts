@@ -22,6 +22,25 @@ export function clearAnalysisUiEventsForTest(): void {
   recentEvents.splice(0, recentEvents.length);
 }
 
+function parseMajorVersion(input: string, versionStart: number): number | null {
+  let versionEnd = versionStart;
+  while (true) {
+    const character = input[versionEnd];
+    if (character === undefined || character < "0" || character > "9") break;
+    versionEnd += 1;
+  }
+  const value = Number.parseInt(input.slice(versionStart, versionEnd), 10);
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
+function matchesRequiredMarker(
+  input: string,
+  requiredMarker: string | undefined,
+  versionStart: number,
+): boolean {
+  return requiredMarker === undefined || input.includes(requiredMarker, versionStart);
+}
+
 export function browserVersion(input: string): {
   family: AnalysisClientContext["browserFamily"];
   majorVersion: number | null;
@@ -39,23 +58,13 @@ export function browserVersion(input: string): {
   ];
   for (const candidate of candidates) {
     const markerIndex = input.indexOf(candidate.marker);
-    if (markerIndex >= 0) {
-      const versionStart = markerIndex + candidate.marker.length;
-      if (candidate.requiredMarker && input.indexOf(candidate.requiredMarker, versionStart) < 0) {
-        continue;
-      }
-      let versionEnd = versionStart;
-      while (true) {
-        const character = input[versionEnd];
-        if (character === undefined || character < "0" || character > "9") break;
-        versionEnd += 1;
-      }
-      const value = Number.parseInt(input.slice(versionStart, versionEnd), 10);
-      return {
-        family: candidate.family,
-        majorVersion: Number.isSafeInteger(value) && value > 0 ? value : null,
-      };
-    }
+    if (markerIndex < 0) continue;
+    const versionStart = markerIndex + candidate.marker.length;
+    if (!matchesRequiredMarker(input, candidate.requiredMarker, versionStart)) continue;
+    return {
+      family: candidate.family,
+      majorVersion: parseMajorVersion(input, versionStart),
+    };
   }
   return { family: "OTHER", majorVersion: null };
 }
