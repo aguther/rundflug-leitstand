@@ -10,6 +10,8 @@ import { ThemeProvider } from "./design-system/theme";
 import { FlightLineView } from "./flight-line-view";
 
 const api = vi.hoisted(() => ({
+  getForecastHistory: vi.fn(),
+  getResourceDayHistory: vi.fn(),
   sendCommand: vi.fn(),
 }));
 
@@ -70,8 +72,8 @@ vi.mock("./api", async (importOriginal) => {
   const original = await importOriginal<typeof import("./api")>();
   return {
     ...original,
-    getForecastHistory: vi.fn(),
-    getResourceDayHistory: vi.fn(),
+    getForecastHistory: api.getForecastHistory,
+    getResourceDayHistory: api.getResourceDayHistory,
     sendCommand: api.sendCommand,
   };
 });
@@ -98,7 +100,119 @@ vi.mock("./dispatch-recommendation-lease", () => ({
 }));
 
 vi.mock("./features/flight-line/FlightDirectorOperationsDialog", () => ({
-  FlightDirectorOperationsDialog: () => null,
+  FlightDirectorOperationsDialog: (props: {
+    open: boolean;
+    onCancelPlannedOperation: (plan: { id: string; version: number }) => Promise<void>;
+    onConfirmPlannedOperation: (
+      plan: {
+        id: string;
+        version: number;
+        durationMultiplierPercent: number;
+        effectMode: "SLOWDOWN";
+      },
+      activate: boolean,
+    ) => Promise<void>;
+    onDisableRecurringRule: (rule: { id: string; version: number }) => Promise<void>;
+    onPublishEventNotice: (note: string) => Promise<boolean>;
+    onPublishResourceNotice: (resourceGroupId: string, note: string) => Promise<boolean>;
+    onSetEventInterruption: (
+      interrupted: boolean,
+      plannedOperationId?: string,
+      expectedReviewAt?: string | null,
+    ) => Promise<void>;
+    onSetResourceGroupStatus: (
+      resourceGroupId: string,
+      status: "PAUSED",
+      plannedOperationId?: string,
+      expectedReviewAt?: string | null,
+    ) => Promise<void>;
+    onTriggerEmergency: () => Promise<void>;
+    onUpsertPlannedOperation: (payload: { planId: string }) => Promise<void>;
+    onUpsertRecurringRule: (payload: { ruleId: string }) => Promise<void>;
+  }) =>
+    props.open ? (
+      <section aria-label="Operations-Testdialog">
+        <button onClick={() => void props.onPublishEventNotice(" Testhinweis ")} type="button">
+          Veranstaltungshinweis senden
+        </button>
+        <button
+          onClick={() => void props.onPublishResourceNotice("resource-group-1", " Gruppenhinweis ")}
+          type="button"
+        >
+          Gruppenhinweis senden
+        </button>
+        <button
+          onClick={() =>
+            void props.onSetEventInterruption(
+              true,
+              "planned-operation-1",
+              "2026-08-11T10:30:00.000Z",
+            )
+          }
+          type="button"
+        >
+          Betrieb unterbrechen
+        </button>
+        <button
+          onClick={() =>
+            void props.onSetResourceGroupStatus(
+              "resource-group-1",
+              "PAUSED",
+              "planned-operation-1",
+              "2026-08-11T10:30:00.000Z",
+            )
+          }
+          type="button"
+        >
+          Gruppe pausieren
+        </button>
+        <button onClick={() => void props.onTriggerEmergency()} type="button">
+          Notfall auslösen
+        </button>
+        <button
+          onClick={() => void props.onUpsertPlannedOperation({ planId: "planned-operation-1" })}
+          type="button"
+        >
+          Plan speichern
+        </button>
+        <button
+          onClick={() =>
+            void props.onConfirmPlannedOperation(
+              {
+                id: "planned-operation-1",
+                version: 2,
+                durationMultiplierPercent: 175,
+                effectMode: "SLOWDOWN",
+              },
+              true,
+            )
+          }
+          type="button"
+        >
+          Plan bestätigen
+        </button>
+        <button
+          onClick={() =>
+            void props.onCancelPlannedOperation({ id: "planned-operation-1", version: 2 })
+          }
+          type="button"
+        >
+          Plan absagen
+        </button>
+        <button
+          onClick={() => void props.onUpsertRecurringRule({ ruleId: "recurring-rule-1" })}
+          type="button"
+        >
+          Regel speichern
+        </button>
+        <button
+          onClick={() => void props.onDisableRecurringRule({ id: "recurring-rule-1", version: 4 })}
+          type="button"
+        >
+          Regel deaktivieren
+        </button>
+      </section>
+    ) : null,
 }));
 
 vi.mock("./flight-line-assist", () => ({
@@ -108,13 +222,46 @@ vi.mock("./flight-line-assist", () => ({
 vi.mock("./flight-line-supervisor", () => ({
   FlightLineSupervisorConsole: (props: {
     board: OperationBoard;
+    loadForecastHistory: (rotationId: string) => Promise<unknown>;
+    loadResourceHistory: (scopeType: "AIRCRAFT", scopeId: string) => Promise<unknown>;
+    onAssignPilot: (aircraftId: string, pilotId: string, reassign: boolean) => Promise<void>;
+    onOpenOperations: () => void;
+    onPauseAircraft: (aircraftId: string) => void;
     onRunRotation: (rotation: unknown, nextState?: string) => Promise<boolean>;
+    onSetAircraftState: (aircraftId: string, state: "AVAILABLE" | "INACTIVE") => Promise<void>;
     operationalSummary: string;
     operationalSummaryTone: string;
   }) => (
     <section aria-label="Flight-Director-Testkonsole">
       <p data-tone={props.operationalSummaryTone}>{props.operationalSummary}</p>
       <p>{props.board.aircraft[0]?.registration}</p>
+      <button onClick={props.onOpenOperations} type="button">
+        Operations öffnen
+      </button>
+      <button onClick={() => void props.onAssignPilot("aircraft-1", "pilot-2", true)} type="button">
+        Pilot zuweisen
+      </button>
+      <button onClick={() => props.onPauseAircraft("aircraft-1")} type="button">
+        Flugzeug pausieren
+      </button>
+      <button
+        onClick={() => void props.onSetAircraftState("aircraft-1", "AVAILABLE")}
+        type="button"
+      >
+        Flugzeug verfügbar
+      </button>
+      <button onClick={() => void props.onSetAircraftState("aircraft-1", "INACTIVE")} type="button">
+        Flugzeug inaktiv
+      </button>
+      <button onClick={() => void props.loadForecastHistory("rotation-1")} type="button">
+        Prognosehistorie laden
+      </button>
+      <button
+        onClick={() => void props.loadResourceHistory("AIRCRAFT", "aircraft-1")}
+        type="button"
+      >
+        Ressourcenhistorie laden
+      </button>
       <button
         onClick={() => void props.onRunRotation(syntheticRotation, "AVAILABLE")}
         type="button"
@@ -195,6 +342,7 @@ function operationBoard(overrides: { emergencyMode?: boolean } = {}): OperationB
         passengerSeats: 4,
         registration: "D-TEST",
         resourceGroupId: "resource-group-1",
+        version: 3,
       },
     ],
     assistClaims: [],
@@ -239,6 +387,8 @@ describe("flight line workflows", () => {
     });
     Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
     api.sendCommand.mockReset();
+    api.getForecastHistory.mockReset();
+    api.getResourceDayHistory.mockReset();
     workspace.state.backendConfirmed = true;
     workspace.state.board = operationBoard();
     workspace.state.confirmEvent.mockReset();
@@ -328,6 +478,130 @@ describe("flight line workflows", () => {
     expect(screen.getByText(/Möglicherweise veraltet · Server nicht erreichbar/)).toBeTruthy();
     expect(screen.getAllByText("D-TEST").length).toBeGreaterThan(0);
     expect(screen.getByRole("status", { name: "Offline" })).toBeTruthy();
+  });
+
+  it("persists flight-director operations with audit context and expected versions", async () => {
+    const user = userEvent.setup();
+    api.sendCommand.mockResolvedValue({ event: { version: 12 } });
+    renderFlightLine();
+    await user.click(screen.getByRole("button", { name: "Operations öffnen" }));
+
+    const actions = [
+      "Veranstaltungshinweis senden",
+      "Gruppenhinweis senden",
+      "Betrieb unterbrechen",
+      "Gruppe pausieren",
+      "Notfall auslösen",
+      "Plan speichern",
+      "Plan bestätigen",
+      "Plan absagen",
+      "Regel speichern",
+      "Regel deaktivieren",
+    ];
+    for (const [index, action] of actions.entries()) {
+      await user.click(screen.getByRole("button", { name: action }));
+      await waitFor(() => expect(api.sendCommand).toHaveBeenCalledTimes(index + 1));
+    }
+
+    expect(api.sendCommand.mock.calls.map(([command]) => command.type)).toEqual([
+      "SET_OPERATIONAL_NOTE",
+      "SET_RESOURCE_GROUP_NOTICE",
+      "SET_EVENT_INTERRUPTION",
+      "SET_RESOURCE_GROUP_STATUS",
+      "TRIGGER_EMERGENCY",
+      "UPSERT_PLANNED_OPERATION",
+      "SET_PLANNED_SLOWDOWN_ACTIVE",
+      "CANCEL_PLANNED_OPERATION",
+      "UPSERT_RECURRING_OPERATIONAL_RULE",
+      "DISABLE_RECURRING_OPERATIONAL_RULE",
+    ]);
+    expect(api.sendCommand.mock.calls[0]?.[0].payload).toEqual({ note: "Testhinweis" });
+    expect(api.sendCommand.mock.calls[2]?.[0].payload).toEqual({
+      interrupted: true,
+      reason: "Operative Entscheidung Flight Director",
+      expectedReviewAt: "2026-08-11T10:30:00.000Z",
+      plannedOperationId: "planned-operation-1",
+    });
+    expect(api.sendCommand.mock.calls[7]?.[0].payload).toEqual({
+      planId: "planned-operation-1",
+      planExpectedVersion: 2,
+    });
+    expect(api.sendCommand.mock.calls[9]?.[0].payload).toEqual({
+      ruleId: "recurring-rule-1",
+      ruleExpectedVersion: 4,
+      reason: "Wiederkehrende Tagesregel deaktiviert.",
+    });
+    expect(workspace.state.refresh).toHaveBeenCalledTimes(10);
+  });
+
+  it("coordinates aircraft state, pilot assignment and paginated history requests", async () => {
+    const user = userEvent.setup();
+    api.sendCommand.mockResolvedValue({ event: { version: 12 } });
+    api.getForecastHistory
+      .mockResolvedValueOnce({
+        entries: [
+          { capturedAt: "2026-08-11T09:01:00.000Z", snapshotId: "snapshot-b" },
+          { capturedAt: "2026-08-11T09:00:00.000Z", snapshotId: "snapshot-a" },
+        ],
+        total: 3,
+      })
+      .mockResolvedValueOnce({ entries: [], total: 3 });
+    api.getResourceDayHistory.mockResolvedValue({ entries: [] });
+    renderFlightLine();
+
+    for (const [index, action] of [
+      "Pilot zuweisen",
+      "Flugzeug verfügbar",
+      "Flugzeug inaktiv",
+    ].entries()) {
+      await user.click(screen.getByRole("button", { name: action }));
+      await waitFor(() => expect(api.sendCommand).toHaveBeenCalledTimes(index + 1));
+    }
+    await user.click(screen.getByRole("button", { name: "Flugzeug pausieren" }));
+    await user.click(screen.getByRole("button", { name: "10 Min." }));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledTimes(4));
+
+    expect(api.sendCommand.mock.calls.map(([command]) => command.type)).toEqual([
+      "ASSIGN_AIRCRAFT_PILOT",
+      "SET_AIRCRAFT_OPERATIONAL_STATE",
+      "SET_AIRCRAFT_OPERATIONAL_STATE",
+      "SET_AIRCRAFT_OPERATIONAL_STATE",
+    ]);
+    expect(api.sendCommand.mock.calls[0]?.[0].payload).toEqual({
+      aircraftId: "aircraft-1",
+      pilotId: "pilot-2",
+      reassign: true,
+    });
+    expect(api.sendCommand.mock.calls[3]?.[0].payload).toEqual(
+      expect.objectContaining({
+        aircraftId: "aircraft-1",
+        state: "PAUSED",
+        reason: "Flugzeugpause durch Flight Line begonnen",
+      }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Prognosehistorie laden" }));
+    await waitFor(() => expect(api.getForecastHistory).toHaveBeenCalledTimes(2));
+    await user.click(screen.getByRole("button", { name: "Ressourcenhistorie laden" }));
+    await waitFor(() => expect(api.getResourceDayHistory).toHaveBeenCalledOnce());
+    expect(api.getForecastHistory).toHaveBeenCalledWith(
+      "synthetic-event",
+      "synthetic-flight-director-device",
+      "synthetic-device-token",
+      { rotationId: "rotation-1", limit: 200, offset: 0 },
+    );
+    expect(api.getForecastHistory).toHaveBeenLastCalledWith(
+      "synthetic-event",
+      "synthetic-flight-director-device",
+      "synthetic-device-token",
+      { rotationId: "rotation-1", limit: 200, offset: 2 },
+    );
+    expect(api.getResourceDayHistory).toHaveBeenCalledWith(
+      "synthetic-event",
+      "synthetic-flight-director-device",
+      "synthetic-device-token",
+      { scopeType: "AIRCRAFT", scopeId: "aircraft-1" },
+    );
   });
 
   it("refreshes after a stale write and requires an explicit replay against the new version", async () => {
