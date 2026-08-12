@@ -19,7 +19,7 @@ export interface CheckboxFieldProps extends Omit<InputHTMLAttributes<HTMLInputEl
   trailing?: ReactNode;
 }
 
-export function Field({ label, help, children, className = "" }: FieldProps) {
+export function Field({ label, help, children, className = "" }: Readonly<FieldProps>) {
   return (
     <div className={`ds-field ${className}`.trim()}>
       <span className="ds-field-label">{label}</span>
@@ -37,7 +37,7 @@ export function CheckboxField({
   disabled,
   id: providedId,
   ...input
-}: CheckboxFieldProps) {
+}: Readonly<CheckboxFieldProps>) {
   const generatedId = useId();
   const id = providedId ?? generatedId;
   return (

@@ -86,7 +86,7 @@ export function EventCatalogDialog({
   search,
   sort,
   view,
-}: EventCatalogDialogProps) {
+}: Readonly<EventCatalogDialogProps>) {
   return (
     <ModalDialog
       bodyClassName={view === "create" ? "event-create-dialog-body" : "event-catalog-dialog-body"}

@@ -17,10 +17,10 @@ const statusLabels: Record<string, string> = {
 export function EventSelectionPage({
   events,
   session,
-}: {
+}: Readonly<{
   events: EventCatalogEntry[];
   session: OperatorSession;
-}) {
+}>) {
   const { logout } = useAuth();
   const [eventId, setEventId] = useState(events.length === 1 ? (events[0]?.eventId ?? "") : "");
   const [logoutBusy, setLogoutBusy] = useState(false);

@@ -48,7 +48,7 @@ export function AdminMasterDataWorkspacePanel({
   onOpenTurnaround,
   presentation,
   table,
-}: AdminMasterDataWorkspacePanelProps) {
+}: Readonly<AdminMasterDataWorkspacePanelProps>) {
   return (
     <section
       aria-labelledby={`admin-event-step-${eventStep}-tab`}

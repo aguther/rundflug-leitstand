@@ -30,14 +30,14 @@ function Stepper({
   maximum,
   disabled,
   onChange,
-}: {
+}: Readonly<{
   label: string;
   value: number;
   minimum: number;
   maximum: number;
   disabled: boolean;
   onChange: (value: number) => void;
-}) {
+}>) {
   return (
     <div className="fids-setting-line">
       <strong>{label}</strong>
@@ -78,7 +78,7 @@ export function FidsSettingsDialog({
   onLogout,
   onSave,
   onSetSetupMode,
-}: {
+}: Readonly<{
   open: boolean;
   preferences: FidsPreferences;
   filterOptions: FidsFilterOptions;
@@ -92,7 +92,7 @@ export function FidsSettingsDialog({
   onLogout?: () => Promise<void>;
   onSave: (next: EditableFidsPreferences) => Promise<void>;
   onSetSetupMode: (active: boolean) => void;
-}) {
+}>) {
   const [draft, setDraft] = useState<EditableFidsPreferences>(() =>
     editablePreferences(preferences),
   );

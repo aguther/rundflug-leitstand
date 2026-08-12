@@ -13,10 +13,10 @@ export function eventStatusLabel(status: EventSnapshot["status"]): string {
 export function EventContextSummary({
   event,
   actions,
-}: {
+}: Readonly<{
   event: EventSnapshot;
   actions?: ReactNode;
-}) {
+}>) {
   return (
     <header className="event-workspace-context">
       <div className="event-workspace-identity">

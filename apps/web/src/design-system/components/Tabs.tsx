@@ -14,7 +14,13 @@ export interface TabsProps<T extends string> {
   idPrefix?: string;
 }
 
-export function Tabs<T extends string>({ items, value, onChange, label, idPrefix }: TabsProps<T>) {
+export function Tabs<T extends string>({
+  items,
+  value,
+  onChange,
+  label,
+  idPrefix,
+}: Readonly<TabsProps<T>>) {
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const generatedId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const resolvedPrefix = idPrefix ?? `tabs-${generatedId}`;

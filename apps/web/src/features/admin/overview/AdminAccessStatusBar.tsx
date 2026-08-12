@@ -26,7 +26,7 @@ export function AdminAccessStatusBar({
   onRefresh,
   onRequestAdminModeUnlock,
   refreshing,
-}: AdminAccessStatusBarProps) {
+}: Readonly<AdminAccessStatusBarProps>) {
   const authenticatedAdministrator = authenticatedAdminLoginCode !== null;
   const presentation = accessPresentation(authenticatedAdministrator, adminModeUnlocked);
   let adminAction = onRequestAdminModeUnlock;

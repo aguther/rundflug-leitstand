@@ -18,7 +18,7 @@ export function CompletionSummaryPanel({
   onExportDailyPdf,
   onExportPerformance,
   onExportRawData,
-}: CompletionSummaryPanelProps) {
+}: Readonly<CompletionSummaryPanelProps>) {
   return (
     <section className="admin-section completion-day-summary">
       <div className="section-heading">

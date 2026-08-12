@@ -105,7 +105,7 @@ export function OperationalPlanPanel({
   onDisableRecurringRule,
   onUpsert,
   onUpsertRecurringRule,
-}: OperationalPlanPanelProps) {
+}: Readonly<OperationalPlanPanelProps>) {
   const showPlans = content === "combined" || content === "plans";
   const showRules = content === "combined" || content === "rules";
   const [editorOpen, setEditorOpen] = useState(false);

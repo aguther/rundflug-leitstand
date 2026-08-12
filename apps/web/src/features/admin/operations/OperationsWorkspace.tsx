@@ -7,11 +7,11 @@ export function OperationsWorkspace({
   board,
   release,
   emergency,
-}: {
+}: Readonly<{
   board: OperationBoard;
   release: ReactNode;
   emergency: ReactNode;
-}) {
+}>) {
   return (
     <EventWorkspaceFrame event={board.event} variant="wide">
       <div className="operations-workspace-content">

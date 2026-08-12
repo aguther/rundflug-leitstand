@@ -122,10 +122,10 @@ function latestSnapshotBefore(
 function ErrorChart({
   rotations,
   snapshots,
-}: {
+}: Readonly<{
   rotations: readonly SimulationRotation[];
   snapshots: readonly SimulationForecastSnapshot[];
-}) {
+}>) {
   const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
   const points = rotations
     .flatMap((rotation) => {
@@ -274,7 +274,11 @@ function ErrorChart({
   );
 }
 
-function MetricCard({ label, value, hint }: { label: string; value: string; hint: string }) {
+function MetricCard({
+  label,
+  value,
+  hint,
+}: Readonly<{ label: string; value: string; hint: string }>) {
   return (
     <article className="sim-metric-card">
       <span>{label}</span>

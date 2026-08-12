@@ -33,7 +33,7 @@ export function ProductEditorDialog({
   resourceGroups,
   submitAttempted,
   tab,
-}: ProductEditorDialogProps) {
+}: Readonly<ProductEditorDialogProps>) {
   const plannedBoardingMinutes = board?.event.plannedBoardingMinutes ?? 8;
   const plannedDeboardingMinutes = board?.event.plannedDeboardingMinutes ?? 5;
   const plannedBufferMinutes = board?.event.plannedBufferMinutes ?? 3;

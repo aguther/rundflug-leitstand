@@ -4,7 +4,7 @@ export interface BusyIndicatorProps {
   label?: string;
 }
 
-export function BusyIndicator({ label = "Aktion wird ausgeführt" }: BusyIndicatorProps) {
+export function BusyIndicator({ label = "Aktion wird ausgeführt" }: Readonly<BusyIndicatorProps>) {
   return (
     <span className="ds-busy-indicator" role="status">
       <LoaderCircle aria-hidden="true" />

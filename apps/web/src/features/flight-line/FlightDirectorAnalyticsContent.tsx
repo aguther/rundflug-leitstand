@@ -89,7 +89,7 @@ function signedMinutes(value: number | null): string {
   return `${value > 0 ? "+" : ""}${value} Min.`;
 }
 
-function AnalyticsError({ message }: { message: string }) {
+function AnalyticsError({ message }: Readonly<{ message: string }>) {
   return (
     <div className="flight-director-analytics-state" role="alert">
       <ChartNoAxesCombined aria-hidden="true" />
@@ -99,7 +99,7 @@ function AnalyticsError({ message }: { message: string }) {
   );
 }
 
-function AnalyticsEmpty({ message }: { message: string }) {
+function AnalyticsEmpty({ message }: Readonly<{ message: string }>) {
   return (
     <div className="flight-director-analytics-state">
       <ChartNoAxesCombined aria-hidden="true" />
@@ -124,12 +124,12 @@ function DiagramZoomControls({
   onReset,
   value,
   zoomLevels,
-}: {
+}: Readonly<{
   onChange: (zoom: number) => void;
   onReset: () => void;
   value: number;
   zoomLevels: readonly number[];
-}) {
+}>) {
   const index = zoomLevels.indexOf(value);
   return (
     <fieldset className="flight-director-diagram-zoom">
@@ -173,12 +173,12 @@ function ForecastTooltip({
   label,
   payload,
   timeZone,
-}: {
+}: Readonly<{
   active?: boolean;
   label?: number | undefined;
   payload?: ReadonlyArray<{ color?: string; name?: string | number; value?: unknown }>;
   timeZone: string;
-}) {
+}>) {
   if (!active || label === undefined || !payload?.length) return null;
   return (
     <div className="flight-director-analytics-tooltip">
@@ -201,14 +201,14 @@ function ForecastRotationPanel({
   loading,
   resetKey,
   rotation,
-}: {
+}: Readonly<{
   board: OperationBoard;
   entries: ForecastEntry[];
   error: string | null;
   loading: boolean;
   resetKey: string;
   rotation: Rotation | undefined;
-}) {
+}>) {
   const [page, setPage] = useState(0);
   const sorted = useMemo(() => sortedForecastEntries(entries), [entries]);
   const chartData = useMemo(() => forecastChartData(entries), [entries]);
@@ -569,7 +569,7 @@ function ForecastPanel({
   rotationId,
   ticketGroupId,
   ticketGroups,
-}: {
+}: Readonly<{
   board: OperationBoard;
   forecastResults: Record<string, ForecastLoadResult>;
   onRotationIdChange: (rotationId: string) => void;
@@ -577,7 +577,7 @@ function ForecastPanel({
   rotationId: string;
   ticketGroupId: string;
   ticketGroups: AnalyticsTicketGroup[];
-}) {
+}>) {
   const ticketGroup = ticketGroups.find((group) => group.id === ticketGroupId);
   const relatedRotations =
     ticketGroup?.rotationIds.flatMap((id) => {
@@ -667,7 +667,7 @@ function ResourcePanel({
   onScopeIdChange,
   scopeId,
   scopeType,
-}: {
+}: Readonly<{
   board: OperationBoard;
   error: string | null;
   history: ResourceDayHistory | null;
@@ -676,7 +676,7 @@ function ResourcePanel({
   onScopeIdChange: (scopeId: string) => void;
   scopeId: string;
   scopeType: "AIRCRAFT" | "PILOT";
-}) {
+}>) {
   const timelineFrom = history ? Date.parse(history.from) : 0;
   const timelineUntil = history ? Date.parse(history.until) : 1;
   const timelineSpan = Math.max(1, timelineUntil - timelineFrom);
@@ -997,7 +997,7 @@ export function FlightDirectorAnalyticsContent({
   rotationId,
   tab,
   ticketGroupId,
-}: FlightDirectorAnalyticsContentProps) {
+}: Readonly<FlightDirectorAnalyticsContentProps>) {
   const [forecastResults, setForecastResults] = useState<Record<string, ForecastLoadResult>>({});
   const [resourceHistory, setResourceHistory] = useState<ResourceDayHistory | null>(null);
   const [resourceLoading, setResourceLoading] = useState(false);

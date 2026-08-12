@@ -7,7 +7,7 @@ export interface StatusPillProps extends HTMLAttributes<HTMLSpanElement> {
   children: ReactNode;
 }
 
-export function StatusPill({ tone, children, className = "", ...span }: StatusPillProps) {
+export function StatusPill({ tone, children, className = "", ...span }: Readonly<StatusPillProps>) {
   return (
     <span className={`ds-status-pill ds-status-pill--${tone} ${className}`.trim()} {...span}>
       {children}

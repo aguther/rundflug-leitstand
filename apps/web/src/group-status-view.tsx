@@ -24,7 +24,7 @@ import {
   realtimeStateChangeVersion,
   sendRealtimeHeartbeat,
 } from "./realtime-heartbeat";
-export function GroupStatusView({ code }: { code: string }) {
+export function GroupStatusView({ code }: Readonly<{ code: string }>) {
   const [status, setStatus] = useState<PublicGroupStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const push = usePublicPush("group", code);

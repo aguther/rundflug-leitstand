@@ -22,7 +22,7 @@ export function ProductSalesDialog({
   onClose,
   onSaveClosing,
   onToggleSales,
-}: {
+}: Readonly<{
   product: Product | null;
   eventStatus: EventStatus;
   closingValue: string;
@@ -31,7 +31,7 @@ export function ProductSalesDialog({
   onClose: () => void;
   onSaveClosing: (remove: boolean) => void;
   onToggleSales: () => void;
-}) {
+}>) {
   const [discardOpen, setDiscardOpen] = useState(false);
   const [initialClosingValue] = useState(closingValue);
 

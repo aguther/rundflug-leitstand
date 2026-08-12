@@ -25,12 +25,12 @@ function FlowTooltip({
   label,
   payload,
   timeZone,
-}: {
+}: Readonly<{
   active?: boolean;
   label?: number | undefined;
   payload?: ReadonlyArray<{ dataKey?: unknown; value?: unknown }>;
   timeZone: string;
-}) {
+}>) {
   if (!active || label === undefined || !payload?.length) return null;
   const values = new Map(payload.map((entry) => [String(entry.dataKey), Number(entry.value ?? 0)]));
   return (
@@ -49,13 +49,13 @@ export function AdminEventFlowChart({
   flow,
   loading,
   timeZone,
-}: {
+}: Readonly<{
   averageWaitMinutes: number | null;
   error: string | null;
   flow: AdminEventFlow | null;
   loading: boolean;
   timeZone: string;
-}) {
+}>) {
   const chartData = useMemo(
     () =>
       flow?.points.map((point) => ({

@@ -22,7 +22,7 @@ export function AdminAuthorizationDialog({
   onPinChange,
   onSubmit,
   pin,
-}: AdminAuthorizationDialogProps) {
+}: Readonly<AdminAuthorizationDialogProps>) {
   if (!mode) return null;
 
   const unlock = mode === "unlock";

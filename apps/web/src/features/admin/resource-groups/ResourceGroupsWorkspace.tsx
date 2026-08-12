@@ -17,7 +17,7 @@ function statusTone(status: ResourceGroup["status"]): "success" | "warning" | "d
   return status === "INTERRUPTED" ? "danger" : "warning";
 }
 
-function CompactRelationshipList({ values }: { values: string[] }) {
+function CompactRelationshipList({ values }: Readonly<{ values: string[] }>) {
   if (values.length === 0) return <span className="resource-card-empty-value">Keine</span>;
   const visible = values.slice(0, 3);
   return (
@@ -38,13 +38,13 @@ export function ResourceGroupsWorkspace({
   onEdit,
   onAssign,
   onDelete,
-}: {
+}: Readonly<{
   board: OperationBoard;
   rows: ResourceGroup[];
   onEdit: (id: string) => void;
   onAssign: (id: string) => void;
   onDelete: (id: string, label: string) => void;
-}) {
+}>) {
   return (
     <div className="resource-group-card-grid" data-testid="resource-group-card-grid">
       {rows.map((group) => {

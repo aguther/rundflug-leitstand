@@ -38,7 +38,7 @@ const STATUS_ICONS: Record<PublicStatusIconName, LucideIcon> = {
   CircleCheck,
 };
 
-function AutoFitText({ children }: { children: string }) {
+function AutoFitText({ children }: Readonly<{ children: string }>) {
   const textRef = useRef<HTMLSpanElement>(null);
   const text = children;
 
@@ -127,11 +127,11 @@ export function PublicStatusIdentity({
   bookingGroupLabel,
   productName,
   passengerCount,
-}: {
+}: Readonly<{
   bookingGroupLabel: string;
   productName: string;
   passengerCount?: number;
-}) {
+}>) {
   return (
     <div className="public-status-summary">
       <div className="public-status-identity">
@@ -157,7 +157,9 @@ export function PublicStatusIdentity({
   );
 }
 
-export function PublicRecallNotice({ recall }: { recall: TicketGroupRecallProjection | null }) {
+export function PublicRecallNotice({
+  recall,
+}: Readonly<{ recall: TicketGroupRecallProjection | null }>) {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -189,12 +191,12 @@ export function PublicStatusPart({
   timeZone,
   bookingGroupPart,
   pauseReason,
-}: {
+}: Readonly<{
   part: StatusPart;
   timeZone: string;
   bookingGroupPart?: BookingGroupPartContext | null;
   pauseReason?: string;
-}) {
+}>) {
   const presentation = PUBLIC_STATUS_PRESENTATIONS[part.status];
   const StatusIcon = STATUS_ICONS[presentation.iconName];
   const partLabels =
@@ -254,12 +256,12 @@ export function PublicStatusFooter({
   timeZone,
   push,
   pushDescription,
-}: {
+}: Readonly<{
   updatedAt: string;
   timeZone: string;
   push: ReturnType<typeof import("./use-public-push").usePublicPush>;
   pushDescription: string;
-}) {
+}>) {
   const [privacyOpen, setPrivacyOpen] = useState(false);
   return (
     <>

@@ -81,7 +81,7 @@ function timeWindow(group: FidsBoardRow, timeZone: string): string {
   }).replace(" – ", "–");
 }
 
-function Status({ group }: { group: FidsBoardRow }) {
+function Status({ group }: Readonly<{ group: FidsBoardRow }>) {
   const presentation = statusPresentation(group.status);
   const Icon = presentation.icon;
   return (
@@ -107,7 +107,7 @@ function Status({ group }: { group: FidsBoardRow }) {
   );
 }
 
-function GroupCell({ group }: { group: FidsBoardRow }) {
+function GroupCell({ group }: Readonly<{ group: FidsBoardRow }>) {
   const codes = groupCodes(group);
   return (
     <div className="fids-group-cell" data-group-count={codes.length}>
@@ -130,13 +130,13 @@ function FidsTable({
   highlightedRows,
   rowCapacity,
   timeZone,
-}: {
+}: Readonly<{
   groups: FidsBoardRow[];
   compact: boolean;
   highlightedRows: ReadonlySet<string>;
   rowCapacity: number;
   timeZone: string;
-}) {
+}>) {
   const emptySlots = Math.max(0, rowCapacity - groups.length);
   return (
     <div className={`fids-table ${compact ? "fids-table--compact" : "fids-table--wide"}`}>
@@ -197,7 +197,7 @@ function FidsTable({
   );
 }
 
-function FidsEmptyState({ message, tone }: { message: string; tone?: "error" }) {
+function FidsEmptyState({ message, tone }: Readonly<{ message: string; tone?: "error" }>) {
   return (
     <p className="fids-section-empty" data-tone={tone ?? "empty"} role={tone ? "alert" : "status"}>
       {message}
@@ -214,7 +214,7 @@ function FidsSection({
   timeZone,
   emptyMessage,
   emptyTone,
-}: {
+}: Readonly<{
   groups: FidsBoardRow[];
   highlightedRows: ReadonlySet<string>;
   label?: string;
@@ -223,7 +223,7 @@ function FidsSection({
   timeZone: string;
   emptyMessage: string;
   emptyTone?: "error";
-}) {
+}>) {
   const leftColumn = groups.filter((_, index) => index % 2 === 0);
   const rightColumn = groups.filter((_, index) => index % 2 === 1);
   const leftColumnCapacity = Math.ceil(rows / 2);
@@ -319,7 +319,7 @@ export function FidsBoardPresentation({
   setupMode = false,
   simulationBanner,
   subtitle,
-}: FidsBoardPresentationProps) {
+}: Readonly<FidsBoardPresentationProps>) {
   const { system: systemTheme } = useTheme();
   const logoTheme =
     preferences.theme === "SYSTEM" ? systemTheme : preferences.theme === "DARK" ? "dark" : "light";
@@ -510,7 +510,7 @@ export function FidsDisplay({
   onLogout,
   simulationBanner,
   subtitle,
-}: {
+}: Readonly<{
   accountCode: string;
   clockOverride?: Date;
   dataSource: FidsDataSource;
@@ -518,7 +518,7 @@ export function FidsDisplay({
   onLogout?: () => Promise<void>;
   simulationBanner?: string;
   subtitle?: string;
-}) {
+}>) {
   const fids = useFidsExperience({ dataSource, locationAdapter });
   return (
     <FidsBoardPresentation

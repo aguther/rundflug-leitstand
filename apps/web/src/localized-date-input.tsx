@@ -61,7 +61,7 @@ export function replaceLocalTime(value: string, time: string): string {
   return date && valid24HourTime(time) ? `${date}T${time}` : date ? `${date}T00:00` : "";
 }
 
-function PickerIcon({ type }: { type: "date" | "time" }) {
+function PickerIcon({ type }: Readonly<{ type: "date" | "time" }>) {
   const Icon = type === "date" ? CalendarDays : Clock3;
   return <Icon aria-hidden="true" />;
 }
@@ -75,7 +75,7 @@ function GermanDateControl({
   disabled,
   invalid,
   required,
-}: {
+}: Readonly<{
   value: string;
   onChange: (value: string) => void;
   ariaLabel: string;
@@ -84,7 +84,7 @@ function GermanDateControl({
   disabled?: boolean | undefined;
   invalid?: boolean | undefined;
   required?: boolean | undefined;
-}) {
+}>) {
   const [displayValue, setDisplayValue] = useState(() => formatGermanDate(value));
   useEffect(() => setDisplayValue(formatGermanDate(value)), [value]);
   return (
@@ -134,7 +134,7 @@ function GermanTimeControl({
   describedBy,
   invalid,
   required,
-}: {
+}: Readonly<{
   value: string;
   onChange: (value: string) => void;
   ariaLabel: string;
@@ -142,7 +142,7 @@ function GermanTimeControl({
   describedBy?: string | undefined;
   invalid?: boolean | undefined;
   required?: boolean | undefined;
-}) {
+}>) {
   const [displayValue, setDisplayValue] = useState(value);
   useEffect(() => setDisplayValue(value), [value]);
   return (
@@ -192,7 +192,7 @@ export function LocalizedDateInput({
   error,
   required,
   disabled,
-}: Omit<LocalizedInputProps, "timeLabel">) {
+}: Readonly<Omit<LocalizedInputProps, "timeLabel">>) {
   const errorId = error && id ? `${id}-error` : undefined;
   return (
     <div className={`localized-input-field${error ? " has-error" : ""}`}>
@@ -223,7 +223,7 @@ export function LocalizedDateTimeInput({
   error,
   required,
   disabled,
-}: LocalizedInputProps) {
+}: Readonly<LocalizedInputProps>) {
   const date = value.slice(0, 10);
   const time = value.length >= 16 ? value.slice(11, 16) : "";
   const errorId = error && id ? `${id}-error` : undefined;

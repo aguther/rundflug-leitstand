@@ -16,7 +16,7 @@ function numberValue(value: string, fallback: number): number {
 export function SimulationRecurringRulesEditor({
   config,
   onChange,
-}: SimulationRecurringRulesEditorProps) {
+}: Readonly<SimulationRecurringRulesEditorProps>) {
   const model = config.operationalModel;
   if (!model) return null;
 

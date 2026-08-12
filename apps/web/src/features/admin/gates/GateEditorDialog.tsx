@@ -33,7 +33,7 @@ export function GateEditorDialog({
   resourceGroups,
   submitAttempted,
   tab,
-}: GateEditorDialogProps) {
+}: Readonly<GateEditorDialogProps>) {
   return (
     <ModalDialog
       bodyClassName="master-data-editor-body"

@@ -6,10 +6,10 @@ import { useTheme } from "./theme";
 export function BrandSymbol({
   className = "",
   labelled = false,
-}: {
+}: Readonly<{
   className?: string;
   labelled?: boolean;
-}) {
+}>) {
   return (
     <svg
       aria-hidden={labelled ? undefined : "true"}
@@ -32,7 +32,7 @@ export function BrandSymbol({
   );
 }
 
-export function BrandLockup({ className = "" }: { className?: string }) {
+export function BrandLockup({ className = "" }: Readonly<{ className?: string }>) {
   return (
     <span aria-label="Rundflug Leitstand" className={`brand-lockup ${className}`.trim()} role="img">
       <BrandSymbol className="brand-lockup-symbol" />
@@ -50,13 +50,13 @@ export function BrandMark({
   alt = "Veranstaltungslogo",
   theme: explicitTheme,
   revision,
-}: {
+}: Readonly<{
   className?: string;
   eventId?: string;
   alt?: string;
   theme?: EventLogoTheme;
   revision?: number | string;
-}) {
+}>) {
   const { resolved } = useTheme();
   const activeEvent = useOptionalActiveEvent();
   const [unavailableLogoUrl, setUnavailableLogoUrl] = useState<string | null>(null);

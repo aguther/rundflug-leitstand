@@ -20,7 +20,7 @@ export function AdminCompletionSummaryPanel({
   busyActionKey,
   onMessage,
   onRunBusyAction,
-}: AdminCompletionSummaryPanelProps) {
+}: Readonly<AdminCompletionSummaryPanelProps>) {
   const {
     eventId: EVENT_ID,
     deviceId: ADMIN_DEVICE_ID,

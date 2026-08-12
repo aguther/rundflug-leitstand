@@ -127,7 +127,7 @@ export function AdminMasterEditorFooter({
   onCancel,
   onDelete,
   onSave,
-}: AdminMasterEditorActionProps): ReactNode {
+}: Readonly<AdminMasterEditorActionProps>): ReactNode {
   return (
     <>
       {deleteAction ? (
@@ -164,7 +164,7 @@ export function AdminMasterEditorFurtherActions({
   administrator,
   deleteAction,
   onDelete,
-}: Pick<AdminMasterEditorActionProps, "administrator" | "deleteAction" | "onDelete">) {
+}: Readonly<Pick<AdminMasterEditorActionProps, "administrator" | "deleteAction" | "onDelete">>) {
   if (!deleteAction) return null;
   return (
     <section className="master-editor-more-actions">

@@ -25,7 +25,7 @@ import {
   realtimeStateChangeVersion,
   sendRealtimeHeartbeat,
 } from "./realtime-heartbeat";
-export function TicketStatusView({ code }: { code: string }) {
+export function TicketStatusView({ code }: Readonly<{ code: string }>) {
   const [status, setStatus] = useState<PublicTicketStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const push = usePublicPush("ticket", code);

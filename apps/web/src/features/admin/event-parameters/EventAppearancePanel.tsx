@@ -19,7 +19,7 @@ export function EventAppearancePanel({
   busyActionKey,
   onUpload,
   onRemove,
-}: {
+}: Readonly<{
   eventId: string;
   eventVersion: number;
   logoVariants: Record<EventLogoTheme, boolean>;
@@ -27,7 +27,7 @@ export function EventAppearancePanel({
   busyActionKey: string | null;
   onUpload: (theme: EventLogoTheme, file: File) => void;
   onRemove: (theme: EventLogoTheme) => void;
-}) {
+}>) {
   const [errors, setErrors] = useState<Partial<Record<EventLogoTheme, string>>>({});
   const [removeTheme, setRemoveTheme] = useState<EventLogoTheme | null>(null);
 

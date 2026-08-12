@@ -28,7 +28,7 @@ export function ConfirmationDialog({
   portal = false,
   onConfirm,
   onCancel,
-}: ConfirmationDialogProps) {
+}: Readonly<ConfirmationDialogProps>) {
   const [internalBusy, setInternalBusy] = useState(false);
   const effectiveBusy = confirmBusy || internalBusy;
   const confirm = () => {

@@ -66,7 +66,7 @@ export function SimulationFoundationDialog({
   activeConfig,
   onClose,
   onLoad,
-}: SimulationFoundationDialogProps) {
+}: Readonly<SimulationFoundationDialogProps>) {
   const [tab, setTab] = useState<FoundationTab>("SCENARIO");
   const [selectedPreset, setSelectedPreset] = useState<SimulationPresetId>(activeConfig.preset);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);

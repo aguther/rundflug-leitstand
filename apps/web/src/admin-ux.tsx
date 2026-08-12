@@ -55,10 +55,10 @@ const navigationItems: Array<{ id: AdminArea; label: string; Icon: LucideIcon }>
 export function AdminNavigation({
   activeArea,
   onChange,
-}: {
+}: Readonly<{
   activeArea: AdminArea;
   onChange: (area: AdminArea) => void;
-}) {
+}>) {
   return (
     <nav aria-label="Administration" className="admin-side-nav">
       {navigationItems.map(({ id, label, Icon }) => (
@@ -82,11 +82,11 @@ export function SetupProgress({
   steps,
   currentStepId,
   onSelect,
-}: {
+}: Readonly<{
   steps: SetupStep[];
   currentStepId?: AdminEventStep;
   onSelect: (step: SetupStep) => void;
-}) {
+}>) {
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const progressRef = useRef<HTMLDivElement | null>(null);
   const [scrollState, setScrollState] = useState({
@@ -266,11 +266,11 @@ export function MasterDataNavigation({
   activeCategory,
   counts,
   onChange,
-}: {
+}: Readonly<{
   activeCategory: MasterDataCategory;
   counts: Record<MasterDataCategory, number>;
   onChange: (category: MasterDataCategory) => void;
-}) {
+}>) {
   return (
     <nav aria-label="Stammdatenkategorien" className="master-data-nav">
       {masterDataItems.map((item) => (
@@ -292,10 +292,10 @@ export function MasterDataNavigation({
 export function ValidationHint({
   children,
   tone = "info",
-}: {
+}: Readonly<{
   children: ReactNode;
   tone?: "info" | "warning" | "error";
-}) {
+}>) {
   return (
     <div className={`admin-validation ${tone}`} role={tone === "error" ? "alert" : "status"}>
       <span aria-hidden="true">{tone === "info" ? "i" : "!"}</span>

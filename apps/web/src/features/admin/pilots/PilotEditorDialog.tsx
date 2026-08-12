@@ -30,7 +30,7 @@ export function PilotEditorDialog({
   onToggle,
   open,
   submitAttempted,
-}: PilotEditorDialogProps) {
+}: Readonly<PilotEditorDialogProps>) {
   return (
     <ModalDialog
       bodyClassName="master-data-editor-body"

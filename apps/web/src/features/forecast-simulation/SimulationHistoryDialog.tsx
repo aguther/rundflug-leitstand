@@ -84,10 +84,10 @@ function statusLabel(
 function ForecastValue({
   snapshot,
   value,
-}: {
+}: Readonly<{
   snapshot: SimulationForecastSnapshot;
   value: string;
-}) {
+}>) {
   return (
     <span className="sim-history-forecast-value">
       {formatTime(value)}
@@ -106,10 +106,10 @@ const FORECAST_SERIES = [
 function GroupForecastChart({
   rotation,
   snapshots,
-}: {
+}: Readonly<{
   rotation: SimulationRotation;
   snapshots: readonly SimulationForecastSnapshot[];
-}) {
+}>) {
   const [activeSnapshotIndex, setActiveSnapshotIndex] = useState<number | null>(null);
   if (snapshots.length === 0) {
     return <div className="sim-history-empty">Für diese Gruppe liegt noch kein Snapshot vor.</div>;
@@ -350,14 +350,14 @@ function AircraftTimeline({
   startMs,
   endMs,
   onOpenGroup,
-}: {
+}: Readonly<{
   aircraft: SimulationAircraft;
   rotations: readonly SimulationRotation[];
   blocks: readonly AircraftBlock[];
   startMs: number;
   endMs: number;
   onOpenGroup: (rotationId: string) => void;
-}) {
+}>) {
   const span = Math.max(1, endMs - startMs);
   const position = (at: string) =>
     Math.max(0, Math.min(100, ((Date.parse(at) - startMs) / span) * 100));
@@ -468,7 +468,7 @@ export function SimulationHistoryDialog({
   initialAircraftId,
   onClose,
   onExport,
-}: SimulationHistoryDialogProps) {
+}: Readonly<SimulationHistoryDialogProps>) {
   const visibleRotations = useMemo(
     () =>
       result.rotations

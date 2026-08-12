@@ -18,7 +18,7 @@ export function AircraftWorkspace({
   onTurnaround,
   onDelete,
   emptyLabel = "Keine Einträge vorhanden.",
-}: {
+}: Readonly<{
   board: OperationBoard;
   rows: Aircraft[];
   sortKey?: string | undefined;
@@ -29,7 +29,7 @@ export function AircraftWorkspace({
   onTurnaround: (id: string) => void;
   onDelete: (id: string, label: string) => void;
   emptyLabel?: ReactNode;
-}) {
+}>) {
   const available = board.aircraft.filter(
     (aircraft) => aircraft.operationalState === "AVAILABLE",
   ).length;

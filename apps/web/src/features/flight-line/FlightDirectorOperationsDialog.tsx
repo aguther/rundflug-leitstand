@@ -74,7 +74,7 @@ function OperationalNoticeEditor({
   onChange,
   onDelete,
   onSave,
-}: OperationalNoticeEditorProps) {
+}: Readonly<OperationalNoticeEditorProps>) {
   return (
     <div className="flight-director-notice-editor">
       {context ? (
@@ -136,7 +136,7 @@ export function FlightDirectorOperationsDialog({
   onTriggerEmergency,
   onUpsertPlannedOperation,
   onUpsertRecurringRule,
-}: FlightDirectorOperationsDialogProps) {
+}: Readonly<FlightDirectorOperationsDialogProps>) {
   const [tab, setTab] = useState<OperationsTab>("operations");
   const [noticeTarget, setNoticeTarget] = useState<NoticeEditorTarget | null>(null);
   const [noticeDraft, setNoticeDraft] = useState("");

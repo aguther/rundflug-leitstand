@@ -46,7 +46,7 @@ export function inferActionNoticeTone(message: string): PageNoticeTone {
   return "success";
 }
 
-export function ActionNotificationProvider({ children }: { children: React.ReactNode }) {
+export function ActionNotificationProvider({ children }: Readonly<{ children: React.ReactNode }>) {
   const [notices, setNotices] = useState<ActionNotice[]>([]);
   const dismiss = useCallback((id: number) => {
     setNotices((current) => current.filter((notice) => notice.id !== id));
@@ -95,7 +95,7 @@ export function ActionNotificationStack() {
   ));
 }
 
-export function PageNotificationRegion({ children }: { children: React.ReactNode }) {
+export function PageNotificationRegion({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <aside aria-label="Benachrichtigungen" aria-live="polite" className="page-notification-region">
       {children}
@@ -109,13 +109,13 @@ export function PageNotice({
   noticeKey,
   onDismiss,
   tone = "warning",
-}: {
+}: Readonly<{
   autoDismissMs?: number;
   children: React.ReactNode;
   noticeKey: string;
   onDismiss?: () => void;
   tone?: PageNoticeTone;
-}) {
+}>) {
   const [dismissedKey, setDismissedKey] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const remainingMs = useRef(autoDismissMs ?? 0);

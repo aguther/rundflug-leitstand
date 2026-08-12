@@ -31,7 +31,7 @@ export function MasterDataDeleteDialog({
   onPinChange,
   pin,
   target,
-}: MasterDataDeleteDialogProps) {
+}: Readonly<MasterDataDeleteDialogProps>) {
   if (!target) return null;
 
   const preparation = eventStatus === "PREPARATION";
@@ -146,7 +146,7 @@ export function MasterDataTemplateImportDialog({
   onImport,
   open,
   validation,
-}: MasterDataTemplateImportDialogProps) {
+}: Readonly<MasterDataTemplateImportDialogProps>) {
   return (
     <ModalDialog
       description="Versionierte Stammdaten werden geprüft und ausschließlich atomar in eine leere Veranstaltung in Vorbereitung importiert."

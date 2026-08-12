@@ -14,7 +14,7 @@ export function MasterDataWorkspace({
   onNew,
   filters,
   children,
-}: {
+}: Readonly<{
   event: EventSnapshot;
   search: string;
   onSearchChange: (value: string) => void;
@@ -23,7 +23,7 @@ export function MasterDataWorkspace({
   onNew: () => void;
   filters?: ReactNode;
   children: ReactNode;
-}) {
+}>) {
   return (
     <EventWorkspaceFrame event={event} variant="master-data">
       <div className="master-data-unified-toolbar">
@@ -47,10 +47,10 @@ export function MasterDataWorkspace({
 export function MasterDataEmptyState({
   title,
   description,
-}: {
+}: Readonly<{
   title: ReactNode;
   description: ReactNode;
-}) {
+}>) {
   return (
     <div className="master-data-empty master-data-unified-empty">
       <Database aria-hidden="true" />

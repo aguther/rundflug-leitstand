@@ -18,7 +18,7 @@ export function AdminOverviewPanel({
   eventFlowError,
   eventFlowLoading,
   pushConfigurationStatus,
-}: AdminOverviewPanelProps) {
+}: Readonly<AdminOverviewPanelProps>) {
   return (
     <>
       <div>

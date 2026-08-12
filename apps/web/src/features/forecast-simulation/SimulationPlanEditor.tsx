@@ -71,7 +71,11 @@ function numberValue(value: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function SimulationPlanEditor({ config, rotations, onChange }: SimulationPlanEditorProps) {
+export function SimulationPlanEditor({
+  config,
+  rotations,
+  onChange,
+}: Readonly<SimulationPlanEditorProps>) {
   const model = config.operationalModel;
   if (!model) {
     return (

@@ -18,7 +18,7 @@ export function SidePanel({
   children,
   footer,
   closeLabel = "Dialog schließen",
-}: SidePanelProps) {
+}: Readonly<SidePanelProps>) {
   return (
     <>
       <div

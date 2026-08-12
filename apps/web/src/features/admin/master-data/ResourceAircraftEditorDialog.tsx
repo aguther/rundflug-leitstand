@@ -33,7 +33,7 @@ export function ResourceAircraftEditorDialog({
   open,
   resourceEditor,
   submitAttempted,
-}: ResourceAircraftEditorDialogProps) {
+}: Readonly<ResourceAircraftEditorDialogProps>) {
   const resourceGroupSelected = category === "resource-groups";
   return (
     <ModalDialog

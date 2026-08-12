@@ -14,7 +14,7 @@ export function PageHeader({
   breadcrumb,
   actions,
   level = 1,
-}: PageHeaderProps) {
+}: Readonly<PageHeaderProps>) {
   const Heading = level === 1 ? "h1" : "h2";
   return (
     <div className="ds-page-header">

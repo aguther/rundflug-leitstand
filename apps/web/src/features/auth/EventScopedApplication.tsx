@@ -11,7 +11,7 @@ const FeatureRouter = lazy(async () => {
   return { default: module.FeatureRouter };
 });
 
-function Loading({ children = "Arbeitsbereich wird geladen …" }: { children?: string }) {
+function Loading({ children = "Arbeitsbereich wird geladen …" }: Readonly<{ children?: string }>) {
   return (
     <div className="app-loading" role="status">
       {children}
@@ -19,7 +19,7 @@ function Loading({ children = "Arbeitsbereich wird geladen …" }: { children?: 
   );
 }
 
-export function EventScopedApplication({ session }: { session: OperatorSession }) {
+export function EventScopedApplication({ session }: Readonly<{ session: OperatorSession }>) {
   const [events, setEvents] = useState<EventCatalogEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activatedEventId, setActivatedEventId] = useState<string | null>(null);

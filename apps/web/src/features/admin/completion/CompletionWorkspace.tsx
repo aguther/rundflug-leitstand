@@ -20,13 +20,13 @@ export function CompletionWorkspace({
   history,
   corrections,
   onHistoryTabChange,
-}: {
+}: Readonly<{
   board: OperationBoard;
   summary: ReactNode;
   history: ReactNode;
   corrections: ReactNode;
   onHistoryTabChange: (tab: "OPERATIONS" | "FORECASTS" | "AUDIT") => void;
-}) {
+}>) {
   const [activeTab, setActiveTab] = useState<CompletionTab>("summary");
   const [correctionStarted, setCorrectionStarted] = useState(false);
   const panels: Record<Exclude<CompletionTab, "corrections">, ReactNode> = {

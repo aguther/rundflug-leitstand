@@ -240,7 +240,7 @@ export function FlightLineSupervisorConsole({
   onGroupDefer,
   loadForecastHistory,
   loadResourceHistory,
-}: {
+}: Readonly<{
   board: OperationBoard;
   deviceId: string;
   deviceToken: string;
@@ -270,7 +270,7 @@ export function FlightLineSupervisorConsole({
     scopeType: "AIRCRAFT" | "PILOT",
     scopeId: string,
   ) => Promise<ResourceDayHistory>;
-}) {
+}>) {
   const [resourceGroupId, setResourceGroupId] = useState("");
   const [ticketSearch, setTicketSearch] = useState("");
   const [onlyOpenTickets, setOnlyOpenTickets] = useState(true);
@@ -866,13 +866,13 @@ function CompactTickets({
   sort,
   onSort,
   onOpenAnalytics,
-}: {
+}: Readonly<{
   rows: TicketRow[];
   timeZone: string;
   sort: TicketSort;
   onSort: (key: TicketSortKey) => void;
   onOpenAnalytics: (ticketGroupId: string, rotationId: string) => void;
-}) {
+}>) {
   const phaseIcon = (rotation: Rotation) => {
     const label = rotationStateLabels[rotation.status];
     const props = { "aria-hidden": true, size: 15 } as const;

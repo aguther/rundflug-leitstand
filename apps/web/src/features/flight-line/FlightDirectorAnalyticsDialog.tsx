@@ -41,7 +41,7 @@ export function FlightDirectorAnalyticsDialog({
   loadResourceHistory,
   onClose,
   open,
-}: FlightDirectorAnalyticsDialogProps) {
+}: Readonly<FlightDirectorAnalyticsDialogProps>) {
   const [tab, setTab] = useState<AnalyticsTab>("aircraft");
   const [ticketGroupId, setTicketGroupId] = useState("");
   const [rotationId, setRotationId] = useState("");

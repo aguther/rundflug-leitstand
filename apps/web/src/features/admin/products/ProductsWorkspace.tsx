@@ -16,7 +16,7 @@ export function ProductsWorkspace({
   onTurnaround,
   onDelete,
   emptyLabel = "Keine Einträge vorhanden.",
-}: {
+}: Readonly<{
   rows: Product[];
   sortKey?: string | undefined;
   sortDirection?: "asc" | "desc" | null | undefined;
@@ -26,7 +26,7 @@ export function ProductsWorkspace({
   onTurnaround: (id: string) => void;
   onDelete: (id: string, label: string) => void;
   emptyLabel?: ReactNode;
-}) {
+}>) {
   return (
     <AdminEntityTable
       className="admin-entity-table product-entity-table"

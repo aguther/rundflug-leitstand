@@ -4,7 +4,10 @@ import { type ReactNode, useEffect, useRef } from "react";
 import { cashierTicketCompletionIndicator } from "../../cashier-guidance";
 import type { TicketReceipt } from "../operations/operation-types";
 
-export function TableIconHeader({ children, label }: { children: ReactNode; label: string }) {
+export function TableIconHeader({
+  children,
+  label,
+}: Readonly<{ children: ReactNode; label: string }>) {
   return (
     <span className="cashier-icon-heading" title={label}>
       {children}
@@ -13,7 +16,7 @@ export function TableIconHeader({ children, label }: { children: ReactNode; labe
   );
 }
 
-export function CashierCompletionIcon({ result }: { result: TicketSearchResult }) {
+export function CashierCompletionIcon({ result }: Readonly<{ result: TicketSearchResult }>) {
   const indicator = cashierTicketCompletionIndicator(result.groupStatus, result.rotationStatuses);
   if (indicator === "NONE") return null;
   const completed = indicator === "COMPLETED";
@@ -37,10 +40,10 @@ export function CashierCompletionIcon({ result }: { result: TicketSearchResult }
 export function TicketPaper({
   compact = false,
   ticket,
-}: {
+}: Readonly<{
   compact?: boolean;
   ticket: TicketReceipt;
-}) {
+}>) {
   return (
     <article className={compact ? "ticket-paper ticket-paper-preview" : "ticket-paper"}>
       <strong>{ticket.eventName}</strong>
@@ -73,11 +76,11 @@ export function QrScanDialog({
   onClose,
   open,
   ticket,
-}: {
+}: Readonly<{
   onClose: () => void;
   open: boolean;
   ticket: TicketReceipt | undefined;
-}) {
+}>) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 

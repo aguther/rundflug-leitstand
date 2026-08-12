@@ -145,7 +145,7 @@ function AircraftSelection({
   refreshing,
   visibleAircraftCount,
   onShowMore,
-}: {
+}: Readonly<{
   aircraft: Aircraft[];
   assistClaims: OperationBoard["assistClaims"];
   board: OperationBoard;
@@ -155,7 +155,7 @@ function AircraftSelection({
   refreshing: boolean;
   visibleAircraftCount: number;
   onShowMore: () => void;
-}) {
+}>) {
   return (
     <section className="flight-assist flight-assist-v15 is-selection-mode">
       <Panel className="assist-v15-picker" padding="compact">
@@ -254,7 +254,7 @@ export function FlightLineAssist({
   onSetAircraftState,
   onToggleGroup,
   selectedQueueGroupIds,
-}: {
+}: Readonly<{
   board: OperationBoard;
   aircraft: Aircraft[];
   busyRotationIds?: ReadonlySet<string>;
@@ -279,7 +279,7 @@ export function FlightLineAssist({
   onSetAircraftState: (aircraftId: string, state: FlightLineFleetState) => Promise<void>;
   onToggleGroup: (ticketGroupId: string, selected: boolean) => void;
   selectedQueueGroupIds: string[];
-}) {
+}>) {
   const assistClaims = board.assistClaims ?? [];
   const ownServerClaim = assistClaims.find((claim) => claim.claimedByCurrentOperator);
   const [claimedAircraftId, setClaimedAircraftId] = useState<string | null>(

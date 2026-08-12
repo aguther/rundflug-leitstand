@@ -12,7 +12,7 @@ export function ProductReferenceRotation({
   offBlockToOnBlockMinutes,
   deboardingMinutes,
   bufferMinutes,
-}: ProductReferenceRotationProps) {
+}: Readonly<ProductReferenceRotationProps>) {
   const breakdown = deriveReferenceRotationBreakdown({
     boardingMinutes,
     offBlockToOnBlockMinutes,

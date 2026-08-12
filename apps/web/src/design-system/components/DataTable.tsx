@@ -37,7 +37,7 @@ export function DataTable<Row>({
   pageSize,
   pageSizeOptions = [10, 25, 50],
   className = "",
-}: DataTableProps<Row>) {
+}: Readonly<DataTableProps<Row>>) {
   const paginated = pageSize !== undefined;
   const paginationId = useId();
   const [rowsPerPage, setRowsPerPage] = useState(pageSize ?? rows.length);

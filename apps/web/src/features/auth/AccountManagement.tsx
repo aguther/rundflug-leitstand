@@ -34,10 +34,10 @@ const assignableRoles: OperatorRole[] = [
 export function AccountManagement({
   createOpen,
   onCreateOpenChange,
-}: {
+}: Readonly<{
   createOpen: boolean;
   onCreateOpenChange: (open: boolean) => void;
-}) {
+}>) {
   const { session } = useAuth();
   const [accounts, setAccounts] = useState<OperatorAccountSummary[]>([]);
   const [role, setRole] = useState<OperatorRole>("FLIGHT_LINE");

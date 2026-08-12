@@ -14,7 +14,7 @@ export function PilotCodesWorkspace({
   onEdit,
   onDelete,
   emptyLabel = "Keine Einträge vorhanden.",
-}: {
+}: Readonly<{
   rows: Pilot[];
   sortKey?: string | undefined;
   sortDirection?: "asc" | "desc" | null | undefined;
@@ -22,7 +22,7 @@ export function PilotCodesWorkspace({
   onEdit: (id: string) => void;
   onDelete: (id: string, label: string) => void;
   emptyLabel?: ReactNode;
-}) {
+}>) {
   return (
     <AdminEntityTable
       className="admin-entity-table"

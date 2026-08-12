@@ -50,7 +50,7 @@ export function Button({
   onClick,
   type = "button",
   ...rest
-}: ButtonProps) {
+}: Readonly<ButtonProps>) {
   const [internalBusy, setInternalBusy] = useState(false);
   const effectiveBusy = busy || internalBusy;
   const contentLabel = visibleText(children);

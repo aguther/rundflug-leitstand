@@ -190,13 +190,13 @@ export function ForecastTimeline({
   selectedRotationId,
   onSelectRotation,
   onShowHistory,
-}: {
+}: Readonly<{
   currentMs: number;
   result: SimulationResult;
   selectedRotationId: string | null;
   onSelectRotation: (rotationId: string) => void;
   onShowHistory: () => void;
-}) {
+}>) {
   const simulationStart = Date.parse(result.runWindow.startAt);
   const simulationEnd = Date.parse(result.runWindow.endAt);
   const halfWindow = (WINDOW_MINUTES / 2) * MINUTE_MS;

@@ -11,7 +11,7 @@ export function AppShell({
   className = "",
   notifications,
   connection,
-}: {
+}: Readonly<{
   title: string;
   children: React.ReactNode;
   kiosk?: boolean;
@@ -27,7 +27,7 @@ export function AppShell({
     lastConfirmedAt: string | null;
     backendConfirmed: boolean;
   };
-}) {
+}>) {
   const online = useConnectivity();
   const connectionStatus = resolveConnectionStatus({
     online,

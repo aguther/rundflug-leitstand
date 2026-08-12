@@ -32,7 +32,7 @@ export function AdminOperationsPanel({
   onSetEventLifecycle,
   setupComplete,
   setupSteps,
-}: AdminOperationsPanelProps) {
+}: Readonly<AdminOperationsPanelProps>) {
   const [emergencyReason, setEmergencyReason] = useState("");
   const [endOperationsConfirmOpen, setEndOperationsConfirmOpen] = useState(false);
   const [pendingEmergencyAction, setPendingEmergencyAction] = useState<EmergencyAction | null>(

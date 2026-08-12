@@ -17,10 +17,10 @@ const operationalPlanTabs = [
 export function OperationalPlanWorkspace({
   board,
   panelProps,
-}: {
+}: Readonly<{
   board: OperationBoard;
   panelProps: Omit<OperationalPlanPanelProps, "content">;
-}) {
+}>) {
   const [activeTab, setActiveTab] = useState<OperationalPlanTab>("plans");
 
   return (

@@ -36,7 +36,7 @@ export function FactoryResetDialog({
   onReasonChange,
   onRetainRecoveryBackupChange,
   onSubmit,
-}: FactoryResetDialogProps) {
+}: Readonly<FactoryResetDialogProps>) {
   if (!open) return null;
 
   const submitDisabled =

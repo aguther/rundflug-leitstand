@@ -15,7 +15,7 @@ export function AdminSimulationLauncher({
   busyActionKey,
   onMessage,
   onRunBusyAction,
-}: AdminSimulationLauncherProps) {
+}: Readonly<AdminSimulationLauncherProps>) {
   const {
     eventId: EVENT_ID,
     deviceId: ADMIN_DEVICE_ID,

@@ -31,7 +31,7 @@ export function GatesWorkspace({
   onEdit,
   onDelete,
   emptyLabel = "Keine Einträge vorhanden.",
-}: {
+}: Readonly<{
   board: OperationBoard;
   rows: Gate[];
   sortKey?: string | undefined;
@@ -40,7 +40,7 @@ export function GatesWorkspace({
   onEdit: (id: string) => void;
   onDelete: (id: string, label: string) => void;
   emptyLabel?: ReactNode;
-}) {
+}>) {
   return (
     <AdminEntityTable
       className="admin-entity-table"

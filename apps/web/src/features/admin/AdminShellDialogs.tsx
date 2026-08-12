@@ -107,7 +107,7 @@ export function AdminShellDialogs({
   setTurnaroundContext,
   templateImport,
   turnaroundContext,
-}: AdminShellDialogsProps) {
+}: Readonly<AdminShellDialogsProps>) {
   const selectedProduct = board?.products.find((product) => product.id === salesProductId) ?? null;
 
   return (

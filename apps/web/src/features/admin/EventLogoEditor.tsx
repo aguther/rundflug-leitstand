@@ -18,7 +18,7 @@ export function EventLogoEditor({
   onFileChange,
   onUpload,
   onRemove,
-}: {
+}: Readonly<{
   eventId: string;
   eventVersion: number;
   files: Record<EventLogoTheme, File | null>;
@@ -28,7 +28,7 @@ export function EventLogoEditor({
   onFileChange: (theme: EventLogoTheme, file: File | null) => void;
   onUpload: (theme: EventLogoTheme) => void;
   onRemove: (theme: EventLogoTheme) => void;
-}) {
+}>) {
   return (
     <section aria-labelledby="event-logo-editor-title" className="event-logo-editor-v15">
       <div className="event-logo-editor-heading">

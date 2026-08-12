@@ -227,11 +227,11 @@ export function CurrentAircraftStateMarker({
   aircraft,
   rotation,
   timeZone,
-}: {
+}: Readonly<{
   aircraft: FlightLineAircraft;
   rotation: FlightLineRotation | undefined;
   timeZone: string;
-}) {
+}>) {
   const status = visibleAircraftState(aircraft, rotation);
   const currentStep = flightProgressSteps(aircraft, rotation).find((step) => step.current);
   if (!currentStep) return null;
@@ -323,12 +323,12 @@ export function FlightProgress({
   rotation,
   timeZone,
   variant = "compact",
-}: {
+}: Readonly<{
   aircraft: FlightLineAircraft;
   rotation: FlightLineRotation | undefined;
   timeZone: string;
   variant?: "compact" | "detailed";
-}) {
+}>) {
   const status = visibleAircraftState(aircraft, rotation);
   const steps = flightProgressSteps(aircraft, rotation);
   return (
@@ -371,13 +371,13 @@ export function TicketGroupRecallButton({
   timeZone,
   onStart,
   onClear,
-}: {
+}: Readonly<{
   group: FlightLineQueueGroup;
   disabled?: boolean;
   timeZone: string;
   onStart: (ticketGroupId: string) => void | Promise<void>;
   onClear: (ticketGroupId: string, recallId: string) => void | Promise<void>;
-}) {
+}>) {
   const activeRecall = group.activeRecall;
   const eligibleToStart = ["QUEUED", "MISSING"].includes(group.status);
   if (!activeRecall && !eligibleToStart) return null;
@@ -417,7 +417,7 @@ function AssignmentQueueRow({
   productMismatch,
   disabled,
   timeZone,
-}: {
+}: Readonly<{
   group: FlightLineQueueGroup;
   selected: boolean;
   selectedSeats: number;
@@ -429,7 +429,7 @@ function AssignmentQueueRow({
   productMismatch: boolean;
   disabled: boolean;
   timeZone: string;
-}) {
+}>) {
   const segmentTicketCount = queuedSegmentTicketCount(group);
   const exceedsCapacity = !selected && selectedSeats + segmentTicketCount > capacity;
   const communicationLabel = formatBookingGroupLabel(group.productCode, group.communicationNumber);
@@ -525,7 +525,7 @@ export function BookingGroupAssignmentDialog({
   onReserveRecommendation,
   timeZone,
   headerActions,
-}: {
+}: Readonly<{
   aircraft: FlightLineAircraft | undefined;
   dispatchLease: DispatchRecommendationLeaseController;
   groups: FlightLineQueueGroup[];
@@ -541,7 +541,7 @@ export function BookingGroupAssignmentDialog({
   onReserveRecommendation: () => void | Promise<void>;
   timeZone: string;
   headerActions?: ReactNode;
-}) {
+}>) {
   const [queueDeviationReason, setQueueDeviationReason] = useState("");
   const [leaseRemainingSeconds, setLeaseRemainingSeconds] = useState(0);
   const [queueMutationPending, setQueueMutationPending] = useState(false);
@@ -945,11 +945,11 @@ export function CompactCurrentRotation({
   aircraft,
   rotation,
   timeZone,
-}: {
+}: Readonly<{
   aircraft: FlightLineAircraft | undefined;
   rotation: FlightLineRotation | undefined;
   timeZone: string;
-}) {
+}>) {
   if (!aircraft) {
     return (
       <div className="flight-director-empty-detail">
@@ -982,10 +982,10 @@ export function CompactCurrentRotation({
 export function CompactHistory({
   history,
   timeZone,
-}: {
+}: Readonly<{
   history: FlightLineRotation[];
   timeZone: string;
-}) {
+}>) {
   return (
     <div className="flight-director-compact-table history">
       <div className="flight-director-compact-head">
@@ -1034,7 +1034,7 @@ export function CompactHistory({
   );
 }
 
-function HistoryCellIcon({ Icon, label }: { Icon: LucideIcon; label: string }) {
+function HistoryCellIcon({ Icon, label }: Readonly<{ Icon: LucideIcon; label: string }>) {
   return (
     <span className="flight-director-history-cell-icon" title={label}>
       <Icon aria-hidden="true" />
@@ -1050,14 +1050,14 @@ export function PilotAssignmentDialogs({
   onAssignPilot,
   onClose,
   open,
-}: {
+}: Readonly<{
   aircraft: FlightLineAircraft | undefined;
   board: OperationBoard;
   currentRotation: FlightLineRotation | undefined;
   onAssignPilot: (aircraftId: string, pilotId: string, reassign: boolean) => Promise<void>;
   onClose: () => void;
   open: boolean;
-}) {
+}>) {
   const [pilotId, setPilotId] = useState("");
   const [reassign, setReassign] = useState<{
     pilotId: string;

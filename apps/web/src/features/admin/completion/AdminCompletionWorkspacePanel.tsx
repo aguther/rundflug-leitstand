@@ -28,7 +28,7 @@ export function AdminCompletionWorkspacePanel({
   onMessage,
   onRequestManifestCorrection,
   onRunBusyAction,
-}: AdminCompletionWorkspacePanelProps) {
+}: Readonly<AdminCompletionWorkspacePanelProps>) {
   return (
     <section
       aria-labelledby="admin-event-step-completion-tab"

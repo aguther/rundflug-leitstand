@@ -87,7 +87,7 @@ export function CompletionHistoryPanel({
   onResetFilters,
   operationalHistory,
   view,
-}: CompletionHistoryPanelProps) {
+}: Readonly<CompletionHistoryPanelProps>) {
   const products = board.products.toSorted(
     (left, right) =>
       productCollator.compare(left.name, right.name) ||

@@ -7,7 +7,11 @@ export interface AddButtonProps
   type?: "button" | "submit" | "reset";
 }
 
-export function AddButton({ ariaLabel, type = "button", ...buttonProps }: AddButtonProps) {
+export function AddButton({
+  ariaLabel,
+  type = "button",
+  ...buttonProps
+}: Readonly<AddButtonProps>) {
   return (
     <Button {...buttonProps} aria-label={ariaLabel} type={type} variant="primary">
       + Hinzufügen

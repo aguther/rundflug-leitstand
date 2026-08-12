@@ -13,13 +13,13 @@ export function AircraftResourceGroupAssignmentDialog({
   busy,
   onClose,
   onConfirm,
-}: {
+}: Readonly<{
   board: OperationBoard;
   context: AircraftResourceGroupAssignmentContext | null;
   busy: boolean;
   onClose: () => void;
   onConfirm: (aircraftId: string, resourceGroupId: string) => void;
-}) {
+}>) {
   const fixedAircraftId = context?.mode === "aircraft" ? context.aircraftId : "";
   const fixedResourceGroupId = context?.mode === "resource-group" ? context.resourceGroupId : "";
   const [aircraftId, setAircraftId] = useState(fixedAircraftId);

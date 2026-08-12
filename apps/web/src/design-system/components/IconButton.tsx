@@ -20,7 +20,7 @@ export function IconButton({
   onClick,
   type = "button",
   ...rest
-}: IconButtonProps) {
+}: Readonly<IconButtonProps>) {
   const [internalBusy, setInternalBusy] = useState(false);
   const effectiveBusy = busy || internalBusy;
   const actionLabel = busyLabel ?? `${label} wird ausgeführt`;

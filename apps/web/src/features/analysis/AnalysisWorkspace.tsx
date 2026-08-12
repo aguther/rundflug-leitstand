@@ -53,12 +53,12 @@ export function AnalysisWorkspace({
   backendConfirmed,
   onRefresh,
   simulator,
-}: {
+}: Readonly<{
   board: OperationBoard | null;
   backendConfirmed: boolean;
   onRefresh: () => void | Promise<void>;
   simulator: ReactNode;
-}) {
+}>) {
   const { deviceId: ADMIN_DEVICE_ID, deviceToken: ADMIN_DEVICE_TOKEN } =
     useAdminOperationIdentity();
   const [tab, setTab] = useState<EvaluationTab>("analysis");

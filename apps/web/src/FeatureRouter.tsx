@@ -27,7 +27,10 @@ const GroupStatusView = lazy(() =>
   import("./group-status-view").then((module) => ({ default: module.GroupStatusView })),
 );
 
-export function FeatureBoundary({ children, routeKey }: { children: ReactNode; routeKey: string }) {
+export function FeatureBoundary({
+  children,
+  routeKey,
+}: Readonly<{ children: ReactNode; routeKey: string }>) {
   return (
     <AppErrorBoundary scope="route" resetKey={routeKey}>
       <Suspense

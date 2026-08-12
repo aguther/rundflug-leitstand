@@ -20,7 +20,7 @@ export function ManifestCorrectionPanel({
   board,
   busy,
   onCorrect,
-}: ManifestCorrectionPanelProps) {
+}: Readonly<ManifestCorrectionPanelProps>) {
   const [ticketGroupId, setTicketGroupId] = useState("");
   const [targetRotationId, setTargetRotationId] = useState("");
   const [reason, setReason] = useState("");

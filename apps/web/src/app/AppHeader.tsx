@@ -69,7 +69,7 @@ export function AppHeader({
   publicView = false,
   publicEvent,
   connectionStatus = "connected",
-}: AppHeaderProps) {
+}: Readonly<AppHeaderProps>) {
   const { session, logout } = useAuth();
   const activeEvent = useOptionalActiveEvent();
   const { preference, setPreference } = useTheme();

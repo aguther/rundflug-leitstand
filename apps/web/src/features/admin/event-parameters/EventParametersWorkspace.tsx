@@ -26,7 +26,7 @@ export function EventParametersWorkspace({
   onSave,
   onUploadLogo,
   onRemoveLogo,
-}: {
+}: Readonly<{
   event: EventSnapshot;
   administrator: boolean;
   busyActionKey: string | null;
@@ -34,7 +34,7 @@ export function EventParametersWorkspace({
   onSave: (payload: ValidEventParameterPayload, lifecycle: EventParameterSaveLifecycle) => void;
   onUploadLogo: (theme: EventLogoTheme, file: File) => void;
   onRemoveLogo: (theme: EventLogoTheme) => void;
-}) {
+}>) {
   const [activeTab, setActiveTab] = useState<"parameters" | "appearance">("parameters");
   const [discardOpen, setDiscardOpen] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);

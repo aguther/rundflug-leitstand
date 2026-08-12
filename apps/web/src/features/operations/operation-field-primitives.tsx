@@ -2,7 +2,7 @@ import { Info } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-export function FieldHelp({ help }: { help: string }) {
+export function FieldHelp({ help }: Readonly<{ help: string }>) {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const [pinned, setPinned] = useState(false);
@@ -116,11 +116,11 @@ export function FieldLabel({
   label,
   help,
   htmlFor,
-}: {
+}: Readonly<{
   label: string;
   help: string;
   htmlFor: string;
-}) {
+}>) {
   return (
     <span className="field-label-with-info">
       <label htmlFor={htmlFor}>{label}</label>
@@ -129,7 +129,7 @@ export function FieldLabel({
   );
 }
 
-export function FieldGroupLabel({ label, help }: { label: string; help: string }) {
+export function FieldGroupLabel({ label, help }: Readonly<{ label: string; help: string }>) {
   return (
     <span className="field-label-with-info">
       <span>{label}</span>

@@ -27,13 +27,13 @@ function TurnaroundPhaseControl({
   inheritedValue,
   inheritedSource,
   onChange,
-}: {
+}: Readonly<{
   label: string;
   value: string;
   inheritedValue: number;
   inheritedSource: "PRODUCT" | "EVENT";
   onChange: (value: string) => void;
-}) {
+}>) {
   const explicit = value !== "";
   return (
     <div className="turnaround-phase-control">
@@ -72,13 +72,13 @@ function TurnaroundOverrideRow({
   override,
   busy,
   onSave,
-}: {
+}: Readonly<{
   aircraft: OperationBoard["aircraft"][number];
   product: Product;
   override?: Override | undefined;
   busy: boolean;
   onSave: (aircraftId: string, productId: string, values: OverrideValues) => void;
-}) {
+}>) {
   const [boarding, setBoarding] = useState(
     override?.plannedBoardingMinutesOverride?.toString() ?? "",
   );
@@ -160,13 +160,13 @@ export function AircraftProductTurnaroundOverrideDialog({
   busyKey,
   onClose,
   onSave,
-}: {
+}: Readonly<{
   board: OperationBoard;
   context: TurnaroundOverrideContext | null;
   busyKey: string | null;
   onClose: () => void;
   onSave: (aircraftId: string, productId: string, values: OverrideValues) => void;
-}) {
+}>) {
   if (!context) return null;
   const rows =
     context.mode === "aircraft"

@@ -6,13 +6,13 @@ export function WorkspaceSection({
   actions,
   children,
   className = "",
-}: {
+}: Readonly<{
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
-}) {
+}>) {
   return (
     <section className={`event-workspace-section ${className}`.trim()}>
       <header className="event-workspace-section-header">

@@ -6,7 +6,7 @@ const LABEL = {
   dark: "Dunkle Darstellung aktiv. Zur Systemdarstellung wechseln",
 } as const;
 
-export function ThemeToggle({ binary = false }: { binary?: boolean }) {
+export function ThemeToggle({ binary = false }: Readonly<{ binary?: boolean }>) {
   const { preference, resolved, cycle, setPreference } = useTheme();
   const label = binary
     ? resolved === "dark"

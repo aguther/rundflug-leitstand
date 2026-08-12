@@ -10,7 +10,7 @@ export function NumberFieldWithUnit({
   maximum,
   step = 1,
   disabled = false,
-}: {
+}: Readonly<{
   label: string;
   unit: string;
   value: string;
@@ -20,7 +20,7 @@ export function NumberFieldWithUnit({
   maximum: number;
   step?: number | undefined;
   disabled?: boolean | undefined;
-}) {
+}>) {
   const generatedId = useId();
   const errorId = error ? `${generatedId}-error` : undefined;
   return (

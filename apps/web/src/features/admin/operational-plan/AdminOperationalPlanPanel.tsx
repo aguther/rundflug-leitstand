@@ -27,7 +27,7 @@ export function AdminOperationalPlanPanel({
   onRefreshHistory,
   onRunBusyAction,
   readOnly,
-}: AdminOperationalPlanPanelProps) {
+}: Readonly<AdminOperationalPlanPanelProps>) {
   const {
     eventId: EVENT_ID,
     deviceId: ADMIN_DEVICE_ID,

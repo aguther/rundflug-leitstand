@@ -12,7 +12,7 @@ export function Panel({
   className = "",
   children,
   ...rest
-}: PanelProps) {
+}: Readonly<PanelProps>) {
   return (
     <Element className={`ds-panel ds-panel--${padding} ${className}`.trim()} {...rest}>
       {children}

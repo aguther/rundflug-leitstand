@@ -228,12 +228,12 @@ function EditableTimeInput({
   className,
   onChange,
   value,
-}: {
+}: Readonly<{
   ariaLabel: string;
   className?: string;
   onChange: (value: string) => void;
   value: string;
-}) {
+}>) {
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
 
@@ -271,12 +271,12 @@ function TimeInput({
   value,
   timeZone,
   onChange,
-}: {
+}: Readonly<{
   label: string;
   value: string;
   timeZone: string;
   onChange: (value: string) => void;
-}) {
+}>) {
   return (
     <div className="sim-time-field">
       <span>{label}</span>
@@ -295,10 +295,10 @@ function TimeInput({
 function DemandProfileChart({
   config,
   demand,
-}: {
+}: Readonly<{
   config: SimulationConfig;
   demand: SimulationDemand;
-}) {
+}>) {
   const width = 680;
   const height = 172;
   const padding = { top: 25, right: 16, bottom: 29, left: 42 };
@@ -406,14 +406,14 @@ function NumberInput({
   max,
   step = 1,
   onChange,
-}: {
+}: Readonly<{
   label: string;
   value: number;
   min?: number;
   max?: number;
   step?: number;
   onChange: (value: number) => void;
-}) {
+}>) {
   return (
     <input
       aria-label={label}
@@ -428,7 +428,7 @@ function NumberInput({
   );
 }
 
-function ParameterTag({ kind }: { kind: "Admin" | "Simulation" | "Experiment" }) {
+function ParameterTag({ kind }: Readonly<{ kind: "Admin" | "Simulation" | "Experiment" }>) {
   return (
     <span className={`sim-parameter-tag sim-parameter-tag--${kind.toLowerCase()}`}>{kind}</span>
   );
@@ -438,11 +438,11 @@ function DistributionInputs({
   id,
   value,
   onChange,
-}: {
+}: Readonly<{
   id: string;
   value: TriangularDistribution;
   onChange: (value: TriangularDistribution) => void;
-}) {
+}>) {
   const update = (key: DistributionValue, next: number) => onChange({ ...value, [key]: next });
   return (
     <div className="sim-distribution-inputs">
@@ -472,11 +472,11 @@ function Toggle({
   checked,
   label,
   onChange,
-}: {
+}: Readonly<{
   checked: boolean;
   label: string;
   onChange: (checked: boolean) => void;
-}) {
+}>) {
   return (
     <label className="sim-toggle">
       <input
@@ -498,7 +498,7 @@ export function ScenarioEditor({
   onChange,
   onApply,
   onClose,
-}: ScenarioEditorProps) {
+}: Readonly<ScenarioEditorProps>) {
   const [activeTab, setActiveTab] = useState<EditorTab>("ADMIN");
   const [requestedDemandProductId, setRequestedDemandProductId] = useState<string | null>(null);
   const demandProducts = config.operationalModel?.products ?? [];

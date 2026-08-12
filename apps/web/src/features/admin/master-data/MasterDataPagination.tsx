@@ -6,13 +6,13 @@ export function MasterDataPagination({
   pageSize,
   onPageChange,
   onPageSizeChange,
-}: {
+}: Readonly<{
   count: number;
   page: number;
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
-}) {
+}>) {
   const pageCount = Math.max(1, Math.ceil(count / pageSize));
   const currentPage = Math.min(page, pageCount - 1);
   const from = count === 0 ? 0 : currentPage * pageSize + 1;
