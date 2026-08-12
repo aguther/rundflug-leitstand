@@ -51,6 +51,30 @@ const board = async () => {
   if (!response.ok) throw new Error(`Board-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
+const waitForFreshDispatchPlan = async (rotationId, expectedVersion, timeoutMs = 2_000) => {
+  const startedAt = Date.now();
+  const deadline = startedAt + timeoutMs;
+  let latest = null;
+  do {
+    latest = await board();
+    const rotation = latest.rotations.find((candidate) => candidate.id === rotationId);
+    if (latest.event.version === expectedVersion && rotation?.dispatchPlan) {
+      return {
+        state: latest,
+        rotation,
+        elapsedMilliseconds: Date.now() - startedAt,
+      };
+    }
+    const remainingMilliseconds = deadline - Date.now();
+    if (remainingMilliseconds <= 0) break;
+    await new Promise((resolvePromise) =>
+      setTimeout(resolvePromise, Math.min(50, remainingMilliseconds)),
+    );
+  } while (Date.now() < deadline);
+  throw new Error(
+    `Forecast dispatch plan did not converge within ${timeoutMs} ms: ${JSON.stringify({ expectedVersion, actualVersion: latest?.event?.version ?? null, rotationId })}`,
+  );
+};
 const command = async (
   deviceId,
   token,
@@ -316,10 +340,12 @@ try {
     throw new Error("Konfliktfreie Pilotenzuordnungen sind in der Operationssicht inkonsistent.");
   }
   const busySale = await sell(secondCall.event.version);
-  current = await board();
-  const earliestBusyProposal = current.rotations.find(
-    (rotation) => rotation.id === busySale.aggregate.relatedRotationId,
+  const forecastConvergence = await waitForFreshDispatchPlan(
+    busySale.aggregate.relatedRotationId,
+    busySale.event.version,
   );
+  current = forecastConvergence.state;
+  const earliestBusyProposal = forecastConvergence.rotation;
   const busyAircraftByCompletion = current.rotations
     .filter(
       (rotation) =>
@@ -584,6 +610,7 @@ try {
       differentPilotsAccepted: true,
       activeRotations: active.length,
       earliestBusyAircraftSuggested: true,
+      forecastConvergenceMilliseconds: forecastConvergence.elapsedMilliseconds,
       rememberedPilotSuggested: true,
       reassignConfirmationRequired: true,
       reassignReplayIdempotent: true,
