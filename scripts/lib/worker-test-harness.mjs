@@ -59,7 +59,7 @@ function runWrangler(stateDirectory, arguments_, stdio = "ignore") {
 }
 
 async function stopProcessTree(processHandle) {
-  if (!processHandle || processHandle.exitCode !== null || !processHandle.pid) return;
+  if (processHandle?.exitCode !== null || !processHandle.pid) return;
   if (process.platform === "win32") {
     spawnSync(WINDOWS_TASKKILL_EXECUTABLE, ["/pid", String(processHandle.pid), "/T", "/F"], {
       stdio: "ignore",
@@ -78,6 +78,19 @@ async function stopProcessTree(processHandle) {
       resolvePromise();
     });
   });
+}
+
+function prepareD1State(stateDirectory, seedFiles, d1Commands) {
+  const migration = runWrangler(stateDirectory, ["d1", "migrations", "apply", "DB"]);
+  if (migration.status !== 0) throw new Error("Isolated D1 migrations failed.");
+  for (const seedFile of seedFiles) {
+    const seed = runWrangler(stateDirectory, ["d1", "execute", "DB", "--file", seedFile]);
+    if (seed.status !== 0) throw new Error(`Isolated D1 seed failed: ${seedFile}`);
+  }
+  for (const command of d1Commands) {
+    const result = runWrangler(stateDirectory, ["d1", "execute", "DB", "--command", command]);
+    if (result.status !== 0) throw new Error("Isolated D1 preparation command failed.");
+  }
 }
 
 export async function createWorkerTestHarness(options) {
@@ -111,16 +124,7 @@ export async function createWorkerTestHarness(options) {
       join(assetsDirectory, "index.html"),
       '<!doctype html><html lang="en"><title>Worker test harness</title></html>\n',
     );
-    const migration = runWrangler(stateDirectory, ["d1", "migrations", "apply", "DB"]);
-    if (migration.status !== 0) throw new Error("Isolated D1 migrations failed.");
-    for (const seedFile of seedFiles) {
-      const seed = runWrangler(stateDirectory, ["d1", "execute", "DB", "--file", seedFile]);
-      if (seed.status !== 0) throw new Error(`Isolated D1 seed failed: ${seedFile}`);
-    }
-    for (const command of d1Commands) {
-      const result = runWrangler(stateDirectory, ["d1", "execute", "DB", "--command", command]);
-      if (result.status !== 0) throw new Error("Isolated D1 preparation command failed.");
-    }
+    prepareD1State(stateDirectory, seedFiles, d1Commands);
 
     const port = await availablePort();
     const adminPinHash = createHash("sha256").update(adminPin).digest("hex");
