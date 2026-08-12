@@ -70,6 +70,26 @@ function createService(db: D1Database, broadcast = vi.fn()): MasterDataCommandSe
   return new MasterDataCommandService({ DB: db } as unknown as Env, broadcast);
 }
 
+function deleteCommand(
+  entityType: DeleteCommand["payload"]["entityType"],
+  entityId: string,
+): DeleteCommand {
+  return {
+    commandId: "550e8400-e29b-41d4-a716-446655440010",
+    eventId: "synthetic-event",
+    deviceId: "synthetic-admin",
+    expectedVersion: 9,
+    issuedAt: "2026-08-08T08:00:00.000Z",
+    type: "DELETE_MASTER_DATA",
+    payload: {
+      entityType,
+      entityId,
+      reason: "Synthetic cleanup",
+      adminPin: "1234",
+    },
+  };
+}
+
 describe("master data command service", () => {
   it("reorders every cashier product atomically with audit and idempotency", async () => {
     const { db, batches } = createDatabase({
@@ -246,6 +266,99 @@ describe("master data command service", () => {
     expect(findStatement(batch, "INSERT INTO idempotency_receipts")).toBeDefined();
     expect(findStatement(batch, "INSERT INTO outbox")).toBeDefined();
     expect(broadcast).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    {
+      entityType: "GATE" as const,
+      entityId: "gate-one",
+      firstRows: [{ label: "Gate one" }, { count: 0 }, { count: 0 }, { count: 0 }],
+      allRows: [],
+      eventType: "GATE_DELETED",
+      deleteSql: "DELETE FROM gates",
+    },
+    {
+      entityType: "RESOURCE_GROUP" as const,
+      entityId: "resource-one",
+      firstRows: [{ name: "Resource one" }, { count: 0 }, { count: 0 }, { count: 0 }],
+      allRows: [],
+      eventType: "RESOURCE_GROUP_DELETED",
+      deleteSql: "DELETE FROM resource_groups",
+    },
+    {
+      entityType: "PILOT" as const,
+      entityId: "pilot-one",
+      firstRows: [{ operational_code: "P-01" }, { count: 0 }, { count: 0 }],
+      allRows: [],
+      eventType: "PILOT_DELETED",
+      deleteSql: "DELETE FROM pilots",
+    },
+    {
+      entityType: "AIRCRAFT" as const,
+      entityId: "aircraft-one",
+      firstRows: [{ registration: "D-SYN1" }, { count: 0 }, { count: 0 }],
+      allRows: [],
+      eventType: "AIRCRAFT_DELETED",
+      deleteSql: "DELETE FROM aircraft",
+    },
+    {
+      entityType: "ASSIGNMENT" as const,
+      entityId: "aircraft-one",
+      firstRows: [{ count: 0 }],
+      allRows: [[{ id: "membership-one", registration: "D-SYN1" }]],
+      eventType: "AIRCRAFT_RESOURCE_GROUP_ASSIGNMENT_DELETED",
+      deleteSql: "DELETE FROM resource_group_memberships",
+    },
+  ])(
+    "deletes an unreferenced $entityType with the matching aggregate event",
+    async ({ entityType, entityId, firstRows, allRows, eventType, deleteSql }) => {
+      const { db, batches } = createDatabase({ firstRows, allRows });
+      const broadcast = vi.fn();
+      const service = createService(db, broadcast);
+
+      const response = await service.handleMasterDataDeletion(
+        deleteCommand(entityType, entityId),
+        currentEvent(),
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        accepted: true,
+        eventType,
+      });
+      expect(batches).toHaveLength(1);
+      const [batch] = batches;
+      if (!batch) throw new Error("Expected one persistence batch");
+      expect(findStatement(batch, deleteSql)).toBeDefined();
+      expect(findStatement(batch, "INSERT INTO operational_events")).toBeDefined();
+      expect(findStatement(batch, "INSERT INTO idempotency_receipts")).toBeDefined();
+      expect(findStatement(batch, "INSERT INTO outbox")).toBeDefined();
+      expect(broadcast).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("reports all gate references that block permanent deletion", async () => {
+    const { db, batches } = createDatabase({
+      firstRows: [{ label: "Gate one" }, { count: 2 }, { count: 3 }, { count: 4 }],
+    });
+    const broadcast = vi.fn();
+    const service = createService(db, broadcast);
+
+    const response = await service.handleMasterDataDeletion(
+      deleteCommand("GATE", "gate-one"),
+      currentEvent(),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        code: "MASTER_DATA_DELETE_BLOCKED",
+        message:
+          "Löschen nicht möglich. Zuerst entfernen: 2 Ressourcengruppe(n), 3 Produkt(e), 4 Umlauf/Umläufe.",
+      },
+    });
+    expect(batches).toHaveLength(0);
+    expect(broadcast).not.toHaveBeenCalled();
   });
 
   it("rejects moving an aircraft while an active rotation owns its lifecycle", async () => {
