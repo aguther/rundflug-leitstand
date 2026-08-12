@@ -1,3 +1,11 @@
+import type { DeviceRole } from "./authorization-types";
+import { DomainRuleError } from "./domain-rule-error";
+import type { RotationState } from "./rotation-state";
+
+export type { DeviceRole } from "./authorization-types";
+export { DomainRuleError } from "./domain-rule-error";
+export { type RotationState, rotationStateLabels, transitionRotation } from "./rotation-state";
+
 export type AircraftOperationalState =
   | "AVAILABLE"
   | "BOARDING"
@@ -23,16 +31,6 @@ export const aircraftOperationalStateLabels: Readonly<Record<AircraftDisplayStat
   INTERRUPTED: "Nicht verfügbar",
   INACTIVE: "Nicht verfügbar",
 };
-
-export class DomainRuleError extends Error {
-  readonly code: string;
-
-  constructor(code: string, message: string) {
-    super(message);
-    this.name = "DomainRuleError";
-    this.code = code;
-  }
-}
 
 export function assertProductPureSelection(productIds: readonly string[]): string {
   const productId = productIds[0];
@@ -134,36 +132,6 @@ export function assertTicketNoShowAllowed(input: {
   }
 }
 
-export type RotationState = "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED" | "CANCELED";
-
-export const rotationStateLabels: Readonly<Record<RotationState, string>> = {
-  DRAFT: "Wartend",
-  CALLED: "Boarding",
-  IN_FLIGHT: "Im Flug",
-  LANDED: "Gelandet",
-  COMPLETED: "Abgeschlossen",
-  CANCELED: "Storniert",
-};
-
-const allowedRotationTransitions: Readonly<Record<RotationState, readonly RotationState[]>> = {
-  DRAFT: ["CALLED"],
-  CALLED: ["IN_FLIGHT", "DRAFT", "CANCELED"],
-  IN_FLIGHT: ["LANDED"],
-  LANDED: ["COMPLETED"],
-  COMPLETED: [],
-  CANCELED: [],
-};
-
-export function transitionRotation(current: RotationState, next: RotationState): RotationState {
-  if (!allowedRotationTransitions[current].includes(next)) {
-    throw new DomainRuleError(
-      "ROTATION_TRANSITION_NOT_ALLOWED",
-      `Übergang ${current} → ${next} ist nicht zulässig.`,
-    );
-  }
-  return next;
-}
-
 export function assertTechnicalRotationAbortAllowed(current: RotationState): void {
   if (current !== "CALLED" && current !== "IN_FLIGHT") {
     throw new DomainRuleError(
@@ -191,8 +159,6 @@ export function planTechnicalRotationAbortQueueBlock(
     )
     .map((entry, index) => ({ id: entry.id, queueSequence: index + 1 }));
 }
-
-export type DeviceRole = "CASHIER" | "FLIGHT_LINE" | "FLIGHT_DIRECTOR" | "ADMIN" | "DISPLAY";
 
 export type OperationalCommandType =
   | "SET_OPERATIONAL_NOTE"

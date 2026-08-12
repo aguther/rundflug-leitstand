@@ -1,4 +1,4 @@
-import { DomainRuleError } from "./index";
+import { DomainRuleError } from "./domain-rule-error";
 
 export interface QueueGroup {
   id: string;

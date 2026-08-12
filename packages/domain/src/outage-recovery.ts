@@ -1,4 +1,6 @@
-import { type DeviceRole, DomainRuleError, type RotationState, transitionRotation } from "./index";
+import type { DeviceRole } from "./authorization-types";
+import { DomainRuleError } from "./domain-rule-error";
+import { type RotationState, transitionRotation } from "./rotation-state";
 
 export type OutageRecoveryEntryType =
   | "PAPER_SALE"

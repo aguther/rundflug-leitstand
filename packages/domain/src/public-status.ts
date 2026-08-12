@@ -1,4 +1,4 @@
-import type { RotationState } from "./index";
+import type { RotationState } from "./rotation-state";
 
 export type PublicRotationStatus =
   | "WAITING"
