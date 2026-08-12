@@ -1,10 +1,12 @@
 # ADR-0010: Anonyme Helferkonten und serverseitige Sitzungen
 
-- Status: Akzeptiert
+- Status: Teilweise ersetzt
 - Datum: 2026-07-17
 - Entscheidung: Auftraggeber
+- Teilweise ersetzt durch: V15-AUTH-010, V173-SES-010 und
+  [ADR-0021](0021-display-konten-und-fids-einstellungen.md)
 - Betroffene Anforderungen: F-ADM-030, F-ADM-050, F-ADM-110 bis F-ADM-130, D-080, D-085,
-  Q-SIC-020 und Q-SIC-050
+  Q-SIC-020, Q-SIC-050, V15-AUTH-010 und V173-SES-010
 
 ## Kontext
 
@@ -25,8 +27,10 @@ eindeutig, rollenberechtigt, widerrufbar und auditierbar bleiben.
   Antworten unterscheiden nicht zwischen unbekanntem Konto und falscher PIN.
 - Erfolgreiche Anmeldung erzeugt eine zufällige, nur gehasht gespeicherte Sitzung. Der Browser
   erhält ausschließlich ein `Secure`, `HttpOnly`, `SameSite=Strict` Cookie.
-- Normale Sitzungen werden nach 30 Minuten Inaktivität gesperrt und spätestens nach zwölf Stunden
-  beendet. Display-Sitzungen dürfen länger leben, bleiben aber einzeln widerrufbar.
+- Die ursprüngliche Laufzeitentscheidung von 30 Minuten Inaktivität und höchstens zwölf Stunden gilt
+  nicht mehr. Sitzungen aller Rollen außer `DISPLAY` laufen absolut 16 Stunden ohne früheren
+  Idle-Ablauf. `DISPLAY`-Sitzungen laufen absolut 90 Tage ohne früheren Idle-Ablauf. Abmeldung,
+  Kontodeaktivierung, PIN-Wechsel und expliziter Sitzungswiderruf wirken für alle Rollen sofort.
 - Schreibkommandos protokollieren Konto, Sitzung und Gerät. Die Geräte-ID ist technische Herkunft,
   nicht Benutzeridentität.
 - Der zuletzt ausgewählte Kontocode darf lokal als Bedienhilfe gespeichert werden. PIN und
@@ -43,3 +47,7 @@ Rollen, Sitzungen und Anmeldeversuche. Die bisherigen Geräte-Header werden wäh
 serverseitig durch die Sitzungskontexte ersetzt. Bestehende fachliche Rollen und Audit-Invarianten
 bleiben erhalten.
 
+Die Konto-, Rollen-, Cookie-, Hashing-, Geräte- und Widerrufsentscheidung dieses ADR bleibt gültig.
+Nur die ursprünglichen Sitzungsfristen wurden durch V15-AUTH-010 und V173-SES-010 sowie die
+Display-Ausgestaltung in ADR-0021 ersetzt. Für die Laufzeitdetails konkretisieren diese neueren
+Anforderungen die allgemeine Inaktivitätsformulierung aus Q-SIC-050.

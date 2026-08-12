@@ -765,8 +765,43 @@
     },
     {
       "path": "packages/contracts/src/operations-dispatch.ts",
-      "maxLines": 1298,
-      "targetLines": 1500
+      "maxLines": 65,
+      "targetLines": 100
+    },
+    {
+      "path": "packages/contracts/src/operation-assistance.ts",
+      "maxLines": 51,
+      "targetLines": 100
+    },
+    {
+      "path": "packages/contracts/src/operation-board.ts",
+      "maxLines": 440,
+      "targetLines": 500
+    },
+    {
+      "path": "packages/contracts/src/operation-command-administration.ts",
+      "maxLines": 343,
+      "targetLines": 400
+    },
+    {
+      "path": "packages/contracts/src/operation-command-base.ts",
+      "maxLines": 21,
+      "targetLines": 60
+    },
+    {
+      "path": "packages/contracts/src/operation-command-flight.ts",
+      "maxLines": 122,
+      "targetLines": 180
+    },
+    {
+      "path": "packages/contracts/src/operation-command-planning.ts",
+      "maxLines": 197,
+      "targetLines": 250
+    },
+    {
+      "path": "packages/contracts/src/operation-command-ticketing.ts",
+      "maxLines": 117,
+      "targetLines": 180
     },
     {
       "path": "packages/contracts/src/reports-recovery.ts",

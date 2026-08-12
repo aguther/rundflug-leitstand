@@ -3,7 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import biomeConfigRaw from "../biome.json?raw";
-import { collectProductionRawImports } from "./verify_refactor_guardrails.mjs";
+import {
+  collectInternalDomainBarrelImports,
+  collectProductionRawImports,
+} from "./verify_refactor_guardrails.mjs";
 
 const temporaryDirectories: string[] = [];
 
@@ -57,5 +60,29 @@ describe("refactor guardrail source scope", () => {
     const biomeConfig = JSON.parse(biomeConfigRaw) as { files: { includes: string[] } };
 
     expect(biomeConfig.files.includes).toContain("!wrangler.*.generated.jsonc");
+  });
+
+  it("reports production modules that import the public domain barrel", async () => {
+    const repositoryRoot = await mkdtemp(join(tmpdir(), "domain-barrel-guardrail-"));
+    temporaryDirectories.push(repositoryRoot);
+    const domainSource = join(repositoryRoot, "packages", "domain", "src");
+    await mkdir(join(domainSource, "nested"), { recursive: true });
+    await Promise.all([
+      writeFile(join(domainSource, "index.ts"), "export const value = 1;\n"),
+      writeFile(join(domainSource, "direct.ts"), 'import { value } from "./index";\nvoid value;\n'),
+      writeFile(
+        join(domainSource, "nested", "indirect.ts"),
+        'import { value } from "../index.ts";\nvoid value;\n',
+      ),
+      writeFile(
+        join(domainSource, "allowed.test.ts"),
+        'import { value } from "./index";\nvoid value;\n',
+      ),
+    ]);
+
+    await expect(collectInternalDomainBarrelImports(repositoryRoot)).resolves.toEqual([
+      "packages/domain/src/direct.ts",
+      "packages/domain/src/nested/indirect.ts",
+    ]);
   });
 });

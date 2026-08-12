@@ -131,7 +131,7 @@ Jedes Schreibkommando trägt mindestens `commandId`, `eventId`, `deviceId`, `exp
 | Schutzziel | Umsetzung |
 | --- | --- |
 | Transport | HTTPS/TLS erzwungen (308-Redirect außerhalb der Entwicklung), WSS für Realtime |
-| Anmeldung | Konten mit Rolle; Sitzungen über Secure-/HttpOnly-/SameSite-Cookies, nicht aus JavaScript lesbar, Inaktivitätssperre und absolute Befristung |
+| Anmeldung | Konten mit Rolle; Sitzungen über Secure-/HttpOnly-/SameSite-Cookies, nicht aus JavaScript lesbar; alle Rollen außer `DISPLAY` absolut 16 Stunden, `DISPLAY` absolut 90 Tage, jeweils ohne früheren Idle-Ablauf und mit sofortigem Widerruf |
 | PIN | langsamer, gesalzener Passwort-Hash; progressive Begrenzung der Fehlversuche je Konto und Herkunft |
 | Rollenrechte | `assertRoleMayExecute` in `packages/domain`; jedes Kommando ist genau einer Rollenmenge zugeordnet |
 | Geräte | gekoppelte Geräte mit gehashtem Kopplungstoken; Klartexttoken bleibt lokal im Browser |
@@ -226,10 +226,10 @@ werden dadurch nicht in Familiendienste dupliziert; deren D1-Batches bleiben die
 | Ebene | Werkzeug / Nachweis |
 | --- | --- |
 | Fachlogik | Vitest-Unit-Tests neben jedem Domänenmodul |
-| Verträge | Schema-Tests in `packages/contracts` inklusive Modul-Exportprüfung |
+| Verträge | Schema-Tests in `packages/contracts` inklusive Modul-Exportprüfung; Familien-Exhaustiveness hält 57 Schemaoptionen und 59 eindeutige Command-Discriminatoren lückenlos |
 | Worker-Laufzeit | `@cloudflare/vitest-pool-workers` über `vitest.worker.config.ts`; eigener PR-CI-Job |
 | Oberfläche | Testing Library und jsdom für DOM-Tests, Playwright für Browserläufe |
-| Integration | zahlreiche `scripts/verify_*.mjs`-Läufe; 18 V1-Kernsuiten als eigener PR-CI-Job, Soak und Abnahmetag als getrennte Langzeitabnahmen |
+| Integration | zahlreiche `scripts/verify_*.mjs`-Läufe; lokale Worker-Verifier erhalten über `scripts/lib/worker-test-harness.mjs` je Instanz freien Port, temporären D1-Zustand und Assets; 18 V1-Kernsuiten als eigener PR-CI-Job, Soak und Abnahmetag als getrennte Langzeitabnahmen |
 | Architekturregeln | `apps/worker/src/maintainability-coverage.test.ts`, `npm run refactor:guardrails` (Dateibudgets, Importverbote) |
 | Coverage | expliziter Produktionscode-Nenner für `apps` und `packages`; lokale abgerundete Ratchets 56 % Statements, 50 % Branches, 54 % Functions und 58 % Lines; 80 % SonarQube-Ziel für neuen Code |
 | Dokumentation | `npm run docs:verify` prüft Architektur-, Datenschutz-, Lizenz-, Link-, Rollen- und Releasekonsistenz |

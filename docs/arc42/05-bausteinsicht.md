@@ -21,16 +21,30 @@ flowchart TB
     WORKER --> CONFIG
 ```
 
+Der bisherige Operations-Vertrag bleibt als öffentliche Fassade kompatibel, besitzt intern jedoch
+eindeutige Änderungsgrenzen:
+
+```mermaid
+flowchart LR
+    FACADE["operations-dispatch.ts<br/>kompatible Fassade"] --> ADMIN["Administration Commands"]
+    FACADE --> FLIGHT["Flight Commands"]
+    FACADE --> PLAN["Planning Commands"]
+    FACADE --> TICKET["Ticketing Commands"]
+    FACADE --> BOARD["Operation Board"]
+    FACADE --> ASSIST["Assistance und Leases"]
+```
+
 `packages/domain` besitzt keine Abhängigkeit (auch keine Entwicklungsabhängigkeit auf Cloudflare, HTTP
 oder React), `packages/contracts` ausschließlich Zod. Die Webanwendung verwendet die Fachlogik nur
 lesend – für Anzeige, Projektionen und den lokalen Prognosesimulator; bestätigte Zustandsübergänge
-entstehen ausschließlich im Worker.
+entstehen ausschließlich im Worker. Interne Domain-Module importieren Kernsymbole direkt aus deren
+besitzendem Modul; `packages/domain/src/index.ts` ist ausschließlich die öffentliche Fassade.
 
 | Baustein | Verantwortung | Bewusste Grenze |
 | --- | --- | --- |
 | `apps/web` | Bedienoberflächen aller Rollen, öffentliche Statusseiten, PWA-Verhalten, Offline-Sichtbarkeit, Prognosesimulator | führt keine fachlichen Zustandsübergänge aus; kennt keine D1- oder Cloudflare-Details |
 | `apps/worker` | HTTP- und WebSocket-Transport, Sitzungen und Rollenprüfung, Persistenz, Serialisierung, Prognoseanstoß, Push, Backups, Cron | dupliziert keine Domänenregel; einziger Ort für Cloudflare-Bindings |
-| `packages/contracts` | ausführbare Verträge für Kommandos, Antworten, öffentliche DTOs, Exporte und Vorlagen | enthält keine Geschäftsentscheidung, nur Form und Validierung |
+| `packages/contracts` | ausführbare Verträge für Kommandos, Antworten, öffentliche DTOs, Exporte und Vorlagen; Operations-Commands sind nach Administration, Flight, Planning und Ticketing getrennt | enthält keine Geschäftsentscheidung, nur Form und Validierung; bisheriger Root- und Operations-Subpath bleiben kompatibel |
 | `packages/domain` | Rollenrechte, Zustandsautomaten, Invarianten, Queue, Prognose, Kapazität, Nacherfassung | keine Laufzeitabhängigkeit, kein Import von Cloudflare, HTTP, DB oder React |
 | `packages/config` | Anwendungsname, Version aus der Root-`package.json`, Standardzeitzone | keine Logik |
 | `packages/testkit` | eigenständige synthetische Testuhr und technische Testkennungen | nicht Teil des Produktionsbundles; derzeit ohne Workspace-Konsumenten |

@@ -14,7 +14,7 @@ ist die Übersicht; verbindlich ist jeweils der ADR-Text mit Kontext, Alternativ
 | [0007](../adr/0007-eine-cloudflare-abnahmeumgebung.md) | Genau eine Abnahmeumgebung bis zur Produktionsfreigabe | Produktion ist ein Gate mit eigener D1, eigenem R2-Bucket und getrennten Secrets |
 | [0008](../adr/0008-abgeleitete-kapazitaet-und-vereinfachter-betrieb.md) | Abgeleitete Kapazität und vereinfachter operativer Ablauf | weniger Pflichtfelder am Veranstaltungstag; Kapazität entsteht rechnerisch |
 | [0009](../adr/0009-mehrflaechenbetrieb-und-automatischer-voraufruf.md) | Mehrflächenbetrieb, automatischer Voraufruf, öffentliche Anzeigen | mehrere Ressourcengruppen parallel; Voraufruf ohne Ressourcenbindung |
-| [0010](../adr/0010-anonyme-helferkonten-und-sitzungen.md) | Anonyme Helferkonten mit serverseitigen Sitzungen | Rollen statt Personen; widerrufbare Sitzungen und Gerätekopplung |
+| [0010](../adr/0010-anonyme-helferkonten-und-sitzungen.md) | Anonyme Helferkonten mit serverseitigen Sitzungen, teilweise ersetzt | Rollen statt Personen; widerrufbare Sitzungen und Gerätekopplung bleiben, Laufzeiten folgen V15-AUTH-010, V173-SES-010 und ADR-0021 |
 | [0011](../adr/0011-v1-2-designsystem-und-web-modularisierung.md) | Designsystem und modulare Webanwendung | verbindliche Modulgrenzen; `App.tsx` nur Komposition und Routing |
 | [0012](../adr/0012-flugzeugzentrierte-abfertigung-und-adaptiver-voraufruf.md) | Flugzeugzentrierte Abfertigung, adaptiver Voraufruf | Umlauf und Flugzeugzustand sind gekoppelt; Bindung erst bei `CALL_NEXT` |
 | [0013](../adr/0013-expliziter-veranstaltungskontext-und-displaybindung.md) | Expliziter Veranstaltungskontext und Displaybindung | jeder Client arbeitet in genau einem Veranstaltungskontext |
@@ -47,6 +47,7 @@ ist die Übersicht; verbindlich ist jeweils der ADR-Text mit Kontext, Alternativ
 | [0040](../adr/0040-serverseitige-oeffentliche-codevergabe.md) | Serverseitige Vergabe öffentlicher Statuscodes | reguläre Verkäufe akzeptieren keine Clientcodes; Worker-Vergabe, Kollisionsprüfung und idempotenter Beleg |
 | [0041](../adr/0041-modulare-forecast-pipeline-und-legacy-abschaltung.md) | Modulare Forecast-Pipeline und Legacy-Abschaltung | explizite Adapter- und Domain-Phasen, Persist-before-publish und messbares Abschaltkriterium |
 | [0042](../adr/0042-modulare-deterministische-simulationspipeline.md) | Modulare deterministische Simulationspipeline | gemeinsame Seed-Primitive und fachliche Phasen für Legacy-/Operational-Simulation; operative Tests sind Teil der Coverage |
+| [0043](../adr/0043-familienvertraege-und-isoliertes-worker-testharness.md) | Familienverträge und isoliertes Worker-Testharness | kompatible Operations-Fassade mit vier Command-Familien; parallele lokale Verifier ohne geteilten Port oder D1-Zustand |
 
 ## Offene Entscheidungen
 

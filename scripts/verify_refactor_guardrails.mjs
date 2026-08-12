@@ -9,6 +9,7 @@ const productionSourceRoots = ["apps", "packages"];
 const testFilePattern = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const productionTypeScriptPattern = /\.(?:ts|tsx)$/;
 const rawImportPattern = /(?:\bfrom\s+|\bimport\s*)["']([^"']+\?raw)["']/g;
+const moduleImportPattern = /(?:\bfrom\s+|\bimport\s*)["']([^"']+)["']/g;
 const forbiddenProductionRawImportTargets = new Set([
   "apps/web/src/admin-view.tsx",
   "apps/worker/src/event-coordinator.ts",
@@ -70,6 +71,31 @@ export async function collectProductionRawImports(
   return [...new Set(imports)].sort(compareTechnicalStrings);
 }
 
+export async function collectInternalDomainBarrelImports(repositoryRoot = root) {
+  const domainSourceRoot = resolve(repositoryRoot, "packages", "domain", "src");
+  const domainBarrel = resolve(domainSourceRoot, "index.ts");
+  const files = (await collectFiles(domainSourceRoot)).filter(
+    (path) =>
+      productionTypeScriptPattern.test(path) &&
+      !testFilePattern.test(path) &&
+      !path.endsWith(".d.ts") &&
+      path !== domainBarrel,
+  );
+  const imports = [];
+  for (const file of files) {
+    const content = await readFile(file, "utf8");
+    for (const match of content.matchAll(moduleImportPattern)) {
+      const specifier = match[1];
+      if (!specifier.startsWith(".")) continue;
+      const target = resolve(dirname(file), specifier.replace(/\.ts$/, ""));
+      if (`${target}.ts` === domainBarrel) {
+        imports.push(normalizePath(relative(repositoryRoot, file)));
+      }
+    }
+  }
+  return [...new Set(imports)].sort(compareTechnicalStrings);
+}
+
 async function verifySizeBudgets(config) {
   const failures = [];
   const observations = [];
@@ -90,6 +116,7 @@ async function verifySizeBudgets(config) {
 async function run() {
   const config = JSON.parse(await readFile(configPath, "utf8"));
   const currentRawImports = await collectProductionRawImports();
+  const internalDomainBarrelImports = await collectInternalDomainBarrelImports();
   if (process.argv.includes("--write-baseline")) {
     config.allowedProductionRawImports = currentRawImports;
     await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
@@ -107,6 +134,12 @@ async function run() {
     (entry) => !currentRawImportSet.has(entry),
   );
   const { failures, observations } = await verifySizeBudgets(config);
+
+  if (internalDomainBarrelImports.length > 0) {
+    failures.push(
+      `production domain modules importing their own public barrel:\n${internalDomainBarrelImports.join("\n")}`,
+    );
+  }
 
   if (unexpected.length > 0) {
     failures.push(`new production TypeScript raw imports:\n${unexpected.join("\n")}`);

@@ -33,6 +33,7 @@ Monolithen aufgelöst:
 | `apps/worker/src/index.ts` | 8.277 Zeilen | 219 Zeilen |
 | `apps/web/src/admin-view.tsx` | 5.546 Zeilen | 663 Zeilen |
 | `packages/contracts/src/index.ts` | 3.793 Zeilen | 8 Zeilen |
+| `packages/contracts/src/operations-dispatch.ts` | 1.293 Zeilen | 65 Zeilen; Fassade vor Familienmodulen mit höchstens 440 Zeilen |
 | `apps/web/.../forecast-simulation/engine.ts` | 1.513 Zeilen | 214 Zeilen |
 | `apps/web/.../forecast-simulation/operational-engine.ts` | 1.490 Zeilen | 339 Zeilen |
 | Dependency-Audit | 13 High, 2 Moderate | 0 Findings |
@@ -52,6 +53,11 @@ Die vormals monolithischen lokalen Simulationsengines sind in Szenario-, Lifecyc
 Precall-, Dispatch-, Snapshot- und Metrikmodule zerlegt. Gemeinsame deterministische Primitive und
 Golden-Seed-Tests verhindern Drift; die Operational-Tests werden nicht mehr aus dem Coverage-Lauf
 ausgeschlossen. Größenratchets schützen die erreichten Orchestratorgrenzen.
+
+Der Operations-Contract ist in vier Command-Familien sowie getrennte Board- und Assistance-Module
+zerlegt; Exhaustiveness- und Subpath-Tests schützen die kompatible Fassade. Produktive Domain-Module
+besitzen keine Rückimporte aus dem eigenen Barrel. Die neun zuvor fest verdrahteten lokalen
+Worker-Verifier verwenden einen gemeinsamen, pro Lauf isolierten Port-, D1- und Assets-Lebenszyklus.
 
 ## 11.3 Leitplanken für weitere Umbauten
 
