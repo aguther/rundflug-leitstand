@@ -14,6 +14,51 @@ interface AdminAccessStatusBarProps {
   refreshing: boolean;
 }
 
+function accessPresentation(authenticated: boolean, unlocked: boolean) {
+  if (authenticated) {
+    return {
+      title: "Administration aktiv",
+      descriptionSuffix: " · Änderungen werden dem angemeldeten Konto zugeordnet.",
+      actionLabel: "Abmelden",
+      hint: "Die Anmeldung ersetzt wiederholte PIN-Abfragen. Jede Änderung bleibt einzeln protokolliert.",
+    };
+  }
+  if (unlocked) {
+    return {
+      title: "Bearbeitungsmodus aktiv",
+      description:
+        "Mehrere Änderungen sind möglich. Jede Änderung wird weiterhin einzeln protokolliert.",
+      actionLabel: "Bearbeitungsmodus sperren",
+      hint: "Änderungen sind freigeschaltet und werden automatisch protokolliert.",
+    };
+  }
+  return {
+    title: "Administration gesperrt",
+    description:
+      "Änderungen fragen die PIN einzeln ab oder können für diese Arbeitssitzung entsperrt werden.",
+    actionLabel: "Bearbeitungsmodus entsperren",
+    hint: "Beim Auslösen einer administrativen Änderung erscheint die PIN-Abfrage.",
+  };
+}
+
+function BoardStatusHint({
+  administrator,
+  boardLoadFailed,
+}: Pick<AdminAccessStatusBarProps, "administrator" | "boardLoadFailed">) {
+  if (administrator) {
+    return null;
+  }
+  if (boardLoadFailed) {
+    return (
+      <ValidationHint tone="error">
+        Der Betriebsstand konnte nicht geladen werden. Erneut laden oder mit einem
+        Administrationskonto anmelden; vorhandene Betriebsdaten bleiben unverändert.
+      </ValidationHint>
+    );
+  }
+  return <ValidationHint>Sitzung und Betriebsstand werden geprüft.</ValidationHint>;
+}
+
 export function AdminAccessStatusBar({
   adminModeUnlocked,
   administrator,
@@ -27,45 +72,33 @@ export function AdminAccessStatusBar({
   refreshing,
 }: AdminAccessStatusBarProps) {
   const authenticatedAdministrator = authenticatedAdminLoginCode !== null;
+  const presentation = accessPresentation(authenticatedAdministrator, adminModeUnlocked);
+  let adminAction = onRequestAdminModeUnlock;
+  if (authenticatedAdministrator) {
+    adminAction = onLogout;
+  } else if (adminModeUnlocked) {
+    adminAction = onLockAdminMode;
+  }
+  const description = authenticatedAdministrator
+    ? `${authenticatedAdminLoginCode}${presentation.descriptionSuffix}`
+    : presentation.description;
 
   return (
     <section
       className={`admin-edit-context admin-mode-bar ${adminModeUnlocked ? "unlocked" : "locked"}`}
     >
       <div>
-        <strong>
-          {authenticatedAdministrator
-            ? "Administration aktiv"
-            : adminModeUnlocked
-              ? "Bearbeitungsmodus aktiv"
-              : "Administration gesperrt"}
-        </strong>
-        <span>
-          {authenticatedAdministrator
-            ? `${authenticatedAdminLoginCode} · Änderungen werden dem angemeldeten Konto zugeordnet.`
-            : adminModeUnlocked
-              ? "Mehrere Änderungen sind möglich. Jede Änderung wird weiterhin einzeln protokolliert."
-              : "Änderungen fragen die PIN einzeln ab oder können für diese Arbeitssitzung entsperrt werden."}
-        </span>
+        <strong>{presentation.title}</strong>
+        <span>{description}</span>
       </div>
       {administrator ? (
         <Button
           busy={authenticatedAdministrator && logoutBusy}
           className="secondary-action"
-          onClick={
-            authenticatedAdministrator
-              ? onLogout
-              : adminModeUnlocked
-                ? onLockAdminMode
-                : onRequestAdminModeUnlock
-          }
+          onClick={adminAction}
           type="button"
         >
-          {authenticatedAdministrator
-            ? "Abmelden"
-            : adminModeUnlocked
-              ? "Bearbeitungsmodus sperren"
-              : "Bearbeitungsmodus entsperren"}
+          {presentation.actionLabel}
         </Button>
       ) : (
         <div className="secondary-actions admin-recovery-actions">
@@ -83,23 +116,8 @@ export function AdminAccessStatusBar({
           </Button>
         </div>
       )}
-      {!administrator ? (
-        boardLoadFailed ? (
-          <ValidationHint tone="error">
-            Der Betriebsstand konnte nicht geladen werden. Erneut laden oder mit einem
-            Administrationskonto anmelden; vorhandene Betriebsdaten bleiben unverändert.
-          </ValidationHint>
-        ) : (
-          <ValidationHint>Sitzung und Betriebsstand werden geprüft.</ValidationHint>
-        )
-      ) : null}
-      <ValidationHint>
-        {authenticatedAdministrator
-          ? "Die Anmeldung ersetzt wiederholte PIN-Abfragen. Jede Änderung bleibt einzeln protokolliert."
-          : adminModeUnlocked
-            ? "Änderungen sind freigeschaltet und werden automatisch protokolliert."
-            : "Beim Auslösen einer administrativen Änderung erscheint die PIN-Abfrage."}
-      </ValidationHint>
+      <BoardStatusHint administrator={administrator} boardLoadFailed={boardLoadFailed} />
+      <ValidationHint>{presentation.hint}</ValidationHint>
     </section>
   );
 }
