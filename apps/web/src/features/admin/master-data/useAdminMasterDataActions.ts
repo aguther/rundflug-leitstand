@@ -8,6 +8,11 @@ import type { useGateEditorState } from "../gates/useGateEditorState";
 import type { usePilotEditorState } from "../pilots/usePilotEditorState";
 import type { useProductEditorState } from "../products/useProductEditorState";
 import type { useResourceGroupEditorState } from "../resource-groups/useResourceGroupEditorState";
+import {
+  invalidAircraftField,
+  invalidProductField,
+  invalidResourceGroupField,
+} from "./admin-master-data-validation";
 
 interface TurnaroundOverrideValues {
   boarding: number | null;
@@ -41,35 +46,6 @@ interface UseAdminMasterDataActionsOptions {
   selectProduct: (id: string) => void;
   selectResourceGroup: (id: string) => void;
   setSubmitAttempted: (attempted: boolean) => void;
-}
-
-function invalidProductField(
-  editor: UseAdminMasterDataActionsOptions["editors"]["product"],
-  priceCents: number | null,
-) {
-  if (editor.name.trim().length < 2) return "product-name";
-  if (!/^[A-Z0-9-]{2,12}$/.test(editor.code)) return "product-code";
-  if (priceCents === null) return "product-price";
-  if (!editor.resourceGroupId) return "product-resource-group";
-  if (!editor.gateId) return "product-gate";
-  return null;
-}
-
-function invalidResourceGroupField(
-  editor: UseAdminMasterDataActionsOptions["editors"]["resourceGroup"],
-) {
-  if (editor.name.trim().length < 2) return "resource-name";
-  if (!/^[A-Z0-9-]{2,8}$/.test(editor.shortCode.trim().toUpperCase())) {
-    return "resource-short-code";
-  }
-  if (!editor.gateId) return "resource-gate";
-  return undefined;
-}
-
-function invalidAircraftField(editor: UseAdminMasterDataActionsOptions["editors"]["aircraft"]) {
-  if (editor.registration.trim().length < 3) return "aircraft-registration";
-  if (editor.type.trim().length < 2) return "aircraft-type";
-  return undefined;
 }
 
 export function useAdminMasterDataActions({
