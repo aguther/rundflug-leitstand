@@ -49,6 +49,13 @@ const dispatchLease = vi.hoisted(() => ({
   },
 }));
 
+const supervisor = vi.hoisted(() => ({
+  onGroupDefer: null as null | ((ticketGroupId: string) => Promise<void>),
+  onGroupRecallClear: null as
+    | null
+    | ((ticketGroupId: string, recallId: string) => Promise<boolean>),
+}));
+
 const syntheticRotation = {
   aircraftId: "aircraft-1",
   bookingGroups: [],
@@ -60,11 +67,47 @@ const syntheticRotation = {
 
 const syntheticDraftRotation = {
   aircraftId: "aircraft-1",
-  bookingGroups: [{ id: "ticket-group-1" }],
+  aircraftRegistration: "D-TEST",
+  baselineCapacity: 4,
+  boardingWindowLowerAt: null,
+  boardingWindowUpperAt: null,
+  bookingGroups: [{ id: "ticket-group-1", tickets: [] }],
+  calledAt: null,
+  capacityReduced: false,
+  communicationLabel: "F-PN-0001",
+  communicationNumber: 1,
+  deferralCount: 0,
+  estimatedPassengerPayloadKg: null,
+  flightGroupId: "flight-group-1",
+  gateId: "gate-1",
+  gateLabel: "Gate 1",
   id: "rotation-draft-1",
+  operationalNote: "",
+  pilotId: "pilot-1",
+  pilotOperationalCode: "PILOT-01",
+  predictedLowerMinutes: 5,
+  predictedUpperMinutes: 15,
+  productCode: "PN",
+  productName: "Synthetischer Rundflug",
+  queuePosition: 1,
   status: "DRAFT",
   suggestedAircraftId: "aircraft-1",
+  suggestedAircraftRegistration: "D-TEST",
+  suggestedPilotId: "pilot-1",
+  suggestedPilotOperationalCode: "PILOT-01",
   ticketGroupId: "ticket-group-1",
+  ticketCount: 2,
+  tickets: [],
+  timeline: {
+    actual: { boardingAt: null, completionAt: null, departureAt: null, landingAt: null },
+    extendsBeyondOperationsEnd: false,
+    overtimeMinutes: 0,
+    planned: { boardingAt: null, completionAt: null, departureAt: null, landingAt: null },
+    predicted: { boardingAt: null, completionAt: null, departureAt: null, landingAt: null },
+    predictionQuality: null,
+    predictionUpdatedAt: null,
+  },
+  usableCapacity: 4,
   version: 1,
 };
 
@@ -225,54 +268,102 @@ vi.mock("./flight-line-supervisor", () => ({
     loadForecastHistory: (rotationId: string) => Promise<unknown>;
     loadResourceHistory: (scopeType: "AIRCRAFT", scopeId: string) => Promise<unknown>;
     onAssignPilot: (aircraftId: string, pilotId: string, reassign: boolean) => Promise<void>;
+    onConfirmAssignment: (queueDeviationReason?: string) => Promise<boolean>;
+    onGroupDefer: (ticketGroupId: string) => Promise<void>;
+    onGroupRecall: (ticketGroupId: string) => Promise<boolean>;
+    onGroupRecallClear: (ticketGroupId: string, recallId: string) => Promise<boolean>;
     onOpenOperations: () => void;
     onPauseAircraft: (aircraftId: string) => void;
+    onReserveAssignment: (aircraftId: string) => Promise<unknown>;
+    onResourceGroupChange: (resourceGroupId: string) => void;
     onRunRotation: (rotation: unknown, nextState?: string) => Promise<boolean>;
+    onSelectAircraft: (aircraftId: string) => void;
     onSetAircraftState: (aircraftId: string, state: "AVAILABLE" | "INACTIVE") => Promise<void>;
+    onToggleGroup: (ticketGroupId: string, selected: boolean) => void;
     operationalSummary: string;
     operationalSummaryTone: string;
-  }) => (
-    <section aria-label="Flight-Director-Testkonsole">
-      <p data-tone={props.operationalSummaryTone}>{props.operationalSummary}</p>
-      <p>{props.board.aircraft[0]?.registration}</p>
-      <button onClick={props.onOpenOperations} type="button">
-        Operations öffnen
-      </button>
-      <button onClick={() => void props.onAssignPilot("aircraft-1", "pilot-2", true)} type="button">
-        Pilot zuweisen
-      </button>
-      <button onClick={() => props.onPauseAircraft("aircraft-1")} type="button">
-        Flugzeug pausieren
-      </button>
-      <button
-        onClick={() => void props.onSetAircraftState("aircraft-1", "AVAILABLE")}
-        type="button"
-      >
-        Flugzeug verfügbar
-      </button>
-      <button onClick={() => void props.onSetAircraftState("aircraft-1", "INACTIVE")} type="button">
-        Flugzeug inaktiv
-      </button>
-      <button onClick={() => void props.loadForecastHistory("rotation-1")} type="button">
-        Prognosehistorie laden
-      </button>
-      <button
-        onClick={() => void props.loadResourceHistory("AIRCRAFT", "aircraft-1")}
-        type="button"
-      >
-        Ressourcenhistorie laden
-      </button>
-      <button
-        onClick={() => void props.onRunRotation(syntheticRotation, "AVAILABLE")}
-        type="button"
-      >
-        Onblock ausführen
-      </button>
-      <button onClick={() => void props.onRunRotation(syntheticDraftRotation)} type="button">
-        Boarding bestätigen
-      </button>
-    </section>
-  ),
+  }) => {
+    supervisor.onGroupDefer = props.onGroupDefer;
+    supervisor.onGroupRecallClear = props.onGroupRecallClear;
+    return (
+      <section aria-label="Flight-Director-Testkonsole">
+        <p data-tone={props.operationalSummaryTone}>{props.operationalSummary}</p>
+        <p>{props.board.aircraft[0]?.registration}</p>
+        <button onClick={props.onOpenOperations} type="button">
+          Operations öffnen
+        </button>
+        <button
+          onClick={() => void props.onAssignPilot("aircraft-1", "pilot-2", true)}
+          type="button"
+        >
+          Pilot zuweisen
+        </button>
+        <button onClick={() => props.onPauseAircraft("aircraft-1")} type="button">
+          Flugzeug pausieren
+        </button>
+        <button
+          onClick={() => void props.onSetAircraftState("aircraft-1", "AVAILABLE")}
+          type="button"
+        >
+          Flugzeug verfügbar
+        </button>
+        <button
+          onClick={() => void props.onSetAircraftState("aircraft-1", "INACTIVE")}
+          type="button"
+        >
+          Flugzeug inaktiv
+        </button>
+        <button onClick={() => void props.loadForecastHistory("rotation-1")} type="button">
+          Prognosehistorie laden
+        </button>
+        <button
+          onClick={() => void props.loadResourceHistory("AIRCRAFT", "aircraft-1")}
+          type="button"
+        >
+          Ressourcenhistorie laden
+        </button>
+        <button
+          onClick={() => void props.onRunRotation(syntheticRotation, "AVAILABLE")}
+          type="button"
+        >
+          Onblock ausführen
+        </button>
+        <button onClick={() => void props.onRunRotation(syntheticDraftRotation)} type="button">
+          Boarding bestätigen
+        </button>
+        <button onClick={() => props.onSelectAircraft("aircraft-1")} type="button">
+          Flugzeug auswählen
+        </button>
+        <button onClick={() => props.onToggleGroup("ticket-group-1", true)} type="button">
+          Gruppe auswählen
+        </button>
+        <button onClick={() => props.onToggleGroup("ticket-group-1", false)} type="button">
+          Gruppe abwählen
+        </button>
+        <button onClick={() => void props.onGroupRecall("ticket-group-1")} type="button">
+          Gruppe aufrufen
+        </button>
+        <button
+          onClick={() => void props.onGroupRecallClear("ticket-group-1", "recall-1")}
+          type="button"
+        >
+          Aufruf beenden
+        </button>
+        <button onClick={() => void props.onGroupDefer("ticket-group-1")} type="button">
+          Gruppe zurückstellen
+        </button>
+        <button onClick={() => void props.onReserveAssignment("aircraft-1")} type="button">
+          Vorschlag reservieren
+        </button>
+        <button onClick={() => void props.onConfirmAssignment("Synthetic deviation")} type="button">
+          Auswahl bestätigen
+        </button>
+        <button onClick={() => props.onResourceGroupChange("resource-group-1")} type="button">
+          Ressourcengruppe filtern
+        </button>
+      </section>
+    );
+  },
 }));
 
 vi.mock("./operation-workspace", () => ({
@@ -360,10 +451,26 @@ function operationBoard(overrides: { emergencyMode?: boolean } = {}): OperationB
     pilots: [],
     plannedOperations: [],
     products: [],
-    queueGroups: [],
+    queueGroups: [
+      {
+        bookingGroupLabel: "BG-0001",
+        bookingGroupNumber: 1,
+        communicationLabel: "G-PN-0001",
+        communicationNumber: 1,
+        id: "ticket-group-1",
+        activeRecall: null,
+        productCode: "PN",
+        productId: "product-1",
+        queueSequence: 1,
+        recallCount: 0,
+        status: "QUEUED",
+        ticketCount: 2,
+        tickets: [],
+      },
+    ],
     recurringOperationalRules: [],
     resourceGroups: [],
-    rotations: [],
+    rotations: [syntheticDraftRotation],
   } as unknown as OperationBoard;
 }
 
@@ -400,6 +507,7 @@ describe("flight line workflows", () => {
     dispatchLease.controller.lease = null;
     dispatchLease.controller.markInvalidated.mockReset();
     dispatchLease.controller.mode = "IDLE";
+    dispatchLease.controller.reloadLatest.mockReset().mockResolvedValue(null);
   });
 
   afterEach(() => cleanup());
@@ -624,5 +732,60 @@ describe("flight line workflows", () => {
     await user.click(action);
     await waitFor(() => expect(api.sendCommand).toHaveBeenCalledTimes(2));
     expect(workspace.state.confirmEvent).toHaveBeenCalledWith({ version: 13 });
+  });
+
+  it("coordinates queue selection, recalls, deferral, reservation and confirmation", async () => {
+    const user = userEvent.setup();
+    api.sendCommand.mockResolvedValue({ event: { version: 12 } });
+    renderFlightLine();
+
+    await user.click(screen.getByRole("button", { name: "Flugzeug auswählen" }));
+    await user.click(screen.getByRole("button", { name: "Gruppe auswählen" }));
+    await user.click(screen.getByRole("button", { name: "Gruppe aufrufen" }));
+    const group = workspace.state.board?.queueGroups[0];
+    expect(group).toBeDefined();
+    if (group) {
+      group.activeRecall = {
+        expiresAt: "2026-08-11T09:10:00.000Z",
+        fidsMessage: "Bitte kommen Sie zur Flight Line.",
+        id: "recall-1",
+        publicMessage: "Bitte kommen Sie zur Flight Line.",
+        sequence: 1,
+        startedAt: "2026-08-11T09:05:00.000Z",
+      };
+    }
+    await supervisor.onGroupRecallClear?.("ticket-group-1", "recall-1");
+    await supervisor.onGroupDefer?.("ticket-group-1");
+    await user.click(screen.getByRole("button", { name: "Vorschlag reservieren" }));
+    await user.click(screen.getByRole("button", { name: "Auswahl bestätigen" }));
+    await user.click(screen.getByRole("button", { name: "Ressourcengruppe filtern" }));
+    await user.click(screen.getByRole("button", { name: "Gruppe abwählen" }));
+
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledTimes(4));
+    expect(api.sendCommand.mock.calls.map(([command]) => command.type)).toEqual([
+      "START_TICKET_GROUP_RECALL",
+      "CLEAR_TICKET_GROUP_RECALL",
+      "DEFER_TICKET_GROUP",
+      "CALL_NEXT",
+    ]);
+    expect(api.sendCommand.mock.calls[0]?.[0].payload).toEqual({
+      ticketGroupId: "ticket-group-1",
+    });
+    expect(api.sendCommand.mock.calls[1]?.[0].payload).toEqual({
+      recallId: "recall-1",
+      ticketGroupId: "ticket-group-1",
+    });
+    expect(api.sendCommand.mock.calls[2]?.[0].payload).toEqual({
+      reason: "Gruppe durch Flight Director zurückgestellt",
+      ticketGroupId: "ticket-group-1",
+    });
+    expect(api.sendCommand.mock.calls[3]?.[0].payload).toEqual(
+      expect.objectContaining({
+        aircraftId: "aircraft-1",
+        queueDeviationReason: "Synthetic deviation",
+        ticketGroupIds: ["ticket-group-1"],
+      }),
+    );
+    expect(dispatchLease.controller.reloadLatest).toHaveBeenCalledWith("aircraft-1", 11);
   });
 });
