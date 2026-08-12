@@ -38,7 +38,7 @@ export interface PageableFidsRow extends FilterableFidsRow {
 }
 
 export interface SharedFlightFidsRow extends PageableFidsRow {
-  activeRecall?: unknown | null;
+  activeRecall?: unknown;
   bookingGroupLabels?: readonly string[] | undefined;
   communicationNumber: number;
   productCode: string;
