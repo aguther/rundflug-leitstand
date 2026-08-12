@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { OperationBoard } from "@rundflug/contracts";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PilotEditorDialog } from "./PilotEditorDialog";
@@ -76,7 +76,7 @@ describe("pilot editor dialog", () => {
   it("shows projected pause and assignment state for an existing pilot", async () => {
     render(<Harness selectedId="pilot-a" />);
 
-    await waitFor(() => screen.getByRole("dialog", { name: "Pilotencode bearbeiten" }));
+    await screen.findByRole("dialog", { name: "Pilotencode bearbeiten" });
     expect(screen.getByText("Pause")).toBeTruthy();
     expect(screen.getByText("Fluggruppe 17")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Deaktivieren" })).toBeTruthy();
@@ -86,7 +86,7 @@ describe("pilot editor dialog", () => {
     const onToggle = vi.fn();
     render(<Harness dirty onToggle={onToggle} selectedId="pilot-a" />);
 
-    const toggle = await waitFor(() => screen.getByRole("button", { name: "Deaktivieren" }));
+    const toggle = await screen.findByRole("button", { name: "Deaktivieren" });
     expect((toggle as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(toggle);
     expect(onToggle).not.toHaveBeenCalled();

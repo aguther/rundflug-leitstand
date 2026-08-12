@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { OperationBoard } from "@rundflug/contracts";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useAircraftEditorState } from "../aircraft/useAircraftEditorState";
@@ -108,9 +108,7 @@ describe("resource and aircraft editor dialog", () => {
       />,
     );
 
-    await waitFor(() =>
-      expect(screen.getByRole("dialog", { name: "Ressourcengruppe bearbeiten" })).toBeTruthy(),
-    );
+    await screen.findByRole("dialog", { name: "Ressourcengruppe bearbeiten" });
     fireEvent.click(screen.getByRole("button", { name: "Flugzeug zuordnen" }));
     expect(onAssignAircraft).toHaveBeenCalledWith("group-a");
   });
@@ -118,7 +116,7 @@ describe("resource and aircraft editor dialog", () => {
   it("shows the selected aircraft operational projection", async () => {
     render(<Harness category="aircraft" selectedId="aircraft-a" />);
 
-    const dialog = await waitFor(() => screen.getByRole("dialog", { name: "Flugzeug bearbeiten" }));
+    const dialog = await screen.findByRole("dialog", { name: "Flugzeug bearbeiten" });
     expect(dialog.classList.contains("ds-modal-dialog--default")).toBe(true);
     expect(screen.getByText("Panorama queue")).toBeTruthy();
     expect(screen.getByText("1")).toBeTruthy();

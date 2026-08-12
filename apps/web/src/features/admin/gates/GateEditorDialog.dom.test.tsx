@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { OperationBoard } from "@rundflug/contracts";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useEffect, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { GateEditorDialog } from "./GateEditorDialog";
@@ -83,7 +83,7 @@ describe("gate editor dialog", () => {
   it("shows existing resource assignments as a read-only projection", async () => {
     render(<Harness initialTab="details" selectedId="gate-a" />);
 
-    await waitFor(() => screen.getByRole("dialog", { name: "Gate bearbeiten" }));
+    await screen.findByRole("dialog", { name: "Gate bearbeiten" });
     expect(screen.getByText("Panorama queue")).toBeTruthy();
     expect(screen.getByText(/Zuordnungen werden bei der Ressourcengruppe gepflegt/)).toBeTruthy();
   });

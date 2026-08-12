@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { OperationBoard } from "@rundflug/contracts";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useEffect, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { ProductEditorDialog } from "./ProductEditorDialog";
@@ -134,7 +134,7 @@ describe("product editor dialog", () => {
   it("loads an existing product without changing its source projection", async () => {
     render(<Harness selectedId="product-a" />);
 
-    await waitFor(() => screen.getByRole("dialog", { name: "Produkt bearbeiten" }));
+    await screen.findByRole("dialog", { name: "Produkt bearbeiten" });
     expect((screen.getByLabelText("Bezeichnung") as HTMLInputElement).value).toBe(
       "Panorama flight",
     );
