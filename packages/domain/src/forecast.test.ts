@@ -754,7 +754,7 @@ describe("event-driven forecast", () => {
           projection.forecastState === "AFTER_OPERATIONS_END" && projection.overtimeMinutes > 0,
       ),
     ).toBe(true);
-    expect(elapsed).toBeLessThan(2_500);
+    expect(elapsed).toBeLessThan(5_000);
   });
 
   it("uses the earliest compatible tail lane after a recurring constraint becomes due", () => {

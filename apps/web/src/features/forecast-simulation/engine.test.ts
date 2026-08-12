@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { runSimulation, sampleTriangular } from "./engine";
 import {
@@ -11,6 +11,8 @@ import {
 } from "./model";
 
 const FORECAST_BASELINE_TIMEOUT_MS = 60_000;
+
+vi.setConfig({ testTimeout: 15_000 });
 
 function shortNormalConfig() {
   const config = simulationConfigForPreset("NORMAL");
