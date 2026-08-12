@@ -155,7 +155,62 @@
     },
     {
       "path": "apps/worker/src/forecast-timeline-service.ts",
-      "maxLines": 1479,
+      "maxLines": 117,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/worker/src/forecast-timeline-loader.ts",
+      "maxLines": 453,
+      "targetLines": 600
+    },
+    {
+      "path": "apps/worker/src/forecast-timeline-projector.ts",
+      "maxLines": 609,
+      "targetLines": 800
+    },
+    {
+      "path": "apps/worker/src/forecast-timeline-repository.ts",
+      "maxLines": 315,
+      "targetLines": 500
+    },
+    {
+      "path": "apps/worker/src/forecast-precall-evaluator.ts",
+      "maxLines": 130,
+      "targetLines": 250
+    },
+    {
+      "path": "apps/worker/src/forecast-publication-service.ts",
+      "maxLines": 47,
+      "targetLines": 150
+    },
+    {
+      "path": "packages/domain/src/forecast.ts",
+      "maxLines": 5,
+      "targetLines": 20
+    },
+    {
+      "path": "packages/domain/src/forecast-types.ts",
+      "maxLines": 254,
+      "targetLines": 350
+    },
+    {
+      "path": "packages/domain/src/forecast-sampling.ts",
+      "maxLines": 99,
+      "targetLines": 200
+    },
+    {
+      "path": "packages/domain/src/forecast-availability.ts",
+      "maxLines": 520,
+      "targetLines": 700
+    },
+    {
+      "path": "packages/domain/src/forecast-diagnostics.ts",
+      "maxLines": 50,
+      "targetLines": 150
+    },
+    {
+      "path": "packages/domain/src/forecast-projection.ts",
+      "maxLines": 1111,
       "targetLines": 1500
     },
     {

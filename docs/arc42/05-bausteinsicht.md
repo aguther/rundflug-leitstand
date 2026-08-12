@@ -98,7 +98,9 @@ flowchart TB
 | `command-handler-registry.ts`, `event-command-handlers.ts`, `*-command-service.ts` | ordnen jeden Contract-Command zur Compile-Zeit genau einer Familie und einem Service-Handler zu; die Cloudflare-unabhängige Registry-Fabrik ist isoliert testbar, Ticketverkauf und Verkaufskonfiguration besitzen getrennte Services |
 | `public-code-service.ts` | kryptografische Vergabe und kollisionsgeprüfte Reservierung öffentlicher Gruppen- und Ticketcodes |
 | `*-read-service.ts`, `*-projection.ts` | berechtigungsabhängige Lesesichten: operative Vollsicht, FIDS-Board, öffentlicher Ticket-/Gruppenstatus |
-| `forecast-timeline-service.ts` | Prognoselauf, Snapshots, Voraufrufentscheidungen |
+| `forecast-timeline-service.ts` | kleiner Orchestrator des Prognoselaufs; besitzt keine D1-Abfragen oder Projektionsregeln |
+| `forecast-timeline-loader.ts`, `forecast-timeline-projector.ts` | laden Forecast-Grundlagen aus D1 und normalisieren sie anschließend Cloudflare-unabhängig zu Domain-Eingaben |
+| `forecast-timeline-repository.ts`, `forecast-precall-evaluator.ts`, `forecast-publication-service.ts` | persistieren Prognose/Snapshots/Voraufruf atomar beziehungsweise wählen Voraufrufe rein aus und veröffentlichen erst nach erfolgreicher Persistenz |
 | `backup.ts`, `analysis-archive-writer.ts`, `admin-event-logo-service.ts`, `analysis-archive*.ts` | portable seitenweise ZIP-/NDJSON-Sicherungen mit inkrementeller Prüfsumme, Veranstaltungslogos und Analysepakete in R2 |
 | `daily-report.ts`, `report.ts`, `report-export-service.ts` | erzeugen CSV- und PDF-Tagesberichte bei Abruf aus dem bestätigten D1-Zustand |
 | `web-push*.ts` | Verschlüsselung, VAPID-Signatur, Zustellwarteschlange, Löschfristen |
@@ -161,7 +163,9 @@ keine fachliche Phasenlogik zurückübernehmen; Golden-Seed-Tests und Größenra
 | --- | --- |
 | `index.ts` | Rollen (`CASHIER`, `FLIGHT_LINE`, `FLIGHT_DIRECTOR`, `ADMIN`, `DISPLAY`), `assertRoleMayExecute`, Kommandotypen, `transitionRotation`, Gruppenschutz, Verkaufsschutz |
 | `queue.ts` | Queue-Ordnung ganzer Buchungsgruppen, `planNextRotations`, produkt- und gatereine Batches |
-| `forecast.ts` | Lernen aus abgeschlossenen Umläufen, Gewichtung, Ausreißerfilter, Qualitätsstufen, Überfälligkeitskorrektur |
+| `forecast.ts` | kompatible Exportfassade ohne eigene Fachlogik |
+| `forecast-types.ts`, `forecast-sampling.ts`, `forecast-availability.ts` | Forecast-Verträge, robuste Stichprobenauswahl und deterministische Verfügbarkeitsbahnen |
+| `forecast-projection.ts`, `forecast-diagnostics.ts` | kurz- und langfristige Projektion, Dispatch-Überlagerung sowie Frische- und Operationsende-Diagnostik |
 | `dispatch-plan.ts` | begrenzte kombinatorische Dispatch-Planung mit Durchsatz- und Fairnesszielen |
 | `capacity.ts` | `assessMarginalProductCapacity`: konservative Restkapazität je Produkt (`AVAILABLE`, `LIMITED`, `MANUAL_REVIEW`, `SOLD_OUT`) |
 | `turnaround.ts`, `reference-rotation.ts` | komponentenweise Umlaufzeit aus Flugzeug + Produkt, Produkt und Veranstaltung |

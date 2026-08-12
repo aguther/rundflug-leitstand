@@ -42,7 +42,7 @@ Verbleibende, bewusst priorisierte Schulden:
 | Priorität | Befund | Nächster geplanter Schnitt |
 | --- | --- | --- |
 | Mittel | Der Coordinator liegt mit 1.394 Zeilen nahe an seiner Grenze von 1.500 Zeilen; größter zusammenhängender Pfad ist der Ticketverkauf | `SELL_TICKET_GROUP` in einen eigenen Kommandoservice extrahieren, abgesichert über Sale-Guards und Skalierungsnachweis |
-| Mittel | `forecast-timeline-service.ts` liegt mit 1.479 Zeilen unmittelbar an der Modulgrenze | Timeline-Projektion und historische Kalibrierung in getrennte Worker-Adapter schneiden |
+| Mittel | Der Forecast-Legacy-Vergleichspfad bleibt bis zum zweifachen Release-/Replay-Nachweis erhalten | Abschaltkriterien aus ADR-0041 erfüllen; keine neuen Fachregeln im Legacy-Pfad ergänzen |
 | Mittel | 135 ältere `?raw`-Importe in Produktionsquellen und 1.805 `.toContain(`-Assertions koppeln Tests an Quelltext statt an Verhalten | bestehenden Ratchet halten und bei jeder Änderung zuerst hochfrequentierte Tests auf DOM-, HTTP- oder Runtime-Verhalten umstellen |
 | Mittel | `master-data-command-service.ts` (1.300 Zeilen) und `operations-routes.ts` (1.043 Zeilen) | Stammdatenfamilien trennen; Operations-Routen weiter auf Transport und Response-Mapping reduzieren |
 | Mittel | Haupt-Entry, Flight-Line-CSS und größter JavaScript-Chunk mit begrenztem Abstand zu den Assetbudgets | routentransitive Manifestwerte vor und nach jeder Änderung vergleichen; schwere Analysebausteine lazy halten |

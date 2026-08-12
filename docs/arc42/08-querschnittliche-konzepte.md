@@ -118,8 +118,13 @@ Jedes Schreibkommando trägt mindestens `commandId`, `eventId`, `deviceId`, `exp
   deterministischen Seed-, PRNG-, Stichproben- und Zeitprimitive. Seine feste Tick-Reihenfolge
   Lifecycle → Precall → Dispatch → Snapshot sowie Golden-Seed-Sequenzen machen Replay-Ergebnisse
   über Refactorings hinweg reproduzierbar.
+- Der Worker verarbeitet jeden Lauf als gerichtete Pipeline: D1-Loader → reiner Eingabe-Projector →
+  Domain-Projektion → reiner Precall-Evaluator → D1-Repository → Push/WebSocket-Publikation.
+  Persistenz und Audit/Outbox liegen vor jeder extern sichtbaren Veröffentlichung.
+- Der interne Legacy-Vergleichspfad erhält keine neuen Fachregeln. ADR-0041 definiert seinen
+  synthetischen Replay-Nachweis und die Bedingungen für seine Entfernung.
 - Details: `docs/architecture/dispatch-planning-v1.md`, `docs/architecture/forecast-sample-policy-v1.md`
-  und `docs/architecture/forecast-snapshots-v1.md`.
+  und `docs/architecture/forecast-snapshots-v1.md` sowie ADR-0041 und ADR-0042.
 
 ## 8.6 Sicherheit und Zugriffsschutz
 
