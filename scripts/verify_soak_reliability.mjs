@@ -177,8 +177,9 @@ const requestJson = async (url, init, maximumMilliseconds = 2_000) => {
   const body = await response.json();
   if (!response.ok) {
     await sleep(100);
+    const diagnosticSuffix = workerDiagnostic ? ` · ${workerDiagnostic}` : "";
     throw new Error(
-      `Langlauf-Request ${response.status}: ${body?.error?.code ?? "UNKNOWN_ERROR"}${workerDiagnostic ? ` · ${workerDiagnostic}` : ""}`,
+      `Langlauf-Request ${response.status}: ${body?.error?.code ?? "UNKNOWN_ERROR"}${diagnosticSuffix}`,
     );
   }
   if (elapsedMilliseconds >= maximumMilliseconds) {

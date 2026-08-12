@@ -118,14 +118,18 @@ function renderTable(rows) {
   const body = rows
     .slice(2)
     .map(tableCells)
-    .map((row) => `<tr>${row.map((cell) => `<td>${renderInline(cell)}</td>`).join("")}</tr>`)
+    .map((row) => {
+      const cells = row.map((cell) => `<td>${renderInline(cell)}</td>`).join("");
+      return `<tr>${cells}</tr>`;
+    })
     .join("\n");
   return `<table>\n<thead><tr>${head}</tr></thead>\n<tbody>\n${body}\n</tbody>\n</table>`;
 }
 
 function renderList(items, ordered) {
   const tag = ordered ? "ol" : "ul";
-  return `<${tag}>\n${items.map((item) => `<li>${renderInline(item)}</li>`).join("\n")}\n</${tag}>`;
+  const entries = items.map((item) => `<li>${renderInline(item)}</li>`).join("\n");
+  return `<${tag}>\n${entries}\n</${tag}>`;
 }
 
 function isTableRow(line) {

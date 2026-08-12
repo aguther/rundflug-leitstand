@@ -146,6 +146,7 @@ export class RotationRecoveryCommandService {
     const ticketGroupIds = queueBlock.map((segment) => segment.id);
     const parkingOffset = (queueMaximum?.maximum_queue_sequence ?? 0) + ticketGroupIds.length + 1;
     const placeholders = ticketGroupIds.map((_, index) => `?${index + 4}`).join(", ");
+    const ticketGroupPlaceholders = ticketGroupIds.map((_, index) => `?${index + 1}`).join(", ");
     const result: CommandResult = {
       accepted: true,
       duplicate: false,
@@ -212,7 +213,7 @@ export class RotationRecoveryCommandService {
                WHERE ticket_group_id = ticket_groups.id AND attendance_status = 'CHECKED_IN'
             ) THEN 'PRESENT' ELSE 'QUEUED' END,
             version = version + 1
-          WHERE id IN (${ticketGroupIds.map((_, index) => `?${index + 1}`).join(", ")})`,
+          WHERE id IN (${ticketGroupPlaceholders})`,
       ).bind(...ticketGroupIds),
       this.env.DB.prepare(
         `UPDATE aircraft SET operational_state = 'INACTIVE',

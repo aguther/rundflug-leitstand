@@ -46,7 +46,8 @@ export function rewriteRelativeLinks(markdown, documentPath, linkBase) {
     );
     const rewritten = linkBase ? `${linkBase}/${repositoryPath}` : repositoryPath;
     const prefix = `${match.image ? "!" : ""}[${match.label}](`;
-    return `${prefix}${anchor ? `${rewritten}#${anchor}` : rewritten})`;
+    const target = anchor ? `${rewritten}#${anchor}` : rewritten;
+    return `${prefix}${target})`;
   });
 }
 

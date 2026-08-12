@@ -122,9 +122,10 @@ export function groupSharedFidsFlights<Row extends SharedFlightFidsRow>(
       const first = chunk[0];
       if (!first) continue;
       const labels = Array.from(new Set(chunk.flatMap(bookingGroupLabels))).slice(0, 3);
+      const rowHashInput = `${key}:${Math.floor(offset / 3)}`;
       chunks.push({
         ...first,
-        rowId: `fids-shared-${stableFidsRowHash(`${key}:${Math.floor(offset / 3)}`)}`,
+        rowId: `fids-shared-${stableFidsRowHash(rowHashInput)}`,
         bookingGroupLabels: labels,
         ticketLabels: chunk.flatMap((row) => [...row.ticketLabels]),
       });

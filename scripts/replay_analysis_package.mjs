@@ -345,7 +345,8 @@ function verifyIntegrity(model) {
     if (chunkById.has(chunk.id)) throw new ReplayError("ANALYSIS_CHUNK_DUPLICATE", chunk.id);
     const json = canonicalJson(chunk.payload);
     const hash = sha256(json);
-    const identity = `planning-chunk-${sha256(`${chunk.kind}:${chunk.schemaVersion}:${hash}`)}`;
+    const identityHashInput = `${chunk.kind}:${chunk.schemaVersion}:${hash}`;
+    const identity = `planning-chunk-${sha256(identityHashInput)}`;
     if (hash !== chunk.hash) {
       throw new ReplayError("ANALYSIS_CHUNK_HASH_MISMATCH", `Chunk-Hash weicht ab: ${chunk.id}`, {
         chunkId: chunk.id,

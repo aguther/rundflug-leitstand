@@ -98,11 +98,10 @@ function runNpmSuite(npmCli, suite, lane) {
     child.once("close", (status, signal) => {
       const durationSeconds = Number(((Date.now() - suiteStartedAt) / 1_000).toFixed(1));
       if (status !== 0) {
-        reject(
-          new Error(
-            `${suite} failed${signal ? ` with signal ${signal}` : ` with exit code ${status ?? "unknown"}`}.`,
-          ),
-        );
+        const failureReason = signal
+          ? ` with signal ${signal}`
+          : ` with exit code ${status ?? "unknown"}`;
+        reject(new Error(`${suite} failed${failureReason}.`));
         return;
       }
       process.stdout.write(

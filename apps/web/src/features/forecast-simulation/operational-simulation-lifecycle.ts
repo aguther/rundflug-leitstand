@@ -253,7 +253,7 @@ export function advanceOperationalSimulationLifecycle(input: {
       aircraftId: plan.scopeType === "AIRCRAFT" ? plan.scopeId : null,
       pilotId: plan.scopeType === "PILOT" ? plan.scopeId : null,
       plannedOperationId: plan.key,
-      details: `${plan.kind}${plan.publicNote ? ` · ${plan.publicNote}` : ""}`,
+      details: plan.publicNote ? `${plan.kind} · ${plan.publicNote}` : plan.kind,
     });
   }
 

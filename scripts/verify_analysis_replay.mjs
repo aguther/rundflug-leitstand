@@ -13,7 +13,8 @@ import {
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const payload = { event: { eventId: "synthetic-event" }, tuning: null };
 const payloadHash = sha256(canonicalJson(payload));
-const chunkId = `planning-chunk-${sha256(`EVENT_CONFIGURATION:1:${payloadHash}`)}`;
+const chunkHashInput = `EVENT_CONFIGURATION:1:${payloadHash}`;
+const chunkId = `planning-chunk-${sha256(chunkHashInput)}`;
 const chunk = {
   id: chunkId,
   kind: "EVENT_CONFIGURATION",
@@ -78,8 +79,9 @@ assert.throws(
 const makeChunk = (kind, value) => {
   const json = canonicalJson(value);
   const hash = sha256(json);
+  const identityHashInput = `${kind}:1:${hash}`;
   return {
-    id: `planning-chunk-${sha256(`${kind}:1:${hash}`)}`,
+    id: `planning-chunk-${sha256(identityHashInput)}`,
     kind,
     schemaVersion: 1,
     hash,

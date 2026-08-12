@@ -98,11 +98,8 @@ function preparePopup(popup: Window): PopupTarget {
     const value = sourceParams.get(key);
     if (value) popupParams.set(key, value);
   }
-  popup.history.replaceState(
-    null,
-    "",
-    `${POPUP_PATH}${popupParams.size > 0 ? `?${popupParams.toString()}` : ""}`,
-  );
+  const popupSearch = popupParams.size > 0 ? `?${popupParams.toString()}` : "";
+  popup.history.replaceState(null, "", `${POPUP_PATH}${popupSearch}`);
   const root = target.createElement("div");
   root.id = "simulation-fids-root";
   target.body.append(root);

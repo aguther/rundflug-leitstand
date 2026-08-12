@@ -310,7 +310,7 @@ export function ForecastTimeline({
                         clampPercent(percent(start, windowStart, windowEnd)),
                     )}%`,
                   }}
-                  title={`${plan.kind}${plan.publicNote ? ` · ${plan.publicNote}` : ""}`}
+                  title={plan.publicNote ? `${plan.kind} · ${plan.publicNote}` : plan.kind}
                 >
                   {plan.kind}
                 </span>
@@ -380,7 +380,7 @@ export function ForecastTimeline({
                             clampPercent(percent(start, windowStart, windowEnd)),
                         )}%`,
                       }}
-                      title={`${plan.kind}${plan.publicNote ? ` · ${plan.publicNote}` : ""}`}
+                      title={plan.publicNote ? `${plan.kind} · ${plan.publicNote}` : plan.kind}
                     >
                       {plan.kind}
                     </span>

@@ -89,7 +89,8 @@ try {
   const persistChunk = (kind, payload, createdAt) => {
     const json = canonicalJson(payload);
     const hash = sha256(json);
-    const id = `planning-chunk-${sha256(`${kind}:1:${hash}`)}`;
+    const identityHashInput = `${kind}:1:${hash}`;
+    const id = `planning-chunk-${sha256(identityHashInput)}`;
     insertChunk.run(id, kind, hash, json, Buffer.byteLength(json), createdAt);
     return id;
   };
@@ -166,7 +167,8 @@ try {
   );
   const manifestJson = canonicalJson(contextEntries);
   const manifestHash = sha256(manifestJson);
-  const contextId = `planning-context-${sha256(`scale-event:1:1:${manifestHash}`)}`;
+  const contextHashInput = `scale-event:1:1:${manifestHash}`;
+  const contextId = `planning-context-${sha256(contextHashInput)}`;
   database
     .prepare(
       `INSERT INTO planning_contexts
