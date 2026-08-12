@@ -246,9 +246,11 @@ export async function loadArchiveEntryCounts(
   return counts;
 }
 
-function csvCell(value: unknown): string {
+type JsonValue = boolean | number | string | null | JsonValue[] | { [key: string]: JsonValue };
+
+function csvCell(value: JsonValue | undefined): string {
   if (value === null || value === undefined) return "";
-  const text = String(value);
+  const text = typeof value === "object" ? JSON.stringify(value) : String(value);
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
@@ -260,7 +262,7 @@ export async function* pagedCsv(input: {
 }): AsyncGenerator<Uint8Array> {
   yield encoder.encode(`${input.columns.join(",")}\r\n`);
   for await (const line of pagedNdjson({ db: input.db, eventId: input.eventId, sql: input.sql })) {
-    const row = JSON.parse(new TextDecoder().decode(line)) as Record<string, unknown>;
+    const row = JSON.parse(new TextDecoder().decode(line)) as Record<string, JsonValue>;
     yield encoder.encode(`${input.columns.map((column) => csvCell(row[column])).join(",")}\r\n`);
   }
 }

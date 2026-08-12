@@ -25,6 +25,20 @@ const defaultDependencies = {
 
 type AdminEventCloneDependencies = typeof defaultDependencies;
 
+function remapOptionalId(
+  value: unknown,
+  mappedIds: ReadonlyMap<string, string>,
+  field: string,
+): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") {
+    throw new TypeError(`${field} must contain a text identifier.`);
+  }
+  const mappedId = mappedIds.get(value);
+  if (!mappedId) throw new TypeError(`${field} references an unknown identifier.`);
+  return mappedId;
+}
+
 function errorResult(
   status: 404 | 409,
   code: AdminEventCloneErrorResponse["error"]["code"],
@@ -191,7 +205,7 @@ export async function cloneAdminEvent(
         row.name,
         row.short_code,
         now,
-        row.gate_id ? gateIds.get(String(row.gate_id)) : null,
+        remapOptionalId(row.gate_id, gateIds, "resource_groups.gate_id"),
         row.reference_capacity,
         row.compatible_aircraft_types_json,
       ),
@@ -221,7 +235,7 @@ export async function cloneAdminEvent(
         row.child_companion_required,
         row.sort_order,
         row.weight_classes_json,
-        row.gate_id ? gateIds.get(String(row.gate_id)) : null,
+        remapOptionalId(row.gate_id, gateIds, "products.gate_id"),
         row.reference_capacity,
         row.reference_duration_minutes,
         row.promised_flight_minutes,

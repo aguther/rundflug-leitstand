@@ -410,6 +410,30 @@ describe("admin event clone service", () => {
     expect(receipt.bindings.slice(0, 3)).toEqual([COMMAND_ID, SOURCE_EVENT_ID, ADMIN_DEVICE_ID]);
   });
 
+  it("rejects malformed gate references before writing the clone batch", async () => {
+    const malformedGateReference = { unexpected: "source-gate" };
+    const sourceGroup = sourceRows.groups[0];
+    if (!sourceGroup) throw new Error("Synthetic source group fixture is missing.");
+    const { env, batch } = createServiceEnvironment({
+      rows: {
+        groups: [
+          {
+            ...sourceGroup,
+            gate_id: malformedGateReference as unknown as string,
+          },
+        ],
+      },
+    });
+
+    await expect(
+      cloneAdminEvent(env, SOURCE_EVENT_ID, ADMIN_DEVICE_ID, cloneRequest, {
+        now: () => NOW,
+        randomUUID: deterministicIds(),
+      }),
+    ).rejects.toThrow("resource_groups.gate_id must contain a text identifier");
+    expect(batch).not.toHaveBeenCalled();
+  });
+
   it("creates an empty production restart without exposing a legacy device id", async () => {
     const { env, batched, prepared } = createServiceEnvironment({ appEnv: "production" });
     const randomUUID = deterministicIds();
