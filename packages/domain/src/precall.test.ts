@@ -150,6 +150,12 @@ describe("automatischer Voraufruf (F-BEN-030)", () => {
         gateTravelLeadMinutesUsed: 6,
       }),
     ).toBe(8);
+    expect(() =>
+      normalizePrecallObservation({
+        observedGoToGateToBoardingMinutes: Number.NaN,
+        gateTravelLeadMinutesUsed: 6,
+      }),
+    ).toThrow(TypeError);
   });
 
   it("keeps production defaults identical and applies a local experimental profile", () => {

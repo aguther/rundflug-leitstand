@@ -261,6 +261,7 @@ describe("Web-Push-Aufbewahrung", () => {
     expect(pushRetentionDays("0")).toBe(7);
     expect(pushRetentionDays("invalid")).toBe(7);
     expect(pushDeleteAfter("2026-07-12T18:00:00.000Z", 7)).toBe("2026-07-19T18:00:00.000Z");
+    expect(() => pushDeleteAfter("invalid", 7)).toThrow(TypeError);
     expect(() => pushDeleteAfter("invalid", 7)).toThrow(/Veranstaltungsende/);
   });
 

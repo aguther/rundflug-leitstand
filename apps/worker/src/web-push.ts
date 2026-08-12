@@ -199,7 +199,7 @@ export function pushRetentionDays(value: string | undefined): number {
 export function pushDeleteAfter(operationsEndAt: string, retentionDays: number): string {
   const operationsEnd = Date.parse(operationsEndAt);
   if (!Number.isFinite(operationsEnd)) {
-    throw new Error("Veranstaltungsende für Push-Aufbewahrung ist ungültig.");
+    throw new TypeError("Veranstaltungsende für Push-Aufbewahrung ist ungültig.");
   }
   return new Date(operationsEnd + retentionDays * 24 * 60 * 60 * 1000).toISOString();
 }

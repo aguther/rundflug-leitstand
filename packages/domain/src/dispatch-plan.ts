@@ -323,7 +323,7 @@ function normalizeGroup(
   }
   const waitingSinceMs = Date.parse(group.waitingSince ?? group.soldAt);
   if (!Number.isFinite(waitingSinceMs)) {
-    throw new Error(`Dispatch group ${group.id} has an invalid waiting timestamp.`);
+    throw new TypeError(`Dispatch group ${group.id} has an invalid waiting timestamp.`);
   }
   const waitMinutes = Math.max(0, (nowMs - waitingSinceMs) / MINUTE_MS);
   const confirmedOvertakeCount = Math.max(0, Math.floor(group.confirmedOvertakeCount ?? 0));

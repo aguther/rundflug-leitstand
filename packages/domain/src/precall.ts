@@ -106,7 +106,7 @@ export function normalizePrecallObservation(input: {
     !Number.isFinite(input.observedGoToGateToBoardingMinutes) ||
     !Number.isFinite(input.gateTravelLeadMinutesUsed)
   ) {
-    throw new Error("Precall observation is invalid.");
+    throw new TypeError("Precall observation is invalid.");
   }
   return Math.max(
     0,

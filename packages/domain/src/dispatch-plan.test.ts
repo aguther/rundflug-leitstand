@@ -87,6 +87,16 @@ function lane(
 }
 
 describe("createDispatchPlan", () => {
+  it("rejects an invalid waiting timestamp as a type error", () => {
+    expect(() =>
+      createDispatchPlan({
+        now: NOW,
+        groups: [group("invalid-time", 1, 1, { waitingSince: "not-a-timestamp" })],
+        lanes: [lane("available", 3)],
+      }),
+    ).toThrow(TypeError);
+  });
+
   it("fills a targeted three-seat wave with the compatible one- and two-person groups", () => {
     const plan = createDispatchPlan({
       now: NOW,
