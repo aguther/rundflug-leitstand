@@ -20,18 +20,17 @@ import {
 import { AssistClaimService } from "./assist-claim-service";
 import { AttendanceCommandService } from "./attendance-command-service";
 import { dispatchRegisteredCommand } from "./command-handler-registry";
-import {
-  loadCommandPreflightReads,
-  plannedOperationExpectation,
-  scopedCommandTarget,
-} from "./command-preflight";
+import { loadCommandPreflightReads } from "./command-preflight";
 import { CommandPreflightService } from "./command-preflight-service";
-import type { PlannedOperationRow } from "./command-preflight-types";
 import { CoordinatorRealtimeService } from "./coordinator-realtime-service";
 import { verifyCredential } from "./crypto";
 import { DispatchRecommendationLeaseService } from "./dispatch-recommendation-lease-service";
 import { EventAdministrationCommandService } from "./event-administration-command-service";
 import { createEventCommandHandlers, type EventCommandServices } from "./event-command-handlers";
+import {
+  validateCommandVersion,
+  validatePlannedOperationLink,
+} from "./event-coordinator-preflight-policy";
 import { FidsPreferencesCommandService } from "./fids-preferences-command-service";
 import { FleetAdministrationCommandService } from "./fleet-administration-command-service";
 import {
@@ -424,99 +423,6 @@ export class EventCoordinator extends DurableObject<Env> {
     this.realtime.handleError(socket);
   }
 
-  private validateCommandVersion(
-    command: CommandEnvelope,
-    current: StoredEventRow,
-    aggregateVersion: number | null,
-  ): Response | null {
-    if (command.type === "REORDER_CASHIER_PRODUCTS") {
-      const observedEventVersion = command.observedEventVersion ?? command.expectedVersion;
-      if (observedEventVersion <= current.version) return null;
-      return json(
-        {
-          error: {
-            code: "FUTURE_VERSION",
-            message: "Der beobachtete Veranstaltungsstand liegt vor dem Serverstand.",
-            currentVersion: current.version,
-          },
-        },
-        { status: 409 },
-      );
-    }
-    const target = scopedCommandTarget(command);
-    const preconditions = command.preconditions;
-    if (!preconditions) {
-      if (current.version === command.expectedVersion) return null;
-      return json(
-        {
-          error: {
-            code: "STALE_VERSION",
-            message: "Der Zustand wurde zwischenzeitlich geändert.",
-            currentVersion: current.version,
-          },
-        },
-        { status: 409 },
-      );
-    }
-    if (
-      !target ||
-      preconditions.length !== 1 ||
-      preconditions[0]?.aggregateType !== target.aggregateType ||
-      preconditions[0].aggregateId !== target.aggregateId
-    ) {
-      return json(
-        {
-          error: {
-            code: "INVALID_PRECONDITION",
-            message: "Die Aggregatversion passt nicht zum Kommandoziel.",
-          },
-        },
-        { status: 400 },
-      );
-    }
-    const observedEventVersion = command.observedEventVersion ?? command.expectedVersion;
-    if (observedEventVersion > current.version) {
-      return json(
-        {
-          error: {
-            code: "FUTURE_VERSION",
-            message: "Der beobachtete Veranstaltungsstand liegt vor dem Serverstand.",
-            currentVersion: current.version,
-          },
-        },
-        { status: 409 },
-      );
-    }
-    const precondition = preconditions[0];
-    if (aggregateVersion === null) {
-      return json(
-        {
-          error: {
-            code: "AGGREGATE_NOT_FOUND",
-            message: "Das Kommandoziel wurde nicht gefunden.",
-          },
-        },
-        { status: 404 },
-      );
-    }
-    if (aggregateVersion === precondition.expectedVersion) return null;
-    return json(
-      {
-        error: {
-          code: "STALE_AGGREGATE_VERSION",
-          message: "Dieses Flugzeug oder dieser Umlauf wurde zwischenzeitlich geändert.",
-          currentVersion: current.version,
-          conflict: {
-            aggregateType: precondition.aggregateType,
-            aggregateId: precondition.aggregateId,
-            currentAggregateVersion: aggregateVersion,
-          },
-        },
-      },
-      { status: 409 },
-    );
-  }
-
   private async handleCommand(request: Request): Promise<Response> {
     let command: CommandEnvelope;
     try {
@@ -625,13 +531,9 @@ export class EventCoordinator extends DurableObject<Env> {
           { status: 404 },
         );
       }
-      const versionConflict = this.validateCommandVersion(
-        command,
-        current,
-        preflight.aggregateVersion,
-      );
+      const versionConflict = validateCommandVersion(command, current, preflight.aggregateVersion);
       if (versionConflict) return versionConflict;
-      const plannedOperationConflict = this.validatePlannedOperationLink(
+      const plannedOperationConflict = validatePlannedOperationLink(
         command,
         preflight.plannedOperation,
       );
@@ -704,68 +606,6 @@ export class EventCoordinator extends DurableObject<Env> {
         { status: 500 },
       );
     }
-  }
-
-  private validatePlannedOperationLink(
-    command: CommandEnvelope,
-    plan: PlannedOperationRow | null,
-  ): Response | null {
-    const expectation = plannedOperationExpectation(command);
-    if (expectation.kind === "none") return null;
-    if (expectation.kind === "unsupported") {
-      return json(
-        {
-          error: {
-            code: "PLANNED_OPERATION_LINK_NOT_SUPPORTED",
-            message: "Dieses Kommando kann nicht mit einem Planeintrag verknüpft werden.",
-          },
-        },
-        { status: 409 },
-      );
-    }
-    if (!plan) {
-      return json(
-        { error: { code: "PLANNED_OPERATION_NOT_FOUND", message: "Planeintrag nicht gefunden." } },
-        { status: 404 },
-      );
-    }
-    if (plan.effect_mode !== "BLOCKING") {
-      return json(
-        {
-          error: {
-            code: "PLANNED_OPERATION_EFFECT_MISMATCH",
-            message: "Ein verzögerter Betrieb darf keinen Ressourcenstopp auslösen.",
-          },
-        },
-        { status: 409 },
-      );
-    }
-    if (plan.scope_type !== expectation.scopeType || plan.scope_id !== expectation.scopeId) {
-      return json(
-        {
-          error: {
-            code: "PLANNED_OPERATION_SCOPE_MISMATCH",
-            message: "Planeintrag und operatives Ziel stimmen nicht überein.",
-          },
-        },
-        { status: 409 },
-      );
-    }
-    if (
-      (expectation.activating && plan.status !== "PLANNED") ||
-      (!expectation.activating && plan.status !== "ACTIVE")
-    ) {
-      return json(
-        {
-          error: {
-            code: "PLANNED_OPERATION_STATUS_MISMATCH",
-            message: "Der Planeintrag ist für diese Bestätigung nicht im passenden Zustand.",
-          },
-        },
-        { status: 409 },
-      );
-    }
-    return null;
   }
 
   private broadcast(result: CommandResult): void {
