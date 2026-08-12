@@ -26,19 +26,31 @@ export function browserVersion(input: string): {
   family: AnalysisClientContext["browserFamily"];
   majorVersion: number | null;
 } {
-  const candidates: Array<{
+  const candidates: ReadonlyArray<{
     family: AnalysisClientContext["browserFamily"];
-    pattern: RegExp;
+    marker: string;
+    requiredMarker?: string;
   }> = [
-    { family: "EDGE", pattern: /Edg\/(\d+)/ },
-    { family: "FIREFOX", pattern: /Firefox\/(\d+)/ },
-    { family: "CHROME", pattern: /(?:Chrome|CriOS)\/(\d+)/ },
-    { family: "SAFARI", pattern: /Version\/(\d+).*Safari/ },
+    { family: "EDGE", marker: "Edg/" },
+    { family: "FIREFOX", marker: "Firefox/" },
+    { family: "CHROME", marker: "Chrome/" },
+    { family: "CHROME", marker: "CriOS/" },
+    { family: "SAFARI", marker: "Version/", requiredMarker: "Safari" },
   ];
   for (const candidate of candidates) {
-    const match = input.match(candidate.pattern);
-    if (match) {
-      const value = Number.parseInt(match[1] ?? "", 10);
+    const markerIndex = input.indexOf(candidate.marker);
+    if (markerIndex >= 0) {
+      const versionStart = markerIndex + candidate.marker.length;
+      if (candidate.requiredMarker && input.indexOf(candidate.requiredMarker, versionStart) < 0) {
+        continue;
+      }
+      let versionEnd = versionStart;
+      while (true) {
+        const character = input[versionEnd];
+        if (character === undefined || character < "0" || character > "9") break;
+        versionEnd += 1;
+      }
+      const value = Number.parseInt(input.slice(versionStart, versionEnd), 10);
       return {
         family: candidate.family,
         majorVersion: Number.isSafeInteger(value) && value > 0 ? value : null,

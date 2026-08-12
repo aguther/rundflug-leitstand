@@ -63,6 +63,9 @@ describe("FIDS settings dialog", () => {
     const { onClose, onSave } = renderSettings();
 
     expect(screen.getByRole("dialog", { name: "FIDS-Einstellungen" })).toBeTruthy();
+    expect(
+      screen.getByRole("checkbox", { name: /Gruppen desselben Flugs zusammenfassen/ }),
+    ).toBeTruthy();
     expect(document.querySelector(".fids-split-guidance")?.textContent).toContain(
       "Abgeflogene Gruppen bleiben 90 Sek. oben sichtbar.",
     );

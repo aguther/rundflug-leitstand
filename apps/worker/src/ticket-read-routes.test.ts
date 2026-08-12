@@ -5,6 +5,7 @@ import type { AuthorizedDevice } from "./device-authorization";
 import { registerTicketReadRoutes, type TicketReadRouteDependencies } from "./ticket-read-routes";
 import {
   decodeTicketSearchCursor,
+  encodeTicketSearchCursor,
   loadTicketGroupPrintData,
   searchTicketGroups,
 } from "./ticket-read-service";
@@ -247,6 +248,14 @@ describe("ticket read routes", () => {
 });
 
 describe("ticket read service", () => {
+  it("round-trips an unpadded URL-safe cursor", () => {
+    const cursor = { soldAt: "2026-08-02T08:00:00.000Z", id: TICKET_GROUP_ID };
+    const encoded = encodeTicketSearchCursor(cursor);
+
+    expect(encoded).not.toContain("=");
+    expect(decodeTicketSearchCursor(encoded)).toEqual(cursor);
+  });
+
   it("returns no results for a one-character query without reading D1", async () => {
     const harness = searchDatabase([]);
     await expect(

@@ -53,6 +53,17 @@ describe("arc42 bundle builder", () => {
     expect(performance.now() - startedAt).toBeLessThan(150);
   });
 
+  it("parses long malformed front matter, headings, and lists in bounded time", () => {
+    const longMarker = "9".repeat(100_000);
+    const markdown = `---\n${longMarker}\n---\n${"#".repeat(100_000)} text\n${longMarker}x`;
+    const startedAt = performance.now();
+
+    expect(parseFrontMatter(markdown).metadata).toEqual({});
+    expect(renderMarkdown(parseFrontMatter(markdown).body).headings).toEqual([]);
+
+    expect(performance.now() - startedAt).toBeLessThan(250);
+  });
+
   it("trims only trailing link-base slashes", () => {
     expect(trimTrailingSlashes("https://example.test/path///")).toBe("https://example.test/path");
     expect(trimTrailingSlashes("https://example.test/path")).toBe("https://example.test/path");

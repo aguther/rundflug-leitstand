@@ -51,7 +51,7 @@ export type TicketGroupPrintResult =
   | { status: "CANCELED" };
 
 export function encodeTicketSearchCursor(cursor: TicketSearchCursor): string {
-  return btoa(JSON.stringify(cursor)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+  return btoa(JSON.stringify(cursor)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
 export function decodeTicketSearchCursor(value: string | undefined): TicketSearchCursor | null {

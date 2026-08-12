@@ -6,11 +6,19 @@ function decodeBase64Url(value) {
   return Buffer.from(value, "base64url");
 }
 
+function isValidEmailAddress(address) {
+  const separator = address.indexOf("@");
+  if (separator <= 0 || separator !== address.lastIndexOf("@")) return false;
+  const dot = address.indexOf(".", separator + 2);
+  if (dot < 0 || dot === address.length - 1) return false;
+  return ![...address].some((character) => character.trim().length === 0);
+}
+
 export function validateVapidSubject(value) {
   const subject = value.trim();
   if (subject.startsWith("mailto:")) {
     const address = subject.slice("mailto:".length);
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) return subject;
+    if (isValidEmailAddress(address)) return subject;
   }
   if (subject.startsWith("https://")) {
     try {

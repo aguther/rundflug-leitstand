@@ -40,7 +40,7 @@ const database = new DatabaseSync(databasePath);
 try {
   const migrationDirectory = new URL("../apps/worker/migrations/", import.meta.url);
   for (const migrationName of readdirSync(migrationDirectory)
-    .filter((name) => /^\d+.*\.sql$/.test(name))
+    .filter((name) => name.endsWith(".sql") && name[0] >= "0" && name[0] <= "9")
     .toSorted(compareTechnicalStrings)) {
     database.exec(readFileSync(new URL(migrationName, migrationDirectory), "utf8"));
   }

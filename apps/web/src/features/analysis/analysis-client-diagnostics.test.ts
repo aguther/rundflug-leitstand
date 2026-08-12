@@ -33,5 +33,13 @@ describe("in-memory analysis client diagnostics", () => {
       family: "OTHER",
       majorVersion: null,
     });
+    expect(browserVersion("Mozilla/5.0 Version/18.4 Mobile Safari/605.1.15")).toEqual({
+      family: "SAFARI",
+      majorVersion: 18,
+    });
+    expect(browserVersion(`Version/18.${"x".repeat(100_000)}`)).toEqual({
+      family: "OTHER",
+      majorVersion: null,
+    });
   });
 });

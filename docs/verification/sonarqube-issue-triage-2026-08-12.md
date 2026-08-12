@@ -29,6 +29,26 @@ Event-Coordinator/Command-Services, Cashier-/Flight-Line-Zustandsvarianten und a
 Admin-Workspaces vorgesehen. Ungedeckte Bootstrap- und Verdrahtungsdateien wurden nicht pauschal
 aus der Messung entfernt.
 
+## Verifizierter Server-Folgescan
+
+Der erfolgreiche GitHub-Lauf `31634968000` analysierte `main` am
+`2026-08-12T19:58:34Z`. Gegen die unmittelbar vor dem Lauf per MCP gesicherten 717 Issue-Keys wurden
+20 alte Issues geschlossen (sechs High/Critical und 14 Medium/Major), fünf neue Low/Minor-Issues
+erkannt und 697 unverändert wiedergefunden. Der offene Bestand beträgt damit 702 Issues: 0 Blocker,
+71 High/Critical, 395 Medium/Major und 236 Low/Minor. Die fünf neu entstandenen Low-Funde sind
+berechtigt und werden im Folgepaket behoben; es gibt dafür keine Accepted- oder False-Positive-
+Einstufung.
+
+Die Sonar-Gesamt-Coverage stieg im selben Scan von 63,5 % auf 72,1 %, die Line-Coverage von 67,7 %
+auf 77,7 % und die Branch-Coverage von 58,3 % auf 65,3 %. Die Duplikationsrate blieb bei 1,9 %.
+Damit ist der Fortschritt nun serverseitig bestätigt, das 80-%-Ziel aber weiterhin offen.
+
+Der vollständige lokale Coverage-Lauf des Reliability-Folgepakets umfasst 327 Testdateien und
+1.797 bestandene Tests bei sechs gezielt übersprungenen Testfällen. Er erreicht 74,78 % Statements,
+65,35 % Branches, 73,68 % Functions und 76,98 % Lines. Diese Werte sind noch kein Ersatz für den
+folgenden Sonar-Scan, belegen aber, dass die neuen Regressionstests die gemessene Produktionsbasis
+nicht durch Exclusions verkleinern.
+
 `PENDING` bedeutet ausdrücklich, dass noch keine technische Bewertung oder Serveraktion erfolgt
 ist. Ein Eintrag darf erst nach Prüfung des konkreten Codes auf `FIX`, `ARCHITECTURE_BACKLOG`,
 `FALSE_POSITIVE`, `ACCEPTED` oder `ROOT_CAUSE` geändert werden.
@@ -144,35 +164,40 @@ durch einen UTF-8-Guard geprüft.
 
 ## Reliability-Issues – technische Einzelbewertung
 
-Alle 60 Reliability-Issues wurden am konkreten Code bewertet: 42 werden durch Codeänderungen
-geschlossen, 14 sind False Positives und vier werden wegen der Kompatibilität stabiler IDs bewusst
-akzeptiert. Die Regex-Bewertung verwendete adversariale Messreihen mit 1.000, 2.000, 4.000 und
-8.000 Wiederholungen. Die Markdown-Linkmuster skalierten dabei quadratisch; der Regressionstest mit
-20.000 fehlgeschlagenen Linkanfängen benötigte vor dem Fix rund 734 ms und muss nach dem linearen
-Scanner unter 150 ms bleiben.
+Alle ursprünglich 60 Reliability-Issues wurden am konkreten Code bewertet. Der verifizierte
+Folgescan hat 42 davon geschlossen. Von den verbleibenden 18 werden sieben durch lineare Parser oder
+deterministische Stringoperationen behoben, sieben sind durch DOM- und Interaktionstests belegte
+False Positives und vier werden wegen der Kompatibilität veröffentlichter Seeds und stabiler IDs
+bewusst akzeptiert. Die Regex-Fixes besitzen adversariale Tests mit bis zu 100.000 Zeichen; die
+Parser vermeiden Backtracking vollständig.
 
-Die Sonar-MCP-Funktion für normale Issues unterstützt zwar Statuswechsel, aber keine Kommentare. Die
-SonarQube-Cloud-Oberfläche war sowohl im internen Browser als auch in der verfügbaren Chrome-Sitzung
-nicht authentifiziert; ein passendes Token steht der Shell nicht zur Verfügung. Deshalb bleibt die
-Serveraktion für `FALSE_POSITIVE` und `ACCEPTED` offen. Ohne dauerhaften Kommentar wurde bewusst kein
-Status geändert.
+Die Issue-Suche liefert für die 18 verbleibenden Reliability-Funde 14 Major und vier Minor, während
+das aggregierte Sonar-Maß 12 Medium und sechs Low ausweist. Diese Serverdifferenz bleibt
+dokumentiert; die Einzelbewertung verwendet die Issue-Keys und nicht die widersprüchliche Summe.
+
+Die Sonar-MCP-Funktion für normale Issues unterstützt Statuswechsel, aber keine Kommentare. Deshalb
+wurden die Begründungen zuerst über die authentifizierte SonarQube-Cloud-Oberfläche hinterlegt; die
+Statuswechsel wurden anschließend ausgeführt und über MCP verifiziert. Alle sieben False Positives
+und alle vier bewusst akzeptierten Abweichungen sind serverseitig `RESOLVED`. Die konkrete Resolution
+(`FALSE_POSITIVE` beziehungsweise `ACCEPTED`) und der dauerhafte Kommentar sind zusätzlich in dieser
+Tabelle dokumentiert.
 
 | Issue-Key | Regel / Fundstelle | Klassifikation | Technische Relevanz, Risiko und Fix | Testnachweis | Serveraktion |
 | --- | --- | --- | --- | --- | --- |
 | AZ_l6Cm5LlJq96xp0cc_ | S9011 · `Button.tsx:76` | FIX | Nativer Default wäre `submit`; sicherer Default `button`, explizites `submit` bleibt möglich. Geringes Risiko. | `busy-indicator.test.ts` | Folgescan muss schließen |
 | AZ_l6CmxLlJq96xp0cc8 | S9011 · `IconButton.tsx:39` | FIX | Wie vorstehend; verhindert unbeabsichtigte Formularaktionen. Geringes Risiko. | `busy-indicator.test.ts` | Folgescan muss schließen |
-| AZ_l6ChYLlJq96xp0ca_ | S6853 · `FactoryResetDialog.tsx:119` | FALSE_POSITIVE | Das native Label umschließt Checkbox und sichtbaren Text in `strong`/`small`; Zuordnung und zugänglicher Name sind vorhanden. Eine Umschreibung könnte die Klickfläche verschlechtern. | DOM-Struktur + HTML-Label-Semantik | Kommentar + Status offen |
-| AZ_l6ChYLlJq96xp0cbA | S6853 · `FactoryResetDialog.tsx:130` | FALSE_POSITIVE | Dasselbe nachweislich korrekte native Labelmuster. | DOM-Struktur + HTML-Label-Semantik | Kommentar + Status offen |
-| AZ_l6Ck9LlJq96xp0ccg | S8786 · `analysis-client-diagnostics.ts:36` | FALSE_POSITIVE | Safari-Muster zeigte lineare Skalierung; User-Agent ist zusätzlich praktisch begrenzt. Kein Backtracking-Risiko nachweisbar. | adversarialer Benchmark; bestehender `browserVersion`-Test | Kommentar + Status offen |
-| AZ_1TeHjXSRXGTervM09 | S6847 · `CashierTicketPresentation.tsx:99` | FALSE_POSITIVE | `<dialog>` ist ein natives Dialogelement; `onCancel`, Backdrop-Klick und Close-Fokus sind die tatsächliche Interaktion. Ein künstlicher Rollenwechsel wäre semantisch schlechter. | Codepfad und native Dialog-Semantik | Kommentar + Status offen |
-| AZ_l6CikLlJq96xp0cbR | S6853 · `FidsSettingsDialog.tsx:198` | FALSE_POSITIVE | Checkbox liegt im Label, sichtbarer Text folgt in `strong`/`small`; Name und Zuordnung sind vorhanden. | DOM-Struktur + HTML-Label-Semantik | Kommentar + Status offen |
-| AZ_l6CdYLlJq96xp0cZh | S6847 · `ForecastTimeline.tsx:281` | FALSE_POSITIVE | Der überlaufende Zeitachsenbereich ist absichtlich per Tastatur scrollbar; Handler implementiert PageUp/PageDown/Home/End. | `forecast-simulation-ui.test.ts` + Handlerprüfung | Kommentar + Status offen |
-| AZ_l6CdYLlJq96xp0cZi | S6845 · `ForecastTimeline.tsx:286` | FALSE_POSITIVE | `tabIndex=0` ist für die Tastaturbedienung des Scrollbereichs erforderlich; Entfernen wäre eine Accessibility-Regression. | `forecast-simulation-ui.test.ts` | Kommentar + Status offen |
+| AZ_l6ChYLlJq96xp0ca_ | S6853 · `FactoryResetDialog.tsx:119` | FALSE_POSITIVE | Das native Label umschließt Checkbox und sichtbaren Text in `strong`/`small`; Zuordnung und zugänglicher Name sind vorhanden. Eine Umschreibung könnte die Klickfläche verschlechtern. | `FactoryResetDialog.dom.test.tsx`: Checkbox per Rolle und vollständigem Namen | Kommentiert; `FALSE_POSITIVE` per MCP verifiziert |
+| AZ_l6ChYLlJq96xp0cbA | S6853 · `FactoryResetDialog.tsx:130` | FALSE_POSITIVE | Dasselbe nachweislich korrekte native Labelmuster. | `FactoryResetDialog.dom.test.tsx`: Checkbox per Rolle und vollständigem Namen | Kommentiert; `FALSE_POSITIVE` per MCP verifiziert |
+| AZ_l6Ck9LlJq96xp0ccg | S8786 · `analysis-client-diagnostics.ts:36` | FIX | Markerbasierte Versionssuche ersetzt das Safari-Muster vollständig und erhält die Browserpriorität. | `analysis-client-diagnostics.test.ts`: Safari und 100.000-Zeichen-Eingabe | Folgescan muss schließen |
+| AZ_1TeHjXSRXGTervM09 | S6847 · `CashierTicketPresentation.tsx:99` | FALSE_POSITIVE | `<dialog>` ist ein natives Dialogelement; `onCancel`, Backdrop-Klick und Close-Fokus sind die tatsächliche Interaktion. Ein künstlicher Rollenwechsel wäre semantisch schlechter. | `CashierTicketPresentation.dom.test.tsx`: native Dialogrolle, Backdrop und Escape | Kommentiert; `FALSE_POSITIVE` per MCP verifiziert |
+| AZ_l6CikLlJq96xp0cbR | S6853 · `FidsSettingsDialog.tsx:198` | FALSE_POSITIVE | Checkbox liegt im Label, sichtbarer Text folgt in `strong`/`small`; Name und Zuordnung sind vorhanden. | `FidsSettingsDialog.dom.test.tsx`: Checkbox per Rolle und vollständigem Namen | Kommentiert; `FALSE_POSITIVE` per MCP verifiziert |
+| AZ_l6CdYLlJq96xp0cZh | S6847 · `ForecastTimeline.tsx:281` | FALSE_POSITIVE | Der überlaufende Zeitachsenbereich ist absichtlich per Tastatur scrollbar; Handler implementiert PageUp/PageDown/Home/End. | `forecast-simulation-ui.test.ts` + Handlerprüfung | Kommentiert; `FALSE_POSITIVE` per MCP verifiziert |
+| AZ_l6CdYLlJq96xp0cZi | S6845 · `ForecastTimeline.tsx:286` | FALSE_POSITIVE | `tabIndex=0` ist für die Tastaturbedienung des Scrollbereichs erforderlich; Entfernen wäre eine Accessibility-Regression. | `forecast-simulation-ui.test.ts` | Kommentiert; `FALSE_POSITIVE` per MCP verifiziert |
 | AZ_l6Cd2LlJq96xp0cZ9 | S6772 · `ScenarioEditor.tsx:675` | FIX | Expliziter JSX-Abstand beseitigt uneindeutige Textverkettung. Geringes Risiko. | vollständige UI-/Formatprüfung | Folgescan muss schließen |
-| AZ_0hwNyR1I9WvIHxPKE | S7758 · `simulation-primitives.ts:25` | ACCEPTED | Hash ist ein publizierter deterministischer UTF-16-Hash. Codepoint-Umstellung würde bestehende Simulationen für Nicht-BMP-Schlüssel ändern. Neubewertung nur bei versioniertem Hashformat. | Emoji-Stabilität in `simulation-primitives.test.ts` | Kommentar + Status offen |
+| AZ_0hwNyR1I9WvIHxPKE | S7758 · `simulation-primitives.ts:25` | ACCEPTED | Hash ist ein publizierter deterministischer UTF-16-Hash. Codepoint-Umstellung würde bestehende Simulationen für Nicht-BMP-Schlüssel ändern. Neubewertung nur bei versioniertem Hashformat. | Emoji-Stabilität in `simulation-primitives.test.ts` | Kommentiert; `ACCEPTED` per MCP verifiziert |
 | AZ_l6CcDLlJq96xp0cZB | S7781 · `simulation-scenario-template.ts:45` | FIX | `replaceAll` ist für den globalen Ausdruck semantisch gleichwertig. Geringes Risiko. | `simulation-plan-import.test.ts` | Folgescan muss schließen |
 | AZ_l6CeALlJq96xp0caB | S6772 · `SimulationFoundationDialog.tsx:408` | FIX | Expliziter Abstand zwischen Checkbox und Labeltext. | vollständige UI-/Formatprüfung | Folgescan muss schließen |
-| AZ_l6CrRLlJq96xp0cgN | S6853 · `flight-line-view.tsx:1480` | FALSE_POSITIVE | Label umschließt Checkbox und den vollständigen Gruppenbezeichner; zugänglicher Name ist vorhanden. | DOM-Struktur + HTML-Label-Semantik | Kommentar + Status offen |
+| AZ_l6CrRLlJq96xp0cgN | S6853 · `flight-line-view.tsx:1480` | FALSE_POSITIVE | Label umschließt Checkbox und den vollständigen Gruppenbezeichner; zugänglicher Name ist vorhanden. | DOM-Struktur + HTML-Label-Semantik | Kommentiert; `FALSE_POSITIVE` per MCP verifiziert |
 | AZ_l6CrRLlJq96xp0cgO | S6772 · `flight-line-view.tsx:1570` | FIX | Expliziter Abstand verbessert den zugänglichen Labeltext. | Flight-Line-Tests | Folgescan muss schließen |
 | AZ_l6CrRLlJq96xp0cgS | S6772 · `flight-line-view.tsx:1845` | FIX | Expliziter Abstand vor Select. | Flight-Line-Tests | Folgescan muss schließen |
 | AZ_l6CrRLlJq96xp0cgT | S6772 · `flight-line-view.tsx:1863` | FIX | Expliziter Abstand vor Input. | Flight-Line-Tests | Folgescan muss schließen |
@@ -192,22 +217,22 @@ Status geändert.
 | AZ_l6CZuLlJq96xp0cXy | S7758 · `crypto.ts:31` | FIX | Eingaben sind nach Typ exakt Bytes 0–255; `fromCodePoint` ist nachweislich äquivalent. | `crypto.test.ts` | Folgescan muss schließen |
 | AZ_l6CZuLlJq96xp0cXz | S7758 · `crypto.ts:41` | FIX | `atob` liefert ein Byte je Codepoint; `codePointAt(0)` ist äquivalent. | `crypto.test.ts` | Folgescan muss schließen |
 | AZ_l6CZdLlJq96xp0cXm | S7758 · `reset-setup-grant.ts:16` | FIX | Bytebereich garantiert; Unicode-Methode ändert Base64-Ausgabe nicht. | Reset-Setup-Tests | Folgescan muss schließen |
-| AZ_oqZw_tOPjZ5mYXd0Q | S8786 · `ticket-read-service.ts:54` | FALSE_POSITIVE | Eingabe des Musters ist ausschließlich intern von `btoa` erzeugt; `=` kann nur als höchstens zweistelliges Suffix vorkommen. Adversariales Muster ist im Datenfluss unmöglich. | Cursor-Roundtriptests + Datenflussprüfung | Kommentar + Status offen |
+| AZ_oqZw_tOPjZ5mYXd0Q | S8786 · `ticket-read-service.ts:54` | FIX | Base64-Padding kann ausschließlich `=` sein und wird ohne Regex mit `replaceAll` entfernt. | `ticket-read-routes.test.ts`: unpadding und Cursor-Roundtrip | Folgescan muss schließen |
 | AZ_l6CZULlJq96xp0cXk | S7758 · `web-push-request.ts:44` | FIX | `atob`-Binärstring ist auf Byte-Codepoints begrenzt. | `web-push-request.test.ts` | Folgescan muss schließen |
 | AZ_l6CZULlJq96xp0cXl | S7758 · `web-push-request.ts:49` | FIX | Uint8Array garantiert 0–255; Ausgabe bleibt bitidentisch. | `web-push-request.test.ts` | Folgescan muss schließen |
-| AZ_l6CubLlJq96xp0ciA | S7758 · `dispatch-plan.ts:285` | ACCEPTED | Hash bildet persistierte Batch-IDs und Revisionen aus UTF-16-Codeeinheiten. Änderung wäre inkompatibel. Neubewertung nur mit versionierter ID-Migration. | Dispatch-Plan-Stabilitätstests | Kommentar + Status offen |
-| AZ_l6CthLlJq96xp0cht | S7758 · `fids.ts:82` | ACCEPTED | Vorwärtsanteil einer stabilen extern sichtbaren Row-ID; Codepoint-Umstellung ändert Schlüssel. Neubewertung nur mit ID-Versionierung. | Nicht-BMP-Row-ID in `fids.test.ts` | Kommentar + Status offen |
-| AZ_l6CthLlJq96xp0chu | S7758 · `fids.ts:83` | ACCEPTED | Rückwärtsanteil derselben stabilen Row-ID; identische Kompatibilitätsentscheidung. | Nicht-BMP-Row-ID in `fids.test.ts` | Kommentar + Status offen |
+| AZ_l6CubLlJq96xp0ciA | S7758 · `dispatch-plan.ts:285` | ACCEPTED | Hash bildet persistierte Batch-IDs und Revisionen aus UTF-16-Codeeinheiten. Änderung wäre inkompatibel. Neubewertung nur mit versionierter ID-Migration. | Dispatch-Plan-Stabilitätstests | Kommentiert; `ACCEPTED` per MCP verifiziert |
+| AZ_l6CthLlJq96xp0cht | S7758 · `fids.ts:82` | ACCEPTED | Vorwärtsanteil einer stabilen extern sichtbaren Row-ID; Codepoint-Umstellung ändert Schlüssel. Neubewertung nur mit ID-Versionierung. | Nicht-BMP-Row-ID in `fids.test.ts` | Kommentiert; `ACCEPTED` per MCP verifiziert |
+| AZ_l6CthLlJq96xp0chu | S7758 · `fids.ts:83` | ACCEPTED | Rückwärtsanteil derselben stabilen Row-ID; identische Kompatibilitätsentscheidung. | Nicht-BMP-Row-ID in `fids.test.ts` | Kommentiert; `ACCEPTED` per MCP verifiziert |
 | AZ_tvunAHB_X69K2orHo | S7758 · `arc42_markdown_to_html.mjs:1` | FIX | Fester Sentinel-Codepoint; Änderung exakt äquivalent. | `build_arc42_bundle.test.ts` | Folgescan muss schließen |
 | AZ_tvunAHB_X69K2orHp | S7758 · `arc42_markdown_to_html.mjs:2` | FIX | Fester Sentinel-Codepoint; Änderung exakt äquivalent. | `build_arc42_bundle.test.ts` | Folgescan muss schließen |
 | AZ_tvunAHB_X69K2orHq | S8786 · `arc42_markdown_to_html.mjs:33` | ROOT_CAUSE | Quadratische Markdown-Linksuche bestätigt; gemeinsamer linearer Scanner ersetzt alle vier Linkmuster. | adversarialer `build_arc42_bundle.test.ts` | Folgescan muss schließen |
-| AZ_tvunAHB_X69K2orHs | S8786 · `arc42_markdown_to_html.mjs:50` | FALSE_POSITIVE | Verankertes Frontmatter-Muster skaliert linear; abschließendes `.*` kann immer konsumieren und erzwingt kein Rücklaufen. | adversarialer Benchmark | Kommentar + Status offen |
-| AZ_tvunAHB_X69K2orHw | S8786 · `arc42_markdown_to_html.mjs:101` | FALSE_POSITIVE | Verankertes Heading-Muster skaliert linear; Quantoren sind durch Literal/Anker getrennt. | adversarialer Benchmark | Kommentar + Status offen |
-| AZ_tvunAHB_X69K2orHx | S8786 · `arc42_markdown_to_html.mjs:141` | FALSE_POSITIVE | Verankertes Listenmuster skaliert linear; keine nichtlineare Messung reproduzierbar. | adversarialer Benchmark | Kommentar + Status offen |
+| AZ_tvunAHB_X69K2orHs | S8786 · `arc42_markdown_to_html.mjs:50` | FIX | Frontmatter-Schlüssel und Wert werden über Separator und lineare Zeichenprüfung gelesen; kein Regex-Backtracking bleibt. | `build_arc42_bundle.test.ts`: Frontmatter mit 100.000 Zeichen | Folgescan muss schließen |
+| AZ_tvunAHB_X69K2orHw | S8786 · `arc42_markdown_to_html.mjs:101` | FIX | Heading-Level und Textanfang werden in einem begrenzten linearen Scan bestimmt. | `build_arc42_bundle.test.ts`: ungültiger 100.000-Zeichen-Heading-Marker | Folgescan muss schließen |
+| AZ_tvunAHB_X69K2orHx | S8786 · `arc42_markdown_to_html.mjs:141` | FIX | Listenmarker und Inhalt werden ohne mehrdeutige Quantoren geparst. | `build_arc42_bundle.test.ts`: ungültiger 100.000-Zeichen-Listenmarker | Folgescan muss schließen |
 | AZ_tvukGHB_X69K2orHk | S8786 · `build_arc42_bundle.mjs:18` | FIX | Unbegrenztes CLI-Argument zeigte nichtlineares Suffix-Backtracking; einmaliger Rückwärtsscan ersetzt Regex. | `trimTrailingSlashes`-Test | Folgescan muss schließen |
 | AZ_tvukGHB_X69K2orHm | S8786 · `build_arc42_bundle.mjs:31` | ROOT_CAUSE | Bestätigtes quadratisches Linkmuster durch gemeinsamen Scanner beseitigt. | adversarialer `build_arc42_bundle.test.ts` | Folgescan muss schließen |
-| AZ_l6CwRLlJq96xp0cie | S8786 · `vapid-keys.mjs:13` | FALSE_POSITIVE | E-Mail-Muster skaliert in adversarialer Messung linear; kein technischer Laufzeitfehler nachweisbar. | adversarialer Benchmark + `vapid-setup-script.test.ts` | Kommentar + Status offen |
-| AZ_l6Cy9LlJq96xp0ci_ | S8786 · `verify_analysis_capture_scale.mjs:43` | FALSE_POSITIVE | Nichtlinear nur für unbeschränkte künstliche Namen; reale Dateinamen sind durch das Dateisystem auf 255 Zeichen begrenzt. Maximallast ist vernachlässigbar. | Benchmark bis 8.000 + Dateisystemgrenze | Kommentar + Status offen |
+| AZ_l6CwRLlJq96xp0cie | S8786 · `vapid-keys.mjs:13` | FIX | Mailadresse wird über eindeutigen Separator, Domainpunkt und Whitespace-Scan validiert; das akzeptierte Format bleibt unverändert. | `vapid-setup-script.test.ts`: gültige Werte, Fehlerfälle und 100.000-Zeichen-Domain | Folgescan muss schließen |
+| AZ_l6Cy9LlJq96xp0ci_ | S8786 · `verify_analysis_capture_scale.mjs:43` | FIX | Migrationen werden über `.sql`-Suffix und erste Ziffer ausgewählt; das Dateinamensmuster ist exakt äquivalent. | `test:analysis-scale` und vollständiger Check | Folgescan muss schließen |
 | AZ_tvup0HB_X69K2orHy | S8786 · `verify_arc42_docs.mjs:38` | ROOT_CAUSE | Bestätigtes quadratisches Linkmuster durch gemeinsamen Scanner beseitigt. | `verify_arc42_docs.test.ts` + adversarialer Test | Folgescan muss schließen |
 | AZ_l6CvSLlJq96xp0ciR | S8786 · `verify_architecture_docs.mjs:176` | ROOT_CAUSE | Bestätigtes quadratisches Linkmuster durch gemeinsamen Scanner beseitigt. | Dokumentationsprüfung + adversarialer Test | Folgescan muss schließen |
 | AZ_l6Cw_LlJq96xp0cin | S7758 · `verify_first_run_setup.mjs:31` | FIX | Fester ASCII-Codepoint 48; exakt äquivalente Unicode-Methode. | V1-Integrationssuite | Folgescan muss schließen |

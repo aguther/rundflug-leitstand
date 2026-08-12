@@ -40,14 +40,65 @@ function renderInline(text) {
   );
 }
 
+function isFrontMatterKeyCharacter(character) {
+  const codePoint = character.codePointAt(0);
+  return (
+    character === "-" ||
+    (codePoint >= 65 && codePoint <= 90) ||
+    (codePoint >= 97 && codePoint <= 122)
+  );
+}
+
+function frontMatterEntry(line) {
+  const separator = line.indexOf(":");
+  if (separator <= 0) return null;
+  const key = line.slice(0, separator);
+  if (![...key].every(isFrontMatterKeyCharacter)) return null;
+  let value = line.slice(separator + 1).trim();
+  if (value.startsWith('"')) value = value.slice(1);
+  if (value.endsWith('"')) value = value.slice(0, -1);
+  return { key, value };
+}
+
+function isWhitespace(character) {
+  return character !== undefined && character.trim().length === 0;
+}
+
+function parseHeading(line) {
+  let level = 0;
+  while (level < 6 && line[level] === "#") level += 1;
+  if (level === 0 || !isWhitespace(line[level])) return null;
+  let textStart = level;
+  while (isWhitespace(line[textStart])) textStart += 1;
+  return { level, text: line.slice(textStart) };
+}
+
+function parseListItem(line) {
+  const content = line.trimStart();
+  let markerEnd = 0;
+  let ordered = false;
+  if (content[0] === "-" || content[0] === "*") {
+    markerEnd = 1;
+  } else {
+    while (content[markerEnd] >= "0" && content[markerEnd] <= "9") markerEnd += 1;
+    if (markerEnd === 0 || content[markerEnd] !== ".") return null;
+    markerEnd += 1;
+    ordered = true;
+  }
+  if (!isWhitespace(content[markerEnd])) return null;
+  let textStart = markerEnd;
+  while (isWhitespace(content[textStart])) textStart += 1;
+  return { ordered, text: content.slice(textStart) };
+}
+
 export function parseFrontMatter(markdown) {
   if (!markdown.startsWith("---\n")) return { body: markdown, metadata: {} };
   const end = markdown.indexOf("\n---\n", 4);
   if (end < 0) return { body: markdown, metadata: {} };
   const metadata = {};
   for (const line of markdown.slice(4, end).split("\n")) {
-    const match = line.match(/^([a-zA-Z-]+):\s*(.*)$/);
-    if (match) metadata[match[1]] = match[2].trim().replace(/^"|"$/g, "");
+    const entry = frontMatterEntry(line);
+    if (entry) metadata[entry.key] = entry.value;
   }
   return { body: markdown.slice(end + 5), metadata };
 }
@@ -82,7 +133,7 @@ function isTableRow(line) {
 }
 
 function isListItem(line) {
-  return /^\s*(?:[-*]|\d+\.)\s+/.test(line);
+  return parseListItem(line) !== null;
 }
 
 export function renderMarkdown(markdown, { renderFence } = {}) {
@@ -97,15 +148,15 @@ export function renderMarkdown(markdown, { renderFence } = {}) {
       index += 1;
       continue;
     }
-    const heading = line.match(/^(#{1,6})\s+(.*)$/);
+    const heading = parseHeading(line);
     if (heading) {
-      const level = heading[1].length;
-      const baseId = slugify(heading[2]) || `section-${headings.length + 1}`;
+      const { level, text } = heading;
+      const baseId = slugify(text) || `section-${headings.length + 1}`;
       const count = usedHeadingIds.get(baseId) ?? 0;
       usedHeadingIds.set(baseId, count + 1);
       const id = count === 0 ? baseId : `${baseId}-${count + 1}`;
-      html.push(`<h${level} id="${id}">${renderInline(heading[2])}</h${level}>`);
-      headings.push({ level, id, text: heading[2] });
+      html.push(`<h${level} id="${id}">${renderInline(text)}</h${level}>`);
+      headings.push({ level, id, text });
       index += 1;
       continue;
     }
@@ -133,13 +184,14 @@ export function renderMarkdown(markdown, { renderFence } = {}) {
       continue;
     }
     if (isListItem(line)) {
-      const ordered = !/^\s*[-*]\s/.test(line);
+      const firstEntry = parseListItem(line);
+      const ordered = firstEntry?.ordered ?? false;
       const items = [];
       while (index < lines.length) {
         const current = lines[index];
-        const entry = current.match(/^\s*(?:[-*]|\d+\.)\s+(.*)$/);
+        const entry = parseListItem(current);
         if (entry) {
-          items.push(entry[1]);
+          items.push(entry.text);
           index += 1;
           continue;
         }
@@ -159,7 +211,7 @@ export function renderMarkdown(markdown, { renderFence } = {}) {
       lines[index].trim().length > 0 &&
       !lines[index].startsWith("```") &&
       !isTableRow(lines[index]) &&
-      !/^#{1,6}\s/.test(lines[index]) &&
+      !parseHeading(lines[index]) &&
       !isListItem(lines[index])
     ) {
       paragraph.push(lines[index].trim());

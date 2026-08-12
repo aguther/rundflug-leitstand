@@ -52,6 +52,9 @@ describe("VAPID setup keys", () => {
     expect(validateVapidSubject("https://example.de/kontakt")).toBe("https://example.de/kontakt");
     expect(() => validateVapidSubject("http://example.de")).toThrow(/mailto:- oder https:/);
     expect(() => validateVapidSubject("mailto:ungueltig")).toThrow(/mailto:- oder https:/);
+    expect(() => validateVapidSubject(`mailto:a@${"a".repeat(100_000)}`)).toThrow(
+      /mailto:- oder https:/,
+    );
   });
 
   it("accepts a public operator URL without exposing a secret on the command line", () => {
