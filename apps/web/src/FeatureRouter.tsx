@@ -48,9 +48,9 @@ export function FeatureBoundary({
 
 export function FeatureRouter() {
   const path = window.location.pathname;
-  const ticketMatch = path.match(/^\/ticket\/([A-Za-z2-9]{12,32})$/);
+  const ticketMatch = /^\/ticket\/([A-Za-z2-9]{12,32})$/.exec(path);
   const ticketCode = ticketMatch?.[1];
-  const groupMatch = path.match(/^\/gruppe\/([A-Za-z2-9]{12,32})$/);
+  const groupMatch = /^\/gruppe\/([A-Za-z2-9]{12,32})$/.exec(path);
   const groupCode = groupMatch?.[1];
   let view: ReactNode = <CashierView />;
   if (groupCode) view = <GroupStatusView code={groupCode.toUpperCase()} />;

@@ -92,7 +92,7 @@ export function publicStatusInstallMetadata(
 }
 
 export function installMetadataForPath(pathname: string): InstallMetadata | null {
-  const publicMatch = pathname.match(/^\/(ticket|gruppe)\/([A-Za-z2-9]{12,32})$/);
+  const publicMatch = /^\/(ticket|gruppe)\/([A-Za-z2-9]{12,32})$/.exec(pathname);
   const publicCode = publicMatch?.[2];
   if (publicMatch && publicCode) {
     return publicStatusInstallMetadata(
