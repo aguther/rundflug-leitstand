@@ -202,14 +202,49 @@ async function findArchiveForVersion(
     .first<ArchiveRow>();
 }
 
-export async function requestAnalysisArchive(input: {
+interface AnalysisArchiveRequestInput {
   env: Env;
   eventId: string;
   expectedEventVersion: number;
   requestId: string;
   actorAlias: string;
   now?: Date;
-}): Promise<AnalysisArchiveRequestResult> {
+}
+
+async function retryFailedAnalysisArchive(
+  input: AnalysisArchiveRequestInput,
+  archive: ArchiveRow,
+): Promise<AnalysisArchiveRequestResult> {
+  const retriedAt = (input.now ?? new Date()).toISOString();
+  await input.env.DB.batch([
+    input.env.DB.prepare(
+      `UPDATE analysis_archives
+          SET status = 'PENDING', started_at = NULL, completed_at = NULL,
+              failure_code = NULL, version = version + 1
+        WHERE id = ?1 AND status = 'FAILED' AND version = ?2`,
+    ).bind(archive.id, archive.version),
+    archiveEventStatement({
+      env: input.env,
+      archiveId: archive.id,
+      eventId: input.eventId,
+      eventType: "ARCHIVE_REQUESTED",
+      occurredAt: retriedAt,
+      actorAlias: input.actorAlias,
+      details: { retry: true },
+    }),
+  ]);
+  const retried = await findArchiveForVersion(
+    input.env,
+    input.eventId,
+    archive.operation_day_version,
+  );
+  if (!retried) throw new Error("ANALYSIS_ARCHIVE_NOT_FOUND");
+  return { archive: archiveProjection(retried), created: true };
+}
+
+export async function requestAnalysisArchive(
+  input: AnalysisArchiveRequestInput,
+): Promise<AnalysisArchiveRequestResult> {
   const hash = await requestHash(input.eventId, input.expectedEventVersion);
   const priorRequest = await findArchiveByRequest(input.env, input.requestId);
   if (priorRequest) {
@@ -230,29 +265,7 @@ export async function requestAnalysisArchive(input: {
 
   const existing = await findArchiveForVersion(input.env, input.eventId, event.version);
   if (existing) {
-    if (existing.status === "FAILED") {
-      const retriedAt = (input.now ?? new Date()).toISOString();
-      await input.env.DB.batch([
-        input.env.DB.prepare(
-          `UPDATE analysis_archives
-              SET status = 'PENDING', started_at = NULL, completed_at = NULL,
-                  failure_code = NULL, version = version + 1
-            WHERE id = ?1 AND status = 'FAILED' AND version = ?2`,
-        ).bind(existing.id, existing.version),
-        archiveEventStatement({
-          env: input.env,
-          archiveId: existing.id,
-          eventId: input.eventId,
-          eventType: "ARCHIVE_REQUESTED",
-          occurredAt: retriedAt,
-          actorAlias: input.actorAlias,
-          details: { retry: true },
-        }),
-      ]);
-      const retried = await findArchiveForVersion(input.env, input.eventId, event.version);
-      if (!retried) throw new Error("ANALYSIS_ARCHIVE_NOT_FOUND");
-      return { archive: archiveProjection(retried), created: true };
-    }
+    if (existing.status === "FAILED") return retryFailedAnalysisArchive(input, existing);
     return { archive: archiveProjection(existing), created: false };
   }
 
@@ -573,7 +586,7 @@ export async function analysisArchiveDownload(input: {
   actorAlias: string;
 }): Promise<{ archive: AnalysisArchive; object: R2ObjectBody } | null> {
   const row = await archiveRowById(input.env, input.archiveId);
-  if (!row || row.operation_day_id !== input.eventId || row.status !== "READY" || !row.object_key) {
+  if (row?.operation_day_id !== input.eventId || row.status !== "READY" || !row.object_key) {
     return null;
   }
   const object = await input.env.BACKUPS.get(row.object_key);
@@ -596,7 +609,7 @@ export async function deleteAnalysisArchive(input: {
   actorAlias: string;
 }): Promise<AnalysisArchive | null> {
   const row = await archiveRowById(input.env, input.archiveId);
-  if (!row || row.operation_day_id !== input.eventId) return null;
+  if (row?.operation_day_id !== input.eventId) return null;
   if (row.status === "DELETED") return archiveProjection(row);
   if (row.status === "BUILDING") throw new Error("ANALYSIS_ARCHIVE_BUILDING");
   if (row.object_key) await input.env.BACKUPS.delete(row.object_key);
