@@ -74,7 +74,6 @@ export function useAdminEventWorkspaceNavigation(input: {
     if (!eventParametersDirty) return;
     const warnBeforeUnload = (unloadEvent: BeforeUnloadEvent) => {
       unloadEvent.preventDefault();
-      unloadEvent.returnValue = "";
     };
     window.addEventListener("beforeunload", warnBeforeUnload);
     return () => window.removeEventListener("beforeunload", warnBeforeUnload);
