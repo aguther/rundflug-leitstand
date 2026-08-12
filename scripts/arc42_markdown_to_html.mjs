@@ -35,7 +35,7 @@ function renderInline(text) {
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, "<em>$1</em>");
   return html.replace(
-    new RegExp(`${codeOpen}(\\d+)${codeClose}`, "g"),
+    new RegExp(String.raw`${codeOpen}(\d+)${codeClose}`, "g"),
     (_match, index) => `<code>${escapeHtml(codeSpans[Number(index)])}</code>`,
   );
 }

@@ -10,6 +10,7 @@ export function createCsv(rows: Array<Array<CsvCellValue>>): string {
 }
 
 function pdfText(value: string): string {
+  const escapeCharacter = String.fromCodePoint(92);
   return value
     .replaceAll("ä", "ae")
     .replaceAll("ö", "oe")
@@ -19,9 +20,9 @@ function pdfText(value: string): string {
     .replaceAll("Ü", "Ue")
     .replaceAll("ß", "ss")
     .replaceAll(/[^\x20-\x7e]/g, "?")
-    .replaceAll("\\", "\\\\")
-    .replaceAll("(", "\\(")
-    .replaceAll(")", "\\)");
+    .replaceAll(escapeCharacter, escapeCharacter.repeat(2))
+    .replaceAll("(", `${escapeCharacter}(`)
+    .replaceAll(")", `${escapeCharacter})`);
 }
 
 /** Creates a deliberately simple, portable A4 PDF without a runtime dependency. */

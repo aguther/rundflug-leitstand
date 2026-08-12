@@ -12,4 +12,10 @@ describe("report formats", () => {
     expect(text).toContain("(Tagesbericht) Tj");
     expect(text.endsWith("%%EOF\n")).toBe(true);
   });
+
+  it("escapes PDF backslashes and parentheses byte-for-byte", () => {
+    const text = new TextDecoder().decode(createTextPdf("A\\B(C)", []));
+
+    expect(text).toContain(String.raw`(A\\B\(C\)) Tj`);
+  });
 });
