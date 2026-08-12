@@ -89,7 +89,7 @@ describe("V1.9 Flight Director and Flight Line surfaces", () => {
     expect(assistSource).toContain("is-selection-mode");
     expect(assistSource).toContain("is-work-mode");
     expect(assistSource).toContain("assist-v15-active-column");
-    expect(assistSource).toContain("availableAircraft.slice(0, visibleAircraftCount)");
+    expect(assistSource).toContain("aircraft.slice(0, visibleAircraftCount)");
     expect(assistSource).not.toContain("assist-v15-workspace");
     expect(assistSource).not.toContain('className="assist-v15-groups"');
     expect(assistSource).toContain("BookingGroupAssignmentDialog");

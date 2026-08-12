@@ -41,12 +41,84 @@ type Aircraft = OperationBoard["aircraft"][number];
 type Rotation = OperationBoard["rotations"][number];
 type TurnaroundNextState = "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE";
 
+function requiresAvailableStateReset(aircraft: Aircraft | undefined): boolean {
+  return Boolean(
+    aircraft &&
+      ["REFUELING", "PAUSED", "INTERRUPTED", "INACTIVE", "TURNAROUND"].includes(
+        aircraft.operationalState,
+      ),
+  );
+}
+
+function primaryActionDisabled(input: {
+  aircraft: Aircraft | undefined;
+  assignedRotation: Rotation | undefined;
+  activeRotation: Rotation | undefined;
+  board: OperationBoard;
+  requiresAvailableReset: boolean;
+}): boolean {
+  if (!input.aircraft) return true;
+  if (input.requiresAvailableReset || input.assignedRotation) return false;
+  return (
+    input.activeRotation?.status !== "DRAFT" ||
+    !input.aircraft.currentPilotId ||
+    input.board.event.emergencyMode ||
+    input.board.event.status !== "ACTIVE" ||
+    input.board.event.operationalInterrupted
+  );
+}
+
+function unavailableActionAllowed(
+  aircraft: Aircraft | undefined,
+  assignedRotation: Rotation | undefined,
+): boolean {
+  if (
+    aircraft?.operationalState === "AVAILABLE" &&
+    (!assignedRotation || assignedRotation.status === "DRAFT")
+  ) {
+    return true;
+  }
+  return Boolean(
+    assignedRotation && ["CALLED", "IN_FLIGHT", "LANDED"].includes(assignedRotation.status),
+  );
+}
+
+function assistActionAvailability(input: {
+  activeAircraft: Aircraft | undefined;
+  activeRotation: Rotation | undefined;
+  assignedRotation: Rotation | undefined;
+  board: OperationBoard;
+  canAssignPilot: boolean;
+}) {
+  const requiresAvailableReset = requiresAvailableStateReset(input.activeAircraft);
+  return {
+    assignmentReady:
+      input.activeAircraft?.operationalState === "AVAILABLE" &&
+      input.activeRotation?.status === "DRAFT",
+    pilotChangeAllowed:
+      input.canAssignPilot &&
+      (!input.assignedRotation || ["DRAFT", "CALLED"].includes(input.assignedRotation.status)),
+    primaryDisabled: primaryActionDisabled({
+      aircraft: input.activeAircraft,
+      assignedRotation: input.assignedRotation,
+      activeRotation: input.activeRotation,
+      board: input.board,
+      requiresAvailableReset,
+    }),
+    requiresAvailableReset,
+    secondaryAllowed:
+      input.activeAircraft?.operationalState === "AVAILABLE" &&
+      (!input.assignedRotation || input.assignedRotation.status === "DRAFT"),
+    unavailableAllowed: unavailableActionAllowed(input.activeAircraft, input.assignedRotation),
+  };
+}
+
 export function AircraftPickerMeta({
   aircraft,
   gateLabel,
 }: {
   aircraft: Aircraft;
-  gateLabel?: string | undefined;
+  gateLabel?: string;
 }) {
   return (
     <div className="assist-v15-picker-meta">
@@ -60,6 +132,104 @@ export function AircraftPickerMeta({
         </span>
       ) : null}
     </div>
+  );
+}
+
+function AircraftSelection({
+  aircraft,
+  assistClaims,
+  board,
+  claimingAircraftId,
+  onClaim,
+  onRefresh,
+  refreshing,
+  visibleAircraftCount,
+  onShowMore,
+}: {
+  aircraft: Aircraft[];
+  assistClaims: OperationBoard["assistClaims"];
+  board: OperationBoard;
+  claimingAircraftId: string | null;
+  onClaim: (aircraft: Aircraft) => Promise<void>;
+  onRefresh: () => Promise<void>;
+  refreshing: boolean;
+  visibleAircraftCount: number;
+  onShowMore: () => void;
+}) {
+  return (
+    <section className="flight-assist flight-assist-v15 is-selection-mode">
+      <Panel className="assist-v15-picker" padding="compact">
+        <PageHeader
+          actions={
+            <IconButton
+              busy={refreshing}
+              label="Flugzeugliste aktualisieren"
+              onClick={() => void onRefresh()}
+            >
+              <RefreshCw aria-hidden="true" />
+            </IconButton>
+          }
+          description="Verfügbare Flugzeuge"
+          level={2}
+          title="Flugzeug übernehmen"
+        />
+        <div className="assist-v15-aircraft-list">
+          {aircraft.slice(0, visibleAircraftCount).map((entry) => {
+            const rotation = operationalRotationForAircraft(entry, board.rotations, board.products);
+            const existingClaim = assistClaims.find(
+              (candidate) => candidate.aircraftId === entry.id,
+            );
+            const isClaiming = claimingAircraftId === entry.id;
+            const claimedByAnotherOperator =
+              existingClaim && !existingClaim.claimedByCurrentOperator;
+            return (
+              <article key={entry.id}>
+                <span className="assist-v15-plane-icon">
+                  <Plane aria-hidden="true" />
+                </span>
+                <div className="assist-v15-aircraft-copy">
+                  <div className="assist-v15-aircraft-title">
+                    <strong>{entry.registration}</strong>
+                  </div>
+                  <AircraftPickerMeta
+                    aircraft={entry}
+                    {...(rotation?.gateLabel ? { gateLabel: rotation.gateLabel } : {})}
+                  />
+                  {claimedByAnotherOperator ? (
+                    <small className="assist-v15-claim-owner">
+                      Betreut von {existingClaim.ownerLoginCode}
+                    </small>
+                  ) : null}
+                </div>
+                <CurrentAircraftStateMarker
+                  aircraft={entry}
+                  rotation={rotation}
+                  timeZone={board.event.timeZone}
+                />
+                <Button
+                  busy={isClaiming}
+                  busyLabel={`Übernahme läuft für ${entry.registration}`}
+                  className={`assist-v15-claim${
+                    claimedByAnotherOperator ? " assist-v15-claim--takeover" : ""
+                  }`}
+                  disabled={claimingAircraftId !== null}
+                  onClick={() => void onClaim(entry)}
+                  size="compact"
+                  variant={claimedByAnotherOperator ? "ghost" : "primary"}
+                >
+                  {claimedByAnotherOperator ? "Bewusst übernehmen" : "Übernehmen"}
+                </Button>
+              </article>
+            );
+          })}
+        </div>
+        {visibleAircraftCount < aircraft.length ? (
+          <Button className="assist-v15-more" onClick={onShowMore} variant="ghost">
+            <ChevronDown aria-hidden="true" /> Weitere anzeigen
+          </Button>
+        ) : null}
+      </Panel>
+    </section>
   );
 }
 
@@ -152,34 +322,21 @@ export function FlightLineAssist({
           ["QUEUED", "PRESENT", "MISSING"].includes(group.status),
       )
     : [];
-  const assignmentReady =
-    activeAircraft?.operationalState === "AVAILABLE" && activeRotation?.status === "DRAFT";
-  const requiresAvailableReset = Boolean(
-    activeAircraft &&
-      ["REFUELING", "PAUSED", "INTERRUPTED", "INACTIVE", "TURNAROUND"].includes(
-        activeAircraft.operationalState,
-      ),
-  );
-  const primaryDisabled =
-    !activeAircraft ||
-    (!requiresAvailableReset &&
-      !assignedRotation &&
-      (activeRotation?.status !== "DRAFT" ||
-        !activeAircraft.currentPilotId ||
-        board.event.emergencyMode ||
-        board.event.status !== "ACTIVE" ||
-        board.event.operationalInterrupted));
-  const secondaryAllowed =
-    activeAircraft?.operationalState === "AVAILABLE" &&
-    (!assignedRotation || assignedRotation.status === "DRAFT");
+  const {
+    assignmentReady,
+    pilotChangeAllowed,
+    primaryDisabled,
+    requiresAvailableReset,
+    secondaryAllowed,
+    unavailableAllowed,
+  } = assistActionAvailability({
+    activeAircraft,
+    activeRotation,
+    assignedRotation,
+    board,
+    canAssignPilot,
+  });
   const turnaroundActionAllowed = activeRotation?.status === "LANDED";
-  const unavailableAllowed =
-    secondaryAllowed ||
-    Boolean(
-      assignedRotation && ["CALLED", "IN_FLIGHT", "LANDED"].includes(assignedRotation.status),
-    );
-  const pilotChangeAllowed =
-    canAssignPilot && (!assignedRotation || ["DRAFT", "CALLED"].includes(assignedRotation.status));
   const primaryPresentation = activeAircraft
     ? primaryAircraftActionPresentation(activeAircraft, activeRotation)
     : null;
@@ -375,88 +532,17 @@ export function FlightLineAssist({
 
   if (!activeAircraft) {
     return (
-      <section className="flight-assist flight-assist-v15 is-selection-mode">
-        <Panel className="assist-v15-picker" padding="compact">
-          <PageHeader
-            actions={
-              <IconButton
-                busy={refreshing}
-                label="Flugzeugliste aktualisieren"
-                onClick={() => void refreshAircraftList()}
-              >
-                <RefreshCw aria-hidden="true" />
-              </IconButton>
-            }
-            description="Verfügbare Flugzeuge"
-            level={2}
-            title="Flugzeug übernehmen"
-          />
-          <div className="assist-v15-aircraft-list">
-            {availableAircraft.slice(0, visibleAircraftCount).map((entry) => {
-              const rotation = operationalRotationForAircraft(
-                entry,
-                board.rotations,
-                board.products,
-              );
-              const existingClaim = assistClaims.find(
-                (candidate) => candidate.aircraftId === entry.id,
-              );
-              const isClaiming = claimingAircraftId === entry.id;
-              return (
-                <article key={entry.id}>
-                  <span className="assist-v15-plane-icon">
-                    <Plane aria-hidden="true" />
-                  </span>
-                  <div className="assist-v15-aircraft-copy">
-                    <div className="assist-v15-aircraft-title">
-                      <strong>{entry.registration}</strong>
-                    </div>
-                    <AircraftPickerMeta aircraft={entry} gateLabel={rotation?.gateLabel} />
-                    {existingClaim && !existingClaim.claimedByCurrentOperator ? (
-                      <small className="assist-v15-claim-owner">
-                        Betreut von {existingClaim.ownerLoginCode}
-                      </small>
-                    ) : null}
-                  </div>
-                  <CurrentAircraftStateMarker
-                    aircraft={entry}
-                    rotation={rotation}
-                    timeZone={board.event.timeZone}
-                  />
-                  <Button
-                    busy={isClaiming}
-                    busyLabel={`Übernahme läuft für ${entry.registration}`}
-                    className={`assist-v15-claim${
-                      existingClaim && !existingClaim.claimedByCurrentOperator
-                        ? " assist-v15-claim--takeover"
-                        : ""
-                    }`}
-                    disabled={claimingAircraftId !== null}
-                    onClick={() => void claim(entry)}
-                    size="compact"
-                    variant={
-                      existingClaim && !existingClaim.claimedByCurrentOperator ? "ghost" : "primary"
-                    }
-                  >
-                    {existingClaim && !existingClaim.claimedByCurrentOperator
-                      ? "Bewusst übernehmen"
-                      : "Übernehmen"}
-                  </Button>
-                </article>
-              );
-            })}
-          </div>
-          {visibleAircraftCount < availableAircraft.length ? (
-            <Button
-              className="assist-v15-more"
-              onClick={() => setVisibleAircraftCount((current) => current + 5)}
-              variant="ghost"
-            >
-              <ChevronDown aria-hidden="true" /> Weitere anzeigen
-            </Button>
-          ) : null}
-        </Panel>
-      </section>
+      <AircraftSelection
+        aircraft={availableAircraft}
+        assistClaims={assistClaims}
+        board={board}
+        claimingAircraftId={claimingAircraftId}
+        onClaim={claim}
+        onRefresh={refreshAircraftList}
+        onShowMore={() => setVisibleAircraftCount((current) => current + 5)}
+        refreshing={refreshing}
+        visibleAircraftCount={visibleAircraftCount}
+      />
     );
   }
 

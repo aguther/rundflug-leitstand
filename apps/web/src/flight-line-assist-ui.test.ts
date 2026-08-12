@@ -44,7 +44,8 @@ describe("Flight Line", () => {
     expect(assistSource).toContain('runRotationAction("paused", activeRotation, "PAUSED")');
     expect(assistSource).toContain('runRotationAction("inactive", activeRotation, "INACTIVE")');
     expect(assistSource).toContain('runAircraftStateAction("primary", "AVAILABLE")');
-    expect(assistSource).toContain("!requiresAvailableReset &&");
+    expect(assistSource).toContain("primaryActionDisabled");
+    expect(assistSource).toContain("input.requiresAvailableReset || input.assignedRotation");
     expect(assistSource).toContain("Coffee");
     expect(assistSource).toContain("AircraftPickerMeta");
     expect(assistSource).toContain("{aircraft.resourceGroupName}");
