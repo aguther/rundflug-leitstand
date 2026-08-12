@@ -48,6 +48,7 @@ export function Button({
   disabled,
   "aria-label": ariaLabel,
   onClick,
+  type = "button",
   ...rest
 }: ButtonProps) {
   const [internalBusy, setInternalBusy] = useState(false);
@@ -79,6 +80,7 @@ export function Button({
       className={`ds-button ${variantClass[variant]} ds-button--${size} ${className}`.trim()}
       disabled={disabled || effectiveBusy}
       onClick={handleClick}
+      type={type}
       {...rest}
     >
       <span className={`ds-button-content${effectiveBusy ? " ds-button-content--hidden" : ""}`}>

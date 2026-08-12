@@ -671,7 +671,7 @@ export function ScenarioEditor({
       open={open}
       title={
         <span className="sim-editor-title">
-          Szenario konfigurieren
+          Szenario konfigurieren{" "}
           <small>Stammdaten, Tagesplan, simulierte Realität und Prognose-Labor</small>
         </span>
       }

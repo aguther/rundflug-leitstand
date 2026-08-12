@@ -127,7 +127,7 @@ if (historySeed.status !== 0) {
   throw new Error(`Synthetische FIDS-Abflughistorie konnte nicht angelegt werden: ${detail}`);
 }
 
-const pin = String.fromCharCode(48).repeat(4);
+const pin = String.fromCodePoint(48).repeat(4);
 const pinHash = createHash("sha256").update(pin).digest("hex");
 const wranglerOutput = createBoundedTextRecorder();
 const server = spawn(

@@ -3,7 +3,7 @@ import { createWorkerTestHarness } from "./lib/worker-test-harness.mjs";
 
 const reviewToken = ["review", "device", "credential"].join("-");
 const leadToken = ["lead", "device", "credential"].join("-");
-const pin = String.fromCharCode(48).repeat(4);
+const pin = String.fromCodePoint(48).repeat(4);
 const harness = await createWorkerTestHarness({ name: "outage-recovery", adminPin: pin });
 const base = harness.baseUrl;
 const board = async (deviceId, token) => {

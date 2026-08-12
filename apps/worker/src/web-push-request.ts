@@ -41,12 +41,12 @@ function decodeBase64Url(value: string): Uint8Array<ArrayBuffer> {
     .replaceAll("_", "/")
     .padEnd(Math.ceil(value.length / 4) * 4, "=");
   const decoded = atob(padded);
-  return Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+  return Uint8Array.from(decoded, (character) => character.codePointAt(0) ?? 0);
 }
 
 function encodeBase64Url(value: Uint8Array): string {
   let binary = "";
-  for (const byte of value) binary += String.fromCharCode(byte);
+  for (const byte of value) binary += String.fromCodePoint(byte);
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 

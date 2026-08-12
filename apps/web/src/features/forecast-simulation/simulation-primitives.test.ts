@@ -28,6 +28,12 @@ describe("deterministic simulation primitives", () => {
       hash: 679_884_749,
       sequence: [0.8904901971109211, 0.12056579883210361, 0.3444467263761908],
     },
+    {
+      seed: 42,
+      key: "rotation-🛩️",
+      hash: 2_941_205_803,
+      sequence: [0.18525313888676465, 0.3954795787576586, 0.5905988605227321],
+    },
   ])("keeps the published seed stream stable for $seed and $key", (example) => {
     const hash = hashSimulationSeed(example.seed, example.key);
     const random = createSeededRandom(hash);

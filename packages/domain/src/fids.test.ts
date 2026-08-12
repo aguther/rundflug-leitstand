@@ -93,6 +93,15 @@ describe("FIDS shared flights", () => {
     expect(paginateFidsRows(grouped, 1, 1)).toMatchObject({ totalItems: 2, totalPages: 2 });
   });
 
+  it("keeps shared row identifiers stable for non-BMP flight keys", () => {
+    const grouped = groupSharedFidsFlights(
+      [sharedRow("unicode", 1, { sharedFlightKey: "rotation:🛩️" })],
+      true,
+    );
+
+    expect(grouped[0]?.rowId).toBe("fids-shared-4vozq61k12k8a");
+  });
+
   it("keeps recalled, incompatible and unbound rows separate", () => {
     const rows = [
       sharedRow("recalled", 1, { activeRecall: { id: "recall" } }),

@@ -39,4 +39,26 @@ describe("Busy Indicator", () => {
     expect(markup).toContain('aria-label="Liste aktualisieren wird ausgeführt"');
     expect(markup).toContain("ds-button-content ds-button-content--hidden");
   });
+
+  it("verhindert unbeabsichtigte Formular-Submits und bewahrt explizite Button-Typen", () => {
+    const defaultButtonProps: ButtonProps = { children: "Speichern" };
+    const submitButtonProps: ButtonProps = { children: "Absenden", type: "submit" };
+    const defaultIconButtonProps: IconButtonProps = { children: "×", label: "Schließen" };
+    const submitIconButtonProps: IconButtonProps = {
+      children: "→",
+      label: "Absenden",
+      type: "submit",
+    };
+    const defaultButton = renderToStaticMarkup(createElement(Button, defaultButtonProps));
+    const submitButton = renderToStaticMarkup(createElement(Button, submitButtonProps));
+    const defaultIconButton = renderToStaticMarkup(
+      createElement(IconButton, defaultIconButtonProps),
+    );
+    const submitIconButton = renderToStaticMarkup(createElement(IconButton, submitIconButtonProps));
+
+    expect(defaultButton).toContain('type="button"');
+    expect(submitButton).toContain('type="submit"');
+    expect(defaultIconButton).toContain('type="button"');
+    expect(submitIconButton).toContain('type="submit"');
+  });
 });

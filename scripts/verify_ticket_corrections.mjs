@@ -31,7 +31,7 @@ const seed = initializeD1(["execute", "DB", "--file", "apps/worker/seed/demo.sql
 if (migrate.status !== 0 || seed.status !== 0) {
   throw new Error("Isolierte lokale Testdatenbank konnte nicht initialisiert werden.");
 }
-const pin = String.fromCharCode(48).repeat(4);
+const pin = String.fromCodePoint(48).repeat(4);
 const server = spawn(
   process.execPath,
   [

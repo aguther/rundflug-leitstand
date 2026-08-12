@@ -40,10 +40,10 @@ export function simulationScenarioTemplateFileName(name: string): string {
   const normalizedName = name.trim() || "Unbenannte Variante";
   const slug = normalizedName
     .normalize("NFKD")
-    .replace(/\p{Diacritic}/gu, "")
+    .replaceAll(/\p{Diacritic}/gu, "")
     .toLocaleLowerCase("de-DE")
     .replace(/ß/g, "ss")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-|-$/g, "");
   return `rundflug-szenario-${slug || "unbenannte-variante"}.json`;
 }

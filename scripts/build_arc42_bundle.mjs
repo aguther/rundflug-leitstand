@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { replaceMarkdownLinks } from "./lib/markdown-links.mjs";
 import { compareTechnicalStrings } from "./lib/technical-order.mjs";
 
 // Bundles the arc42 chapters into a single Markdown document that pandoc, VS Code
@@ -15,11 +16,17 @@ function parseArguments(argv) {
   for (const argument of argv) {
     const [key, ...rest] = argument.split("=");
     const value = rest.join("=");
-    if (key === "--link-base") options.linkBase = value.replace(/\/+$/, "");
+    if (key === "--link-base") options.linkBase = trimTrailingSlashes(value);
     else if (key === "--out") options.out = resolve(root, value);
     else throw new Error(`Unbekannte Option: ${argument}`);
   }
   return options;
+}
+
+export function trimTrailingSlashes(value) {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") end -= 1;
+  return value.slice(0, end);
 }
 
 export async function chapterFiles() {
@@ -28,17 +35,18 @@ export async function chapterFiles() {
 }
 
 export function rewriteRelativeLinks(markdown, documentPath, linkBase) {
-  return markdown.replace(/(!?\[[^\]]*]\()([^)]+)(\))/g, (match, prefix, target, suffix) => {
-    const trimmed = target.trim();
-    if (!trimmed || /^(?:https?:|mailto:|#)/i.test(trimmed)) return match;
+  return replaceMarkdownLinks(markdown, (match) => {
+    const trimmed = match.target.trim();
+    if (!trimmed || /^(?:https?:|mailto:|#)/i.test(trimmed)) return match.raw;
     const [path, anchor] = trimmed.split("#", 2);
-    if (!path) return match;
+    if (!path) return match.raw;
     const repositoryPath = relative(root, resolve(dirname(documentPath), path)).replaceAll(
       "\\",
       "/",
     );
     const rewritten = linkBase ? `${linkBase}/${repositoryPath}` : repositoryPath;
-    return `${prefix}${anchor ? `${rewritten}#${anchor}` : rewritten}${suffix}`;
+    const prefix = `${match.image ? "!" : ""}[${match.label}](`;
+    return `${prefix}${anchor ? `${rewritten}#${anchor}` : rewritten})`;
   });
 }
 

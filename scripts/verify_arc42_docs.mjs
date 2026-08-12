@@ -2,6 +2,7 @@ import { access, readdir, readFile } from "node:fs/promises";
 import { dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
+import { markdownLinkTargets } from "./lib/markdown-links.mjs";
 import { compareTechnicalStrings } from "./lib/technical-order.mjs";
 
 const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -35,8 +36,8 @@ async function parseMermaid(source) {
 }
 
 function markdownTargets(markdown) {
-  return [...markdown.matchAll(/!?\[[^\]]*]\(([^)]+)\)/g)]
-    .map((match) => match[1].trim().replace(/^<|>$/g, ""))
+  return markdownLinkTargets(markdown)
+    .map((target) => target.trim().replace(/^<|>$/g, ""))
     .filter((target) => target && !/^(?:https?:|mailto:|#)/i.test(target));
 }
 

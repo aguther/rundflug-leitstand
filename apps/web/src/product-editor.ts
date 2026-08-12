@@ -10,7 +10,7 @@ export function formatEuroInput(priceCents: number): string {
 export function parseEuroToCents(value: string): number | null {
   const compact = value.trim().replace(/\s/g, "").replace(/€$/, "");
   const normalized = /^\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$/.test(compact)
-    ? compact.replace(/\./g, "").replace(",", ".")
+    ? compact.replaceAll(".", "").replace(",", ".")
     : compact.replace(",", ".");
   if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) return null;
   const [euros, fraction = ""] = normalized.split(".");

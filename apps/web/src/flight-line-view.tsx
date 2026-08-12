@@ -1566,7 +1566,7 @@ export function FlightLineView() {
                 </div>
                 {queueDeviationReasonRequired ? (
                   <label className="queue-deviation-reason">
-                    Grund für das Überspringen früherer Gruppen
+                    Grund für das Überspringen früherer Gruppen{" "}
                     <input
                       maxLength={240}
                       onChange={(event) => setCallDeviationReason(event.target.value)}
@@ -1841,7 +1841,7 @@ export function FlightLineView() {
                   <div className="landed-warning">
                     <p>Gelandet · noch nicht verfügbar</p>
                     <label>
-                      Zustand nach dem Turnaround
+                      Zustand nach dem Turnaround{" "}
                       <select
                         onChange={(event) =>
                           setTurnaroundNextState(event.target.value as typeof turnaroundNextState)
@@ -1859,7 +1859,7 @@ export function FlightLineView() {
                 {selected.status === "DRAFT" || selected.status === "CALLED" ? (
                   <div className="correction-controls">
                     <label>
-                      Grund für Queue-Abweichung
+                      Grund für Queue-Abweichung{" "}
                       <input
                         value={queueReason}
                         onChange={(event) => setQueueReason(event.target.value)}
@@ -1980,7 +1980,7 @@ export function FlightLineView() {
                 <section>
                   <h3>Ganze Gruppe verschieben</h3>
                   <label>
-                    Zielumlauf
+                    Zielumlauf{" "}
                     <select
                       value={moveTargetId}
                       onChange={(event) => setMoveTargetId(event.target.value)}
@@ -1995,7 +1995,7 @@ export function FlightLineView() {
                     </select>
                   </label>
                   <label>
-                    Begründung der Abweichung
+                    Begründung der Abweichung{" "}
                     <input
                       value={moveReason}
                       onChange={(event) => setMoveReason(event.target.value)}
@@ -2179,7 +2179,7 @@ export function FlightLineView() {
         title="Umlauf abbrechen?"
       >
         <label className="technical-abort-reason">
-          Grund
+          Grund{" "}
           <input
             maxLength={500}
             onChange={(event) => setTechnicalAbortReason(event.target.value)}

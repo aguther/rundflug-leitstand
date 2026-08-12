@@ -405,7 +405,7 @@ export function SimulationFoundationDialog({
                     checked={excludeUnresolvedPlans}
                     onChange={(event) => setExcludeUnresolvedPlans(event.currentTarget.checked)}
                     type="checkbox"
-                  />
+                  />{" "}
                   Unaufgelöste umlaufgebundene Planeinträge für diese Variante ausdrücklich
                   ausschließen
                 </label>

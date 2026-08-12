@@ -104,7 +104,7 @@ export function SetupView() {
             ) : null}
             <div className="setup-grid">
               <label>
-                Technische Veranstaltungs-ID
+                Technische Veranstaltungs-ID{" "}
                 <input
                   value={eventId}
                   onChange={(event) => setEventId(event.target.value.toLowerCase())}
@@ -113,12 +113,11 @@ export function SetupView() {
                 <small id="event-id-help">Kleinbuchstaben, Ziffern und Bindestriche</small>
               </label>
               <label>
-                Bezeichnung
-                <input value={name} onChange={(event) => setName(event.target.value)} />
+                Bezeichnung <input value={name} onChange={(event) => setName(event.target.value)} />
               </label>
               <LocalizedDateInput label="Datum" value={eventDate} onChange={setEventDate} />
               <label>
-                Flugplatz
+                Flugplatz{" "}
                 <input
                   value={aerodrome}
                   onChange={(event) => setAerodrome(event.target.value)}
@@ -127,7 +126,7 @@ export function SetupView() {
               </label>
               {!status?.resetSetupAuthorized ? (
                 <label>
-                  Installations-Notfallcode
+                  Installations-Notfallcode{" "}
                   <input
                     type="password"
                     value={setupCode}
@@ -138,7 +137,7 @@ export function SetupView() {
                 </label>
               ) : null}
               <label>
-                Erste Administrator-PIN
+                Erste Administrator-PIN{" "}
                 <input
                   type="password"
                   inputMode="numeric"

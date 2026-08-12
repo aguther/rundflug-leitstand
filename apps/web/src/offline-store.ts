@@ -9,6 +9,10 @@ interface StoredOperationBoard {
   board: OperationBoard;
 }
 
+function indexedDbError(cause: DOMException | null, operation: string): Error {
+  return cause ?? new Error(`IndexedDB ${operation} failed without an error cause.`);
+}
+
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE_NAME, 1);
@@ -18,7 +22,7 @@ function openDatabase(): Promise<IDBDatabase> {
       }
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onerror = () => reject(indexedDbError(request.error, "open"));
   });
 }
 
@@ -48,8 +52,8 @@ export async function saveOperationBoard(
         board,
       } satisfies StoredOperationBoard);
       transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-      transaction.onabort = () => reject(transaction.error);
+      transaction.onerror = () => reject(indexedDbError(transaction.error, "write transaction"));
+      transaction.onabort = () => reject(indexedDbError(transaction.error, "write transaction"));
     });
   } finally {
     database.close();
@@ -74,7 +78,7 @@ export async function loadOperationBoard(
         .objectStore(STORE_NAME)
         .get(snapshotKey(eventId, deviceId));
       request.onsuccess = () => resolve(request.result as StoredOperationBoard | undefined);
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(indexedDbError(request.error, "read"));
     });
     if (!stored || !Number.isFinite(Date.parse(stored.savedAt))) return null;
     return { board: operationBoardSchema.parse(stored.board), savedAt: stored.savedAt };

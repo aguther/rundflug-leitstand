@@ -126,70 +126,83 @@ durch einen UTF-8-Guard geprüft.
 | AZ_l6Cw2LlJq96xp0cim | High | Maintainability | python:S3776 | `scripts/verify_requirements.py:85` | Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed. | PENDING | PENDING | PENDING | PENDING | PENDING |
 | AZ_l6CzsLlJq96xp0cjK | High | Maintainability | python:S3776 | `scripts/verify_role_guides.py:17` | Refactor this function to reduce its Cognitive Complexity from 30 to the 15 allowed. | PENDING | PENDING | PENDING | PENDING | PENDING |
 
-## Reliability-Issues – Einzelbewertung erforderlich
+## Reliability-Issues – technische Einzelbewertung
 
-| Issue-Key | Severity | Qualität | Regel | Fundstelle | Problem | Klassifikation | Technische Relevanz / Begründung | Änderungsrisiko | Testnachweis | Serveraktion |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| AZ_l6Cm5LlJq96xp0cc_ | Medium | Reliability | typescript:S9011 | `apps/web/src/design-system/components/Button.tsx:76` | Add an explicit "type" attribute to this button. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CmxLlJq96xp0cc8 | Medium | Reliability | typescript:S9011 | `apps/web/src/design-system/components/IconButton.tsx:39` | Add an explicit "type" attribute to this button. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6ChYLlJq96xp0ca_ | Medium | Reliability | typescript:S6853 | `apps/web/src/features/admin/FactoryResetDialog.tsx:119` | A form label must have accessible text. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6ChYLlJq96xp0cbA | Medium | Reliability | typescript:S6853 | `apps/web/src/features/admin/FactoryResetDialog.tsx:130` | A form label must have accessible text. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6Ck9LlJq96xp0ccg | Medium | Reliability | typescript:S8786 | `apps/web/src/features/analysis/analysis-client-diagnostics.ts:36` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_1TeHjXSRXGTervM09 | Medium | Reliability | typescript:S6847 | `apps/web/src/features/cashier/CashierTicketPresentation.tsx:99` | Non-interactive elements should not be assigned mouse or keyboard event listeners. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CikLlJq96xp0cbR | Medium | Reliability | typescript:S6853 | `apps/web/src/features/fids/FidsSettingsDialog.tsx:198` | A form label must have accessible text. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CdYLlJq96xp0cZh | Medium | Reliability | typescript:S6847 | `apps/web/src/features/forecast-simulation/ForecastTimeline.tsx:281` | Non-interactive elements should not be assigned mouse or keyboard event listeners. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CdYLlJq96xp0cZi | Medium | Reliability | typescript:S6845 | `apps/web/src/features/forecast-simulation/ForecastTimeline.tsx:286` | `tabIndex` should only be declared on interactive elements. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6Cd2LlJq96xp0cZ9 | Medium | Reliability | typescript:S6772 | `apps/web/src/features/forecast-simulation/ScenarioEditor.tsx:675` | Ambiguous spacing before next element small | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_0hwNyR1I9WvIHxPKE | Low | Reliability | typescript:S7758 | `apps/web/src/features/forecast-simulation/simulation-primitives.ts:25` | Prefer `String#codePointAt()` over `String#charCodeAt()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CcDLlJq96xp0cZB | Low | Reliability | typescript:S7781 | `apps/web/src/features/forecast-simulation/simulation-scenario-template.ts:45` | Prefer `String#replaceAll()` over `String#replace()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CeALlJq96xp0caB | Medium | Reliability | typescript:S6772 | `apps/web/src/features/forecast-simulation/SimulationFoundationDialog.tsx:408` | Ambiguous spacing after previous element input | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CrRLlJq96xp0cgN | Medium | Reliability | typescript:S6853 | `apps/web/src/flight-line-view.tsx:1480` | A form label must have accessible text. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CrRLlJq96xp0cgO | Medium | Reliability | typescript:S6772 | `apps/web/src/flight-line-view.tsx:1570` | Ambiguous spacing before next element input | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CrRLlJq96xp0cgS | Medium | Reliability | typescript:S6772 | `apps/web/src/flight-line-view.tsx:1845` | Ambiguous spacing before next element select | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CrRLlJq96xp0cgT | Medium | Reliability | typescript:S6772 | `apps/web/src/flight-line-view.tsx:1863` | Ambiguous spacing before next element input | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CrRLlJq96xp0cgU | Medium | Reliability | typescript:S6772 | `apps/web/src/flight-line-view.tsx:1984` | Ambiguous spacing before next element select | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CrRLlJq96xp0cgV | Medium | Reliability | typescript:S6772 | `apps/web/src/flight-line-view.tsx:1999` | Ambiguous spacing before next element input | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CrRLlJq96xp0cgW | Medium | Reliability | typescript:S6772 | `apps/web/src/flight-line-view.tsx:2183` | Ambiguous spacing before next element input | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6Cp0LlJq96xp0ceJ | Medium | Reliability | typescript:S6671 | `apps/web/src/offline-store.ts:21` | Expected the Promise rejection reason to be an Error. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6Cp0LlJq96xp0ceK | Medium | Reliability | typescript:S6671 | `apps/web/src/offline-store.ts:51` | Expected the Promise rejection reason to be an Error. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6Cp0LlJq96xp0ceL | Medium | Reliability | typescript:S6671 | `apps/web/src/offline-store.ts:52` | Expected the Promise rejection reason to be an Error. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6Cp0LlJq96xp0ceM | Medium | Reliability | typescript:S6671 | `apps/web/src/offline-store.ts:77` | Expected the Promise rejection reason to be an Error. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CoTLlJq96xp0cdS | Low | Reliability | typescript:S7781 | `apps/web/src/product-editor.ts:13` | Prefer `String#replaceAll()` over `String#replace()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CqrLlJq96xp0cfy | Medium | Reliability | typescript:S6772 | `apps/web/src/setup-view.tsx:108` | Ambiguous spacing before next element input | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CqrLlJq96xp0cfz | Medium | Reliability | typescript:S6772 | `apps/web/src/setup-view.tsx:117` | Ambiguous spacing before next element input | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CqrLlJq96xp0cf0 | Medium | Reliability | typescript:S6772 | `apps/web/src/setup-view.tsx:122` | Ambiguous spacing before next element input | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CqrLlJq96xp0cf1 | Medium | Reliability | typescript:S6772 | `apps/web/src/setup-view.tsx:131` | Ambiguous spacing before next element input | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CqrLlJq96xp0cf2 | Medium | Reliability | typescript:S6772 | `apps/web/src/setup-view.tsx:142` | Ambiguous spacing before next element input | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CZuLlJq96xp0cXy | Low | Reliability | typescript:S7758 | `apps/worker/src/crypto.ts:31` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CZuLlJq96xp0cXz | Low | Reliability | typescript:S7758 | `apps/worker/src/crypto.ts:41` | Prefer `String#codePointAt()` over `String#charCodeAt()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CZdLlJq96xp0cXm | Low | Reliability | typescript:S7758 | `apps/worker/src/reset-setup-grant.ts:16` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_oqZw_tOPjZ5mYXd0Q | Medium | Reliability | typescript:S8786 | `apps/worker/src/ticket-read-service.ts:54` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CZULlJq96xp0cXk | Low | Reliability | typescript:S7758 | `apps/worker/src/web-push-request.ts:44` | Prefer `String#codePointAt()` over `String#charCodeAt()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CZULlJq96xp0cXl | Low | Reliability | typescript:S7758 | `apps/worker/src/web-push-request.ts:49` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CubLlJq96xp0ciA | Low | Reliability | typescript:S7758 | `packages/domain/src/dispatch-plan.ts:285` | Prefer `String#codePointAt()` over `String#charCodeAt()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CthLlJq96xp0cht | Low | Reliability | typescript:S7758 | `packages/domain/src/fids.ts:82` | Prefer `String#codePointAt()` over `String#charCodeAt()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CthLlJq96xp0chu | Low | Reliability | typescript:S7758 | `packages/domain/src/fids.ts:83` | Prefer `String#codePointAt()` over `String#charCodeAt()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_tvunAHB_X69K2orHo | Low | Reliability | javascript:S7758 | `scripts/arc42_markdown_to_html.mjs:1` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_tvunAHB_X69K2orHp | Low | Reliability | javascript:S7758 | `scripts/arc42_markdown_to_html.mjs:2` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_tvunAHB_X69K2orHq | Medium | Reliability | javascript:S8786 | `scripts/arc42_markdown_to_html.mjs:33` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_tvunAHB_X69K2orHs | Medium | Reliability | javascript:S8786 | `scripts/arc42_markdown_to_html.mjs:50` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_tvunAHB_X69K2orHw | Medium | Reliability | javascript:S8786 | `scripts/arc42_markdown_to_html.mjs:101` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_tvunAHB_X69K2orHx | Medium | Reliability | javascript:S8786 | `scripts/arc42_markdown_to_html.mjs:141` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_tvukGHB_X69K2orHk | Medium | Reliability | javascript:S8786 | `scripts/build_arc42_bundle.mjs:18` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_tvukGHB_X69K2orHm | Medium | Reliability | javascript:S8786 | `scripts/build_arc42_bundle.mjs:31` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CwRLlJq96xp0cie | Medium | Reliability | javascript:S8786 | `scripts/vapid-keys.mjs:13` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6Cy9LlJq96xp0ci_ | Medium | Reliability | javascript:S8786 | `scripts/verify_analysis_capture_scale.mjs:43` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_tvup0HB_X69K2orHy | Medium | Reliability | javascript:S8786 | `scripts/verify_arc42_docs.mjs:38` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CvSLlJq96xp0ciR | Medium | Reliability | javascript:S8786 | `scripts/verify_architecture_docs.mjs:176` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6Cw_LlJq96xp0cin | Low | Reliability | javascript:S7758 | `scripts/verify_first_run_setup.mjs:31` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6Cx8LlJq96xp0cix | Low | Reliability | javascript:S7758 | `scripts/verify_fleet_operations.mjs:4` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CySLlJq96xp0ci3 | Low | Reliability | javascript:S7758 | `scripts/verify_master_data.mjs:4` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CwkLlJq96xp0cih | Low | Reliability | javascript:S7758 | `scripts/verify_outage_recovery.mjs:6` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CyzLlJq96xp0ci8 | Low | Reliability | javascript:S7758 | `scripts/verify_pilot_conflict.mjs:4` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CyeLlJq96xp0ci5 | Low | Reliability | javascript:S7758 | `scripts/verify_public_monitors.mjs:129` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CwALlJq96xp0ciY | Low | Reliability | javascript:S7758 | `scripts/verify_soak_reliability.mjs:108` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CwuLlJq96xp0cij | Low | Reliability | javascript:S7758 | `scripts/verify_ticket_corrections.mjs:34` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
-| AZ_l6CwcLlJq96xp0cif | Low | Reliability | javascript:S7758 | `scripts/verify_vertical_slice.mjs:19` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | PENDING | PENDING | PENDING | PENDING | PENDING |
+Alle 60 Reliability-Issues wurden am konkreten Code bewertet: 42 werden durch Codeänderungen
+geschlossen, 14 sind False Positives und vier werden wegen der Kompatibilität stabiler IDs bewusst
+akzeptiert. Die Regex-Bewertung verwendete adversariale Messreihen mit 1.000, 2.000, 4.000 und
+8.000 Wiederholungen. Die Markdown-Linkmuster skalierten dabei quadratisch; der Regressionstest mit
+20.000 fehlgeschlagenen Linkanfängen benötigte vor dem Fix rund 734 ms und muss nach dem linearen
+Scanner unter 150 ms bleiben.
+
+Die Sonar-MCP-Funktion für normale Issues unterstützt zwar Statuswechsel, aber keine Kommentare. Die
+SonarQube-Cloud-Oberfläche war sowohl im internen Browser als auch in der verfügbaren Chrome-Sitzung
+nicht authentifiziert; ein passendes Token steht der Shell nicht zur Verfügung. Deshalb bleibt die
+Serveraktion für `FALSE_POSITIVE` und `ACCEPTED` offen. Ohne dauerhaften Kommentar wurde bewusst kein
+Status geändert.
+
+| Issue-Key | Regel / Fundstelle | Klassifikation | Technische Relevanz, Risiko und Fix | Testnachweis | Serveraktion |
+| --- | --- | --- | --- | --- | --- |
+| AZ_l6Cm5LlJq96xp0cc_ | S9011 · `Button.tsx:76` | FIX | Nativer Default wäre `submit`; sicherer Default `button`, explizites `submit` bleibt möglich. Geringes Risiko. | `busy-indicator.test.ts` | Folgescan muss schließen |
+| AZ_l6CmxLlJq96xp0cc8 | S9011 · `IconButton.tsx:39` | FIX | Wie vorstehend; verhindert unbeabsichtigte Formularaktionen. Geringes Risiko. | `busy-indicator.test.ts` | Folgescan muss schließen |
+| AZ_l6ChYLlJq96xp0ca_ | S6853 · `FactoryResetDialog.tsx:119` | FALSE_POSITIVE | Das native Label umschließt Checkbox und sichtbaren Text in `strong`/`small`; Zuordnung und zugänglicher Name sind vorhanden. Eine Umschreibung könnte die Klickfläche verschlechtern. | DOM-Struktur + HTML-Label-Semantik | Kommentar + Status offen |
+| AZ_l6ChYLlJq96xp0cbA | S6853 · `FactoryResetDialog.tsx:130` | FALSE_POSITIVE | Dasselbe nachweislich korrekte native Labelmuster. | DOM-Struktur + HTML-Label-Semantik | Kommentar + Status offen |
+| AZ_l6Ck9LlJq96xp0ccg | S8786 · `analysis-client-diagnostics.ts:36` | FALSE_POSITIVE | Safari-Muster zeigte lineare Skalierung; User-Agent ist zusätzlich praktisch begrenzt. Kein Backtracking-Risiko nachweisbar. | adversarialer Benchmark; bestehender `browserVersion`-Test | Kommentar + Status offen |
+| AZ_1TeHjXSRXGTervM09 | S6847 · `CashierTicketPresentation.tsx:99` | FALSE_POSITIVE | `<dialog>` ist ein natives Dialogelement; `onCancel`, Backdrop-Klick und Close-Fokus sind die tatsächliche Interaktion. Ein künstlicher Rollenwechsel wäre semantisch schlechter. | Codepfad und native Dialog-Semantik | Kommentar + Status offen |
+| AZ_l6CikLlJq96xp0cbR | S6853 · `FidsSettingsDialog.tsx:198` | FALSE_POSITIVE | Checkbox liegt im Label, sichtbarer Text folgt in `strong`/`small`; Name und Zuordnung sind vorhanden. | DOM-Struktur + HTML-Label-Semantik | Kommentar + Status offen |
+| AZ_l6CdYLlJq96xp0cZh | S6847 · `ForecastTimeline.tsx:281` | FALSE_POSITIVE | Der überlaufende Zeitachsenbereich ist absichtlich per Tastatur scrollbar; Handler implementiert PageUp/PageDown/Home/End. | `forecast-simulation-ui.test.ts` + Handlerprüfung | Kommentar + Status offen |
+| AZ_l6CdYLlJq96xp0cZi | S6845 · `ForecastTimeline.tsx:286` | FALSE_POSITIVE | `tabIndex=0` ist für die Tastaturbedienung des Scrollbereichs erforderlich; Entfernen wäre eine Accessibility-Regression. | `forecast-simulation-ui.test.ts` | Kommentar + Status offen |
+| AZ_l6Cd2LlJq96xp0cZ9 | S6772 · `ScenarioEditor.tsx:675` | FIX | Expliziter JSX-Abstand beseitigt uneindeutige Textverkettung. Geringes Risiko. | vollständige UI-/Formatprüfung | Folgescan muss schließen |
+| AZ_0hwNyR1I9WvIHxPKE | S7758 · `simulation-primitives.ts:25` | ACCEPTED | Hash ist ein publizierter deterministischer UTF-16-Hash. Codepoint-Umstellung würde bestehende Simulationen für Nicht-BMP-Schlüssel ändern. Neubewertung nur bei versioniertem Hashformat. | Emoji-Stabilität in `simulation-primitives.test.ts` | Kommentar + Status offen |
+| AZ_l6CcDLlJq96xp0cZB | S7781 · `simulation-scenario-template.ts:45` | FIX | `replaceAll` ist für den globalen Ausdruck semantisch gleichwertig. Geringes Risiko. | `simulation-plan-import.test.ts` | Folgescan muss schließen |
+| AZ_l6CeALlJq96xp0caB | S6772 · `SimulationFoundationDialog.tsx:408` | FIX | Expliziter Abstand zwischen Checkbox und Labeltext. | vollständige UI-/Formatprüfung | Folgescan muss schließen |
+| AZ_l6CrRLlJq96xp0cgN | S6853 · `flight-line-view.tsx:1480` | FALSE_POSITIVE | Label umschließt Checkbox und den vollständigen Gruppenbezeichner; zugänglicher Name ist vorhanden. | DOM-Struktur + HTML-Label-Semantik | Kommentar + Status offen |
+| AZ_l6CrRLlJq96xp0cgO | S6772 · `flight-line-view.tsx:1570` | FIX | Expliziter Abstand verbessert den zugänglichen Labeltext. | Flight-Line-Tests | Folgescan muss schließen |
+| AZ_l6CrRLlJq96xp0cgS | S6772 · `flight-line-view.tsx:1845` | FIX | Expliziter Abstand vor Select. | Flight-Line-Tests | Folgescan muss schließen |
+| AZ_l6CrRLlJq96xp0cgT | S6772 · `flight-line-view.tsx:1863` | FIX | Expliziter Abstand vor Input. | Flight-Line-Tests | Folgescan muss schließen |
+| AZ_l6CrRLlJq96xp0cgU | S6772 · `flight-line-view.tsx:1984` | FIX | Expliziter Abstand vor Select. | Flight-Line-Tests | Folgescan muss schließen |
+| AZ_l6CrRLlJq96xp0cgV | S6772 · `flight-line-view.tsx:1999` | FIX | Expliziter Abstand vor Input. | Flight-Line-Tests | Folgescan muss schließen |
+| AZ_l6CrRLlJq96xp0cgW | S6772 · `flight-line-view.tsx:2183` | FIX | Expliziter Abstand vor Input. | Flight-Line-Tests | Folgescan muss schließen |
+| AZ_l6Cp0LlJq96xp0ceJ | S6671 · `offline-store.ts:21` | FIX | IndexedDB darf `error=null` liefern; Fallback-`Error` bewahrt Promise-Vertrag. | `offline-store.test.ts` | Folgescan muss schließen |
+| AZ_l6Cp0LlJq96xp0ceK | S6671 · `offline-store.ts:51` | FIX | Schreibfehler erhält stets ein `Error`; vorhandene DOMException bleibt erhalten. | `offline-store.test.ts` | Folgescan muss schließen |
+| AZ_l6Cp0LlJq96xp0ceL | S6671 · `offline-store.ts:52` | FIX | Abbruch ohne Engine-Ursache erhält explizites `Error`. | `offline-store.test.ts` | Folgescan muss schließen |
+| AZ_l6Cp0LlJq96xp0ceM | S6671 · `offline-store.ts:77` | FIX | Lesefehler erhält stets ein `Error`; Fallbackverhalten nach außen bleibt `null`. | `offline-store.test.ts` | Folgescan muss schließen |
+| AZ_l6CoTLlJq96xp0cdS | S7781 · `product-editor.ts:13` | FIX | Punkte werden äquivalent mit `replaceAll` entfernt. | `product-editor.test.ts` | Folgescan muss schließen |
+| AZ_l6CqrLlJq96xp0cfy | S6772 · `setup-view.tsx:108` | FIX | Expliziter Abstand vor Input. | Setup-Tests | Folgescan muss schließen |
+| AZ_l6CqrLlJq96xp0cfz | S6772 · `setup-view.tsx:117` | FIX | Expliziter Abstand vor Input. | Setup-Tests | Folgescan muss schließen |
+| AZ_l6CqrLlJq96xp0cf0 | S6772 · `setup-view.tsx:122` | FIX | Expliziter Abstand vor Input. | Setup-Tests | Folgescan muss schließen |
+| AZ_l6CqrLlJq96xp0cf1 | S6772 · `setup-view.tsx:131` | FIX | Expliziter Abstand vor Input. | Setup-Tests | Folgescan muss schließen |
+| AZ_l6CqrLlJq96xp0cf2 | S6772 · `setup-view.tsx:142` | FIX | Expliziter Abstand vor Input. | Setup-Tests | Folgescan muss schließen |
+| AZ_l6CZuLlJq96xp0cXy | S7758 · `crypto.ts:31` | FIX | Eingaben sind nach Typ exakt Bytes 0–255; `fromCodePoint` ist nachweislich äquivalent. | `crypto.test.ts` | Folgescan muss schließen |
+| AZ_l6CZuLlJq96xp0cXz | S7758 · `crypto.ts:41` | FIX | `atob` liefert ein Byte je Codepoint; `codePointAt(0)` ist äquivalent. | `crypto.test.ts` | Folgescan muss schließen |
+| AZ_l6CZdLlJq96xp0cXm | S7758 · `reset-setup-grant.ts:16` | FIX | Bytebereich garantiert; Unicode-Methode ändert Base64-Ausgabe nicht. | Reset-Setup-Tests | Folgescan muss schließen |
+| AZ_oqZw_tOPjZ5mYXd0Q | S8786 · `ticket-read-service.ts:54` | FALSE_POSITIVE | Eingabe des Musters ist ausschließlich intern von `btoa` erzeugt; `=` kann nur als höchstens zweistelliges Suffix vorkommen. Adversariales Muster ist im Datenfluss unmöglich. | Cursor-Roundtriptests + Datenflussprüfung | Kommentar + Status offen |
+| AZ_l6CZULlJq96xp0cXk | S7758 · `web-push-request.ts:44` | FIX | `atob`-Binärstring ist auf Byte-Codepoints begrenzt. | `web-push-request.test.ts` | Folgescan muss schließen |
+| AZ_l6CZULlJq96xp0cXl | S7758 · `web-push-request.ts:49` | FIX | Uint8Array garantiert 0–255; Ausgabe bleibt bitidentisch. | `web-push-request.test.ts` | Folgescan muss schließen |
+| AZ_l6CubLlJq96xp0ciA | S7758 · `dispatch-plan.ts:285` | ACCEPTED | Hash bildet persistierte Batch-IDs und Revisionen aus UTF-16-Codeeinheiten. Änderung wäre inkompatibel. Neubewertung nur mit versionierter ID-Migration. | Dispatch-Plan-Stabilitätstests | Kommentar + Status offen |
+| AZ_l6CthLlJq96xp0cht | S7758 · `fids.ts:82` | ACCEPTED | Vorwärtsanteil einer stabilen extern sichtbaren Row-ID; Codepoint-Umstellung ändert Schlüssel. Neubewertung nur mit ID-Versionierung. | Nicht-BMP-Row-ID in `fids.test.ts` | Kommentar + Status offen |
+| AZ_l6CthLlJq96xp0chu | S7758 · `fids.ts:83` | ACCEPTED | Rückwärtsanteil derselben stabilen Row-ID; identische Kompatibilitätsentscheidung. | Nicht-BMP-Row-ID in `fids.test.ts` | Kommentar + Status offen |
+| AZ_tvunAHB_X69K2orHo | S7758 · `arc42_markdown_to_html.mjs:1` | FIX | Fester Sentinel-Codepoint; Änderung exakt äquivalent. | `build_arc42_bundle.test.ts` | Folgescan muss schließen |
+| AZ_tvunAHB_X69K2orHp | S7758 · `arc42_markdown_to_html.mjs:2` | FIX | Fester Sentinel-Codepoint; Änderung exakt äquivalent. | `build_arc42_bundle.test.ts` | Folgescan muss schließen |
+| AZ_tvunAHB_X69K2orHq | S8786 · `arc42_markdown_to_html.mjs:33` | ROOT_CAUSE | Quadratische Markdown-Linksuche bestätigt; gemeinsamer linearer Scanner ersetzt alle vier Linkmuster. | adversarialer `build_arc42_bundle.test.ts` | Folgescan muss schließen |
+| AZ_tvunAHB_X69K2orHs | S8786 · `arc42_markdown_to_html.mjs:50` | FALSE_POSITIVE | Verankertes Frontmatter-Muster skaliert linear; abschließendes `.*` kann immer konsumieren und erzwingt kein Rücklaufen. | adversarialer Benchmark | Kommentar + Status offen |
+| AZ_tvunAHB_X69K2orHw | S8786 · `arc42_markdown_to_html.mjs:101` | FALSE_POSITIVE | Verankertes Heading-Muster skaliert linear; Quantoren sind durch Literal/Anker getrennt. | adversarialer Benchmark | Kommentar + Status offen |
+| AZ_tvunAHB_X69K2orHx | S8786 · `arc42_markdown_to_html.mjs:141` | FALSE_POSITIVE | Verankertes Listenmuster skaliert linear; keine nichtlineare Messung reproduzierbar. | adversarialer Benchmark | Kommentar + Status offen |
+| AZ_tvukGHB_X69K2orHk | S8786 · `build_arc42_bundle.mjs:18` | FIX | Unbegrenztes CLI-Argument zeigte nichtlineares Suffix-Backtracking; einmaliger Rückwärtsscan ersetzt Regex. | `trimTrailingSlashes`-Test | Folgescan muss schließen |
+| AZ_tvukGHB_X69K2orHm | S8786 · `build_arc42_bundle.mjs:31` | ROOT_CAUSE | Bestätigtes quadratisches Linkmuster durch gemeinsamen Scanner beseitigt. | adversarialer `build_arc42_bundle.test.ts` | Folgescan muss schließen |
+| AZ_l6CwRLlJq96xp0cie | S8786 · `vapid-keys.mjs:13` | FALSE_POSITIVE | E-Mail-Muster skaliert in adversarialer Messung linear; kein technischer Laufzeitfehler nachweisbar. | adversarialer Benchmark + `vapid-setup-script.test.ts` | Kommentar + Status offen |
+| AZ_l6Cy9LlJq96xp0ci_ | S8786 · `verify_analysis_capture_scale.mjs:43` | FALSE_POSITIVE | Nichtlinear nur für unbeschränkte künstliche Namen; reale Dateinamen sind durch das Dateisystem auf 255 Zeichen begrenzt. Maximallast ist vernachlässigbar. | Benchmark bis 8.000 + Dateisystemgrenze | Kommentar + Status offen |
+| AZ_tvup0HB_X69K2orHy | S8786 · `verify_arc42_docs.mjs:38` | ROOT_CAUSE | Bestätigtes quadratisches Linkmuster durch gemeinsamen Scanner beseitigt. | `verify_arc42_docs.test.ts` + adversarialer Test | Folgescan muss schließen |
+| AZ_l6CvSLlJq96xp0ciR | S8786 · `verify_architecture_docs.mjs:176` | ROOT_CAUSE | Bestätigtes quadratisches Linkmuster durch gemeinsamen Scanner beseitigt. | Dokumentationsprüfung + adversarialer Test | Folgescan muss schließen |
+| AZ_l6Cw_LlJq96xp0cin | S7758 · `verify_first_run_setup.mjs:31` | FIX | Fester ASCII-Codepoint 48; exakt äquivalente Unicode-Methode. | V1-Integrationssuite | Folgescan muss schließen |
+| AZ_l6Cx8LlJq96xp0cix | S7758 · `verify_fleet_operations.mjs:4` | FIX | Fester ASCII-Codepoint 48; exakt äquivalent. | Fleet-Operations-Suite | Folgescan muss schließen |
+| AZ_l6CySLlJq96xp0ci3 | S7758 · `verify_master_data.mjs:4` | FIX | Fester ASCII-Codepoint 48; exakt äquivalent. | Master-Data-Suite | Folgescan muss schließen |
+| AZ_l6CwkLlJq96xp0cih | S7758 · `verify_outage_recovery.mjs:6` | FIX | Fester ASCII-Codepoint 48; exakt äquivalent. | Outage-Recovery-Suite | Folgescan muss schließen |
+| AZ_l6CyzLlJq96xp0ci8 | S7758 · `verify_pilot_conflict.mjs:4` | FIX | Fester ASCII-Codepoint 48; exakt äquivalent. | Pilot-Conflict-Suite | Folgescan muss schließen |
+| AZ_l6CyeLlJq96xp0ci5 | S7758 · `verify_public_monitors.mjs:129` | FIX | Fester ASCII-Codepoint 48; exakt äquivalent. | Public-Monitor-Suite | Folgescan muss schließen |
+| AZ_l6CwALlJq96xp0ciY | S7758 · `verify_soak_reliability.mjs:108` | FIX | Fester ASCII-Codepoint 48; exakt äquivalent. | Soak-Reliability-Suite | Folgescan muss schließen |
+| AZ_l6CwuLlJq96xp0cij | S7758 · `verify_ticket_corrections.mjs:34` | FIX | Fester ASCII-Codepoint 48; exakt äquivalent. | Ticket-Corrections-Suite | Folgescan muss schließen |
+| AZ_l6CwcLlJq96xp0cif | S7758 · `verify_vertical_slice.mjs:19` | FIX | Fester ASCII-Codepoint 48; exakt äquivalent. | Vertical-Slice-Suite | Folgescan muss schließen |
 
 ## Übrige Regelcluster
 

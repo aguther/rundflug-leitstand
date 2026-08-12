@@ -1,6 +1,7 @@
 import { access, readdir, readFile } from "node:fs/promises";
 import { dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { markdownLinkTargets } from "./lib/markdown-links.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -173,8 +174,8 @@ const currentDocuments = [
 const missingLinks = [];
 for (const document of currentDocuments) {
   const markdown = await readFile(document, "utf8");
-  for (const match of markdown.matchAll(/!?\[[^\]]*]\(([^)]+)\)/g)) {
-    const target = match[1].trim().replace(/^<|>$/g, "").split("#", 1)[0];
+  for (const linkTarget of markdownLinkTargets(markdown)) {
+    const target = linkTarget.trim().replace(/^<|>$/g, "").split("#", 1)[0];
     if (!target || /^(?:https?:|mailto:)/i.test(target)) continue;
     const path = target.startsWith("/")
       ? resolve(root, target.slice(1))

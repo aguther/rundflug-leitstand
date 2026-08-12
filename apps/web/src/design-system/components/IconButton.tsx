@@ -18,6 +18,7 @@ export function IconButton({
   children,
   disabled,
   onClick,
+  type = "button",
   ...rest
 }: IconButtonProps) {
   const [internalBusy, setInternalBusy] = useState(false);
@@ -43,6 +44,7 @@ export function IconButton({
       disabled={disabled || effectiveBusy}
       onClick={handleClick}
       title={label}
+      type={type}
       {...rest}
     >
       <span className={`ds-button-content${effectiveBusy ? " ds-button-content--hidden" : ""}`}>

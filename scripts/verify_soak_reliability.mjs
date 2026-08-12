@@ -105,7 +105,7 @@ if (prepare.status !== 0) {
   );
 }
 
-const pin = String.fromCharCode(48).repeat(4);
+const pin = String.fromCodePoint(48).repeat(4);
 const deviceId = "cashier-tablet-1";
 const deviceToken = ["demo", "cashier", "device", "token"].join("-");
 const eventId = "demo-2026";

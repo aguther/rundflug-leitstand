@@ -1,5 +1,7 @@
-const codeOpen = String.fromCharCode(0);
-const codeClose = String.fromCharCode(1);
+import { replaceMarkdownLinks } from "./lib/markdown-links.mjs";
+
+const codeOpen = String.fromCodePoint(0);
+const codeClose = String.fromCodePoint(1);
 
 function escapeHtml(value) {
   return value
@@ -24,15 +26,12 @@ function renderInline(text) {
     codeSpans.push(code);
     return `${codeOpen}${codeSpans.length - 1}${codeClose}`;
   });
-  const html = escapeHtml(withoutCode)
-    .replace(
-      /!\[([^\]]*)]\(([^)]+)\)/g,
-      (_match, alt, source) => `<img alt="${alt}" src="${source}">`,
-    )
-    .replace(
-      /\[([^\]]+)]\(([^)]+)\)/g,
-      (_match, label, target) => `<a href="${target}">${label}</a>`,
-    )
+  const linkedHtml = replaceMarkdownLinks(escapeHtml(withoutCode), (match) => {
+    if (match.image) return `<img alt="${match.label}" src="${match.target}">`;
+    if (match.label.length === 0) return match.raw;
+    return `<a href="${match.target}">${match.label}</a>`;
+  });
+  const html = linkedHtml
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, "<em>$1</em>");
   return html.replace(

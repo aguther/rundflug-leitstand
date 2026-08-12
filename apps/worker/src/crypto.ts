@@ -28,7 +28,7 @@ const PIN_HASH_ITERATIONS = 100_000;
 
 function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
+  for (const byte of bytes) binary += String.fromCodePoint(byte);
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
@@ -38,7 +38,7 @@ function base64UrlToBytes(value: string): Uint8Array {
     .replaceAll("_", "/")
     .padEnd(Math.ceil(value.length / 4) * 4, "=");
   const binary = atob(padded);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return Uint8Array.from(binary, (character) => character.codePointAt(0) ?? 0);
 }
 
 async function derivePin(pin: string, salt: Uint8Array, iterations: number): Promise<Uint8Array> {

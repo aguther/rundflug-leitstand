@@ -16,7 +16,7 @@ const reset = spawnSync(process.execPath, [npmCli, "run", "db:reset:local"], {
 });
 if (reset.status !== 0) throw new Error("Lokale Testdatenbank konnte nicht initialisiert werden.");
 
-const pin = String.fromCharCode(48).repeat(4);
+const pin = String.fromCodePoint(48).repeat(4);
 const pinHash = createHash("sha256").update(pin).digest("hex");
 const server = spawn(
   process.execPath,

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createWorkerTestHarness } from "./lib/worker-test-harness.mjs";
 
-const pin = String.fromCharCode(48).repeat(4);
+const pin = String.fromCodePoint(48).repeat(4);
 const harness = await createWorkerTestHarness({ name: "pilot-conflict", adminPin: pin });
 const base = harness.baseUrl;
 const tokens = {

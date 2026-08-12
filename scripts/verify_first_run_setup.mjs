@@ -28,7 +28,7 @@ const migrate = spawnSync(
 );
 if (migrate.status !== 0)
   throw new Error("Leere lokale Testdatenbank konnte nicht migriert werden.");
-const pin = String.fromCharCode(48).repeat(6);
+const pin = String.fromCodePoint(48).repeat(6);
 const setupCode = ["synthetic", "first", "run", "recovery", "code"].join("-");
 const deviceToken = ["synthetic", "bootstrap", "admin", "device", "token", "value"].join("-");
 const server = spawn(
