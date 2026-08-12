@@ -56,4 +56,49 @@ describe("public forecast projection", () => {
       forecastReason: "OPERATIONS_INTERRUPTED",
     });
   });
+
+  it("prioritizes emergency and unavailable resource states over apparent windows", () => {
+    expect(derivePublicForecastProjection({ ...base, emergencyMode: true }).forecastReason).toBe(
+      "EMERGENCY_MODE",
+    );
+    expect(
+      derivePublicForecastProjection({ ...base, resourceGroupStatus: "ENDED" }).forecastReason,
+    ).toBe("RESOURCE_GROUP_UNAVAILABLE");
+  });
+
+  it("maps paused capacity and attendance uncertainty to safe public reasons", () => {
+    const unavailable = {
+      ...base,
+      predictedBoardingAt: null,
+      predictionQuality: "UNCERTAIN",
+    } as const;
+    expect(
+      derivePublicForecastProjection({
+        ...unavailable,
+        resourceGroupStatus: "PAUSED",
+        dispatchUnplannedReason: "NO_FORECAST_CAPACITY",
+      }).forecastReason,
+    ).toBe("RETURN_TIME_UNKNOWN");
+    expect(
+      derivePublicForecastProjection({
+        ...unavailable,
+        dispatchUnplannedReason: "ATTENDANCE_CLARIFICATION",
+      }).forecastReason,
+    ).toBe("STATUS_CLARIFICATION");
+  });
+
+  it("keeps completed rotations and missing diagnoses unavailable without invented reasons", () => {
+    expect(derivePublicForecastProjection({ ...base, rotationStatus: "COMPLETED" })).toEqual({
+      forecastState: "UNAVAILABLE",
+      forecastReason: null,
+    });
+    expect(
+      derivePublicForecastProjection({
+        ...base,
+        predictedBoardingAt: null,
+        predictionQuality: "UNCERTAIN",
+        dispatchUnplannedReason: null,
+      }),
+    ).toEqual({ forecastState: "UNAVAILABLE", forecastReason: null });
+  });
 });

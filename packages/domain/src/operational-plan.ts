@@ -47,48 +47,62 @@ export function deriveOperationalPlanStatus(
   return plan.status;
 }
 
-export function validateOperationalPlan(
-  plan: Omit<PlannedOperationalConstraint, "status">,
-): string[] {
-  const errors: string[] = [];
-  const minimum = plan.minimumDurationMinutes;
-  const typical = plan.typicalDurationMinutes;
-  const maximum = plan.maximumDurationMinutes;
-  if (
-    (plan.effectMode === "BLOCKING" && plan.durationMultiplierPercent !== null) ||
-    (plan.effectMode === "SLOWDOWN" &&
-      (!Number.isInteger(plan.durationMultiplierPercent) ||
-        (plan.durationMultiplierPercent ?? 0) < 110 ||
-        (plan.durationMultiplierPercent ?? 0) > 300))
-  ) {
-    errors.push("Ein verzögerter Betrieb benötigt einen Faktor zwischen 110 und 300 Prozent.");
-  }
-  if (
+type OperationalPlanInput = Omit<PlannedOperationalConstraint, "status">;
+
+function hasInvalidEffectConfiguration(plan: OperationalPlanInput): boolean {
+  if (plan.effectMode === "BLOCKING") return plan.durationMultiplierPercent !== null;
+  return (
+    !Number.isInteger(plan.durationMultiplierPercent) ||
+    (plan.durationMultiplierPercent ?? 0) < 110 ||
+    (plan.durationMultiplierPercent ?? 0) > 300
+  );
+}
+
+function hasInvalidDuration(plan: OperationalPlanInput): boolean {
+  const { minimumDurationMinutes: minimum } = plan;
+  const { typicalDurationMinutes: typical } = plan;
+  const { maximumDurationMinutes: maximum } = plan;
+  return (
     !Number.isInteger(minimum) ||
     !Number.isInteger(typical) ||
     !Number.isInteger(maximum) ||
     minimum < 1 ||
     minimum > typical ||
     typical > maximum
-  ) {
-    errors.push("Die Dauer muss als aufsteigendes Minimum, Typisch und Maximum angegeben werden.");
-  }
+  );
+}
+
+function validateStartConfiguration(plan: OperationalPlanInput): string[] {
   if (plan.startMode === "TIME_WINDOW") {
     const earliest = plan.earliestStartAt ? Date.parse(plan.earliestStartAt) : Number.NaN;
     const latest = plan.latestStartAt ? Date.parse(plan.latestStartAt) : Number.NaN;
-    if (!Number.isFinite(earliest) || !Number.isFinite(latest) || earliest > latest) {
-      errors.push("Das Startzeitfenster ist unvollständig oder ungültig.");
-    }
-    if (plan.afterRotationId !== null) {
-      errors.push("Ein Zeitfenster darf nicht zugleich an einen Umlauf gebunden sein.");
-    }
-  } else {
-    if (plan.afterRotationId === null) {
-      errors.push("Für 'nach aktuellem Umlauf' muss ein Umlauf angegeben werden.");
-    }
-    if (plan.earliestStartAt !== null || plan.latestStartAt !== null) {
-      errors.push("Ein umlaufgebundener Beginn darf kein festes Startzeitfenster enthalten.");
-    }
+    return [
+      ...(!Number.isFinite(earliest) || !Number.isFinite(latest) || earliest > latest
+        ? ["Das Startzeitfenster ist unvollständig oder ungültig."]
+        : []),
+      ...(plan.afterRotationId !== null
+        ? ["Ein Zeitfenster darf nicht zugleich an einen Umlauf gebunden sein."]
+        : []),
+    ];
   }
+  return [
+    ...(plan.afterRotationId === null
+      ? ["Für 'nach aktuellem Umlauf' muss ein Umlauf angegeben werden."]
+      : []),
+    ...(plan.earliestStartAt !== null || plan.latestStartAt !== null
+      ? ["Ein umlaufgebundener Beginn darf kein festes Startzeitfenster enthalten."]
+      : []),
+  ];
+}
+
+export function validateOperationalPlan(plan: OperationalPlanInput): string[] {
+  const errors: string[] = [];
+  if (hasInvalidEffectConfiguration(plan)) {
+    errors.push("Ein verzögerter Betrieb benötigt einen Faktor zwischen 110 und 300 Prozent.");
+  }
+  if (hasInvalidDuration(plan)) {
+    errors.push("Die Dauer muss als aufsteigendes Minimum, Typisch und Maximum angegeben werden.");
+  }
+  errors.push(...validateStartConfiguration(plan));
   return errors;
 }

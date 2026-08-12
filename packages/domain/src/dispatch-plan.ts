@@ -773,16 +773,17 @@ function advanceState(
   };
 }
 
-function planResourceGroup(input: {
+interface PlanResourceGroupInput {
   groups: readonly NormalizedGroup[];
   lanes: readonly NormalizedLane[];
   limits: DispatchPlanningLimits;
   previousSlots: ReadonlyMap<string, Set<string>>;
   previousExpectedAtByMember: ReadonlyMap<string, number>;
   lockedBatches: readonly DispatchLockedBatchInput[];
-}): PlannedBatchState[] {
-  if (input.groups.length === 0 || input.lanes.length === 0) return [];
-  let initialState: SearchState = {
+}
+
+function initialSearchState(input: PlanResourceGroupInput): SearchState {
+  return {
     remaining: [...input.groups],
     lanes: input.lanes.map((lane) => ({ ...lane })),
     batches: [],
@@ -799,87 +800,82 @@ function planResourceGroup(input: {
     prepareBreaks: 0,
     stableKey: "",
   };
-  const lockedAircraftIds = new Set<string>();
-  for (const lockedBatch of [...input.lockedBatches].sort((left, right) =>
-    left.id.localeCompare(right.id),
-  )) {
-    if (lockedAircraftIds.has(lockedBatch.aircraftId)) {
-      throw new Error(`Dispatch aircraft ${lockedBatch.aircraftId} has multiple active leases.`);
-    }
-    const lane = initialState.lanes.find(
-      (entry) => entry.aircraftId === lockedBatch.aircraftId && entry.wave === 1,
-    );
-    if (!lane) {
-      throw new Error(`Locked dispatch batch ${lockedBatch.id} has no available aircraft lane.`);
-    }
-    const memberIdSet = new Set(lockedBatch.memberIds);
-    if (memberIdSet.size !== lockedBatch.memberIds.length || memberIdSet.size === 0) {
-      throw new Error(`Locked dispatch batch ${lockedBatch.id} has invalid members.`);
-    }
-    const members = initialState.remaining.filter((group) => memberIdSet.has(group.id));
-    if (members.length !== memberIdSet.size) {
-      throw new Error(`Locked dispatch batch ${lockedBatch.id} references unavailable members.`);
-    }
-    if (
-      members.some(
-        (group) =>
-          group.resourceGroupId !== lockedBatch.resourceGroupId ||
-          group.productId !== lockedBatch.productId ||
-          group.gateId !== lockedBatch.gateId,
-      )
-    ) {
-      throw new Error(`Locked dispatch batch ${lockedBatch.id} is incompatible with its members.`);
-    }
-    const occupiedSeats = members.reduce((sum, group) => sum + group.size, 0);
-    const duration = lane.productDurations.get(lockedBatch.productId);
-    if (occupiedSeats > lane.passengerSeats || !duration) {
-      throw new Error(`Locked dispatch batch ${lockedBatch.id} no longer fits its aircraft.`);
-    }
-    const previousMembers = new Set(lockedBatch.memberIds);
-    const candidate = buildCandidate(members, initialState.remaining, lane, previousMembers);
-    initialState = advanceState(
-      initialState,
-      lane,
-      candidate,
-      duration,
-      input.limits,
-      input.previousExpectedAtByMember,
-      lockedBatch.id,
-    );
-    lockedAircraftIds.add(lockedBatch.aircraftId);
+}
+
+function applyLockedBatch(
+  state: SearchState,
+  lockedBatch: DispatchLockedBatchInput,
+  input: PlanResourceGroupInput,
+  lockedAircraftIds: Set<string>,
+): SearchState {
+  if (lockedAircraftIds.has(lockedBatch.aircraftId)) {
+    throw new Error(`Dispatch aircraft ${lockedBatch.aircraftId} has multiple active leases.`);
   }
-  let beam: SearchState[] = [initialState];
-  const maximumSteps = input.lanes.length * input.limits.maximumWaves;
-  for (let step = 0; step < maximumSteps; step += 1) {
-    const expanded: SearchState[] = [];
-    for (const state of beam) {
-      if (state.remaining.length === 0) {
-        expanded.push(state);
-        continue;
-      }
-      const lane = state.lanes
-        .filter((entry) => entry.wave <= input.limits.maximumWaves)
-        .sort(laneOrder)[0];
-      if (!lane) {
-        expanded.push(state);
-        continue;
-      }
-      const previousMembers = input.previousSlots.get(`${lane.id}:${lane.wave}`) ?? new Set();
-      const candidates = enumerateCandidates(state.remaining, lane, input.limits, previousMembers);
-      if (candidates.length === 0) {
-        expanded.push({
-          ...state,
-          lanes: state.lanes.map((entry) =>
-            entry.id === lane.id ? { ...entry, wave: input.limits.maximumWaves + 1 } : entry,
-          ),
-          stableKey: `${state.stableKey}|${lane.id}:no-fit`,
-        });
-        continue;
-      }
-      for (const candidate of candidates) {
-        const duration = lane.productDurations.get(candidate.productId);
-        if (!duration) continue;
-        expanded.push(
+  const lane = state.lanes.find(
+    (entry) => entry.aircraftId === lockedBatch.aircraftId && entry.wave === 1,
+  );
+  if (!lane) {
+    throw new Error(`Locked dispatch batch ${lockedBatch.id} has no available aircraft lane.`);
+  }
+  const memberIdSet = new Set(lockedBatch.memberIds);
+  if (memberIdSet.size !== lockedBatch.memberIds.length || memberIdSet.size === 0) {
+    throw new Error(`Locked dispatch batch ${lockedBatch.id} has invalid members.`);
+  }
+  const members = state.remaining.filter((group) => memberIdSet.has(group.id));
+  if (members.length !== memberIdSet.size) {
+    throw new Error(`Locked dispatch batch ${lockedBatch.id} references unavailable members.`);
+  }
+  if (
+    members.some(
+      (group) =>
+        group.resourceGroupId !== lockedBatch.resourceGroupId ||
+        group.productId !== lockedBatch.productId ||
+        group.gateId !== lockedBatch.gateId,
+    )
+  ) {
+    throw new Error(`Locked dispatch batch ${lockedBatch.id} is incompatible with its members.`);
+  }
+  const occupiedSeats = members.reduce((sum, group) => sum + group.size, 0);
+  const duration = lane.productDurations.get(lockedBatch.productId);
+  if (occupiedSeats > lane.passengerSeats || !duration) {
+    throw new Error(`Locked dispatch batch ${lockedBatch.id} no longer fits its aircraft.`);
+  }
+  const candidate = buildCandidate(members, state.remaining, lane, new Set(lockedBatch.memberIds));
+  lockedAircraftIds.add(lockedBatch.aircraftId);
+  return advanceState(
+    state,
+    lane,
+    candidate,
+    duration,
+    input.limits,
+    input.previousExpectedAtByMember,
+    lockedBatch.id,
+  );
+}
+
+function expandSearchState(state: SearchState, input: PlanResourceGroupInput): SearchState[] {
+  if (state.remaining.length === 0) return [state];
+  const lane = state.lanes
+    .filter((entry) => entry.wave <= input.limits.maximumWaves)
+    .sort(laneOrder)[0];
+  if (!lane) return [state];
+  const previousMembers = input.previousSlots.get(`${lane.id}:${lane.wave}`) ?? new Set();
+  const candidates = enumerateCandidates(state.remaining, lane, input.limits, previousMembers);
+  if (candidates.length === 0) {
+    return [
+      {
+        ...state,
+        lanes: state.lanes.map((entry) =>
+          entry.id === lane.id ? { ...entry, wave: input.limits.maximumWaves + 1 } : entry,
+        ),
+        stableKey: `${state.stableKey}|${lane.id}:no-fit`,
+      },
+    ];
+  }
+  return candidates.flatMap((candidate) => {
+    const duration = lane.productDurations.get(candidate.productId);
+    return duration
+      ? [
           advanceState(
             state,
             lane,
@@ -888,17 +884,43 @@ function planResourceGroup(input: {
             input.limits,
             input.previousExpectedAtByMember,
           ),
-        );
-      }
-    }
-    beam = expanded.sort(compareStates).slice(0, input.limits.beamWidth);
+        ]
+      : [];
+  });
+}
+
+function searchDispatchBatches(
+  initialState: SearchState,
+  input: PlanResourceGroupInput,
+): PlannedBatchState[] {
+  let beam: SearchState[] = [initialState];
+  const maximumSteps = input.lanes.length * input.limits.maximumWaves;
+  for (let step = 0; step < maximumSteps; step += 1) {
+    const expanded = beam.flatMap((state) => expandSearchState(state, input));
+    expanded.sort(compareStates);
+    beam = expanded.slice(0, input.limits.beamWidth);
   }
-  return (beam.sort(compareStates)[0]?.batches ?? []).sort(
+  beam.sort(compareStates);
+  const batches = [...(beam[0]?.batches ?? [])];
+  batches.sort(
     (left, right) =>
       left.expectedMs - right.expectedMs ||
       left.laneId.localeCompare(right.laneId) ||
       left.wave - right.wave,
   );
+  return batches;
+}
+
+function planResourceGroup(input: PlanResourceGroupInput): PlannedBatchState[] {
+  if (input.groups.length === 0 || input.lanes.length === 0) return [];
+  let state = initialSearchState(input);
+  const lockedAircraftIds = new Set<string>();
+  for (const lockedBatch of [...input.lockedBatches].sort((left, right) =>
+    left.id.localeCompare(right.id),
+  )) {
+    state = applyLockedBatch(state, lockedBatch, input, lockedAircraftIds);
+  }
+  return searchDispatchBatches(state, input);
 }
 
 function unplannedReason(
@@ -921,41 +943,70 @@ function unplannedReason(
   return "NOT_IN_NEAR_DISPATCH_BATCH";
 }
 
-export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
-  const nowMs = Date.parse(input.now);
-  if (!Number.isFinite(nowMs)) throw new Error("Dispatch planning time is invalid.");
-  const limits = normalizedLimits(input.limits);
+function normalizeDispatchGroups(
+  input: DispatchPlanInput,
+  nowMs: number,
+  limits: DispatchPlanningLimits,
+): NormalizedGroup[] {
   const seenIds = new Set<string>();
-  const normalizedGroups = input.groups.map((group) => {
+  const groups = input.groups.map((group) => {
     if (seenIds.has(group.id)) throw new Error(`Dispatch group ${group.id} is duplicated.`);
     seenIds.add(group.id);
     return normalizeGroup(group, nowMs, limits);
   });
-  for (const group of normalizedGroups) {
+  for (const group of groups) {
     for (const predecessorId of group.predecessorMemberIds ?? []) {
-      const predecessor = normalizedGroups.find((entry) => entry.id === predecessorId);
+      const predecessor = groups.find((entry) => entry.id === predecessorId);
       if (!predecessor || predecessor.resourceGroupId !== group.resourceGroupId) {
         throw new Error(`Dispatch group ${group.id} has an invalid predecessor ${predecessorId}.`);
       }
     }
   }
+  return groups;
+}
+
+function validateLockedBatchAssignments(lockedBatches: readonly DispatchLockedBatchInput[]): void {
+  const batchIds = new Set<string>();
+  const memberIds = new Set<string>();
+  for (const batch of lockedBatches) {
+    if (batchIds.has(batch.id)) {
+      throw new Error(`Locked dispatch batch ${batch.id} is duplicated.`);
+    }
+    batchIds.add(batch.id);
+    for (const memberId of batch.memberIds) {
+      if (memberIds.has(memberId)) {
+        throw new Error(`Dispatch member ${memberId} is held by multiple active leases.`);
+      }
+      memberIds.add(memberId);
+    }
+  }
+}
+
+function reasonForUnplannedGroup(
+  group: NormalizedGroup,
+  consideredIds: ReadonlySet<string>,
+  normalizedLanes: readonly NormalizedLane[],
+  plannedStates: readonly PlannedBatchState[],
+): DispatchUnplannedReason {
+  if (group.attendanceStatus === "MISSING") return "ATTENDANCE_MISSING";
+  if (group.attendanceStatus === "CLARIFICATION") return "ATTENDANCE_CLARIFICATION";
+  if (!consideredIds.has(group.id)) return "NOT_IN_NEAR_DISPATCH_BATCH";
+  return unplannedReason(
+    group,
+    normalizedLanes.filter((lane) => lane.resourceGroupId === group.resourceGroupId),
+    plannedStates,
+  );
+}
+
+export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
+  const nowMs = Date.parse(input.now);
+  if (!Number.isFinite(nowMs)) throw new Error("Dispatch planning time is invalid.");
+  const limits = normalizedLimits(input.limits);
+  const normalizedGroups = normalizeDispatchGroups(input, nowMs, limits);
   const normalizedLanes = input.lanes.map(normalizeLane);
   const previousSlots = previousSlotMembers(input.previousPlan);
   const lockedBatches = input.lockedBatches ?? [];
-  const lockedBatchIds = new Set<string>();
-  const lockedMemberIds = new Set<string>();
-  for (const lockedBatch of lockedBatches) {
-    if (lockedBatchIds.has(lockedBatch.id)) {
-      throw new Error(`Locked dispatch batch ${lockedBatch.id} is duplicated.`);
-    }
-    lockedBatchIds.add(lockedBatch.id);
-    for (const memberId of lockedBatch.memberIds) {
-      if (lockedMemberIds.has(memberId)) {
-        throw new Error(`Dispatch member ${memberId} is held by multiple active leases.`);
-      }
-      lockedMemberIds.add(memberId);
-    }
-  }
+  validateLockedBatchAssignments(lockedBatches);
   const plannedStates: PlannedBatchState[] = [];
   const consideredIds = new Set<string>();
   const resourceGroupIds = [
@@ -1065,18 +1116,7 @@ export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
     .sort(queueOrder)
     .map((group) => ({
       memberId: group.id,
-      reason:
-        group.attendanceStatus === "MISSING"
-          ? ("ATTENDANCE_MISSING" as const)
-          : group.attendanceStatus === "CLARIFICATION"
-            ? ("ATTENDANCE_CLARIFICATION" as const)
-            : consideredIds.has(group.id)
-              ? unplannedReason(
-                  group,
-                  normalizedLanes.filter((lane) => lane.resourceGroupId === group.resourceGroupId),
-                  plannedStates,
-                )
-              : ("NOT_IN_NEAR_DISPATCH_BATCH" as const),
+      reason: reasonForUnplannedGroup(group, consideredIds, normalizedLanes, plannedStates),
     }));
   const revision = stableHash(
     batches

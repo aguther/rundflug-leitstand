@@ -525,6 +525,138 @@ describe("createDispatchPlan", () => {
     expect(new Set(plan.batches.flatMap((batch) => batch.memberIds)).size).toBe(3);
   });
 
+  it.each([
+    {
+      name: "missing aircraft lane",
+      groups: [group("a", 1, 1)],
+      lanes: [lane("available", 3)],
+      lockedBatches: [
+        {
+          id: "lease-1",
+          resourceGroupId: "touring",
+          productId: "short-flight",
+          gateId: "gate-a",
+          aircraftId: "aircraft-missing",
+          memberIds: ["a"],
+        },
+      ],
+      message: /no available aircraft lane/,
+    },
+    {
+      name: "empty member list",
+      groups: [group("a", 1, 1)],
+      lanes: [lane("available", 3)],
+      lockedBatches: [
+        {
+          id: "lease-1",
+          resourceGroupId: "touring",
+          productId: "short-flight",
+          gateId: "gate-a",
+          aircraftId: "aircraft-available",
+          memberIds: [],
+        },
+      ],
+      message: /invalid members/,
+    },
+    {
+      name: "unknown member",
+      groups: [group("a", 1, 1)],
+      lanes: [lane("available", 3)],
+      lockedBatches: [
+        {
+          id: "lease-1",
+          resourceGroupId: "touring",
+          productId: "short-flight",
+          gateId: "gate-a",
+          aircraftId: "aircraft-available",
+          memberIds: ["missing"],
+        },
+      ],
+      message: /references unavailable members/,
+    },
+    {
+      name: "incompatible product",
+      groups: [group("a", 1, 1)],
+      lanes: [lane("available", 3)],
+      lockedBatches: [
+        {
+          id: "lease-1",
+          resourceGroupId: "touring",
+          productId: "long-flight",
+          gateId: "gate-a",
+          aircraftId: "aircraft-available",
+          memberIds: ["a"],
+        },
+      ],
+      message: /incompatible with its members/,
+    },
+    {
+      name: "insufficient seats",
+      groups: [group("a", 3, 1)],
+      lanes: [lane("available", 2)],
+      lockedBatches: [
+        {
+          id: "lease-1",
+          resourceGroupId: "touring",
+          productId: "short-flight",
+          gateId: "gate-a",
+          aircraftId: "aircraft-available",
+          memberIds: ["a"],
+        },
+      ],
+      message: /no longer fits its aircraft/,
+    },
+  ])("rejects a locked batch with $name", ({ groups, lanes, lockedBatches, message }) => {
+    expect(() =>
+      createDispatchPlan({ now: NOW, groups, lanes, lockedBatches, limits: { maximumWaves: 1 } }),
+    ).toThrow(message);
+  });
+
+  it("rejects duplicate lease identities and cross-lease member ownership", () => {
+    const lockedBatch = {
+      id: "lease-1",
+      resourceGroupId: "touring",
+      productId: "short-flight",
+      gateId: "gate-a",
+      aircraftId: "aircraft-a",
+      memberIds: ["a"],
+    };
+    const input = {
+      now: NOW,
+      groups: [group("a", 1, 1), group("b", 1, 2)],
+      lanes: [lane("a", 3), lane("b", 3)],
+      limits: { maximumWaves: 1 },
+    };
+    expect(() =>
+      createDispatchPlan({ ...input, lockedBatches: [lockedBatch, { ...lockedBatch }] }),
+    ).toThrow(/is duplicated/);
+    expect(() =>
+      createDispatchPlan({
+        ...input,
+        lockedBatches: [lockedBatch, { ...lockedBatch, id: "lease-2", aircraftId: "aircraft-b" }],
+      }),
+    ).toThrow(/held by multiple active leases/);
+    expect(() =>
+      createDispatchPlan({
+        ...input,
+        lockedBatches: [lockedBatch, { ...lockedBatch, id: "lease-2", memberIds: ["b"] }],
+      }),
+    ).toThrow(/multiple active leases/);
+  });
+
+  it("rejects predecessors outside the same resource group", () => {
+    expect(() =>
+      createDispatchPlan({
+        now: NOW,
+        groups: [
+          group("first", 1, 1, { resourceGroupId: "other" }),
+          group("second", 1, 2, { predecessorMemberIds: ["first"] }),
+        ],
+        lanes: [lane("available", 3)],
+      }),
+    ).toThrow(/invalid predecessor/);
+  });
+
   it("replans after a lane loss without duplicating or splitting groups", () => {
     const groups = [group("a", 2, 1), group("b", 1, 2), group("c", 3, 3)];
     const first = createDispatchPlan({

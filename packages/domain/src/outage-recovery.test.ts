@@ -84,6 +84,8 @@ describe("outage recovery simulation", () => {
   });
 
   it("separates cashier paper sales from flight-line-lead rotation records", () => {
+    expect(() => assertMayStageOutageRecoveryEntry("ADMIN", "PAPER_SALE")).not.toThrow();
+    expect(() => assertMayStageOutageRecoveryEntry("ADMIN", "ROTATION_COMPLETED")).not.toThrow();
     expect(() => assertMayStageOutageRecoveryEntry("CASHIER", "PAPER_SALE")).not.toThrow();
     expect(() => assertMayStageOutageRecoveryEntry("CASHIER", "ROTATION_CALLED")).toThrowError(
       /Leiter Flight Line/,
@@ -168,6 +170,18 @@ describe("outage recovery simulation", () => {
     expect(result.conflicts.map((conflict) => conflict.code)).toEqual(
       expect.arrayContaining(["TICKET_CODE_ALREADY_EXISTS", "DUPLICATE_TICKET_CODE"]),
     );
+  });
+
+  it("rejects duplicate entry IDs before applying their later payload", () => {
+    const result = simulateOutageRecovery({
+      entries: [entry("same-id", "PAPER_SALE", 0, 1), entry("same-id", "ROTATION_LANDED", 5, 2)],
+      existingPaperReferences: [],
+      recordedAt: at(30),
+    });
+
+    expect(result.conflicts).toEqual([
+      expect.objectContaining({ entryId: "same-id", code: "DUPLICATE_ENTRY_ID" }),
+    ]);
   });
 
   it("continues a flight-line batch from an already applied cashier paper sale", () => {

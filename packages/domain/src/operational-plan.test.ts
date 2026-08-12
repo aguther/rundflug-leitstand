@@ -63,4 +63,63 @@ describe("operational planning", () => {
       }),
     ).toContain("Ein verzögerter Betrieb benötigt einen Faktor zwischen 110 und 300 Prozent.");
   });
+
+  it("rejects effect configurations that contradict their mode", () => {
+    const { status: _status, ...validPlan } = basePlan;
+    expect(validateOperationalPlan({ ...validPlan, durationMultiplierPercent: 150 })).toContain(
+      "Ein verzögerter Betrieb benötigt einen Faktor zwischen 110 und 300 Prozent.",
+    );
+    expect(
+      validateOperationalPlan({
+        ...validPlan,
+        effectMode: "SLOWDOWN",
+        durationMultiplierPercent: null,
+      }),
+    ).toContain("Ein verzögerter Betrieb benötigt einen Faktor zwischen 110 und 300 Prozent.");
+  });
+
+  it("validates every start-mode invariant", () => {
+    const { status: _status, ...validPlan } = basePlan;
+    expect(
+      validateOperationalPlan({
+        ...validPlan,
+        earliestStartAt: null,
+        afterRotationId: "rotation-1",
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        "Das Startzeitfenster ist unvollständig oder ungültig.",
+        "Ein Zeitfenster darf nicht zugleich an einen Umlauf gebunden sein.",
+      ]),
+    );
+    expect(
+      validateOperationalPlan({
+        ...validPlan,
+        startMode: "AFTER_CURRENT_ROTATION",
+        earliestStartAt: null,
+        latestStartAt: null,
+        afterRotationId: null,
+      }),
+    ).toContain("Für 'nach aktuellem Umlauf' muss ein Umlauf angegeben werden.");
+    expect(
+      validateOperationalPlan({
+        ...validPlan,
+        startMode: "AFTER_CURRENT_ROTATION",
+        afterRotationId: "rotation-1",
+      }),
+    ).toContain("Ein umlaufgebundener Beginn darf kein festes Startzeitfenster enthalten.");
+  });
+
+  it("rejects non-integral, non-positive, and descending durations", () => {
+    const { status: _status, ...validPlan } = basePlan;
+    for (const invalidDuration of [
+      { minimumDurationMinutes: 0 },
+      { typicalDurationMinutes: 20.5 },
+      { maximumDurationMinutes: 19 },
+    ]) {
+      expect(validateOperationalPlan({ ...validPlan, ...invalidDuration })).toContain(
+        "Die Dauer muss als aufsteigendes Minimum, Typisch und Maximum angegeben werden.",
+      );
+    }
+  });
 });

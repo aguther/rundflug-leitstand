@@ -110,6 +110,107 @@ const targetState: Readonly<Record<Exclude<OutageRecoveryEntryType, "PAPER_SALE"
     ROTATION_COMPLETED: "COMPLETED",
   };
 
+interface RecoverySimulationContext {
+  conflicts: OutageRecoveryConflict[];
+  existingTicketKeys: ReadonlySet<string>;
+  ids: Set<string>;
+  recordedAtMs: number;
+  references: Set<string>;
+  sequences: Set<number>;
+  states: Map<string, RotationState>;
+  ticketKeys: Set<string>;
+}
+
+function addConflict(
+  context: RecoverySimulationContext,
+  entry: OutageRecoveryEntry,
+  code: OutageRecoveryConflict["code"],
+  message: string,
+): void {
+  context.conflicts.push({ entryId: entry.id, code, message });
+}
+
+function registerEntry(entry: OutageRecoveryEntry, context: RecoverySimulationContext): boolean {
+  if (context.ids.has(entry.id)) {
+    addConflict(
+      context,
+      entry,
+      "DUPLICATE_ENTRY_ID",
+      "Die Eintrags-ID kommt im Nacherfassungsbatch mehrfach vor.",
+    );
+    return false;
+  }
+  context.ids.add(entry.id);
+  if (context.sequences.has(entry.paperSequence)) {
+    addConflict(
+      context,
+      entry,
+      "DUPLICATE_PAPER_SEQUENCE",
+      "Die Papier-Belegfolge muss innerhalb des Batches eindeutig sein.",
+    );
+  }
+  context.sequences.add(entry.paperSequence);
+  if (Date.parse(entry.originalOccurredAt) > context.recordedAtMs) {
+    addConflict(
+      context,
+      entry,
+      "EVENT_IN_FUTURE",
+      "Die ursprüngliche Ereigniszeit darf nicht nach der Nacherfassung liegen.",
+    );
+  }
+  return true;
+}
+
+function recordPaperSale(entry: OutageRecoveryEntry, context: RecoverySimulationContext): void {
+  if (context.references.has(entry.paperReference)) {
+    addConflict(
+      context,
+      entry,
+      "PAPER_REFERENCE_ALREADY_EXISTS",
+      "Die Papier-Belegreferenz wurde bereits erfasst.",
+    );
+    return;
+  }
+  context.references.add(entry.paperReference);
+  context.states.set(entry.paperReference, "DRAFT");
+  for (const ticketKey of entry.ticketKeys ?? []) {
+    if (context.ticketKeys.has(ticketKey)) {
+      addConflict(
+        context,
+        entry,
+        context.existingTicketKeys.has(ticketKey)
+          ? "TICKET_CODE_ALREADY_EXISTS"
+          : "DUPLICATE_TICKET_CODE",
+        "Ein Ticketcode ist bereits vorhanden oder kommt im Batch mehrfach vor.",
+      );
+    }
+    context.ticketKeys.add(ticketKey);
+  }
+}
+
+function recordRotationEvent(
+  entry: OutageRecoveryEntry,
+  nextState: RotationState,
+  context: RecoverySimulationContext,
+): void {
+  const current = context.states.get(entry.paperReference);
+  if (!current) {
+    addConflict(
+      context,
+      entry,
+      "PAPER_REFERENCE_UNKNOWN",
+      "Für das Umlaufereignis fehlt ein vorangehender Papierverkauf im Batch.",
+    );
+    return;
+  }
+  try {
+    context.states.set(entry.paperReference, transitionRotation(current, nextState));
+  } catch (reason) {
+    if (!(reason instanceof DomainRuleError)) throw reason;
+    addConflict(context, entry, "RECOVERY_TRANSITION_INVALID", reason.message);
+  }
+}
+
 export function simulateOutageRecovery(input: {
   entries: readonly OutageRecoveryEntry[];
   existingPaperReferences: readonly string[];
@@ -123,88 +224,30 @@ export function simulateOutageRecovery(input: {
       left.paperSequence - right.paperSequence ||
       left.id.localeCompare(right.id),
   );
-  const conflicts: OutageRecoveryConflict[] = [];
-  const ids = new Set<string>();
-  const sequences = new Set<number>();
-  const references = new Set(input.existingPaperReferences);
-  const states = new Map<string, RotationState>(
-    Object.entries(input.existingReferenceStates ?? {}),
-  );
-  const ticketKeys = new Set(input.existingTicketKeys ?? []);
-  const recordedAtMs = Date.parse(input.recordedAt);
+  const existingTicketKeys = new Set(input.existingTicketKeys ?? []);
+  const context: RecoverySimulationContext = {
+    conflicts: [],
+    existingTicketKeys,
+    ids: new Set(),
+    recordedAtMs: Date.parse(input.recordedAt),
+    references: new Set(input.existingPaperReferences),
+    sequences: new Set(),
+    states: new Map(Object.entries(input.existingReferenceStates ?? {})),
+    ticketKeys: new Set(existingTicketKeys),
+  };
 
   for (const entry of orderedEntries) {
-    if (ids.has(entry.id)) {
-      conflicts.push({
-        entryId: entry.id,
-        code: "DUPLICATE_ENTRY_ID",
-        message: "Die Eintrags-ID kommt im Nacherfassungsbatch mehrfach vor.",
-      });
-      continue;
-    }
-    ids.add(entry.id);
-    if (sequences.has(entry.paperSequence)) {
-      conflicts.push({
-        entryId: entry.id,
-        code: "DUPLICATE_PAPER_SEQUENCE",
-        message: "Die Papier-Belegfolge muss innerhalb des Batches eindeutig sein.",
-      });
-    }
-    sequences.add(entry.paperSequence);
-    if (Date.parse(entry.originalOccurredAt) > recordedAtMs) {
-      conflicts.push({
-        entryId: entry.id,
-        code: "EVENT_IN_FUTURE",
-        message: "Die ursprüngliche Ereigniszeit darf nicht nach der Nacherfassung liegen.",
-      });
-    }
-
+    if (!registerEntry(entry, context)) continue;
     if (entry.type === "PAPER_SALE") {
-      if (references.has(entry.paperReference)) {
-        conflicts.push({
-          entryId: entry.id,
-          code: "PAPER_REFERENCE_ALREADY_EXISTS",
-          message: "Die Papier-Belegreferenz wurde bereits erfasst.",
-        });
-        continue;
-      }
-      references.add(entry.paperReference);
-      states.set(entry.paperReference, "DRAFT");
-      for (const ticketKey of entry.ticketKeys ?? []) {
-        if (ticketKeys.has(ticketKey)) {
-          conflicts.push({
-            entryId: entry.id,
-            code: (input.existingTicketKeys ?? []).includes(ticketKey)
-              ? "TICKET_CODE_ALREADY_EXISTS"
-              : "DUPLICATE_TICKET_CODE",
-            message: "Ein Ticketcode ist bereits vorhanden oder kommt im Batch mehrfach vor.",
-          });
-        }
-        ticketKeys.add(ticketKey);
-      }
+      recordPaperSale(entry, context);
       continue;
     }
-
-    const current = states.get(entry.paperReference);
-    if (!current) {
-      conflicts.push({
-        entryId: entry.id,
-        code: "PAPER_REFERENCE_UNKNOWN",
-        message: "Für das Umlaufereignis fehlt ein vorangehender Papierverkauf im Batch.",
-      });
-      continue;
-    }
-    try {
-      states.set(entry.paperReference, transitionRotation(current, targetState[entry.type]));
-    } catch (reason) {
-      if (!(reason instanceof DomainRuleError)) throw reason;
-      conflicts.push({
-        entryId: entry.id,
-        code: "RECOVERY_TRANSITION_INVALID",
-        message: reason.message,
-      });
-    }
+    recordRotationEvent(entry, targetState[entry.type], context);
   }
 
-  return { orderedEntries, conflicts, canCommit: conflicts.length === 0 };
+  return {
+    orderedEntries,
+    conflicts: context.conflicts,
+    canCommit: context.conflicts.length === 0,
+  };
 }
