@@ -46,7 +46,7 @@ export function runSimulation(
   const operationsStartMs = Date.parse(config.schedule.operationsStartAt);
   const operationsEndMs = Date.parse(config.schedule.operationsEndAt);
   const runStartMs = Math.min(Date.parse(config.schedule.salesStartAt), operationsStartMs);
-  let runEndMs = operationsEndMs;
+  let runEndMs: number;
   const aircraft = createAircraft(config);
   for (const entry of aircraft) {
     entry.nextPauseAtMinutes = config.realityModel.incidents.plannedPause.everyOperatingMinutes;
