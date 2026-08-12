@@ -53,9 +53,27 @@ vi.mock("./ForecastTimeline", () => ({
   ),
 }));
 vi.mock("./ScenarioEditor", () => ({
-  ScenarioEditor: ({ onClose, open }: { onClose: () => void; open: boolean }) =>
+  ScenarioEditor: ({
+    config,
+    onApply,
+    onChange,
+    onClose,
+    open,
+  }: {
+    config: SimulationConfig;
+    onApply: () => void;
+    onChange: (config: SimulationConfig) => void;
+    onClose: () => void;
+    open: boolean;
+  }) =>
     open ? (
       <section aria-label="Szenarioeditor">
+        <button onClick={() => onChange({ ...config, seed: config.seed + 1 })} type="button">
+          Editorwert ändern
+        </button>
+        <button onClick={onApply} type="button">
+          Editor anwenden
+        </button>
         <button onClick={onClose} type="button">
           Editor schließen
         </button>
@@ -109,9 +127,16 @@ vi.mock("./SimulationFoundationDialog", async () => {
 vi.mock("./SimulationFidsPopout", async () => {
   const { forwardRef, useImperativeHandle } = await import("react");
   return {
-    SimulationFidsPopout: forwardRef(function MockFidsPopout(_props, ref) {
+    SimulationFidsPopout: forwardRef(function MockFidsPopout(
+      { onWindowError }: { onWindowError: (message: string) => void },
+      ref,
+    ) {
       useImperativeHandle(ref, () => ({ open: mocks.fidsOpen }));
-      return null;
+      return (
+        <button onClick={() => onWindowError("Popout wurde blockiert")} type="button">
+          FIDS-Fehler auslösen
+        </button>
+      );
     }),
   };
 });
@@ -251,5 +276,90 @@ describe("forecast simulation view", () => {
         /CSV|Spalten|Datensätze/,
       ),
     );
+  });
+
+  it("exports named variants and result packages entirely in the browser", async () => {
+    const user = userEvent.setup();
+    render(<ForecastSimulationView />);
+
+    const name = screen.getByLabelText("Variantenname");
+    await user.clear(name);
+    await user.type(name, "Synthetische Exportvariante");
+    await user.click(screen.getByRole("button", { name: /Variante exportieren/ }));
+    expect(URL.createObjectURL).toHaveBeenCalledOnce();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:synthetic-export");
+    expect(document.querySelector(".sim-import-message")?.textContent).toContain(
+      "Synthetische Exportvariante als Szenario-Konfiguration exportiert.",
+    );
+
+    await user.click(screen.getByRole("button", { name: /Ergebnis exportieren/ }));
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+    expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledTimes(2);
+  });
+
+  it("applies playback controls and injects only synthetic operational incidents", async () => {
+    const user = userEvent.setup();
+    render(<ForecastSimulationView />);
+
+    await user.click(screen.getByRole("button", { name: "Ein Flugzeug hinzufügen" }));
+    await user.click(screen.getByRole("button", { name: "Ein Flugzeug entfernen" }));
+    await user.clear(screen.getByLabelText("Seed"));
+    await user.type(screen.getByLabelText("Seed"), "23");
+    await user.selectOptions(screen.getByLabelText("Simulationsgeschwindigkeit"), "60");
+    for (let index = 0; index < 12; index += 1) {
+      await user.click(screen.getByRole("button", { name: "+5 Min." }));
+    }
+
+    for (const action of ["Tanken", "Defekt", "Flugzeugausfall", "Betrieb unterbrechen"]) {
+      const button = screen.getByRole("button", { name: action });
+      expect((button as HTMLButtonElement).disabled).toBe(false);
+      await user.click(button);
+    }
+    const pauseButtons = screen.getAllByRole("button", { name: "Pause" });
+    expect(pauseButtons).toHaveLength(2);
+    await user.click(pauseButtons[1] as HTMLButtonElement);
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    await user.click(pauseButtons[0] as HTMLButtonElement);
+    await user.click(screen.getByRole("button", { name: /Neu starten/ }));
+  });
+
+  it("applies an edited scenario and reports a blocked FIDS popout", async () => {
+    const user = userEvent.setup();
+    render(<ForecastSimulationView />);
+
+    await user.click(screen.getByRole("button", { name: /Szenario konfigurieren/ }));
+    await user.click(screen.getByRole("button", { name: "Editorwert ändern" }));
+    await user.click(screen.getByRole("button", { name: "Editor anwenden" }));
+    expect(screen.queryByRole("region", { name: "Szenarioeditor" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "FIDS-Fehler auslösen" }));
+    expect(await screen.findByText("Popout wurde blockiert")).toBeTruthy();
+  });
+
+  it("contains comparison worker failures and allows a clean retry", async () => {
+    const user = userEvent.setup();
+    render(<ForecastSimulationView />);
+    const firstWorker = mocks.workers[0];
+
+    await user.click(screen.getByRole("button", { name: "Baseline und Kandidat vergleichen" }));
+    firstWorker?.onmessage?.(
+      new MessageEvent("message", {
+        data: { type: "error", message: "Synthetischer Vergleichsfehler" },
+      }),
+    );
+    expect(await screen.findByText("Synthetischer Vergleichsfehler")).toBeTruthy();
+    expect(firstWorker?.terminate).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole("button", { name: "Erneut ausführen" }));
+    const retryWorker = mocks.workers[1];
+    expect(retryWorker?.postMessage).toHaveBeenCalledOnce();
+    retryWorker?.onerror?.(new Event("error"));
+    expect(await screen.findByText("Der lokale A/B-Vergleich ist fehlgeschlagen.")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Erneut ausführen" }));
+    await user.click(screen.getByRole("button", { name: "Vergleich abbrechen" }));
+    expect(mocks.workers[2]?.terminate).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole("button", { name: "Schließen" }));
+    expect(screen.queryByRole("dialog", { name: "A/B-Prognosevergleich" })).toBeNull();
   });
 });
