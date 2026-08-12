@@ -30,6 +30,15 @@ type Manifest = {
   packageManager?: string;
   scripts?: Record<string, string>;
 };
+type PackageLock = {
+  packages?: Record<
+    string,
+    {
+      dependencies?: Record<string, string>;
+      version?: string;
+    }
+  >;
+};
 const dependencyNames = (raw: string) => {
   const manifest = JSON.parse(raw) as Manifest;
   return [
@@ -41,6 +50,7 @@ const dependencyNames = (raw: string) => {
 describe("V1 maintainability and portability boundaries", () => {
   it("pins the supported TypeScript 7 and npm 12 toolchain", () => {
     const rootManifest = JSON.parse(rootManifestRaw) as Manifest;
+    const packageLock = JSON.parse(packageLockRaw) as PackageLock;
     const webManifest = JSON.parse(webManifestRaw) as Manifest;
     const workerManifest = JSON.parse(workerManifestRaw) as Manifest;
 
@@ -59,7 +69,7 @@ describe("V1 maintainability and portability boundaries", () => {
       jsdom: "^30.0.1",
       mermaid: "11.16.1",
       typescript: "7.0.2",
-      wrangler: "^4.120.0",
+      wrangler: "4.112.0",
     });
     expect(webManifest.dependencies).toMatchObject({ "lucide-react": "^1.28.0" });
     expect(webManifest.devDependencies).toMatchObject({
@@ -71,8 +81,20 @@ describe("V1 maintainability and portability boundaries", () => {
     expect(workerManifest.dependencies).toMatchObject({ hono: "^4.12.34" });
     expect(rootManifest.allowScripts).toEqual({
       "esbuild@0.28.1": true,
+      "workerd@1.20260714.1": true,
       "workerd@1.20260801.1": true,
+      sharp: false,
     });
+    expect(packageLock.packages?.["node_modules/wrangler"]).toMatchObject({
+      version: "4.112.0",
+      dependencies: {
+        miniflare: "4.20260714.0",
+        workerd: "1.20260714.1",
+      },
+    });
+    expect(
+      packageLock.packages?.["node_modules/@cloudflare/vitest-pool-workers/node_modules/wrangler"],
+    ).toMatchObject({ version: "4.120.0" });
     const defaultNodeVersion = nodeVersion.trim();
     expect(defaultNodeVersion).toBe("24.18.0");
     expect(rootManifest.scripts?.["check:ci"]).toBe(

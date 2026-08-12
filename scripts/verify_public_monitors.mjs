@@ -6,6 +6,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createBoundedTextRecorder, createHttpFailure } from "./lib/bounded-diagnostics.mjs";
 import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -128,6 +129,7 @@ if (historySeed.status !== 0) {
 
 const pin = String.fromCharCode(48).repeat(4);
 const pinHash = createHash("sha256").update(pin).digest("hex");
+const wranglerOutput = createBoundedTextRecorder();
 const server = spawn(
   process.execPath,
   [
@@ -146,8 +148,10 @@ const server = spawn(
     "--var",
     `ADMIN_PIN_HASH:${pinHash}`,
   ],
-  { cwd: root, stdio: "ignore", windowsHide: true },
+  { cwd: root, stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
 );
+server.stdout.on("data", wranglerOutput.append);
+server.stderr.on("data", wranglerOutput.append);
 const base = `http://127.0.0.1:${port}`;
 const wsBase = `ws://127.0.0.1:${port}`;
 const tokens = {
@@ -163,6 +167,11 @@ const devices = {
 
 const waitForWorker = async () => {
   for (let attempt = 0; attempt < 120; attempt += 1) {
+    if (server.exitCode !== null || server.signalCode !== null) {
+      throw new Error(
+        `Lokaler Worker wurde vor der Bereitschaft beendet.\nWrangler output (bounded tail): ${wranglerOutput.read() || "<empty>"}`,
+      );
+    }
     try {
       if ((await fetch(`${base}/api/health`)).ok) return;
     } catch {}
@@ -197,14 +206,24 @@ const searchTickets = async (query) => {
 };
 const ticketStatus = async (code) => {
   const response = await fetch(`${base}/api/public/tickets/${code}`);
-  if (!response.ok)
-    throw new Error(`Öffentlicher Ticketstatus fehlgeschlagen (${response.status}).`);
+  if (!response.ok) {
+    throw await createHttpFailure(
+      "Öffentlicher Ticketstatus fehlgeschlagen",
+      response,
+      wranglerOutput.read(),
+    );
+  }
   return response.json();
 };
 const groupStatus = async (code) => {
   const response = await fetch(`${base}/api/public/groups/${code}`);
-  if (!response.ok)
-    throw new Error(`Öffentlicher Gruppenstatus fehlgeschlagen (${response.status}).`);
+  if (!response.ok) {
+    throw await createHttpFailure(
+      "Öffentlicher Gruppenstatus fehlgeschlagen",
+      response,
+      wranglerOutput.read(),
+    );
+  }
   return response.json();
 };
 const publicManifest = async (target, code) => {
