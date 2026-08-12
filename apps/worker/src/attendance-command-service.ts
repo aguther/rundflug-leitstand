@@ -5,6 +5,11 @@ import {
   TICKET_GROUP_RECALL_DURATION_MS,
   ticketGroupRecallEligibility,
 } from "@rundflug/domain";
+import {
+  attendanceJson as json,
+  ticketGroupStatusForAttendance,
+  ticketStatusForAttendance,
+} from "./attendance-command-response";
 import { rowToSnapshot } from "./snapshot";
 import type {
   StoredTicketGroupRecall,
@@ -12,25 +17,6 @@ import type {
 } from "./ticket-group-recall-persistence-service";
 import type { Env, StoredEventRow } from "./types";
 import { sendTicketGroupRecallPushNotifications } from "./web-push";
-
-const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
-
-function json(data: unknown, init: ResponseInit = {}): Response {
-  const headers = new Headers(init.headers);
-  headers.set("content-type", JSON_HEADERS["content-type"]);
-  return new Response(JSON.stringify(data), { ...init, headers });
-}
-
-function ticketStatusForAttendance(checkedIn: boolean, rotationStatus: string): string {
-  if (checkedIn) return rotationStatus === "CALLED" ? "BOARDING" : "CHECKED_IN";
-  return rotationStatus === "CALLED" ? "CALLED" : "QUEUED";
-}
-
-function ticketGroupStatusForAttendance(checkedIn: boolean, rotationStatus: string): string {
-  if (checkedIn) return rotationStatus === "DRAFT" ? "CHECKED_IN" : "BOARDING";
-  return rotationStatus === "DRAFT" ? "QUEUED" : "CALLED";
-}
-
 export class AttendanceCommandService {
   constructor(
     private readonly env: Env,

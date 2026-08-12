@@ -1,5 +1,6 @@
 import { type AssistClaim, assistClaimMutationSchema } from "@rundflug/contracts";
 import type { DeviceRole } from "@rundflug/domain";
+import { assistClaimConflictCode } from "./assist-claim-conflict";
 import type { Env } from "./types";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
@@ -9,10 +10,6 @@ function json(data: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set("content-type", JSON_HEADERS["content-type"]);
   return new Response(JSON.stringify(data), { ...init, headers });
-}
-
-function assistClaimConflictCode(action: "ACQUIRE_OR_RENEW" | "TAKEOVER"): string {
-  return action === "TAKEOVER" ? "AIRCRAFT_ASSIST_CLAIM_CHANGED" : "AIRCRAFT_ASSIST_CLAIMED";
 }
 
 export class AssistClaimService {
