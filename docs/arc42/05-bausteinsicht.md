@@ -39,6 +39,30 @@ Die Grenze wird maschinell geprüft: `apps/worker/src/maintainability-coverage.t
 Abhängigkeits-Allowlist und Domain-Reinheit, `npm run refactor:guardrails` zusätzlich Dateibudgets und
 verbotene Importmuster.
 
+### Web-interne Bausteingrenzen
+
+Die rollenbezogenen React-Ansichten werden innerhalb von `apps/web` aus vier fokussierten Grenzen
+komponiert:
+
+```mermaid
+flowchart LR
+    EVENT["ActiveEventProvider<br/>aktive Veranstaltung"]
+    IDENTITY["operation-identity<br/>Event- und Geräteidentität"]
+    BOARD["use-operation-board<br/>REST, Offline-Snapshot, WebSocket"]
+    ROLE["Rollen-Controller<br/>Kasse, Flight Line, Admin, FIDS"]
+    PRESENT["Feature-Komponenten<br/>rein präsentierende Teilansichten"]
+
+    EVENT --> IDENTITY --> BOARD --> ROLE --> PRESENT
+    EVENT --> ROLE
+```
+
+`ActiveEventProvider` ist die Laufzeitquelle für Event-ID und Anzeigename. Event- oder Geräte-IDs
+werden nicht mehr beim Modulimport aus `localStorage` abgeleitet. Rollen-Controller verwenden die
+gemeinsamen Hooks, während Notices, Labels, Feldprimitiven, Ticketdarstellung und operative
+Teilansichten in fokussierten Feature-Modulen liegen. `operation-workspace.tsx` bleibt nur als kleine
+Kompatibilitätsfassade für noch nicht migrierte Importe; neue Feature-Implementierungen importieren
+die fokussierten Module direkt.
+
 ## 5.2 Ebene 2 – Worker
 
 ```mermaid

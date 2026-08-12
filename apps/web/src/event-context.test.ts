@@ -1,5 +1,12 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { rememberActiveEvent, resolveActiveEvent } from "./event-context";
+import {
+  ActiveEventProvider,
+  rememberActiveEvent,
+  resolveActiveEvent,
+  useActiveEvent,
+} from "./event-context";
 
 function memoryStorage(initial: Record<string, string> = {}) {
   const values = new Map(Object.entries(initial));
@@ -10,6 +17,23 @@ function memoryStorage(initial: Record<string, string> = {}) {
 }
 
 describe("active event context", () => {
+  it("provides the validated event at render time", () => {
+    function EventConsumer() {
+      const activeEvent = useActiveEvent();
+      return createElement("span", null, `${activeEvent.eventId}:${activeEvent.eventName}`);
+    }
+
+    expect(
+      renderToStaticMarkup(
+        createElement(
+          ActiveEventProvider,
+          { eventId: "event-2026", eventName: "Rundflug 2026" },
+          createElement(EventConsumer),
+        ),
+      ),
+    ).toContain("event-2026:Rundflug 2026");
+  });
+
   it("prefers an event selected through the URL without persisting it before validation", () => {
     const storage = memoryStorage();
     expect(resolveActiveEvent("?event=rundflug-2026", storage)).toBe("rundflug-2026");

@@ -1,7 +1,7 @@
 import { ExternalLink, FlaskConical } from "lucide-react";
 import { downloadSimulationPlan } from "../../../api";
 import { Button } from "../../../design-system/components";
-import { ADMIN_DEVICE_ID, deviceTokenFor, EVENT_ID } from "../../../operation-workspace";
+import { useAdminOperationIdentity } from "../../operations/operation-identity";
 
 interface AdminSimulationLauncherProps {
   available: boolean;
@@ -16,8 +16,13 @@ export function AdminSimulationLauncher({
   onMessage,
   onRunBusyAction,
 }: AdminSimulationLauncherProps) {
+  const {
+    eventId: EVENT_ID,
+    deviceId: ADMIN_DEVICE_ID,
+    deviceToken: ADMIN_DEVICE_TOKEN,
+  } = useAdminOperationIdentity();
   async function exportSimulationPlan() {
-    await downloadSimulationPlan(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
+    await downloadSimulationPlan(EVENT_ID, ADMIN_DEVICE_ID, ADMIN_DEVICE_TOKEN);
     onMessage("Stammdaten und offener Betriebsplan wurden für die Simulation exportiert.");
   }
 

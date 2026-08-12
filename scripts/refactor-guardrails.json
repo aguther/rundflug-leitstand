@@ -13,8 +13,23 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 663,
+      "maxLines": 664,
       "targetLines": 700
+    },
+    {
+      "path": "apps/web/src/cashier-view.tsx",
+      "maxLines": 1549,
+      "targetLines": 1200
+    },
+    {
+      "path": "apps/web/src/flight-line-view.tsx",
+      "maxLines": 2197,
+      "targetLines": 1600
+    },
+    {
+      "path": "apps/web/src/operation-workspace.tsx",
+      "maxLines": 13,
+      "targetLines": 20
     },
     {
       "path": "apps/web/src/features/admin/admin-shell-model.ts",
@@ -33,7 +48,7 @@
     },
     {
       "path": "apps/web/src/features/admin/completion/AdminCompletionSummaryPanel.tsx",
-      "maxLines": 79,
+      "maxLines": 84,
       "targetLines": 1500
     },
     {
@@ -43,12 +58,12 @@
     },
     {
       "path": "apps/web/src/features/admin/event-workspace/useAdminEventCatalog.ts",
-      "maxLines": 199,
+      "maxLines": 200,
       "targetLines": 1500
     },
     {
       "path": "apps/web/src/features/admin/event-parameters/useAdminEventConfigurationActions.ts",
-      "maxLines": 191,
+      "maxLines": 205,
       "targetLines": 1500
     },
     {
@@ -68,7 +83,7 @@
     },
     {
       "path": "apps/web/src/features/admin/master-data/useAdminMasterDataDeletion.ts",
-      "maxLines": 155,
+      "maxLines": 158,
       "targetLines": 1500
     },
     {
@@ -93,12 +108,12 @@
     },
     {
       "path": "apps/web/src/features/admin/overview/AdminSimulationLauncher.tsx",
-      "maxLines": 62,
+      "maxLines": 67,
       "targetLines": 1500
     },
     {
       "path": "apps/web/src/features/admin/operational-plan/AdminOperationalPlanPanel.tsx",
-      "maxLines": 149,
+      "maxLines": 154,
       "targetLines": 1500
     },
     {
@@ -108,7 +123,7 @@
     },
     {
       "path": "apps/web/src/features/admin/useAdminAuthorization.ts",
-      "maxLines": 152,
+      "maxLines": 157,
       "targetLines": 1500
     },
     {
@@ -118,6 +133,26 @@
     }
   ],
   "extractedModuleBudgets": [
+    {
+      "path": "apps/web/src/event-context.tsx",
+      "maxLines": 60,
+      "targetLines": 80
+    },
+    {
+      "path": "apps/web/src/features/cashier/CashierTicketPresentation.tsx",
+      "maxLines": 143,
+      "targetLines": 180
+    },
+    {
+      "path": "apps/web/src/features/operations/operation-identity.ts",
+      "maxLines": 40,
+      "targetLines": 80
+    },
+    {
+      "path": "apps/web/src/features/operations/use-operation-board.ts",
+      "maxLines": 146,
+      "targetLines": 200
+    },
     {
       "path": "apps/worker/src/event-command-handlers.ts",
       "maxLines": 363,
@@ -785,7 +820,6 @@
     "apps/web/src/admin-v15-ui.test.ts -> apps/web/src/features/admin/products/ProductsWorkspace.tsx",
     "apps/web/src/admin-v15-ui.test.ts -> apps/web/src/features/admin/resource-groups/ResourceGroupsWorkspace.tsx",
     "apps/web/src/api.test.ts -> apps/web/src/api.ts",
-    "apps/web/src/api.test.ts -> apps/web/src/operation-workspace.tsx",
     "apps/web/src/app/navigation.test.ts -> apps/web/src/app/AppHeader.tsx",
     "apps/web/src/app/navigation.test.ts -> apps/web/src/app/AppShell.tsx",
     "apps/web/src/app/navigation.test.ts -> apps/web/src/ticket-status-view.tsx",
@@ -856,7 +890,6 @@
     "apps/web/src/v18-ui.test.ts -> apps/web/src/group-status-view.tsx",
     "apps/web/src/v19-ui.test.ts -> apps/web/src/FeatureRouter.tsx",
     "apps/web/src/v19-ui.test.ts -> apps/web/src/cashier-view.tsx",
-    "apps/web/src/v19-ui.test.ts -> apps/web/src/operation-workspace.tsx",
     "apps/worker/src/analysis-snapshot.test.ts -> apps/worker/src/analysis-snapshot.ts",
     "apps/worker/src/audit-coverage.test.ts -> apps/worker/src/daily-report.ts",
     "apps/worker/src/fids-board-projection.test.ts -> apps/worker/src/fids-board-projection.ts",

@@ -1,7 +1,37 @@
+import { createContext, type ReactNode, useContext, useMemo } from "react";
+
 const ACTIVE_EVENT_STORAGE_KEY = "active-event-id";
 const ACTIVE_EVENT_LABEL_STORAGE_KEY = "active-event-label";
 
 type EventStorage = Pick<Storage, "getItem" | "setItem">;
+
+export interface ActiveEventContextValue {
+  eventId: string;
+  eventName: string;
+}
+
+const ActiveEventContext = createContext<ActiveEventContextValue | null>(null);
+
+export function ActiveEventProvider({
+  children,
+  eventId,
+  eventName,
+}: ActiveEventContextValue & { children?: ReactNode }) {
+  const value = useMemo(() => ({ eventId, eventName }), [eventId, eventName]);
+  return <ActiveEventContext.Provider value={value}>{children}</ActiveEventContext.Provider>;
+}
+
+export function useActiveEvent(): ActiveEventContextValue {
+  const activeEvent = useContext(ActiveEventContext);
+  if (!activeEvent) {
+    throw new Error("Active event context is unavailable for this route.");
+  }
+  return activeEvent;
+}
+
+export function useOptionalActiveEvent(): ActiveEventContextValue | null {
+  return useContext(ActiveEventContext);
+}
 
 export function rememberActiveEvent(
   storage: EventStorage,

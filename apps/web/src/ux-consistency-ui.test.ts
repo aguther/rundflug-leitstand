@@ -5,7 +5,12 @@ import productSalesDialogSource from "./features/admin/products/ProductSalesDial
 import flightLineSource from "./flight-line-view.tsx?raw";
 import sharedSource from "./operation-workspace.tsx?raw";
 
-const appSource = `${sharedSource}\n${productSalesDialogSource}\n${flightLineSource}\n${cashierSource}`;
+const operationLabelsSource = readFileSync(
+  new URL("./features/operations/operation-labels.ts", import.meta.url),
+  "utf8",
+);
+
+const appSource = `${sharedSource}\n${operationLabelsSource}\n${productSalesDialogSource}\n${flightLineSource}\n${cashierSource}`;
 
 const stylesSource = [
   readFileSync(new URL("./styles.css", import.meta.url), "utf8"),

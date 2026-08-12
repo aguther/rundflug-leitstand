@@ -10,7 +10,12 @@ import masterDataWorkspaceSource from "./features/admin/master-data/MasterDataWo
 import operationsWorkspaceSource from "./features/admin/operations/OperationsWorkspace.tsx?raw";
 import sharedSource from "./operation-workspace.tsx?raw";
 
-const appSource = `${sharedSource}\n${factoryResetDialogSource}\n${eventParametersSource}\n${assignmentDialogSource}\n${completionWorkspaceSource}\n${masterDataWorkspaceSource}\n${operationsWorkspaceSource}`;
+const fieldPrimitivesSource = readFileSync(
+  new URL("./features/operations/operation-field-primitives.tsx", import.meta.url),
+  "utf8",
+);
+
+const appSource = `${sharedSource}\n${fieldPrimitivesSource}\n${factoryResetDialogSource}\n${eventParametersSource}\n${assignmentDialogSource}\n${completionWorkspaceSource}\n${masterDataWorkspaceSource}\n${operationsWorkspaceSource}`;
 
 const stylesSource = [
   readFileSync(new URL("./styles.css", import.meta.url), "utf8"),

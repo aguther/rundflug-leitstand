@@ -2,13 +2,18 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import cashier from "./cashier-view.tsx?raw";
 import router from "./FeatureRouter.tsx?raw";
-import workspace from "./operation-workspace.tsx?raw";
+
+const flightLine = readFileSync(new URL("./flight-line-view.tsx", import.meta.url), "utf8");
 
 const cashierStyles = readFileSync(
   new URL("./features/cashier/cashier-v12.css", import.meta.url),
   "utf8",
 );
 const legacyStyles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+const cashierTicketPresentation = readFileSync(
+  new URL("./features/cashier/CashierTicketPresentation.tsx", import.meta.url),
+  "utf8",
+);
 
 describe("V1.9 approved UI delta", () => {
   it("uses the approved cashier tabs and icon headers", () => {
@@ -39,9 +44,9 @@ describe("V1.9 approved UI delta", () => {
   });
 
   it("shows progress and success semantics for ticket and rotation completion", () => {
-    expect(cashier).toContain("cashierTicketCompletionIndicator");
-    expect(cashier).toContain("<CircleEllipsis");
-    expect(cashier).toContain("<CircleCheck");
+    expect(cashierTicketPresentation).toContain("cashierTicketCompletionIndicator");
+    expect(cashierTicketPresentation).toContain("<CircleEllipsis");
+    expect(cashierTicketPresentation).toContain("<CircleCheck");
     expect(cashierStyles).toMatch(
       /\.cashier-phase-icon\.is-complete,[\s\S]*?color: var\(--ui-success\);/,
     );
@@ -75,6 +80,6 @@ describe("V1.9 approved UI delta", () => {
   it("maps only the approved Flight Director and Flight Line paths", () => {
     expect(router).toContain('path === "/flight-director" || path === "/flight-line"');
     expect(router).not.toContain('path === "/flight-line/assist"');
-    expect(workspace).toContain('window.location.pathname === "/flight-line"');
+    expect(flightLine).toContain('window.location.pathname === "/flight-line"');
   });
 });

@@ -22,7 +22,7 @@ import { BrandMark } from "../design-system/BrandMark";
 import { BusyIndicator, IconButton, ModalDialog } from "../design-system/components";
 import { ThemeToggle } from "../design-system/ThemeToggle";
 import { useTheme } from "../design-system/theme";
-import { activeEventLabel } from "../event-context";
+import { activeEventLabel, useOptionalActiveEvent } from "../event-context";
 import { switchActiveEvent } from "../event-navigation";
 import { useAuth } from "../features/auth/AuthContext";
 import type { ConnectionStatus } from "../shared/hooks/use-connectivity";
@@ -71,6 +71,7 @@ export function AppHeader({
   connectionStatus = "connected",
 }: AppHeaderProps) {
   const { session, logout } = useAuth();
+  const activeEvent = useOptionalActiveEvent();
   const { preference, setPreference } = useTheme();
   const [infoOpen, setInfoOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
@@ -81,7 +82,7 @@ export function AppHeader({
   const revisionCopyResetRef = useRef<number | null>(null);
   const pathname = window.location.pathname;
   const fidsView = pathname === "/fids" || pathname.startsWith("/fids/");
-  const eventLabel = activeEventLabel(window.localStorage);
+  const eventLabel = activeEvent?.eventName ?? activeEventLabel(window.localStorage);
   const currentDestination = appDestinations.find((destination) =>
     isDestinationActive(pathname, destination.href),
   );

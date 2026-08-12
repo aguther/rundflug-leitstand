@@ -14,9 +14,12 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock("../../api", () => api);
-vi.mock("../../operation-workspace", () => ({
-  ADMIN_DEVICE_ID: "admin-device",
-  deviceTokenFor: () => "synthetic-token",
+vi.mock("../operations/operation-identity", () => ({
+  useAdminOperationIdentity: () => ({
+    eventId: "event-synthetic",
+    deviceId: "admin-device",
+    deviceToken: "synthetic-token",
+  }),
 }));
 
 const archive = {

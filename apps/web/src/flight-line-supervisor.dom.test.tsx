@@ -20,11 +20,6 @@ vi.mock("./api", async (importOriginal) => {
   };
 });
 
-vi.mock("./operation-workspace", () => ({
-  deviceTokenFor: () => "synthetic-device-token",
-  FLIGHT_LINE_DEVICE_ID: "synthetic-flight-line-device",
-}));
-
 const board = {
   event: {
     eventId: "synthetic-event",
@@ -63,6 +58,8 @@ function renderConsole() {
     <FlightLineSupervisorConsole
       aircraft={[]}
       board={board}
+      deviceId="synthetic-flight-line-device"
+      deviceToken="synthetic-device-token"
       canManageOperations={false}
       dispatchLease={dispatchLease}
       loadForecastHistory={vi.fn().mockResolvedValue([])}

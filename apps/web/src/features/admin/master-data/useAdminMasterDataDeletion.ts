@@ -2,12 +2,10 @@ import type { OperationBoard } from "@rundflug/contracts";
 import { useState } from "react";
 import { sendCommand } from "../../../api";
 import {
-  ADMIN_DEVICE_ID,
-  deviceTokenFor,
-  EVENT_ID,
   MASTER_DATA_DELETE_REASON,
   type MasterDataDeleteTarget,
 } from "../../../operation-workspace";
+import { useAdminOperationIdentity } from "../../operations/operation-identity";
 
 type MasterDataEntityType = MasterDataDeleteTarget["entityType"];
 
@@ -87,6 +85,11 @@ export function useAdminMasterDataDeletion({
   onRefreshBoard,
   onRefreshHistory,
 }: UseAdminMasterDataDeletionOptions) {
+  const {
+    eventId: EVENT_ID,
+    deviceId: ADMIN_DEVICE_ID,
+    deviceToken: ADMIN_DEVICE_TOKEN,
+  } = useAdminOperationIdentity();
   const [pendingDeletion, setPendingDeletion] = useState<MasterDataDeleteTarget | null>(null);
 
   function requestDeletion(entityType: MasterDataEntityType, entityId: string, label: string) {
@@ -131,7 +134,7 @@ export function useAdminMasterDataDeletion({
             adminPin,
           },
         },
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
       );
       onMessage(`${pendingDeletion.label} wurde gelöscht und die Löschung protokolliert.`);
       setPendingDeletion(null);

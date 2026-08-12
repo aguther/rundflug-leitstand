@@ -159,7 +159,30 @@ vi.mock("./operation-workspace", () => ({
     IN_FLIGHT: "Im Flug",
     LANDED: "Gelandet",
   },
+  useOperationIdentity: () => ({
+    eventId: "synthetic-event",
+    deviceId: "synthetic-flight-director-device",
+    deviceToken: "synthetic-device-token",
+  }),
   useOperationBoard: () => workspace.state,
+}));
+vi.mock("./features/operations/operation-identity", () => ({
+  useOperationIdentity: () => ({
+    eventId: "synthetic-event",
+    deviceId: "synthetic-flight-director-device",
+    deviceToken: "synthetic-device-token",
+  }),
+}));
+vi.mock("./features/operations/use-operation-board", () => ({
+  useOperationBoard: () => workspace.state,
+}));
+vi.mock("./features/operations/operation-notices", () => ({
+  ConnectionNotice: ({ error }: { error: string | null }) =>
+    error ? <p>Möglicherweise veraltet · {error}</p> : null,
+  EmergencyNotice: ({ active }: { active: boolean }) =>
+    active ? <p>Notfallmodus aktiv · keine Verkäufe oder neuen Aufrufe</p> : null,
+  InterruptionNotice: () => null,
+  OperationalNotice: () => null,
 }));
 
 function operationBoard(overrides: { emergencyMode?: boolean } = {}): OperationBoard {

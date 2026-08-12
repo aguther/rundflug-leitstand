@@ -21,9 +21,13 @@ vi.mock("../../../api", async (importOriginal) => ({
 }));
 vi.mock("../../../operation-workspace", () => ({
   ADMIN_CONFIGURATION_AUDIT_REASON: "Synthetic configuration change",
-  ADMIN_DEVICE_ID: "synthetic-admin-device",
-  EVENT_ID: "synthetic-event",
-  deviceTokenFor: () => "synthetic-device-token",
+}));
+vi.mock("../../operations/operation-identity", () => ({
+  useAdminOperationIdentity: () => ({
+    eventId: "synthetic-event",
+    deviceId: "synthetic-admin-device",
+    deviceToken: "synthetic-device-token",
+  }),
 }));
 
 const board = { event: { version: 41 } } as OperationBoard;

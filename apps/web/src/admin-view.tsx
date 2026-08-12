@@ -49,19 +49,20 @@ import { useAdminFactoryReset } from "./features/admin/useAdminFactoryReset";
 import { useAdminShellState } from "./features/admin/useAdminShellState";
 import { useAuth } from "./features/auth/AuthContext";
 import {
-  ADMIN_DEVICE_ID,
   ConnectionNotice,
   EmergencyNotice,
-  EVENT_ID,
   InterruptionNotice,
   OperationalNotice,
   useOperationBoard,
+  useOperationIdentity,
 } from "./operation-workspace";
 
 export function AdminView() {
   const { session, logout } = useAuth();
+  const adminIdentity = useOperationIdentity("ADMIN", "technical-scaffold");
+  const { eventId: EVENT_ID } = adminIdentity;
   const { board, error, lastConfirmedAt, backendConfirmed, refresh, refreshing } =
-    useOperationBoard(ADMIN_DEVICE_ID);
+    useOperationBoard(adminIdentity);
   const initialAdminParams = useRef(new URLSearchParams(window.location.search)).current;
   const [accountCreateOpen, setAccountCreateOpen] = useState(false);
   const [masterDataCategory, setMasterDataCategory] = useState<MasterDataCategory>(() => {

@@ -1,13 +1,8 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import type { MasterDataCategory } from "../../../admin-ux";
 import { sendCommand } from "../../../api";
-import {
-  ADMIN_DEVICE_ID,
-  deviceTokenFor,
-  EVENT_ID,
-  MASTER_DATA_AUDIT_REASON,
-  OPERATIONAL_AUDIT_REASON,
-} from "../../../operation-workspace";
+import { MASTER_DATA_AUDIT_REASON, OPERATIONAL_AUDIT_REASON } from "../../../operation-workspace";
+import { useAdminOperationIdentity } from "../../operations/operation-identity";
 import type { useAircraftEditorState } from "../aircraft/useAircraftEditorState";
 import type { useGateEditorState } from "../gates/useGateEditorState";
 import type { usePilotEditorState } from "../pilots/usePilotEditorState";
@@ -69,6 +64,11 @@ export function useAdminMasterDataActions({
   selectResourceGroup,
   setSubmitAttempted,
 }: UseAdminMasterDataActionsOptions) {
+  const {
+    eventId: EVENT_ID,
+    deviceId: ADMIN_DEVICE_ID,
+    deviceToken: ADMIN_DEVICE_TOKEN,
+  } = useAdminOperationIdentity();
   const { aircraft: aircraftEditor, gate: gateEditor, pilot: pilotEditor } = editors;
   const { product: productEditor, resourceGroup: resourceEditor } = editors;
   const productPriceCents = productEditor.priceCents;
@@ -96,7 +96,7 @@ export function useAdminMasterDataActions({
             adminPin: getAdminPin(),
           },
         },
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
       );
       onMessage("Gate-Stammdaten wurden protokolliert gespeichert.");
       clearPinWhenLocked();
@@ -138,7 +138,7 @@ export function useAdminMasterDataActions({
             adminPin: getAdminPin(),
           },
         },
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
       );
       onManifestCorrected();
       onMessage("Dokumentierte Besetzung wurde als Admin-Korrektur vollständig auditiert.");
@@ -212,7 +212,7 @@ export function useAdminMasterDataActions({
             adminPin: getAdminPin(),
           },
         },
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
       );
       onMessage("Produktstammdaten wurden protokolliert gespeichert.");
       clearPinWhenLocked();
@@ -275,7 +275,7 @@ export function useAdminMasterDataActions({
                 adminPin: getAdminPin(),
               },
             },
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
       );
       onMessage(
         inheritAll
@@ -340,7 +340,7 @@ export function useAdminMasterDataActions({
             adminPin: getAdminPin(),
           },
         },
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
       );
       onMessage(
         "Ressourcengruppe wurde protokolliert gespeichert; Zuordnungen bleiben unverändert.",
@@ -389,7 +389,7 @@ export function useAdminMasterDataActions({
             adminPin: getAdminPin(),
           },
         },
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
       );
       onMessage("Flugzeugstammdaten wurden protokolliert gespeichert.");
       clearPinWhenLocked();
@@ -423,7 +423,7 @@ export function useAdminMasterDataActions({
             adminPin: getAdminPin(),
           },
         },
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
       );
       onMessage(
         "Flugzeugzuordnung wurde historisiert geändert; Queue und Prognose werden neu berechnet.",
@@ -481,7 +481,7 @@ export function useAdminMasterDataActions({
               type,
               payload: { reason: emergencyReason.trim(), adminPin: getAdminPin() },
             },
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
       );
       onMessage(
         type === "TRIGGER_EMERGENCY" ? "Notfallmodus ausgelöst." : "Notfallmodus aufgehoben.",
@@ -523,7 +523,7 @@ export function useAdminMasterDataActions({
             adminPin: getAdminPin(),
           },
         },
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
       );
       onMessage("Verkaufssteuerung wurde protokolliert aktualisiert.");
       onSalesComplete();
@@ -559,7 +559,7 @@ export function useAdminMasterDataActions({
             adminPin: getAdminPin(),
           },
         },
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
       );
       onMessage("Anonymer operativer Pilotencode wurde aktualisiert.");
       clearPinWhenLocked();

@@ -2,7 +2,7 @@ import type { EventCatalogEntry, OperationBoard } from "@rundflug/contracts";
 import { useCallback, useEffect, useState } from "react";
 import { cloneEvent, deleteEvent, downloadMasterDataTemplate, getEventCatalog } from "../../../api";
 import { forgetActiveEvent, rememberActiveEvent } from "../../../event-context";
-import { ADMIN_DEVICE_ID, deviceTokenFor, EVENT_ID } from "../../../operation-workspace";
+import { useAdminOperationIdentity } from "../../operations/operation-identity";
 import type { EventDialogView, EventSortKey, EventSortState } from "./EventCatalogDialog";
 
 interface UseAdminEventCatalogOptions {
@@ -25,6 +25,11 @@ export function useAdminEventCatalog({
   onViewChange,
   view,
 }: UseAdminEventCatalogOptions) {
+  const {
+    eventId: EVENT_ID,
+    deviceId: ADMIN_DEVICE_ID,
+    deviceToken: ADMIN_DEVICE_TOKEN,
+  } = useAdminOperationIdentity();
   const [events, setEvents] = useState<EventCatalogEntry[]>([]);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<EventSortState>({ key: "eventDate", direction: null });
@@ -39,30 +44,26 @@ export function useAdminEventCatalog({
   const refreshEvents = useCallback(async () => {
     if (!administrator) return;
     try {
-      const catalog = await getEventCatalog(
-        EVENT_ID,
-        ADMIN_DEVICE_ID,
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
+      const catalog = await getEventCatalog(EVENT_ID, ADMIN_DEVICE_ID, ADMIN_DEVICE_TOKEN);
       setEvents(catalog.events);
     } catch (cause) {
       onMessage(cause instanceof Error ? cause.message : "Veranstaltungen nicht verfügbar.");
     }
-  }, [administrator, onMessage]);
+  }, [administrator, onMessage, EVENT_ID, ADMIN_DEVICE_TOKEN, ADMIN_DEVICE_ID]);
 
   useEffect(() => {
     void refreshEvents();
   }, [refreshEvents]);
 
   async function exportTemplate() {
-    await downloadMasterDataTemplate(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
+    await downloadMasterDataTemplate(EVENT_ID, ADMIN_DEVICE_ID, ADMIN_DEVICE_TOKEN);
     onMessage("Stammdatenvorlage wurde als versionierte JSON-Datei exportiert.");
   }
 
   async function createEvent() {
     setCreationError(null);
     try {
-      const result = await cloneEvent(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID), {
+      const result = await cloneEvent(EVENT_ID, ADMIN_DEVICE_ID, ADMIN_DEVICE_TOKEN, {
         commandId: crypto.randomUUID(),
         expectedSourceVersion: board?.event.version ?? 0,
         eventId,
@@ -97,7 +98,7 @@ export function useAdminEventCatalog({
         entry.eventId,
         entry.version,
         ADMIN_DEVICE_ID,
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
         reason,
       );
       if (entry.eventId === EVENT_ID) {

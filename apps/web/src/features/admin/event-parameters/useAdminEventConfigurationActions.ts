@@ -1,12 +1,8 @@
 import type { EventLogoTheme, OperationBoard } from "@rundflug/contracts";
 import { useCallback } from "react";
 import { ApiCommandError, removeEventLogo, sendCommand, uploadEventLogo } from "../../../api";
-import {
-  ADMIN_CONFIGURATION_AUDIT_REASON,
-  ADMIN_DEVICE_ID,
-  deviceTokenFor,
-  EVENT_ID,
-} from "../../../operation-workspace";
+import { ADMIN_CONFIGURATION_AUDIT_REASON } from "../../../operation-workspace";
+import { useAdminOperationIdentity } from "../../operations/operation-identity";
 import type { EventParameterSaveLifecycle } from "./EventParametersWorkspace";
 import type { ValidEventParameterPayload } from "./useEventParametersForm";
 
@@ -33,6 +29,11 @@ export function useAdminEventConfigurationActions({
   requestAdminAction,
   runBusyAction,
 }: UseAdminEventConfigurationActionsOptions) {
+  const {
+    eventId: EVENT_ID,
+    deviceId: ADMIN_DEVICE_ID,
+    deviceToken: ADMIN_DEVICE_TOKEN,
+  } = useAdminOperationIdentity();
   const setEventLifecycle = useCallback(
     async (status: "PREPARATION" | "ACTIVE" | "CLOSED" | "ARCHIVED") => {
       if (!board || getAdminPin().length < 4) return;
@@ -51,7 +52,7 @@ export function useAdminEventConfigurationActions({
               adminPin: getAdminPin(),
             },
           },
-          deviceTokenFor(ADMIN_DEVICE_ID),
+          ADMIN_DEVICE_TOKEN,
         );
         onMessage(`Veranstaltungsstatus auf ${status} gesetzt und protokolliert.`);
         clearPinWhenLocked();
@@ -61,7 +62,17 @@ export function useAdminEventConfigurationActions({
         onMessage(cause instanceof Error ? cause.message : "Statusänderung fehlgeschlagen.");
       }
     },
-    [board, clearPinWhenLocked, getAdminPin, onMessage, refreshBoard, refreshEvents],
+    [
+      board,
+      clearPinWhenLocked,
+      getAdminPin,
+      onMessage,
+      refreshBoard,
+      refreshEvents,
+      ADMIN_DEVICE_TOKEN,
+      EVENT_ID,
+      ADMIN_DEVICE_ID,
+    ],
   );
 
   const requestSaveEventParameters = useCallback(
@@ -84,7 +95,7 @@ export function useAdminEventConfigurationActions({
                   adminPin: getAdminPin(),
                 },
               },
-              deviceTokenFor(ADMIN_DEVICE_ID),
+              ADMIN_DEVICE_TOKEN,
             );
             lifecycle.onSaved();
             onMessage("Veranstaltungsparameter wurden protokolliert aktualisiert.");
@@ -116,6 +127,9 @@ export function useAdminEventConfigurationActions({
       refreshHistory,
       requestAdminAction,
       runBusyAction,
+      ADMIN_DEVICE_TOKEN,
+      ADMIN_DEVICE_ID,
+      EVENT_ID,
     ],
   );
 
@@ -126,7 +140,7 @@ export function useAdminEventConfigurationActions({
         await uploadEventLogo(
           EVENT_ID,
           ADMIN_DEVICE_ID,
-          deviceTokenFor(ADMIN_DEVICE_ID),
+          ADMIN_DEVICE_TOKEN,
           board.event.version,
           theme,
           file,
@@ -139,7 +153,7 @@ export function useAdminEventConfigurationActions({
         onMessage(cause instanceof Error ? cause.message : "Logo konnte nicht gespeichert werden.");
       }
     },
-    [board, onMessage, refreshBoard],
+    [board, onMessage, refreshBoard, EVENT_ID, ADMIN_DEVICE_TOKEN, ADMIN_DEVICE_ID],
   );
 
   const requestSaveEventLogo = useCallback(
@@ -158,7 +172,7 @@ export function useAdminEventConfigurationActions({
         await removeEventLogo(
           EVENT_ID,
           ADMIN_DEVICE_ID,
-          deviceTokenFor(ADMIN_DEVICE_ID),
+          ADMIN_DEVICE_TOKEN,
           board.event.version,
           theme,
         );
@@ -170,7 +184,7 @@ export function useAdminEventConfigurationActions({
         onMessage(cause instanceof Error ? cause.message : "Logo konnte nicht entfernt werden.");
       }
     },
-    [board, onMessage, refreshBoard],
+    [board, onMessage, refreshBoard, ADMIN_DEVICE_TOKEN, EVENT_ID, ADMIN_DEVICE_ID],
   );
 
   const requestClearEventLogo = useCallback(

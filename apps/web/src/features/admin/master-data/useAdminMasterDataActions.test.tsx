@@ -10,11 +10,15 @@ const mocks = vi.hoisted(() => ({ sendCommand: vi.fn() }));
 
 vi.mock("../../../api", () => ({ sendCommand: mocks.sendCommand }));
 vi.mock("../../../operation-workspace", () => ({
-  ADMIN_DEVICE_ID: "synthetic-admin-device",
-  EVENT_ID: "synthetic-event",
   MASTER_DATA_AUDIT_REASON: "Synthetic master-data change",
   OPERATIONAL_AUDIT_REASON: "Synthetic operational change",
-  deviceTokenFor: () => "synthetic-device-token",
+}));
+vi.mock("../../operations/operation-identity", () => ({
+  useAdminOperationIdentity: () => ({
+    eventId: "synthetic-event",
+    deviceId: "synthetic-admin-device",
+    deviceToken: "synthetic-device-token",
+  }),
 }));
 
 const baseBoard = {

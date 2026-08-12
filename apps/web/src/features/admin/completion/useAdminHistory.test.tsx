@@ -11,10 +11,12 @@ const apiMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../api", () => apiMocks);
-vi.mock("../../../operation-workspace", () => ({
-  ADMIN_DEVICE_ID: "synthetic-admin-device",
-  EVENT_ID: "synthetic-event",
-  deviceTokenFor: () => "synthetic-token",
+vi.mock("../../operations/operation-identity", () => ({
+  useAdminOperationIdentity: () => ({
+    eventId: "synthetic-event",
+    deviceId: "synthetic-admin-device",
+    deviceToken: "synthetic-token",
+  }),
 }));
 
 beforeEach(() => {

@@ -11,6 +11,13 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../api", () => mocks);
+vi.mock("../../operations/operation-identity", () => ({
+  useAdminOperationIdentity: () => ({
+    eventId: "synthetic-event",
+    deviceId: "synthetic-admin-device",
+    deviceToken: "synthetic-device-token",
+  }),
+}));
 
 const template = {
   format: "rundflug-master-data-template",

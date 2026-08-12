@@ -12,7 +12,6 @@ import {
   Check,
   CircleArrowRight,
   CircleCheck,
-  CircleEllipsis,
   Clock3,
   Coins,
   Flag,
@@ -36,12 +35,10 @@ import {
   Trash2,
   UserRound,
   Users,
-  X,
 } from "lucide-react";
 import QRCode from "qrcode";
 import {
   type DragEvent,
-  type ReactNode,
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
@@ -52,7 +49,6 @@ import {
 import { getTicketGroupPrintData, searchTickets, sendCommand } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
-import { cashierTicketCompletionIndicator } from "./cashier-guidance";
 import {
   Button,
   CheckboxField,
@@ -67,6 +63,12 @@ import {
 import { useAuth } from "./features/auth/AuthContext";
 import { type LoginAccount, loadLoginAccounts } from "./features/auth/api";
 import {
+  CashierCompletionIcon,
+  QrScanDialog,
+  TableIconHeader,
+  TicketPaper,
+} from "./features/cashier/CashierTicketPresentation";
+import {
   cashierProductOrderChanged,
   moveCashierProduct,
 } from "./features/cashier/cashier-product-order";
@@ -76,6 +78,15 @@ import {
   ticketGroupIdBatches,
 } from "./features/cashier/cashier-ticket-status-sync";
 import { useTemporaryRowHighlights } from "./features/cashier/use-temporary-row-highlights";
+import { useOperationIdentity } from "./features/operations/operation-identity";
+import {
+  ConnectionNotice,
+  EmergencyNotice,
+  InterruptionNotice,
+  OperationalNotice,
+} from "./features/operations/operation-notices";
+import type { TicketReceipt } from "./features/operations/operation-types";
+import { useOperationBoard } from "./features/operations/use-operation-board";
 import {
   appendCashierDraftRevision,
   cashierDraftQueueKey,
@@ -85,158 +96,19 @@ import {
   shouldPersistCashierDraft,
   writeCashierDraftQueue,
 } from "./offline-drafts";
-import {
-  CASHIER_DEVICE_ID,
-  ConnectionNotice,
-  deviceTokenFor,
-  EmergencyNotice,
-  EVENT_ID,
-  InterruptionNotice,
-  OperationalNotice,
-  type TicketReceipt,
-  useOperationBoard,
-} from "./operation-workspace";
 import { oversizeSplitPreview } from "./operational-exceptions";
 import { useConnectivity } from "./shared/hooks/use-connectivity";
 import { formatAbsoluteTimeWindow } from "./time-window";
 
 type TicketListTab = TicketSearchRequest["status"];
 
-function TableIconHeader({ children, label }: { children: ReactNode; label: string }) {
-  return (
-    <span className="cashier-icon-heading" title={label}>
-      {children}
-      <span className="visually-hidden">{label}</span>
-    </span>
-  );
-}
-
-function CashierCompletionIcon({ result }: { result: TicketSearchResult }) {
-  const indicator = cashierTicketCompletionIndicator(result.groupStatus, result.rotationStatuses);
-  if (indicator === "NONE") return null;
-  const completed = indicator === "COMPLETED";
-  const label = completed ? "Alle Fluggruppen abgeschlossen" : "Boarding oder Flugbetrieb begonnen";
-  return (
-    <span
-      aria-label={label}
-      className={`cashier-completion-icon${completed ? " is-complete" : ""}`}
-      role="img"
-      title={label}
-    >
-      {completed ? (
-        <CircleCheck aria-hidden="true" size={17} />
-      ) : (
-        <CircleEllipsis aria-hidden="true" size={17} />
-      )}
-    </span>
-  );
-}
-
-function TicketPaper({ compact = false, ticket }: { compact?: boolean; ticket: TicketReceipt }) {
-  return (
-    <article className={compact ? "ticket-paper ticket-paper-preview" : "ticket-paper"}>
-      <strong>{ticket.eventName}</strong>
-      <b>{ticket.code}</b>
-      <img src={ticket.qrDataUrl} alt={`QR-Code der Gruppe ${ticket.communicationLabel}`} />
-      <dl>
-        <div>
-          <dt>Gruppe:</dt>
-          <dd>{ticket.communicationLabel}</dd>
-        </div>
-        <div>
-          <dt>Personen:</dt>
-          <dd>{ticket.groupSize}</dd>
-        </div>
-        <div>
-          <dt>Produkt:</dt>
-          <dd>{ticket.productName}</dd>
-        </div>
-        <div>
-          <dt>Eingang:</dt>
-          <dd>{ticket.gateLabel}</dd>
-        </div>
-      </dl>
-      <small>Gruppenstatus über QR-Code öffnen</small>
-    </article>
-  );
-}
-
-function QrScanDialog({
-  onClose,
-  open,
-  ticket,
-}: {
-  onClose: () => void;
-  open: boolean;
-  ticket: TicketReceipt | undefined;
-}) {
-  const dialogRef = useRef<HTMLDialogElement | null>(null);
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    let focusFrame: number | null = null;
-    if (open && !dialog.open) {
-      dialog.showModal();
-      focusFrame = window.requestAnimationFrame(() => closeButtonRef.current?.focus());
-    }
-    if (!open && dialog.open) dialog.close();
-    return () => {
-      if (focusFrame !== null) window.cancelAnimationFrame(focusFrame);
-    };
-  }, [open]);
-
-  return (
-    <dialog
-      aria-labelledby="qr-scan-dialog-title"
-      aria-describedby="qr-scan-dialog-description"
-      className="qr-scan-dialog"
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-      onClick={(event) => {
-        if (event.target === dialogRef.current) onClose();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") onClose();
-      }}
-      onClose={onClose}
-      ref={dialogRef}
-    >
-      {ticket ? (
-        <div className="qr-scan-dialog-content">
-          <header>
-            <div>
-              <span id="qr-scan-dialog-title">Gruppenstatus scannen</span>
-              <strong>{ticket.code}</strong>
-            </div>
-            <button
-              aria-label="Gruppen-QR-Code schließen"
-              onClick={onClose}
-              ref={closeButtonRef}
-              type="button"
-            >
-              <X aria-hidden="true" size={22} />
-            </button>
-          </header>
-          <img
-            src={ticket.qrDataUrl}
-            alt={`QR-Code der Gruppe ${ticket.communicationLabel} in Großansicht`}
-          />
-          <p id="qr-scan-dialog-description">
-            {ticket.communicationLabel} · {ticket.groupSize} Personen · {ticket.productName}
-          </p>
-        </div>
-      ) : null}
-    </dialog>
-  );
-}
-
 export function CashierView() {
   const { session } = useAuth();
+  const cashierIdentity = useOperationIdentity("CASHIER", "cashier-tablet-1");
+  const { eventId: EVENT_ID, deviceId: CASHIER_DEVICE_ID, deviceToken } = cashierIdentity;
+  const deviceTokenFor = useCallback((_deviceId: string) => deviceToken, [deviceToken]);
   const { board, error, lastConfirmedAt, backendConfirmed, confirmEvent, refresh } =
-    useOperationBoard(CASHIER_DEVICE_ID);
+    useOperationBoard(cashierIdentity);
   const online = useConnectivity();
   const serverConfirmed = online && backendConfirmed && error === null;
   const draftQueueKey = cashierDraftQueueKey(EVENT_ID, CASHIER_DEVICE_ID);
@@ -460,6 +332,9 @@ export function CashierView() {
       serverConfirmed,
       ticketListTab,
       ticketSearchQuery,
+      EVENT_ID,
+      deviceTokenFor,
+      CASHIER_DEVICE_ID,
     ],
   );
 
@@ -498,7 +373,14 @@ export function CashierView() {
         return nextResults;
       });
     },
-    [effectiveCashierAccountFilter, serverConfirmed, session?.account.id],
+    [
+      effectiveCashierAccountFilter,
+      serverConfirmed,
+      session?.account.id,
+      EVENT_ID,
+      deviceTokenFor,
+      CASHIER_DEVICE_ID,
+    ],
   );
 
   const revalidateLoadedTicketGroups = useCallback(async () => {
@@ -555,7 +437,7 @@ export function CashierView() {
         ticketStatusRefreshRef.current = { controller: null, id: refreshId };
       }
     }
-  }, [effectiveCashierAccountFilter, serverConfirmed]);
+  }, [effectiveCashierAccountFilter, serverConfirmed, deviceTokenFor, EVENT_ID, CASHIER_DEVICE_ID]);
 
   async function reopenTicketGroup(
     ticketGroupId: string,
@@ -603,7 +485,7 @@ export function CashierView() {
   }
   useEffect(() => {
     localStorage.removeItem(legacyCashierDraftQueueKey(EVENT_ID, CASHIER_DEVICE_ID));
-  }, []);
+  }, [EVENT_ID, CASHIER_DEVICE_ID]);
   useEffect(() => () => cancelTicketStatusRefresh(), [cancelTicketStatusRefresh]);
   useEffect(() => {
     void loadLoginAccounts()

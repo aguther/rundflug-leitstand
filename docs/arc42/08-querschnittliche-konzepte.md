@@ -193,6 +193,12 @@ Reset, `DISPLAY` besitzt ausschließlich Lesezugriff auf die Boardprojektion.
   eindeutig erkennbar bleiben.
 - Rollenansichten werden lazy geladen; ein Asset-Budget wird durch `npm run web:assets:verify`
   überwacht.
+- Die aktive Veranstaltung wird nach Auswahl und Sitzungsprüfung über `ActiveEventProvider`
+  bereitgestellt. REST-, Offline- und WebSocket-Hooks sowie Geräteidentitäten lesen diese Laufzeitquelle;
+  ein Wechsel der Veranstaltung kann deshalb keine beim Modulimport eingefrorene Event-ID weiterverwenden.
+- Kasse, Flight Line und Administration trennen Controller-Hooks von präsentierenden
+  Feature-Komponenten. Ein Größen-Ratchet verhindert erneutes Wachstum der bisherigen Sammelmodule;
+  `operation-workspace.tsx` ist nur noch eine Kompatibilitätsfassade.
 
 ## 8.10 Zeit, Sprache und Texte
 

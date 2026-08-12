@@ -6,7 +6,7 @@ import {
 } from "@rundflug/contracts";
 import { useState } from "react";
 import { importMasterDataTemplate, validateMasterDataTemplate } from "../../../api";
-import { ADMIN_DEVICE_ID, deviceTokenFor, EVENT_ID } from "../../../operation-workspace";
+import { useAdminOperationIdentity } from "../../operations/operation-identity";
 
 interface UseMasterDataTemplateImportOptions {
   board: OperationBoard | null;
@@ -23,6 +23,11 @@ export function useMasterDataTemplateImport({
   onRefreshEvents,
   onRefreshHistory,
 }: UseMasterDataTemplateImportOptions) {
+  const {
+    eventId: EVENT_ID,
+    deviceId: ADMIN_DEVICE_ID,
+    deviceToken: ADMIN_DEVICE_TOKEN,
+  } = useAdminOperationIdentity();
   const [open, setOpen] = useState(false);
   const [fileName, setFileName] = useState("");
   const [draft, setDraft] = useState<MasterDataTemplate | null>(null);
@@ -60,7 +65,7 @@ export function useMasterDataTemplateImport({
         await validateMasterDataTemplate(
           EVENT_ID,
           ADMIN_DEVICE_ID,
-          deviceTokenFor(ADMIN_DEVICE_ID),
+          ADMIN_DEVICE_TOKEN,
           parsedTemplate.data,
         ),
       );
@@ -78,16 +83,11 @@ export function useMasterDataTemplateImport({
     setBusy(true);
     setError(null);
     try {
-      const result = await importMasterDataTemplate(
-        EVENT_ID,
-        ADMIN_DEVICE_ID,
-        deviceTokenFor(ADMIN_DEVICE_ID),
-        {
-          commandId: crypto.randomUUID(),
-          expectedVersion: board.event.version,
-          template: draft,
-        },
-      );
+      const result = await importMasterDataTemplate(EVENT_ID, ADMIN_DEVICE_ID, ADMIN_DEVICE_TOKEN, {
+        commandId: crypto.randomUUID(),
+        expectedVersion: board.event.version,
+        template: draft,
+      });
       setOpen(false);
       onMessage(
         `Stammdatenvorlage importiert: ${result.counts.gates} Gates, ${result.counts.resourceGroups} Ressourcengruppen, ${result.counts.aircraft} Flugzeuge, ${result.counts.pilots} Pilotencodes und ${result.counts.products} Produkte.`,

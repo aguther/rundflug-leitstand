@@ -5,7 +5,7 @@ import {
   downloadPerformanceProfile,
   downloadTicketRawData,
 } from "../../../api";
-import { ADMIN_DEVICE_ID, deviceTokenFor, EVENT_ID } from "../../../operation-workspace";
+import { useAdminOperationIdentity } from "../../operations/operation-identity";
 import { CompletionSummaryPanel } from "./CompletionSummaryPanel";
 
 interface AdminCompletionSummaryPanelProps {
@@ -21,13 +21,18 @@ export function AdminCompletionSummaryPanel({
   onMessage,
   onRunBusyAction,
 }: AdminCompletionSummaryPanelProps) {
+  const {
+    eventId: EVENT_ID,
+    deviceId: ADMIN_DEVICE_ID,
+    deviceToken: ADMIN_DEVICE_TOKEN,
+  } = useAdminOperationIdentity();
   async function exportFile(
     download: (eventId: string, deviceId: string, deviceToken: string) => Promise<void>,
     successMessage: string,
     fallbackError: string,
   ) {
     try {
-      await download(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
+      await download(EVENT_ID, ADMIN_DEVICE_ID, ADMIN_DEVICE_TOKEN);
       onMessage(successMessage);
     } catch (cause) {
       onMessage(cause instanceof Error ? cause.message : fallbackError);

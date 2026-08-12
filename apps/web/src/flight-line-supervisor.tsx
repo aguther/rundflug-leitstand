@@ -215,6 +215,8 @@ export function compareTicketRows(left: TicketRow, right: TicketRow, sort: Ticke
 
 export function FlightLineSupervisorConsole({
   board,
+  deviceId,
+  deviceToken,
   aircraft,
   selectedAircraft,
   selectedQueueGroupIds,
@@ -240,6 +242,8 @@ export function FlightLineSupervisorConsole({
   loadResourceHistory,
 }: {
   board: OperationBoard;
+  deviceId: string;
+  deviceToken: string;
   aircraft: Aircraft[];
   selectedAircraft: Aircraft | undefined;
   selectedQueueGroupIds: string[];
@@ -393,11 +397,10 @@ export function FlightLineSupervisorConsole({
       occurredAt: new Date().toISOString(),
     });
     try {
-      const { deviceTokenFor, FLIGHT_LINE_DEVICE_ID } = await import("./operation-workspace");
       await downloadAnalysisSnapshot(
         board.event.eventId,
-        FLIGHT_LINE_DEVICE_ID,
-        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+        deviceId,
+        deviceToken,
         board.event.version,
         buildAnalysisClientContext({
           route: window.location.pathname,

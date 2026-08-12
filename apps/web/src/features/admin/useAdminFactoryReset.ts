@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { factoryReset } from "../../api";
 import { clearOfflineOperationBoards } from "../../offline-store";
-import { ADMIN_DEVICE_ID, deviceTokenFor, EVENT_ID } from "../../operation-workspace";
+import { useAdminOperationIdentity } from "../operations/operation-identity";
 
 interface UseAdminFactoryResetOptions {
   onMessage: (message: string | null) => void;
@@ -34,6 +34,11 @@ export function useAdminFactoryReset({
   onMessage,
   onResetComplete = clearFactoryResetClientState,
 }: UseAdminFactoryResetOptions) {
+  const {
+    eventId: EVENT_ID,
+    deviceId: ADMIN_DEVICE_ID,
+    deviceToken: ADMIN_DEVICE_TOKEN,
+  } = useAdminOperationIdentity();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,20 +73,15 @@ export function useAdminFactoryReset({
     setBusy(true);
     setError(null);
     try {
-      const result = await factoryReset(
-        EVENT_ID,
-        ADMIN_DEVICE_ID,
-        deviceTokenFor(ADMIN_DEVICE_ID),
-        {
-          commandId,
-          eventId: EVENT_ID,
-          reason: reason.trim(),
-          adminPin: pin,
-          confirmation: "WERKSZUSTAND",
-          retainRecoveryBackup,
-          deleteAllBackups,
-        },
-      );
+      const result = await factoryReset(EVENT_ID, ADMIN_DEVICE_ID, ADMIN_DEVICE_TOKEN, {
+        commandId,
+        eventId: EVENT_ID,
+        reason: reason.trim(),
+        adminPin: pin,
+        confirmation: "WERKSZUSTAND",
+        retainRecoveryBackup,
+        deleteAllBackups,
+      });
       if (result.resetComplete) await onResetComplete();
     } catch (cause) {
       setError(

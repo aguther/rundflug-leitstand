@@ -2,6 +2,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import appSource from "../../cashier-view.tsx?raw";
 
+const ticketPresentationSource = readFileSync(
+  new URL("./CashierTicketPresentation.tsx", import.meta.url),
+  "utf8",
+);
+const cashierSource = `${appSource}\n${ticketPresentationSource}`;
+
 const stylesSource = readFileSync(new URL("./cashier-v12.css", import.meta.url), "utf8");
 const tabletLandscapeStart = stylesSource.search(
   /@media\s*\(min-width:\s*1101px\)[^{}]*\(max-height:\s*900px\)/,
@@ -186,8 +192,8 @@ describe("V1.7.0 cashier", () => {
   });
 
   it("renders one shared ticket component without fixed POS-58 paper length", () => {
-    expect(appSource).toContain("function TicketPaper");
-    expect(appSource).toContain("function QrScanDialog");
+    expect(cashierSource).toContain("function TicketPaper");
+    expect(cashierSource).toContain("function QrScanDialog");
     expect(appSource).toContain('className="ticket-print-document"');
     expect(appSource).toContain("images.length !== 1");
     expect(stylesSource).toMatch(/@page \{[\s\S]*?margin: 0;/);

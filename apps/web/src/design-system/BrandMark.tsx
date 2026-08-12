@@ -1,6 +1,6 @@
 import type { EventLogoTheme } from "@rundflug/contracts";
 import { useState } from "react";
-import { resolveActiveEvent } from "../event-context";
+import { resolveActiveEvent, useOptionalActiveEvent } from "../event-context";
 import { useTheme } from "./theme";
 
 export function BrandSymbol({
@@ -58,9 +58,12 @@ export function BrandMark({
   revision?: number | string;
 }) {
   const { resolved } = useTheme();
+  const activeEvent = useOptionalActiveEvent();
   const [unavailableLogoUrl, setUnavailableLogoUrl] = useState<string | null>(null);
   const eventId =
-    explicitEventId ?? resolveActiveEvent(window.location.search, window.localStorage);
+    explicitEventId ??
+    activeEvent?.eventId ??
+    resolveActiveEvent(window.location.search, window.localStorage);
   const theme = explicitTheme ?? resolved;
   const revisionQuery = revision === undefined ? "" : `&v=${encodeURIComponent(revision)}`;
   const logoUrl = eventId

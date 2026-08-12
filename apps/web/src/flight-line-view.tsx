@@ -19,25 +19,24 @@ import { useActionMessageBridge } from "./app/PageNotifications";
 import { Button, ModalDialog } from "./design-system/components";
 import { useDispatchRecommendationLease } from "./dispatch-recommendation-lease";
 import { FlightDirectorOperationsDialog } from "./features/flight-line/FlightDirectorOperationsDialog";
+import { useOperationIdentity } from "./features/operations/operation-identity";
+import {
+  aircraftStateLabel,
+  operationalTimeLabel,
+  predictionQualityLabel,
+  rotationStatusLabel,
+} from "./features/operations/operation-labels";
+import {
+  ConnectionNotice,
+  EmergencyNotice,
+  InterruptionNotice,
+  OperationalNotice,
+} from "./features/operations/operation-notices";
+import { useOperationBoard } from "./features/operations/use-operation-board";
 import { FlightLineAssist } from "./flight-line-assist";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
 import { TicketGroupRecallButton } from "./flight-line-shared";
 import { FlightLineSupervisorConsole } from "./flight-line-supervisor";
-import {
-  aircraftStateLabel,
-  ConnectionNotice,
-  deviceTokenFor,
-  EmergencyNotice,
-  EVENT_ID,
-  FLIGHT_LINE_ASSIST_MODE,
-  FLIGHT_LINE_DEVICE_ID,
-  InterruptionNotice,
-  OperationalNotice,
-  operationalTimeLabel,
-  predictionQualityLabel,
-  rotationStatusLabel,
-  useOperationBoard,
-} from "./operation-workspace";
 import {
   checkedInCount,
   eligibleMoveTargets,
@@ -79,8 +78,12 @@ function queuedSegmentPresentCount(group: QueueGroup): number {
 }
 
 export function FlightLineView() {
+  const flightLineIdentity = useOperationIdentity("FLIGHT_DIRECTOR", "recovery-flight-lead");
+  const { eventId: EVENT_ID, deviceId: FLIGHT_LINE_DEVICE_ID, deviceToken } = flightLineIdentity;
+  const deviceTokenFor = useCallback((_deviceId: string) => deviceToken, [deviceToken]);
+  const FLIGHT_LINE_ASSIST_MODE = window.location.pathname === "/flight-line";
   const { board, error, lastConfirmedAt, backendConfirmed, confirmEvent, refresh, refreshAndGet } =
-    useOperationBoard(FLIGHT_LINE_DEVICE_ID);
+    useOperationBoard(flightLineIdentity);
   const [selectedAircraftId, setSelectedAircraftId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -227,7 +230,7 @@ export function FlightLineView() {
     if (!selectedAircraftId && operationalAircraft[0]) {
       setSelectedAircraftId(operationalAircraft[0].id);
     }
-  }, [claimedAssistAircraftId, operationalAircraft, selectedAircraftId]);
+  }, [claimedAssistAircraftId, operationalAircraft, selectedAircraftId, FLIGHT_LINE_ASSIST_MODE]);
   useEffect(() => {
     if (selected?.status !== "DRAFT") return;
     setNextAircraftId(selectedAircraft?.id ?? selected.suggestedAircraftId ?? "");
@@ -1212,31 +1215,34 @@ export function FlightLineView() {
     }
   }
 
-  const loadAllForecastHistory = useCallback(async (rotationId: string) => {
-    const entries: ForecastHistory["entries"] = [];
-    let offset = 0;
-    let total = Number.POSITIVE_INFINITY;
-    while (offset < total) {
-      const page = await getForecastHistory(
-        EVENT_ID,
-        FLIGHT_LINE_DEVICE_ID,
-        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
-        { rotationId, limit: 200, offset },
-      );
-      entries.push(...page.entries);
-      total = page.total;
-      offset += page.entries.length;
-      if (page.entries.length === 0) break;
-      if (offset > 100_000 && offset < total) {
-        throw new Error("Der Prognoseverlauf überschreitet die abrufbare Tagesmenge.");
+  const loadAllForecastHistory = useCallback(
+    async (rotationId: string) => {
+      const entries: ForecastHistory["entries"] = [];
+      let offset = 0;
+      let total = Number.POSITIVE_INFINITY;
+      while (offset < total) {
+        const page = await getForecastHistory(
+          EVENT_ID,
+          FLIGHT_LINE_DEVICE_ID,
+          deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+          { rotationId, limit: 200, offset },
+        );
+        entries.push(...page.entries);
+        total = page.total;
+        offset += page.entries.length;
+        if (page.entries.length === 0) break;
+        if (offset > 100_000 && offset < total) {
+          throw new Error("Der Prognoseverlauf überschreitet die abrufbare Tagesmenge.");
+        }
       }
-    }
-    return entries.sort(
-      (left, right) =>
-        Date.parse(left.capturedAt) - Date.parse(right.capturedAt) ||
-        left.snapshotId.localeCompare(right.snapshotId),
-    );
-  }, []);
+      return entries.sort(
+        (left, right) =>
+          Date.parse(left.capturedAt) - Date.parse(right.capturedAt) ||
+          left.snapshotId.localeCompare(right.snapshotId),
+      );
+    },
+    [EVENT_ID, FLIGHT_LINE_DEVICE_ID, deviceTokenFor],
+  );
 
   const loadResourceHistory = useCallback(
     (scopeType: "AIRCRAFT" | "PILOT", scopeId: string) =>
@@ -1246,7 +1252,7 @@ export function FlightLineView() {
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
         { scopeType, scopeId },
       ),
-    [],
+    [deviceTokenFor, FLIGHT_LINE_DEVICE_ID, EVENT_ID],
   );
 
   return (
@@ -1339,6 +1345,8 @@ export function FlightLineView() {
         <FlightLineSupervisorConsole
           aircraft={operationalAircraft}
           board={board}
+          deviceId={FLIGHT_LINE_DEVICE_ID}
+          deviceToken={deviceToken}
           busyRotationIds={busyRotationIds}
           canManageOperations={canManageAircraft}
           dispatchLease={dispatchLease}

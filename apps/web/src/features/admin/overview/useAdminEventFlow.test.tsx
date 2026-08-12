@@ -8,6 +8,13 @@ import { useAdminEventFlow } from "./useAdminEventFlow";
 const mocks = vi.hoisted(() => ({ getAdminEventFlow: vi.fn() }));
 
 vi.mock("../../../api", () => mocks);
+vi.mock("../../operations/operation-identity", () => ({
+  useAdminOperationIdentity: () => ({
+    eventId: "synthetic-event",
+    deviceId: "synthetic-admin-device",
+    deviceToken: "synthetic-device-token",
+  }),
+}));
 
 const flow = { tickets: [], totals: {} } as unknown as AdminEventFlow;
 

@@ -8,6 +8,13 @@ import { AdminOperationalPlanPanel } from "./AdminOperationalPlanPanel";
 const mocks = vi.hoisted(() => ({ sendCommand: vi.fn() }));
 
 vi.mock("../../../api", () => ({ sendCommand: mocks.sendCommand }));
+vi.mock("../../operations/operation-identity", () => ({
+  useAdminOperationIdentity: () => ({
+    eventId: "synthetic-event",
+    deviceId: "synthetic-admin-device",
+    deviceToken: "synthetic-device-token",
+  }),
+}));
 vi.mock("./OperationalPlanWorkspace", () => ({
   OperationalPlanWorkspace: ({
     panelProps,

@@ -7,6 +7,13 @@ import { AdminSimulationLauncher } from "./AdminSimulationLauncher";
 const downloadSimulationPlan = vi.hoisted(() => vi.fn());
 
 vi.mock("../../../api", () => ({ downloadSimulationPlan }));
+vi.mock("../../operations/operation-identity", () => ({
+  useAdminOperationIdentity: () => ({
+    eventId: "synthetic-event",
+    deviceId: "synthetic-admin-device",
+    deviceToken: "synthetic-device-token",
+  }),
+}));
 
 afterEach(() => {
   cleanup();

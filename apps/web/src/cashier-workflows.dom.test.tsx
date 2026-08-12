@@ -74,7 +74,30 @@ vi.mock("./operation-workspace", () => ({
   InterruptionNotice: () => null,
   OperationalNotice: () => null,
   deviceTokenFor: () => "synthetic-device-token",
+  useOperationIdentity: () => ({
+    eventId: "synthetic-event",
+    deviceId: "synthetic-cashier-device",
+    deviceToken: "synthetic-device-token",
+  }),
   useOperationBoard: () => workspace.state,
+}));
+vi.mock("./features/operations/operation-identity", () => ({
+  useOperationIdentity: () => ({
+    eventId: "synthetic-event",
+    deviceId: "synthetic-cashier-device",
+    deviceToken: "synthetic-device-token",
+  }),
+}));
+vi.mock("./features/operations/use-operation-board", () => ({
+  useOperationBoard: () => workspace.state,
+}));
+vi.mock("./features/operations/operation-notices", () => ({
+  ConnectionNotice: ({ error }: { error: string | null }) =>
+    error ? <p>Möglicherweise veraltet · {error}</p> : null,
+  EmergencyNotice: ({ active }: { active: boolean }) =>
+    active ? <p>Notfallmodus aktiv · keine Verkäufe oder neuen Aufrufe</p> : null,
+  InterruptionNotice: () => null,
+  OperationalNotice: () => null,
 }));
 
 const activeTicket: TicketSearchResult = {

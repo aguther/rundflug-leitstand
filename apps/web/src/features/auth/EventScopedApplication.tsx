@@ -1,7 +1,7 @@
 import type { EventCatalogEntry, OperatorSession } from "@rundflug/contracts";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { homeForRole, mayOpenEventRoute } from "../../app/navigation";
-import { rememberActiveEvent, resolveActiveEvent } from "../../event-context";
+import { ActiveEventProvider, rememberActiveEvent, resolveActiveEvent } from "../../event-context";
 import { eventSelectionLocation } from "../../event-navigation";
 import { loadSelectableEvents } from "./api";
 import { EventSelectionPage } from "./EventSelectionPage";
@@ -84,8 +84,10 @@ export function EventScopedApplication({ session }: { session: OperatorSession }
     return <Loading>Arbeitsbereich wird geöffnet …</Loading>;
   }
   return (
-    <Suspense fallback={<Loading />}>
-      <FeatureRouter />
-    </Suspense>
+    <ActiveEventProvider eventId={selectedEvent.eventId} eventName={selectedEvent.name}>
+      <Suspense fallback={<Loading />}>
+        <FeatureRouter />
+      </Suspense>
+    </ActiveEventProvider>
   );
 }

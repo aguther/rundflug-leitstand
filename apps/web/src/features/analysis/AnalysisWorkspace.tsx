@@ -10,7 +10,7 @@ import {
   listAnalysisArchives,
 } from "../../api";
 import { Button, ConfirmationDialog, StatusPill, Tabs } from "../../design-system/components";
-import { ADMIN_DEVICE_ID, deviceTokenFor } from "../../operation-workspace";
+import { useAdminOperationIdentity } from "../operations/operation-identity";
 import { buildAnalysisClientContext, recordAnalysisUiEvent } from "./analysis-client-diagnostics";
 import "./analysis-workspace.css";
 
@@ -59,6 +59,8 @@ export function AnalysisWorkspace({
   onRefresh: () => void | Promise<void>;
   simulator: ReactNode;
 }) {
+  const { deviceId: ADMIN_DEVICE_ID, deviceToken: ADMIN_DEVICE_TOKEN } =
+    useAdminOperationIdentity();
   const [tab, setTab] = useState<EvaluationTab>("analysis");
   const [exportBusy, setExportBusy] = useState(false);
   const [archives, setArchives] = useState<AnalysisArchive[]>([]);
@@ -80,11 +82,7 @@ export function AnalysisWorkspace({
     setArchivesLoading(true);
     try {
       setArchives(
-        await listAnalysisArchives(
-          board.event.eventId,
-          ADMIN_DEVICE_ID,
-          deviceTokenFor(ADMIN_DEVICE_ID),
-        ),
+        await listAnalysisArchives(board.event.eventId, ADMIN_DEVICE_ID, ADMIN_DEVICE_TOKEN),
       );
       setArchiveError("");
     } catch {
@@ -92,7 +90,7 @@ export function AnalysisWorkspace({
     } finally {
       setArchivesLoading(false);
     }
-  }, [board]);
+  }, [board, ADMIN_DEVICE_TOKEN, ADMIN_DEVICE_ID]);
 
   useEffect(() => {
     void loadArchives();
@@ -115,7 +113,7 @@ export function AnalysisWorkspace({
       const archive = await createAnalysisArchive(
         board.event.eventId,
         ADMIN_DEVICE_ID,
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
         board.event.version,
       );
       setArchives((current) => [archive, ...current.filter((item) => item.id !== archive.id)]);
@@ -136,7 +134,7 @@ export function AnalysisWorkspace({
       await downloadAnalysisArchive(
         board.event.eventId,
         ADMIN_DEVICE_ID,
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
         archive,
       );
       setArchiveError("");
@@ -155,7 +153,7 @@ export function AnalysisWorkspace({
       const updated = await deleteAnalysisArchive(
         board.event.eventId,
         ADMIN_DEVICE_ID,
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
         archive.id,
       );
       setArchives((current) => current.map((item) => (item.id === updated.id ? updated : item)));
@@ -191,7 +189,7 @@ export function AnalysisWorkspace({
       await downloadAnalysisSnapshot(
         board.event.eventId,
         ADMIN_DEVICE_ID,
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
         board.event.version,
         clientContext,
       );

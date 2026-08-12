@@ -13,6 +13,13 @@ vi.mock("../../api", () => ({ factoryReset: mocks.factoryReset }));
 vi.mock("../../offline-store", () => ({
   clearOfflineOperationBoards: mocks.clearOfflineOperationBoards,
 }));
+vi.mock("../operations/operation-identity", () => ({
+  useAdminOperationIdentity: () => ({
+    eventId: "synthetic-event",
+    deviceId: "synthetic-admin-device",
+    deviceToken: "synthetic-device-token",
+  }),
+}));
 
 function renderFactoryReset() {
   const onMessage = vi.fn();

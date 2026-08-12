@@ -14,6 +14,13 @@ vi.mock("../../../api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../api")>()),
   sendCommand,
 }));
+vi.mock("../../operations/operation-identity", () => ({
+  useAdminOperationIdentity: () => ({
+    eventId: "synthetic-event",
+    deviceId: "synthetic-admin-device",
+    deviceToken: "synthetic-device-token",
+  }),
+}));
 
 const board = {
   event: { status: "PREPARATION", version: 17 },

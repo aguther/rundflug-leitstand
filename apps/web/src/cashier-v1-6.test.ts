@@ -3,6 +3,12 @@ import { describe, expect, it } from "vitest";
 import apiSource from "./api.ts?raw";
 import cashierSource from "./cashier-view.tsx?raw";
 
+const ticketPresentationSource = readFileSync(
+  new URL("./features/cashier/CashierTicketPresentation.tsx", import.meta.url),
+  "utf8",
+);
+const cashierFeatureSource = `${cashierSource}\n${ticketPresentationSource}`;
+
 const styles = readFileSync(new URL("./features/cashier/cashier-v12.css", import.meta.url), "utf8");
 
 describe("cashier release 1.7.0 acceptance coverage", () => {
@@ -89,8 +95,8 @@ describe("cashier release 1.7.0 acceptance coverage", () => {
   });
 
   it("shows a complete compact preview and a dedicated QR scan dialog", () => {
-    expect(cashierSource).toContain("function QrScanDialog");
-    expect(cashierSource).toContain("dialog.showModal()");
+    expect(cashierFeatureSource).toContain("function QrScanDialog");
+    expect(cashierFeatureSource).toContain("dialog.showModal()");
     expect(cashierSource).toContain("QR-Code vergrößern");
     expect(cashierSource).toContain("width: 768");
     expect(styles).toMatch(/\.cashier-ticket-paper \{[\s\S]*?overflow: hidden;/);
@@ -98,8 +104,8 @@ describe("cashier release 1.7.0 acceptance coverage", () => {
     expect(styles).toContain(".qr-scan-dialog::backdrop");
     expect(styles).toMatch(/\.ticket-paper-preview \{[\s\S]*?width: min\(260px,/);
     expect(styles).toMatch(/\.cashier-ticket-enlarge \{[\s\S]*?width: 40px;/);
-    expect(cashierSource).toContain("<strong>{ticket.eventName}</strong>");
-    expect(cashierSource).not.toContain("<strong>Rundflug-Leitstand</strong>");
+    expect(cashierFeatureSource).toContain("<strong>{ticket.eventName}</strong>");
+    expect(cashierFeatureSource).not.toContain("<strong>Rundflug-Leitstand</strong>");
   });
 
   it("keeps large sale totals in a stable two-line label", () => {

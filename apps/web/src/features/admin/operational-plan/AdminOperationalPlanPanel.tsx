@@ -1,12 +1,12 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import { sendCommand } from "../../../api";
-import { ADMIN_DEVICE_ID, deviceTokenFor, EVENT_ID } from "../../../operation-workspace";
 import type {
   PlannedOperation,
   RecurringOperationalRule,
   UpsertPlannedOperationPayload,
   UpsertRecurringOperationalRulePayload,
 } from "../../operations/OperationalPlanPanel";
+import { useAdminOperationIdentity } from "../../operations/operation-identity";
 import { OperationalPlanWorkspace } from "./OperationalPlanWorkspace";
 
 interface AdminOperationalPlanPanelProps {
@@ -28,6 +28,11 @@ export function AdminOperationalPlanPanel({
   onRunBusyAction,
   readOnly,
 }: AdminOperationalPlanPanelProps) {
+  const {
+    eventId: EVENT_ID,
+    deviceId: ADMIN_DEVICE_ID,
+    deviceToken: ADMIN_DEVICE_TOKEN,
+  } = useAdminOperationIdentity();
   async function persistCommand(
     command:
       | { type: "UPSERT_PLANNED_OPERATION"; payload: UpsertPlannedOperationPayload }
@@ -57,7 +62,7 @@ export function AdminOperationalPlanPanel({
           issuedAt: new Date().toISOString(),
           ...command,
         },
-        deviceTokenFor(ADMIN_DEVICE_ID),
+        ADMIN_DEVICE_TOKEN,
       );
       onMessage(successMessage);
       await onRefresh();

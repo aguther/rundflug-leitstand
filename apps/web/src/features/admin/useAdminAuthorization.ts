@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { verifyAdminPin } from "../../api";
-import { ADMIN_DEVICE_ID, deviceTokenFor, EVENT_ID } from "../../operation-workspace";
+import { useAdminOperationIdentity } from "../operations/operation-identity";
 
 type PendingAdminAction = () => Promise<void>;
 
@@ -15,6 +15,11 @@ export function useAdminAuthorization({
   administrator,
   onMessage,
 }: UseAdminAuthorizationOptions) {
+  const {
+    eventId: EVENT_ID,
+    deviceId: ADMIN_DEVICE_ID,
+    deviceToken: ADMIN_DEVICE_TOKEN,
+  } = useAdminOperationIdentity();
   const initialPin = accountIsAdministrator ? "000000" : "";
   const [pin, setPinState] = useState(initialPin);
   const pinRef = useRef(initialPin);
@@ -93,7 +98,7 @@ export function useAdminAuthorization({
     setBusy(true);
     setError(null);
     try {
-      await verifyAdminPin(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID), pin);
+      await verifyAdminPin(EVENT_ID, ADMIN_DEVICE_ID, ADMIN_DEVICE_TOKEN, pin);
       if (dialogMode === "unlock") {
         setModeUnlocked(true);
         setDialogMode(null);
@@ -113,7 +118,7 @@ export function useAdminAuthorization({
     } finally {
       setBusy(false);
     }
-  }, [busy, dialogMode, onMessage, pin, setPin]);
+  }, [busy, dialogMode, onMessage, pin, setPin, EVENT_ID, ADMIN_DEVICE_TOKEN, ADMIN_DEVICE_ID]);
 
   useEffect(() => {
     if (!dialogMode) return;

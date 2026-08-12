@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AdminArea, AdminEventStep } from "../../../admin-ux";
 import { getAuditHistory, getForecastHistory, getOperationalHistory } from "../../../api";
 import { eventLocalDateTimeToIso } from "../../../event-time";
-import { ADMIN_DEVICE_ID, deviceTokenFor, EVENT_ID } from "../../../operation-workspace";
+import { useAdminOperationIdentity } from "../../operations/operation-identity";
 import type {
   AdminHistoryFilterKey,
   AdminHistoryFilters,
@@ -41,6 +41,11 @@ export function useAdminHistory({
   onError,
   timeZone = "Europe/Berlin",
 }: UseAdminHistoryOptions) {
+  const {
+    eventId: EVENT_ID,
+    deviceId: ADMIN_DEVICE_ID,
+    deviceToken: ADMIN_DEVICE_TOKEN,
+  } = useAdminOperationIdentity();
   const [auditHistory, setAuditHistory] = useState<AuditHistory>({ entries: [] });
   const [view, setView] = useState<AdminHistoryView>("OPERATIONS");
   const [operationalHistory, setOperationalHistory] = useState<OperationalHistory>({
@@ -66,7 +71,7 @@ export function useAdminHistory({
   const refreshAuditHistory = useCallback(async () => {
     try {
       setAuditHistory(
-        await getAuditHistory(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID), {
+        await getAuditHistory(EVENT_ID, ADMIN_DEVICE_ID, ADMIN_DEVICE_TOKEN, {
           eventType: filters.eventType,
           aggregateType: filters.aggregateType,
           aggregateId: filters.aggregateId,
@@ -85,6 +90,9 @@ export function useAdminHistory({
     filters.until,
     onError,
     timeZone,
+    ADMIN_DEVICE_TOKEN,
+    ADMIN_DEVICE_ID,
+    EVENT_ID,
   ]);
 
   const refreshDetailedHistory = useCallback(
@@ -101,36 +109,26 @@ export function useAdminHistory({
         };
         if (view === "FORECASTS") {
           setForecastHistory(
-            await getForecastHistory(
-              EVENT_ID,
-              ADMIN_DEVICE_ID,
-              deviceTokenFor(ADMIN_DEVICE_ID),
-              shared,
-            ),
+            await getForecastHistory(EVENT_ID, ADMIN_DEVICE_ID, ADMIN_DEVICE_TOKEN, shared),
           );
         } else if (view === "OPERATIONS") {
           setOperationalHistory(
-            await getOperationalHistory(
-              EVENT_ID,
-              ADMIN_DEVICE_ID,
-              deviceTokenFor(ADMIN_DEVICE_ID),
-              {
-                ...shared,
-                ...(filters.ticketStatus
-                  ? {
-                      ticketStatus:
-                        filters.ticketStatus as OperationalHistory["entries"][number]["ticketStatus"],
-                    }
-                  : {}),
-                ...(filters.productId ? { productId: filters.productId } : {}),
-                ...(filters.resourceGroupId ? { resourceGroupId: filters.resourceGroupId } : {}),
-                ...(filters.communicationNumber
-                  ? { communicationNumber: Number(filters.communicationNumber) }
-                  : {}),
-                ...(filters.ticketId ? { ticketId: filters.ticketId.trim() } : {}),
-                ...(filters.ticketGroupId ? { ticketGroupId: filters.ticketGroupId.trim() } : {}),
-              },
-            ),
+            await getOperationalHistory(EVENT_ID, ADMIN_DEVICE_ID, ADMIN_DEVICE_TOKEN, {
+              ...shared,
+              ...(filters.ticketStatus
+                ? {
+                    ticketStatus:
+                      filters.ticketStatus as OperationalHistory["entries"][number]["ticketStatus"],
+                  }
+                : {}),
+              ...(filters.productId ? { productId: filters.productId } : {}),
+              ...(filters.resourceGroupId ? { resourceGroupId: filters.resourceGroupId } : {}),
+              ...(filters.communicationNumber
+                ? { communicationNumber: Number(filters.communicationNumber) }
+                : {}),
+              ...(filters.ticketId ? { ticketId: filters.ticketId.trim() } : {}),
+              ...(filters.ticketGroupId ? { ticketGroupId: filters.ticketGroupId.trim() } : {}),
+            }),
           );
         }
         setOffset(requestedOffset);
@@ -138,7 +136,7 @@ export function useAdminHistory({
         onError(cause instanceof Error ? cause.message : "Verlauf nicht verfügbar.");
       }
     },
-    [filters, onError, timeZone, view],
+    [filters, onError, timeZone, view, ADMIN_DEVICE_TOKEN, EVENT_ID, ADMIN_DEVICE_ID],
   );
 
   useEffect(() => {
