@@ -614,4 +614,86 @@ describe("EventCoordinator delegated work", () => {
     expect(realtime.handleClose).toHaveBeenCalledOnce();
     expect(realtime.handleError).toHaveBeenCalledWith(socket);
   });
+
+  it("coalesces automatic forecast requests and keeps the latest trigger", async () => {
+    vi.stubGlobal("scheduler", { wait: vi.fn().mockResolvedValue(undefined) });
+    const { coordinator } = coordinatorHarness();
+    const recalculateForecastTimelines = vi.fn().mockResolvedValue(undefined);
+    Object.assign(coordinator, {
+      forecastTimelineService: { recalculateForecastTimelines },
+    });
+    const schedule = Reflect.get(coordinator, "scheduleForecastRecalculation").bind(
+      coordinator,
+    ) as (eventId: string, triggerEventType: string) => Promise<void>;
+
+    const first = schedule("event-1", "FIRST_TRIGGER");
+    const second = schedule("event-1", "LATEST_TRIGGER");
+    await Promise.all([first, second]);
+
+    expect(recalculateForecastTimelines).toHaveBeenCalledOnce();
+    expect(recalculateForecastTimelines).toHaveBeenCalledWith({
+      eventId: "event-1",
+      triggerEventType: "LATEST_TRIGGER",
+    });
+    expect(Reflect.get(coordinator, "forecastWork")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("contains automatic forecast failures and accepts subsequent work", async () => {
+    vi.stubGlobal("scheduler", { wait: vi.fn().mockResolvedValue(undefined) });
+    const { coordinator } = coordinatorHarness();
+    const recalculateForecastTimelines = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("synthetic forecast failure"))
+      .mockResolvedValueOnce(undefined);
+    Object.assign(coordinator, {
+      forecastTimelineService: { recalculateForecastTimelines },
+    });
+    const schedule = Reflect.get(coordinator, "scheduleForecastRecalculation").bind(
+      coordinator,
+    ) as (eventId: string, triggerEventType: string) => Promise<void>;
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const failed = schedule("event-1", "FAILED_TRIGGER");
+    await failed;
+    const recovered = schedule("event-1", "RECOVERED_TRIGGER");
+    await recovered;
+
+    expect(recalculateForecastTimelines).toHaveBeenCalledTimes(2);
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining('"code":"FORECAST_RECALCULATION_FAILED"'),
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it("broadcasts persisted changes only after scheduling follow-up work", async () => {
+    const { coordinator, waits } = coordinatorHarness();
+    const ensureForecastAlarm = vi.fn().mockResolvedValue(undefined);
+    const scheduleForecastRecalculation = vi.fn().mockResolvedValue(undefined);
+    const broadcastStateChanged = vi.fn();
+    Object.assign(coordinator, {
+      ensureForecastAlarm,
+      scheduleForecastRecalculation,
+      realtime: { broadcastStateChanged },
+    });
+    const broadcast = Reflect.get(coordinator, "broadcast").bind(coordinator) as (
+      result: ReturnType<typeof storedCommandResult>,
+    ) => void;
+    const broadcastBoardRefresh = Reflect.get(coordinator, "broadcastBoardRefresh").bind(
+      coordinator,
+    ) as (eventVersion: number, eventType: string) => void;
+
+    broadcast(storedCommandResult());
+    broadcastBoardRefresh(5, "BOARD_REFRESHED");
+
+    expect(ensureForecastAlarm).toHaveBeenCalledWith("event-1");
+    expect(scheduleForecastRecalculation).toHaveBeenCalledWith(
+      "event-1",
+      "RESOURCE_GROUP_NOTICE_SET",
+    );
+    expect(waits).toHaveLength(2);
+    await Promise.all(waits);
+    expect(broadcastStateChanged).toHaveBeenNthCalledWith(1, 4);
+    expect(broadcastStateChanged).toHaveBeenNthCalledWith(2, 5, "BOARD_REFRESHED");
+  });
 });
