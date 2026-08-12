@@ -1,4 +1,5 @@
 import { DomainRuleError } from "./domain-rule-error";
+import type { NonCanceledRotationState } from "./rotation-state";
 
 export interface QueueGroup {
   id: string;
@@ -154,7 +155,7 @@ export function planNextRotations(input: {
 }
 
 export function assertQueueMutationAllowed(input: {
-  rotationState: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+  rotationState: NonCanceledRotationState;
   action: "CANCEL" | "DEFER" | "NO_SHOW";
 }): void {
   if (
@@ -170,8 +171,8 @@ export function assertQueueMutationAllowed(input: {
 }
 
 export function assertManualGroupMoveAllowed(input: {
-  sourceStates: readonly ("DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED")[];
-  targetState: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+  sourceStates: readonly NonCanceledRotationState[];
+  targetState: NonCanceledRotationState;
   sameResourceGroup: boolean;
   sameProduct: boolean;
   groupSize: number;
@@ -213,7 +214,7 @@ export interface CapacityReductionSegment {
 }
 
 export function planRotationCapacityReduction(input: {
-  rotationState: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+  rotationState: NonCanceledRotationState;
   called: boolean;
   baselineCapacity: number;
   currentUsableCapacity: number | null;

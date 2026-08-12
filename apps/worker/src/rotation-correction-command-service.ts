@@ -2,6 +2,7 @@ import type { CommandEnvelope, CommandResult } from "@rundflug/contracts";
 import {
   assertManualGroupMoveAllowed,
   DomainRuleError,
+  type NonCanceledRotationState,
   planRotationCapacityReduction,
 } from "@rundflug/domain";
 import { rowToSnapshot } from "./snapshot";
@@ -45,7 +46,7 @@ export class RotationCorrectionCommandService {
       .bind(command.payload.rotationId, command.eventId)
       .first<{
         id: string;
-        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        status: NonCanceledRotationState;
         version: number;
         called_at: string | null;
         usable_capacity: number | null;
@@ -291,7 +292,7 @@ export class RotationCorrectionCommandService {
       .bind(group.id)
       .all<{
         id: string;
-        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        status: NonCanceledRotationState;
         aircraft_id: string | null;
         rotation_group_count: number;
       }>();
@@ -340,7 +341,7 @@ export class RotationCorrectionCommandService {
       .bind(command.payload.targetRotationId, command.eventId, group.id, group.product_id)
       .first<{
         id: string;
-        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        status: NonCanceledRotationState;
         resource_group_id: string;
         target_capacity: number;
         occupied_seats: number;
@@ -504,7 +505,7 @@ export class RotationCorrectionCommandService {
       .bind(group.id)
       .all<{
         id: string;
-        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        status: NonCanceledRotationState;
         assigned_tickets: number;
       }>();
     const assignedTicketCount = sourceRows.results.reduce(
@@ -552,7 +553,7 @@ export class RotationCorrectionCommandService {
       .bind(command.payload.targetRotationId, command.eventId)
       .first<{
         id: string;
-        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        status: NonCanceledRotationState;
         capacity: number;
         occupied_seats: number;
       }>();

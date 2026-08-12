@@ -1,4 +1,8 @@
-import { buildTicketGroupRecallCopy, formatBookingGroupLabel } from "@rundflug/domain";
+import {
+  buildTicketGroupRecallCopy,
+  formatBookingGroupLabel,
+  type NonCanceledRotationState,
+} from "@rundflug/domain";
 
 export interface ActiveTicketGroupRecallColumns {
   recall_id: string | null;
@@ -34,7 +38,7 @@ export function activeTicketGroupRecallProjection(row: ActiveTicketGroupRecallCo
 }
 
 export function predictedBoardingWindow(input: {
-  status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+  status: NonCanceledRotationState;
   quality: "STABLE" | "CHANGING" | "UNCERTAIN";
   predictedBoardingAt: string | null;
   lowerMinutes: number;

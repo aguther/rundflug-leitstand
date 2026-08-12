@@ -1,6 +1,7 @@
+import type { NonCanceledRotationState } from "@rundflug/domain";
 import type { WeightClass } from "./operation-labels";
 
-export type GateDisplayStatus = "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+export type GateDisplayStatus = NonCanceledRotationState;
 
 export interface TicketDetail {
   clientId: string;

@@ -9,6 +9,8 @@ import {
   assertOutageRecoveryApplication,
   assertOutageRecoveryApproval,
   DomainRuleError,
+  type NonCanceledRotationState,
+  type RotationState,
   simulateOutageRecovery,
   transitionRotation,
 } from "@rundflug/domain";
@@ -163,7 +165,7 @@ export class OutageRecoveryCommandService {
           paper_reference: string;
           ticket_group_id: string;
           rotation_id: string;
-          current_state: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+          current_state: NonCanceledRotationState;
           aircraft_id: string | null;
           pilot_id: string | null;
           resource_group_id: string;
@@ -204,7 +206,7 @@ export class OutageRecoveryCommandService {
       ticketGroupId: string;
       rotationId: string;
       flightGroupId?: string;
-      state: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED" | "CANCELED";
+      state: RotationState;
       resourceGroupId: string;
       ticketCount: number;
       rotationVersion: number;
@@ -957,12 +959,9 @@ export class OutageRecoveryCommandService {
       .bind(command.eventId)
       .all<{
         paper_reference: string;
-        current_state: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        current_state: NonCanceledRotationState;
       }>();
-    const appliedReferenceStates: Record<
-      string,
-      "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED"
-    > = {};
+    const appliedReferenceStates: Record<string, NonCanceledRotationState> = {};
     for (const entry of appliedRecoveryReferences.results) {
       appliedReferenceStates[entry.paper_reference] = entry.current_state;
     }

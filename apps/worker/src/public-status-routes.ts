@@ -3,6 +3,7 @@ import {
   derivePublicForecastProjection,
   derivePublicRotationStatus,
   formatBookingGroupLabel,
+  type NonCanceledRotationState,
 } from "@rundflug/domain";
 import type { Hono } from "hono";
 import type { SessionActor } from "./auth";
@@ -23,7 +24,7 @@ type WorkerApp = Hono<{
   Variables: { sessionActor: SessionActor | null };
 }>;
 
-type RotationStatus = "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+type RotationStatus = NonCanceledRotationState;
 type PredictionQuality = "STABLE" | "CHANGING" | "UNCERTAIN";
 type ResourceGroupStatus = "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
 type DispatchUnplannedReason =

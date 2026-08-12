@@ -1,9 +1,10 @@
+import type { NonCanceledRotationState } from "@rundflug/domain";
 import { describe, expect, it } from "vitest";
 import { recordConfirmedOvertakes } from "./confirmed-overtakes";
 import type { SimulationRotation } from "./model";
 
 type DispatchableRotation = SimulationRotation & {
-  status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+  status: NonCanceledRotationState;
 };
 
 function rotation(id: string, createdAt: string): DispatchableRotation {

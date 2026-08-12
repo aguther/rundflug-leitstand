@@ -1,5 +1,9 @@
 import type { FidsBoardRow, PublicBoard } from "@rundflug/contracts";
-import { derivePublicForecastProjection, formatBookingGroupLabel } from "@rundflug/domain";
+import {
+  derivePublicForecastProjection,
+  formatBookingGroupLabel,
+  type NonCanceledRotationState,
+} from "@rundflug/domain";
 import type {
   SimulationEvent,
   SimulationForecastSnapshot,
@@ -11,7 +15,7 @@ const MINUTE_MS = 60_000;
 export const SIMULATION_DEPARTED_VISIBILITY_MS = 15_000;
 export const SIMULATION_DEPARTED_MINIMUM_VISIBILITY_MS = 1_000;
 
-type RotationLifecycle = "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+type RotationLifecycle = NonCanceledRotationState;
 type PublicGroup = PublicBoard["groups"][number];
 export type SimulationFidsBoard = Omit<PublicBoard, "groups"> & { groups: FidsBoardRow[] };
 

@@ -1,6 +1,6 @@
 import { compareTechnicalStrings as order } from "@rundflug/domain";
 import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-report";
-import { createCsv, createTextPdf } from "./report";
+import { type CsvCellValue, createCsv, createTextPdf } from "./report";
 
 export type GeneratedReportResult<T> = { status: "READY"; body: T } | { status: "EVENT_NOT_FOUND" };
 export async function generateDailyReportCsv(
@@ -201,7 +201,7 @@ export async function generateTicketExportCsv(
         ORDER BY t.created_at, t.id`,
     )
     .bind(eventId)
-    .all<Record<string, string | number | null>>();
+    .all<Record<string, CsvCellValue>>();
   return createCsv([
     [...ticketExportColumns],
     ...rows.results.map((row) => ticketExportColumns.map((column) => row[column] ?? null)),

@@ -3,6 +3,7 @@ import {
   assertTechnicalRotationAbortAllowed,
   DomainRuleError,
   planTechnicalRotationAbortQueueBlock,
+  type RotationState,
 } from "@rundflug/domain";
 import { rowToSnapshot } from "./snapshot";
 import type { Env, StoredEventRow } from "./types";
@@ -46,7 +47,7 @@ export class RotationRecoveryCommandService {
       .bind(command.payload.rotationId, command.eventId)
       .first<{
         id: string;
-        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED" | "CANCELED";
+        status: RotationState;
         version: number;
         aircraft_id: string | null;
         aircraft_version: number | null;

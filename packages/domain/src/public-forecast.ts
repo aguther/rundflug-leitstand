@@ -1,5 +1,6 @@
 import type { DispatchUnplannedReason } from "./dispatch-plan";
 import type { ForecastState, PredictionQuality } from "./forecast";
+import type { NonCanceledRotationState } from "./rotation-state";
 
 export type PublicForecastReason =
   | "RETURN_TIME_UNKNOWN"
@@ -59,7 +60,7 @@ function unplannedForecastReason(input: PublicForecastInput): PublicForecastReas
 }
 
 export function derivePublicForecastProjection(input: {
-  rotationStatus: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+  rotationStatus: NonCanceledRotationState;
   predictionQuality: PredictionQuality;
   predictedBoardingAt: string | null;
   predictedCompletionAt: string | null;

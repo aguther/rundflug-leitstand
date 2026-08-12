@@ -153,7 +153,9 @@ function precallDecisionLabel(rotation: Rotation): string {
   }
 }
 
-function ticketSortValue(row: TicketRow, key: TicketSortKey): string | number | null {
+type TicketSortValue = string | number | null;
+
+function ticketSortValue(row: TicketRow, key: TicketSortKey): TicketSortValue {
   const { group, rotation } = row;
   switch (key) {
     case "ticketGroup":

@@ -4,6 +4,7 @@ import {
   type MasterDataTemplate,
   masterDataTemplateSchema,
 } from "@rundflug/contracts";
+import type { MasterDataExportValue } from "./master-data-export-types";
 
 function parseGateDisplayFilterJson(value: string): GateDisplayFilter {
   try {
@@ -31,7 +32,7 @@ export async function loadAdminMasterDataTemplate(
          FROM operation_days WHERE id = ?1`,
     )
     .bind(eventId)
-    .first<Record<string, string | number | null>>();
+    .first<Record<string, MasterDataExportValue>>();
   if (!event) return null;
 
   const [gates, resourceGroups, products, pilots, assignments, turnaroundOverrides] =
@@ -63,7 +64,7 @@ export async function loadAdminMasterDataTemplate(
              FROM products WHERE operation_day_id = ?1 ORDER BY sort_order, name, id`,
         )
         .bind(eventId)
-        .all<Record<string, string | number | null>>(),
+        .all<Record<string, MasterDataExportValue>>(),
       database
         .prepare(
           `SELECT id, operational_code, operational_note, active
@@ -81,7 +82,7 @@ export async function loadAdminMasterDataTemplate(
             ORDER BY a.registration, a.id`,
         )
         .bind(eventId)
-        .all<Record<string, string | number | null>>(),
+        .all<Record<string, MasterDataExportValue>>(),
       database
         .prepare(
           `SELECT aircraft_id, product_id, planned_boarding_minutes_override,
@@ -90,7 +91,7 @@ export async function loadAdminMasterDataTemplate(
             WHERE operation_day_id = ?1 ORDER BY product_id, aircraft_id`,
         )
         .bind(eventId)
-        .all<Record<string, string | number | null>>(),
+        .all<Record<string, MasterDataExportValue>>(),
     ]);
   const gateKeys = new Map(
     gates.results.map((gate, index) => [String(gate.id), `gate-${index + 1}`]),

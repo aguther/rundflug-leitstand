@@ -5,6 +5,7 @@ import {
   calculateConfirmedOvertakeIncrements,
   DomainRuleError,
   compareTechnicalStrings as order,
+  type RotationState,
   resolveTurnaroundProfile,
   transitionRotation,
 } from "@rundflug/domain";
@@ -106,7 +107,7 @@ export class RotationTransitionCommandService {
       .bind(rotationId, command.eventId)
       .first<{
         id: string;
-        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED" | "CANCELED";
+        status: RotationState;
         version: number;
         aircraft_id: string | null;
         pilot_id: string | null;

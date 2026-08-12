@@ -4,7 +4,12 @@ import type { RotationState } from "./rotation-state";
 
 export type { DeviceRole } from "./authorization-types";
 export { DomainRuleError } from "./domain-rule-error";
-export { type RotationState, rotationStateLabels, transitionRotation } from "./rotation-state";
+export {
+  type NonCanceledRotationState,
+  type RotationState,
+  rotationStateLabels,
+  transitionRotation,
+} from "./rotation-state";
 
 export type AircraftOperationalState =
   | "AVAILABLE"

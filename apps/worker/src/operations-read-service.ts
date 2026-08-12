@@ -1,3 +1,4 @@
+import type { NonCanceledRotationState } from "@rundflug/domain";
 import { withBookingGroupPartProjection } from "./booking-group-part-projection";
 import { d1Read, runD1ReadsInBatch } from "./d1-read-scheduler";
 import {
@@ -300,7 +301,7 @@ export async function loadOperationsReadModels(
         resource_group_short_code: string;
         communication_number: number;
         queue_position: number;
-        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        status: NonCanceledRotationState;
         precalled_at: string | null;
         precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
         precall_decision_reason:

@@ -1,3 +1,4 @@
+import type { NonCanceledRotationState } from "@rundflug/domain";
 import { withBookingGroupPartProjection } from "./booking-group-part-projection";
 
 export type FidsProjectionBand = "ALL" | "ACTIONABLE" | "RECENT_DEPARTURE" | "PREPARE" | "LOWER";
@@ -21,7 +22,7 @@ export interface FidsProjectionRow {
   precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
   queue_position: number;
   dispatch_order: number | null;
-  status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+  status: NonCanceledRotationState;
   predicted_boarding_at: string | null;
   predicted_completion_at: string | null;
   prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;

@@ -11,6 +11,7 @@ import {
 } from "./model";
 
 const MINUTE_MS = 60_000;
+type TimestampValue = string | number | null;
 
 const timeFormatter = new Intl.DateTimeFormat("de-DE", {
   hour: "2-digit",
@@ -19,7 +20,7 @@ const timeFormatter = new Intl.DateTimeFormat("de-DE", {
   timeZone: "Europe/Berlin",
 });
 
-function formatTime(value: string | number | null): string {
+function formatTime(value: TimestampValue): string {
   if (value === null) return "–";
   return timeFormatter.format(new Date(value));
 }

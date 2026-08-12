@@ -2,6 +2,7 @@ import type { CommandEnvelope, CommandResult } from "@rundflug/contracts";
 import {
   assertQueueMutationAllowed,
   DomainRuleError,
+  type NonCanceledRotationState,
   planBookingGroupSplit,
 } from "@rundflug/domain";
 import { rowToSnapshot } from "./snapshot";
@@ -82,7 +83,7 @@ export class TicketGroupMutationCommandService {
       .bind(group.id)
       .all<{
         id: string;
-        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        status: NonCanceledRotationState;
         called_at: string | null;
         aircraft_id: string | null;
         rotation_group_count: number;

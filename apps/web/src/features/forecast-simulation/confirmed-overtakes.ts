@@ -1,9 +1,12 @@
-import { calculateConfirmedOvertakeIncrements } from "@rundflug/domain";
+import {
+  calculateConfirmedOvertakeIncrements,
+  type NonCanceledRotationState,
+} from "@rundflug/domain";
 
 import type { SimulationRotation } from "./model";
 
 interface DispatchableSimulationRotation extends SimulationRotation {
-  status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+  status: NonCanceledRotationState;
 }
 
 export function recordConfirmedOvertakes(input: {

@@ -1,9 +1,11 @@
-export function csvCell(value: string | number | null): string {
+export type CsvCellValue = string | number | null;
+
+export function csvCell(value: CsvCellValue): string {
   const text = value === null ? "" : String(value);
   return /[";\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-export function createCsv(rows: Array<Array<string | number | null>>): string {
+export function createCsv(rows: Array<Array<CsvCellValue>>): string {
   return `\uFEFF${rows.map((row) => row.map(csvCell).join(";")).join("\r\n")}\r\n`;
 }
 

@@ -8,6 +8,7 @@ import type { Env } from "./types";
 
 const EVENT_ID = "550e8400-e29b-41d4-a716-446655440040";
 const NOW = new Date("2026-08-09T16:00:00.000Z");
+type StoredEventValue = string | number | null;
 
 function adminDevice(role: AuthorizedDevice["role"] = "ADMIN"): AuthorizedDevice {
   return {
@@ -20,7 +21,7 @@ function adminDevice(role: AuthorizedDevice["role"] = "ADMIN"): AuthorizedDevice
 
 function createApp(input?: {
   device?: AuthorizedDevice | null;
-  events?: Array<Record<string, string | number | null>>;
+  events?: Array<Record<string, StoredEventValue>>;
   event?: Record<string, string | null> | null;
   tickets?: Array<{ sold_at: string; completed_at: string | null }>;
 }) {

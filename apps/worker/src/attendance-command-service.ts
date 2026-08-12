@@ -2,6 +2,7 @@ import type { CommandEnvelope, CommandResult } from "@rundflug/contracts";
 import {
   assertTicketNoShowAllowed,
   DomainRuleError,
+  type NonCanceledRotationState,
   TICKET_GROUP_RECALL_DURATION_MS,
   ticketGroupRecallEligibility,
 } from "@rundflug/domain";
@@ -49,7 +50,7 @@ export class AttendanceCommandService {
         id: string;
         status: string;
         attendance_status: "NOT_CHECKED_IN" | "CHECKED_IN";
-        rotation_status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        rotation_status: NonCanceledRotationState;
       }>();
     if (!ticket) {
       return json(
@@ -578,7 +579,7 @@ export class AttendanceCommandService {
         attendance_status: "NOT_CHECKED_IN" | "CHECKED_IN";
         group_version: number;
         rotation_id: string;
-        rotation_status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        rotation_status: NonCanceledRotationState;
         called_at: string | null;
         aircraft_id: string | null;
         remaining_group_tickets: number;

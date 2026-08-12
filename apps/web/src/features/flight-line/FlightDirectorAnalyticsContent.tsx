@@ -41,6 +41,7 @@ import {
 
 type Rotation = OperationBoard["rotations"][number];
 type ForecastEntry = ForecastHistory["entries"][number];
+type TimestampValue = string | number | null;
 
 interface FlightDirectorAnalyticsContentProps {
   aircraftId: string;
@@ -67,7 +68,7 @@ const MINIMUM_TIME_LABEL_SPACING_PX = 64;
 const FORECAST_CHART_HORIZONTAL_INSET_PX = 116;
 const RESOURCE_CHART_HORIZONTAL_INSET_PX = 28;
 
-function formatTime(value: string | number | null, timeZone: string): string {
+function formatTime(value: TimestampValue, timeZone: string): string {
   if (value === null) return "–";
   return new Intl.DateTimeFormat("de-DE", {
     timeZone,

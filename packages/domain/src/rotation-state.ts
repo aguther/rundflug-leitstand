@@ -1,6 +1,7 @@
 import { DomainRuleError } from "./domain-rule-error";
 
 export type RotationState = "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED" | "CANCELED";
+export type NonCanceledRotationState = Exclude<RotationState, "CANCELED">;
 
 export const rotationStateLabels: Readonly<Record<RotationState, string>> = {
   DRAFT: "Wartend",
