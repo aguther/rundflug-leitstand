@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { OperationBoard, TicketSearchResult } from "@rundflug/contracts";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ActionNotificationProvider } from "./app/PageNotifications";
@@ -125,6 +125,7 @@ const activeTicket: TicketSearchResult = {
 function operationBoard(
   overrides: {
     emergencyMode?: boolean;
+    includeSecondProduct?: boolean;
     remainingSellableSeats?: number;
     saleEnabled?: boolean;
   } = {},
@@ -154,6 +155,26 @@ function operationBoard(
         resourceGroupStatus: "ACTIVE",
         saleEnabled: overrides.saleEnabled ?? true,
       },
+      ...(overrides.includeSecondProduct
+        ? [
+            {
+              code: "KS",
+              id: "product-b",
+              name: "Kurzstrecke",
+              nextBoardingWindowLowerAt: "2026-08-11T10:10:00.000Z",
+              nextBoardingWindowUpperAt: "2026-08-11T10:30:00.000Z",
+              predictionQuality: "CHANGING" as const,
+              priceCents: 1800,
+              projectedSeats: 3,
+              promisedFlightMinutes: 12,
+              publicDescription: "Kurzer synthetischer Rundflug",
+              referenceCapacity: 3,
+              remainingSellableSeats: 3,
+              resourceGroupStatus: "ACTIVE" as const,
+              saleEnabled: true,
+            },
+          ]
+        : []),
     ],
     rotations: [],
   } as unknown as OperationBoard;
@@ -175,6 +196,12 @@ function renderCashier() {
 
 describe("cashier workflows", () => {
   beforeEach(() => {
+    HTMLDialogElement.prototype.showModal = function showModal() {
+      this.setAttribute("open", "");
+    };
+    HTMLDialogElement.prototype.close = function close() {
+      this.removeAttribute("open");
+    };
     window.history.replaceState({}, "", "/kasse");
     window.localStorage.clear();
     window.matchMedia = vi.fn().mockReturnValue({
@@ -187,6 +214,7 @@ describe("cashier workflows", () => {
     api.searchTickets.mockReset().mockResolvedValue({ nextCursor: null, results: [] });
     api.sendCommand.mockReset();
     auth.loadLoginAccounts.mockReset().mockResolvedValue([]);
+    window.print = vi.fn();
     workspace.state.backendConfirmed = true;
     workspace.state.board = operationBoard();
     workspace.state.confirmEvent.mockReset();
@@ -317,5 +345,124 @@ describe("cashier workflows", () => {
     });
     expect((restoredSale as HTMLButtonElement).disabled).toBe(true);
     expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it("searches, filters, reopens, enlarges and prints a confirmed ticket", async () => {
+    const user = userEvent.setup();
+    auth.loadLoginAccounts.mockResolvedValue([
+      { id: activeTicket.soldByOperatorAccountId, loginCode: "KASSE-01", role: "CASHIER" },
+      { id: "admin-1", loginCode: "ADMIN-01", role: "ADMIN" },
+    ]);
+    api.searchTickets.mockResolvedValue({ nextCursor: null, results: [activeTicket] });
+    api.getTicketGroupPrintData.mockResolvedValue({
+      code: "synthetic-public-code",
+      communicationLabel: "G-PN-0042",
+      eventName: "Synthetischer Flugtag",
+      gateLabel: "Tor A",
+      groupSize: 2,
+      productName: "Panoramaflug",
+    });
+    Object.defineProperties(HTMLImageElement.prototype, {
+      complete: { configurable: true, value: true },
+      decode: { configurable: true, value: vi.fn().mockResolvedValue(undefined) },
+      naturalWidth: { configurable: true, value: 768 },
+    });
+    renderCashier();
+
+    expect(await screen.findByText("BG-0007")).toBeTruthy();
+    await user.click(screen.getByText("BG-0007"));
+    expect(await screen.findAllByText("G-PN-0042")).toHaveLength(2);
+    expect(api.getTicketGroupPrintData).toHaveBeenCalledWith(
+      "synthetic-event",
+      "ticket-group-7",
+      "synthetic-cashier-device",
+      "synthetic-device-token",
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "QR-Code der Gruppe G-PN-0042 vergrößern" }),
+    );
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByRole("button", { name: "Ticket drucken" }));
+    expect(window.print).toHaveBeenCalledOnce();
+    expect(
+      await screen.findByText(
+        "Druckdialog geöffnet. Der Verkauf bleibt unabhängig vom Ausdruck gültig.",
+      ),
+    ).toBeTruthy();
+
+    const search = screen.getByRole("textbox", { name: "Tickets suchen" });
+    await user.type(search, "P");
+    await user.keyboard("{Enter}");
+    expect(await screen.findByText("Für die Suche mindestens zwei Zeichen eingeben.")).toBeTruthy();
+    await user.type(search, "N");
+    await user.keyboard("{Enter}");
+    await waitFor(() =>
+      expect(api.searchTickets).toHaveBeenLastCalledWith(
+        "synthetic-event",
+        "synthetic-cashier-device",
+        "synthetic-device-token",
+        expect.objectContaining({ q: "PN", status: "ACTIVE" }),
+      ),
+    );
+    await user.click(screen.getByRole("checkbox", { name: "Nur meine Tickets" }));
+    await waitFor(() =>
+      expect(api.searchTickets).toHaveBeenLastCalledWith(
+        "synthetic-event",
+        "synthetic-cashier-device",
+        "synthetic-device-token",
+        expect.objectContaining({ soldByOperatorAccountId: activeTicket.soldByOperatorAccountId }),
+      ),
+    );
+    await user.click(screen.getByRole("tab", { name: "Stornierte Tickets" }));
+    await waitFor(() =>
+      expect(api.searchTickets).toHaveBeenLastCalledWith(
+        "synthetic-event",
+        "synthetic-cashier-device",
+        "synthetic-device-token",
+        expect.objectContaining({ status: "CANCELED" }),
+      ),
+    );
+    await user.click(screen.getByRole("button", { name: "Liste aktualisieren" }));
+  });
+
+  it("persists an explicit cashier product order with the current event version", async () => {
+    const user = userEvent.setup();
+    workspace.state.board = operationBoard({ includeSecondProduct: true });
+    api.sendCommand.mockResolvedValue({ event: { version: 42 } });
+    renderCashier();
+
+    await user.click(screen.getByRole("button", { name: "Kassenreihenfolge bearbeiten" }));
+    await user.click(screen.getByRole("button", { name: "Kurzstrecke nach oben verschieben" }));
+    await user.click(screen.getByRole("button", { name: "Speichern" }));
+
+    expect(api.sendCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expectedVersion: 41,
+        payload: {
+          expectedProductIds: ["product-a", "product-b"],
+          orderedProductIds: ["product-b", "product-a"],
+        },
+        type: "REORDER_CASHIER_PRODUCTS",
+      }),
+      "synthetic-device-token",
+    );
+    expect(workspace.state.confirmEvent).toHaveBeenCalledWith({ version: 42 });
+  });
+
+  it("keeps a failed sale retryable and reports the server reason", async () => {
+    const user = userEvent.setup();
+    api.sendCommand.mockRejectedValue(new Error("Synthetischer Verkaufsfehler"));
+    renderCashier();
+
+    const saleAction = await screen.findByRole("button", {
+      name: /1 Ticket für Panoramaflug verkaufen/,
+    });
+    await user.click(saleAction);
+
+    expect(await screen.findByText("Synthetischer Verkaufsfehler")).toBeTruthy();
+    expect((saleAction as HTMLButtonElement).disabled).toBe(false);
   });
 });
