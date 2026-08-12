@@ -72,6 +72,53 @@ function createCommand(planExpectedVersion: number | null): PlannedOperationComm
   };
 }
 
+function existingPlan(overrides: Record<string, unknown> = {}) {
+  return {
+    constraint_kind: "PAUSE",
+    duration_multiplier_percent: null,
+    effect_mode: "BLOCKING",
+    id: "550e8400-e29b-41d4-a716-446655440002",
+    recurring_rule_id: null,
+    scope_type: "EVENT",
+    status: "PLANNED",
+    version: 2,
+    ...overrides,
+  };
+}
+
+function cancelCommand(planExpectedVersion = 2): PlannedOperationCommand {
+  return {
+    commandId: "550e8400-e29b-41d4-a716-446655440003",
+    deviceId: "synthetic-director",
+    eventId: "synthetic-event",
+    expectedVersion: 5,
+    issuedAt: "2026-08-08T08:00:00.000Z",
+    payload: {
+      planExpectedVersion,
+      planId: "550e8400-e29b-41d4-a716-446655440002",
+    },
+    type: "CANCEL_PLANNED_OPERATION",
+  } as PlannedOperationCommand;
+}
+
+function slowdownCommand(active: boolean, planExpectedVersion = 2): PlannedOperationCommand {
+  return {
+    commandId: active
+      ? "550e8400-e29b-41d4-a716-446655440004"
+      : "550e8400-e29b-41d4-a716-446655440005",
+    deviceId: "synthetic-director",
+    eventId: "synthetic-event",
+    expectedVersion: 5,
+    issuedAt: "2026-08-08T08:00:00.000Z",
+    payload: {
+      active,
+      planExpectedVersion,
+      planId: "550e8400-e29b-41d4-a716-446655440002",
+    },
+    type: "SET_PLANNED_SLOWDOWN_ACTIVE",
+  } as PlannedOperationCommand;
+}
+
 function findStatement(batch: PreparedQuery[], fragment: string): PreparedQuery {
   const statement = batch.find(({ sql }) => sql.includes(fragment));
   if (!statement) throw new Error(`Missing statement containing ${fragment}`);
@@ -131,6 +178,142 @@ describe("planned operation command service", () => {
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "PLANNED_OPERATION_VERSION_CONFLICT", currentVersion: 2 },
+    });
+    expect(batches).toHaveLength(0);
+    expect(broadcast).not.toHaveBeenCalled();
+  });
+
+  it("updates an editable plan with optimistic versioning", async () => {
+    const { db, batches } = createDatabase([existingPlan()]);
+    const broadcast = vi.fn();
+    const service = new PlannedOperationCommandService({ DB: db } as unknown as Env, broadcast);
+
+    const response = await service.handlePlannedOperation(
+      createCommand(2),
+      currentEvent(),
+      "FLIGHT_DIRECTOR",
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      accepted: true,
+      eventType: "PLANNED_OPERATION_UPDATED",
+    });
+    const [batch] = batches;
+    if (!batch) throw new Error("Expected one persistence batch");
+    const update = findStatement(batch, "UPDATE planned_operational_constraints");
+    expect(update.parameters).toContain(3);
+    expect(update.parameters.at(-1)).toBe(2);
+    expect(broadcast).toHaveBeenCalledOnce();
+  });
+
+  it("cancels a plan and resets its recurring rule in the same batch", async () => {
+    const { db, batches } = createDatabase([
+      existingPlan({ recurring_rule_id: "recurring-rule-1" }),
+    ]);
+    const broadcast = vi.fn();
+    const service = new PlannedOperationCommandService({ DB: db } as unknown as Env, broadcast);
+
+    const response = await service.handlePlannedOperation(
+      cancelCommand(),
+      currentEvent(),
+      "FLIGHT_DIRECTOR",
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      accepted: true,
+      eventType: "RECURRING_OPERATION_OCCURRENCE_SKIPPED",
+    });
+    const [batch] = batches;
+    if (!batch) throw new Error("Expected one persistence batch");
+    expect(findStatement(batch, "SET status = 'CANCELED'")).toBeDefined();
+    expect(findStatement(batch, "UPDATE recurring_operational_rules")).toBeDefined();
+  });
+
+  it.each([
+    {
+      active: true,
+      existing: existingPlan({
+        constraint_kind: "OTHER",
+        duration_multiplier_percent: 175,
+        effect_mode: "SLOWDOWN",
+      }),
+      expectedEventType: "PLANNED_SLOWDOWN_STARTED",
+      expectedStatus: "ACTIVE",
+    },
+    {
+      active: false,
+      existing: existingPlan({
+        constraint_kind: "OTHER",
+        duration_multiplier_percent: 175,
+        effect_mode: "SLOWDOWN",
+        status: "ACTIVE",
+      }),
+      expectedEventType: "PLANNED_SLOWDOWN_ENDED",
+      expectedStatus: "CLEARED",
+    },
+  ])("sets slowdown active=$active without a resource stop", async (testCase) => {
+    const { db, batches } = createDatabase([testCase.existing]);
+    const broadcast = vi.fn();
+    const service = new PlannedOperationCommandService({ DB: db } as unknown as Env, broadcast);
+
+    const response = await service.handlePlannedOperation(
+      slowdownCommand(testCase.active),
+      currentEvent(),
+      "FLIGHT_DIRECTOR",
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      accepted: true,
+      eventType: testCase.expectedEventType,
+    });
+    const [batch] = batches;
+    if (!batch) throw new Error("Expected one persistence batch");
+    const update = findStatement(batch, "effect_mode = 'SLOWDOWN'");
+    expect(update.parameters[0]).toBe(testCase.expectedStatus);
+    const audit = findStatement(batch, "INSERT INTO operational_events");
+    expect(String(audit.parameters.at(-1))).toContain('"durationMultiplierPercent":175');
+    expect(String(audit.parameters.at(-1))).toContain('"informationalOnly":true');
+  });
+
+  it.each([
+    {
+      command: cancelCommand(),
+      existing: null,
+      expectedCode: "PLANNED_OPERATION_NOT_FOUND",
+      status: 404,
+    },
+    {
+      command: cancelCommand(),
+      existing: existingPlan({ status: "ACTIVE" }),
+      expectedCode: "PLANNED_OPERATION_NOT_CANCELABLE",
+      status: 409,
+    },
+    {
+      command: slowdownCommand(true),
+      existing: existingPlan(),
+      expectedCode: "PLANNED_OPERATION_EFFECT_MISMATCH",
+      status: 409,
+    },
+    {
+      command: slowdownCommand(false),
+      existing: existingPlan({ effect_mode: "SLOWDOWN" }),
+      expectedCode: "PLANNED_OPERATION_STATUS_MISMATCH",
+      status: 409,
+    },
+  ])("rejects invalid transitions with $expectedCode", async (testCase) => {
+    const { db, batches } = createDatabase([testCase.existing]);
+    const broadcast = vi.fn();
+    const service = new PlannedOperationCommandService({ DB: db } as unknown as Env, broadcast);
+
+    const response = await service.handlePlannedOperation(
+      testCase.command,
+      currentEvent(),
+      "FLIGHT_DIRECTOR",
+    );
+
+    expect(response.status).toBe(testCase.status);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: testCase.expectedCode },
     });
     expect(batches).toHaveLength(0);
     expect(broadcast).not.toHaveBeenCalled();
