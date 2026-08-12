@@ -1,40 +1,9 @@
-import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const port = Number(process.env.MASTER_DATA_TEST_PORT ?? "18787");
-const npmCli = process.env.npm_execpath;
-if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
-const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
-const reset = spawnSync(process.execPath, [npmCli, "run", "db:reset:local"], {
-  cwd: root,
-  stdio: "ignore",
-});
-if (reset.status !== 0) throw new Error("Lokale Testdatenbank konnte nicht initialisiert werden.");
+import { randomUUID } from "node:crypto";
+import { createWorkerTestHarness } from "./lib/worker-test-harness.mjs";
 
 const pin = String.fromCharCode(48).repeat(6);
-const server = spawn(
-  process.execPath,
-  [
-    wranglerCli,
-    "dev",
-    "--config",
-    "wrangler.jsonc",
-    "--var",
-    "APP_ENV:development",
-    "--var",
-    "DATA_JURISDICTION:eu",
-    "--var",
-    `ADMIN_PIN_HASH:${createHash("sha256").update(pin).digest("hex")}`,
-    "--port",
-    String(port),
-  ],
-  { cwd: root, stdio: "ignore", windowsHide: true },
-);
-const base = `http://127.0.0.1:${port}`;
+const harness = await createWorkerTestHarness({ name: "master-data", adminPin: pin });
+const base = harness.baseUrl;
 const tokens = {
   admin: ["demo", "admin", "device", "token"].join("-"),
   cashier: ["demo", "cashier", "device", "token"].join("-"),
@@ -46,15 +15,6 @@ const devices = {
   flightLine: "flight-line-tablet-1",
 };
 
-const waitForWorker = async () => {
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    try {
-      if ((await fetch(`${base}/api/health`)).ok) return;
-    } catch {}
-    await new Promise((resolvePromise) => setTimeout(resolvePromise, 250));
-  }
-  throw new Error("Lokaler Worker wurde nicht rechtzeitig bereit.");
-};
 const operationBoard = async (deviceId, token) => {
   const response = await fetch(`${base}/api/control/demo-2026/operations`, {
     headers: { "x-device-id": deviceId, "x-device-token": token },
@@ -104,7 +64,6 @@ const admin = (version, type, payload, expectedStatus) =>
   command(devices.admin, tokens.admin, version, type, payload, expectedStatus);
 
 try {
-  await waitForWorker();
   let board = await operationBoard(devices.admin, tokens.admin);
   let result = await admin(board.event.version, "UPSERT_GATE", {
     gateId: "gate-delete-test",
@@ -592,11 +551,5 @@ try {
     }),
   );
 } finally {
-  if (process.platform === "win32") {
-    spawnSync(WINDOWS_TASKKILL_EXECUTABLE, ["/PID", String(server.pid), "/T", "/F"], {
-      stdio: "ignore",
-    });
-  } else {
-    server.kill();
-  }
+  await harness.dispose();
 }

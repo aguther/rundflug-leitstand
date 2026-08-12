@@ -1,103 +1,33 @@
-import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
+import { randomUUID } from "node:crypto";
+import {
+  createWorkerTestHarness,
+  TEST_ADMIN_PIN,
+  TEST_DEVICE_TOKENS,
+  TEST_DEVICES,
+} from "./lib/worker-test-harness.mjs";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const npmCli = process.env.npm_execpath;
-if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
-const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
-const reset = spawnSync(process.execPath, [npmCli, "run", "db:reset:local"], {
-  cwd: root,
-  stdio: "ignore",
-});
-if (reset.status !== 0) throw new Error("Lokale Testdatenbank konnte nicht initialisiert werden.");
-
-const pin = String.fromCharCode(48).repeat(4);
-const pinHash = createHash("sha256").update(pin).digest("hex");
-const server = spawn(
-  process.execPath,
-  [
-    wranglerCli,
-    "dev",
-    "--config",
-    "wrangler.jsonc",
-    "--var",
-    "APP_ENV:development",
-    "--var",
-    "DATA_JURISDICTION:eu",
-    "--var",
-    `ADMIN_PIN_HASH:${pinHash}`,
-  ],
-  { cwd: root, stdio: "ignore", windowsHide: true },
-);
-const base = "http://127.0.0.1:8787";
-const tokens = {
-  admin: ["demo", "admin", "device", "token"].join("-"),
-  cashier: ["demo", "cashier", "device", "token"].join("-"),
-  flightLine: ["demo", "flight", "line", "device", "token"].join("-"),
-  flightLead: ["lead", "device", "credential"].join("-"),
-};
-const devices = {
-  admin: "technical-scaffold",
-  cashier: "cashier-tablet-1",
-  flightLine: "flight-line-tablet-1",
-  flightLead: "recovery-flight-lead",
-};
-
-const waitForWorker = async () => {
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    try {
-      if ((await fetch(`${base}/api/health`)).ok) return;
-    } catch {}
-    await new Promise((resolvePromise) => setTimeout(resolvePromise, 250));
-  }
-  throw new Error("Lokaler Worker wurde nicht rechtzeitig bereit.");
-};
-const board = async (device, token) => {
-  const response = await fetch(`${base}/api/control/demo-2026/operations`, {
-    headers: { "x-device-id": device, "x-device-token": token },
+const harness = await createWorkerTestHarness({ name: "emergency-mode" });
+const pin = TEST_ADMIN_PIN;
+const tokens = TEST_DEVICE_TOKENS;
+const devices = TEST_DEVICES;
+const board = (deviceId, token) => harness.board({ deviceId, token });
+const command = (deviceId, token, expectedVersion, type, payload, expectedStatus = 200) =>
+  harness.command({
+    deviceId,
+    token,
+    expectedVersion,
+    type,
+    payload,
+    expectedStatus,
+    commandId: randomUUID(),
   });
-  if (!response.ok) throw new Error(`Board-Abruf fehlgeschlagen (${response.status}).`);
-  return response.json();
-};
-const command = async (device, token, expectedVersion, type, payload, expectedStatus = 200) => {
-  const response = await fetch(`${base}/api/control/demo-2026/commands`, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-device-token": token },
-    body: JSON.stringify({
-      commandId: randomUUID(),
-      eventId: "demo-2026",
-      deviceId: device,
-      expectedVersion,
-      issuedAt: new Date().toISOString(),
-      type,
-      payload,
-    }),
+const publicJson = (path) => harness.fetchJson(path);
+const history = () =>
+  harness.fetchJson("/api/control/demo-2026/history?aggregateType=OPERATION_DAY", {
+    headers: { "x-device-id": devices.admin, "x-device-token": tokens.admin },
   });
-  if (response.status !== expectedStatus) {
-    throw new Error(`${type} lieferte ${response.status} statt ${expectedStatus}.`);
-  }
-  return response.json();
-};
-const publicJson = async (path) => {
-  const response = await fetch(`${base}${path}`);
-  if (!response.ok) throw new Error(`Öffentlicher Abruf fehlgeschlagen (${response.status}).`);
-  return response.json();
-};
-const history = async () => {
-  const response = await fetch(
-    `${base}/api/control/demo-2026/history?aggregateType=OPERATION_DAY`,
-    {
-      headers: { "x-device-id": devices.admin, "x-device-token": tokens.admin },
-    },
-  );
-  if (!response.ok) throw new Error(`Historien-Abruf fehlgeschlagen (${response.status}).`);
-  return response.json();
-};
+
 try {
-  await waitForWorker();
   let current = await board(devices.admin, tokens.admin);
   const configured = await command(
     devices.admin,
@@ -294,11 +224,5 @@ try {
     }),
   );
 } finally {
-  if (process.platform === "win32") {
-    spawnSync(WINDOWS_TASKKILL_EXECUTABLE, ["/PID", String(server.pid), "/T", "/F"], {
-      stdio: "ignore",
-    });
-  } else {
-    server.kill();
-  }
+  await harness.dispose();
 }

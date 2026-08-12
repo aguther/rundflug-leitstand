@@ -1,56 +1,11 @@
-import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
+import { randomBytes, randomUUID } from "node:crypto";
+import { createWorkerTestHarness } from "./lib/worker-test-harness.mjs";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const npmCli = process.env.npm_execpath;
-if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
-const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
-const run = (executable, args, options = {}) => {
-  const result = spawnSync(executable, args, {
-    cwd: root,
-    stdio: "ignore",
-    ...options,
-  });
-  if (result.status !== 0) throw new Error(`Lokaler Prüfschritt fehlgeschlagen (${args[0]}).`);
-};
-const hash = (value) => createHash("sha256").update(value).digest("hex");
-
-run(process.execPath, [npmCli, "run", "db:reset:local"]);
 const reviewToken = ["review", "device", "credential"].join("-");
 const leadToken = ["lead", "device", "credential"].join("-");
-
 const pin = String.fromCharCode(48).repeat(4);
-const server = spawn(
-  process.execPath,
-  [
-    wranglerCli,
-    "dev",
-    "--config",
-    "wrangler.jsonc",
-    "--var",
-    "APP_ENV:development",
-    "--var",
-    "DATA_JURISDICTION:eu",
-    "--var",
-    `ADMIN_PIN_HASH:${hash(pin)}`,
-  ],
-  { cwd: root, stdio: "ignore", windowsHide: true },
-);
-
-const base = "http://127.0.0.1:8787";
-const waitForWorker = async () => {
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    try {
-      const response = await fetch(`${base}/api/health`);
-      if (response.ok) return;
-    } catch {}
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  throw new Error("Lokaler Worker wurde nicht rechtzeitig bereit.");
-};
+const harness = await createWorkerTestHarness({ name: "outage-recovery", adminPin: pin });
+const base = harness.baseUrl;
 const board = async (deviceId, token) => {
   const response = await fetch(`${base}/api/control/demo-2026/operations`, {
     headers: { "x-device-id": deviceId, "x-device-token": token },
@@ -77,7 +32,6 @@ const send = async (deviceId, token, expectedVersion, type, payload) => {
 };
 
 try {
-  await waitForWorker();
   const cashierToken = ["demo", "cashier", "device", "token"].join("-");
   const paperReference = `BELEG-${randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`;
   const ticketCode = randomBytes(12)
@@ -178,11 +132,5 @@ try {
     }),
   );
 } finally {
-  if (process.platform === "win32") {
-    spawnSync(WINDOWS_TASKKILL_EXECUTABLE, ["/PID", String(server.pid), "/T", "/F"], {
-      stdio: "ignore",
-    });
-  } else {
-    server.kill();
-  }
+  await harness.dispose();
 }

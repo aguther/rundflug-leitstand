@@ -1,31 +1,9 @@
-import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
+import { createWorkerTestHarness } from "./lib/worker-test-harness.mjs";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const npmCli = process.env.npm_execpath;
-if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
-const reset = spawnSync(process.execPath, [npmCli, "run", "db:reset:local"], {
-  cwd: root,
-  stdio: "ignore",
-});
-if (reset.status !== 0) throw new Error("Lokale Testdatenbank konnte nicht initialisiert werden.");
-
-const wrangler = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
-const forecastFixture = spawnSync(
-  process.execPath,
-  [
-    wrangler,
-    "d1",
-    "execute",
-    "DB",
-    "--local",
-    "--config",
-    "wrangler.jsonc",
-    "--command",
-    `INSERT INTO flight_groups
+const pin = "123456";
+const setupCode = ["synthetic", "factory", "reset", "setup", "code"].join("-");
+const forecastFixtureSql = `INSERT INTO flight_groups
       (id, operation_day_id, resource_group_id, product_id, communication_number, status, version, created_at, updated_at)
      VALUES ('factory-reset-flight-group', 'demo-2026', 'rg-panorama', 'panorama-20', 999, 'PLANNED', 0,
              '2026-07-11T09:00:00.000Z', '2026-07-11T09:00:00.000Z');
@@ -85,49 +63,19 @@ const forecastFixture = spawnSync(
        lower_minutes, upper_minutes, planning_run_id)
      VALUES ('factory-reset-forecast', 'demo-2026', 'factory-reset-rotation', 0,
              '2026-07-11T09:00:00.000Z', 'STABLE', 10, 20,
-             'factory-reset-child-run');`,
-  ],
-  { cwd: root, stdio: "ignore" },
-);
-if (forecastFixture.status !== 0) {
-  throw new Error("Prognosehistorie für den Werksreset-Test konnte nicht angelegt werden.");
-}
-
-const pin = "123456";
-const setupCode = ["synthetic", "factory", "reset", "setup", "code"].join("-");
-const server = spawn(
-  process.execPath,
-  [
-    wrangler,
-    "dev",
-    "--config",
-    "wrangler.jsonc",
-    "--var",
-    "APP_ENV:development",
-    "--var",
-    "DATA_JURISDICTION:eu",
-    "--var",
-    `ADMIN_PIN_HASH:${createHash("sha256").update(pin).digest("hex")}`,
-    "--var",
-    `INSTALLATION_RECOVERY_CODE:${setupCode}`,
-    "--var",
-    `RESET_SETUP_SIGNING_KEY:${["synthetic", "reset", "grant", "signing", "key"].join("-")}`,
-  ],
-  { cwd: root, stdio: "ignore", windowsHide: true },
-);
-const base = "http://127.0.0.1:8787";
-const waitForWorker = async () => {
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    try {
-      if ((await fetch(`${base}/api/health`)).ok) return;
-    } catch {}
-    await new Promise((resolvePromise) => setTimeout(resolvePromise, 250));
-  }
-  throw new Error("Lokaler Worker wurde nicht rechtzeitig bereit.");
-};
+             'factory-reset-child-run');`;
+const harness = await createWorkerTestHarness({
+  name: "factory-reset",
+  adminPin: pin,
+  d1Commands: [forecastFixtureSql],
+  variables: {
+    INSTALLATION_RECOVERY_CODE: setupCode,
+    RESET_SETUP_SIGNING_KEY: ["synthetic", "reset", "grant", "signing", "key"].join("-"),
+  },
+});
+const base = harness.baseUrl;
 
 try {
-  await waitForWorker();
   const loginResponse = await fetch(`${base}/api/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -285,11 +233,5 @@ try {
     }),
   );
 } finally {
-  if (process.platform === "win32") {
-    spawnSync(WINDOWS_TASKKILL_EXECUTABLE, ["/PID", String(server.pid), "/T", "/F"], {
-      stdio: "ignore",
-    });
-  } else {
-    server.kill();
-  }
+  await harness.dispose();
 }

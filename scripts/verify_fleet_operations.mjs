@@ -1,35 +1,9 @@
-import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
+import { randomUUID } from "node:crypto";
+import { createWorkerTestHarness } from "./lib/worker-test-harness.mjs";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const npmCli = process.env.npm_execpath;
-if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
-const reset = spawnSync(process.execPath, [npmCli, "run", "db:reset:local"], {
-  cwd: root,
-  stdio: "ignore",
-});
-if (reset.status !== 0) throw new Error("Lokale Testdatenbank konnte nicht initialisiert werden.");
 const pin = String.fromCharCode(48).repeat(4);
-const server = spawn(
-  process.execPath,
-  [
-    resolve(root, "node_modules", "wrangler", "bin", "wrangler.js"),
-    "dev",
-    "--config",
-    "wrangler.jsonc",
-    "--var",
-    "APP_ENV:development",
-    "--var",
-    "DATA_JURISDICTION:eu",
-    "--var",
-    `ADMIN_PIN_HASH:${createHash("sha256").update(pin).digest("hex")}`,
-  ],
-  { cwd: root, stdio: "ignore", windowsHide: true },
-);
-const base = "http://127.0.0.1:8787";
+const harness = await createWorkerTestHarness({ name: "fleet-operations", adminPin: pin });
+const base = harness.baseUrl;
 const devices = {
   admin: "technical-scaffold",
   cashier: "cashier-tablet-1",
@@ -39,15 +13,6 @@ const tokens = {
   admin: ["demo", "admin", "device", "token"].join("-"),
   cashier: ["demo", "cashier", "device", "token"].join("-"),
   flightLine: ["demo", "flight", "line", "device", "token"].join("-"),
-};
-const waitForWorker = async () => {
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    try {
-      if ((await fetch(`${base}/api/health`)).ok) return;
-    } catch {}
-    await new Promise((resolvePromise) => setTimeout(resolvePromise, 250));
-  }
-  throw new Error("Lokaler Worker wurde nicht rechtzeitig bereit.");
 };
 const board = async (deviceId, token) => {
   const response = await fetch(`${base}/api/control/demo-2026/operations`, {
@@ -98,7 +63,6 @@ const flight = (version, type, payload, expectedStatus, commandId) =>
   command(devices.flightLine, tokens.flightLine, version, type, payload, expectedStatus, commandId);
 
 try {
-  await waitForWorker();
   let current = await board(devices.admin, tokens.admin);
   let result = await admin(current.event.version, "UPSERT_PILOT", {
     pilotId: "550e8400-e29b-41d4-a716-446655440199",
@@ -757,11 +721,5 @@ try {
     }),
   );
 } finally {
-  if (process.platform === "win32") {
-    spawnSync(WINDOWS_TASKKILL_EXECUTABLE, ["/PID", String(server.pid), "/T", "/F"], {
-      stdio: "ignore",
-    });
-  } else {
-    server.kill();
-  }
+  await harness.dispose();
 }
