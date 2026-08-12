@@ -401,6 +401,113 @@ describe("dispatch recommendation lease authorization and concurrency", () => {
     expect(recalculate).not.toHaveBeenCalled();
   });
 
+  it("acquires the current complete batch and expires obsolete leases atomically", async () => {
+    const planningRows = [
+      {
+        attendance_status: "PRESENT",
+        communication_number: 17,
+        created_at: "2026-08-12T08:00:00.000Z",
+        dispatch_batch_id: "batch-a",
+        dispatch_confirmed_overtake_count: 0,
+        dispatch_decision_reasons_json: '["CAPACITY_OPTIMIZED","QUEUE_ORDER"]',
+        dispatch_group_ids_json: '["group-a","group-b"]',
+        dispatch_occupied_seats: 3,
+        dispatch_order: 1,
+        dispatch_plan_revision: "plan-a",
+        dispatch_projected_overtake_count: 0,
+        dispatch_wave: 1,
+        gate_id: "gate-a",
+        group_ids_json: '["group-a"]',
+        precall_decision_status: "GO_TO_GATE",
+        precalled_at: "2026-08-12T08:55:00.000Z",
+        prediction_updated_at: "2026-08-12T08:54:00.000Z",
+        product_id: "product-a",
+        queue_sequence: 1,
+        reference_duration_minutes: 20,
+        reserved_by_active_lease: 0,
+        rotation_id: "rotation-a",
+        segment_order: 1,
+        sold_at: "2026-08-12T07:30:00.000Z",
+        standby: 0,
+        ticket_count: 1,
+      },
+      {
+        attendance_status: "PRESENT",
+        communication_number: 18,
+        created_at: "2026-08-12T08:01:00.000Z",
+        dispatch_batch_id: "batch-a",
+        dispatch_confirmed_overtake_count: 0,
+        dispatch_decision_reasons_json: '["CAPACITY_OPTIMIZED","QUEUE_ORDER"]',
+        dispatch_group_ids_json: '["group-a","group-b"]',
+        dispatch_occupied_seats: 3,
+        dispatch_order: 1,
+        dispatch_plan_revision: "plan-a",
+        dispatch_projected_overtake_count: 0,
+        dispatch_wave: 1,
+        gate_id: "gate-a",
+        group_ids_json: '["group-b"]',
+        precall_decision_status: "GO_TO_GATE",
+        precalled_at: "2026-08-12T08:55:00.000Z",
+        prediction_updated_at: "2026-08-12T08:54:00.000Z",
+        product_id: "product-a",
+        queue_sequence: 2,
+        reference_duration_minutes: 20,
+        reserved_by_active_lease: 0,
+        rotation_id: "rotation-b",
+        segment_order: 1,
+        sold_at: "2026-08-12T07:31:00.000Z",
+        standby: 0,
+        ticket_count: 2,
+      },
+    ];
+    const obsoleteLease = {
+      aircraft_id: "aircraft-b",
+      dispatch_batch_id: "batch-old",
+      id: "lease-old",
+      version: 3,
+    };
+    const { service, batch, recalculate, schedule, waitUntil } = createLeaseService(
+      [
+        { version: 7 },
+        null,
+        {
+          current_pilot_id: "pilot-a",
+          id: "aircraft-a",
+          operational_state: "AVAILABLE",
+          passenger_seats: 3,
+          resource_group_id: "resource-a",
+        },
+        null,
+        null,
+        { dispatch_plan_revision: "plan-a" },
+      ],
+      [planningRows, [obsoleteLease]],
+    );
+
+    const response = await service.handleRequest(leaseRequest(acquireLease), leaseUrl);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      aircraftId: "aircraft-a",
+      availableSeats: 0,
+      batchId: "batch-a",
+      decisionReasons: ["CAPACITY_OPTIMIZED", "QUEUE_ORDER"],
+      dispatchOrder: 1,
+      groupIds: ["group-a", "group-b"],
+      occupiedSeats: 3,
+      planRevision: "plan-a",
+    });
+    expect(recalculate).not.toHaveBeenCalled();
+    expect(batch).toHaveBeenCalledOnce();
+    const statements = batch.mock.calls[0]?.[0] ?? [];
+    expect(statements).toHaveLength(5);
+    expect(statements.map(({ sql }) => sql).join("\n")).toMatch(
+      /LEASE_EXPIRED[\s\S]*INSERT INTO dispatch_recommendation_leases[\s\S]*LEASE_ACQUIRED/,
+    );
+    expect(schedule).toHaveBeenCalledWith("event-a", "DISPATCH_RECOMMENDATION_LEASE_CHANGED");
+    expect(waitUntil).toHaveBeenCalledOnce();
+  });
+
   it("returns only each ticket group's first eligible draft segment", async () => {
     const rows = [
       {
