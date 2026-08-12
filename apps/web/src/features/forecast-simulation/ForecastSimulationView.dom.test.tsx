@@ -220,7 +220,7 @@ describe("forecast simulation view", () => {
       }),
     );
 
-    await waitFor(() => expect(screen.getByText("Median absolut")).toBeTruthy());
+    expect(await screen.findByText("Median absolut")).toBeTruthy();
     expect(screen.getByText(/Median je Kennzahl über 5 Läufe ab Seed 17/)).toBeTruthy();
   });
 

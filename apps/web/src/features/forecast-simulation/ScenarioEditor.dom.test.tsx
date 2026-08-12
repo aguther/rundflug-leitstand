@@ -165,7 +165,7 @@ describe("product demand editor", () => {
     expect((profile as HTMLSelectElement).value).toBe("OPENING_RUSH");
 
     await user.click(screen.getByRole("button", { name: /Zeitfenster hinzufügen/ }));
-    expect(screen.getAllByLabelText(/Nachfragefenster \d+, Personen je Stunde/).length).toBe(3);
+    expect(screen.getAllByLabelText(/Nachfragefenster \d+, Personen je Stunde/)).toHaveLength(3);
     await user.click(screen.getByRole("button", { name: "Nachfragefenster 3 entfernen" }));
     expect(screen.getAllByLabelText(/Nachfragefenster \d+, Personen je Stunde/)).toHaveLength(2);
 

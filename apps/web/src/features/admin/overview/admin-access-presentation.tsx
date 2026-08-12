@@ -32,7 +32,10 @@ export function accessPresentation(authenticated: boolean, unlocked: boolean) {
   };
 }
 
-export function BoardStatusHint({ administrator, boardLoadFailed }: BoardStatusHintProps) {
+export function BoardStatusHint({
+  administrator,
+  boardLoadFailed,
+}: Readonly<BoardStatusHintProps>) {
   if (administrator) {
     return null;
   }

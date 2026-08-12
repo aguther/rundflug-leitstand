@@ -24,7 +24,7 @@ export function AdminEventReleasePanel({
   onReleaseOperations,
   setupComplete,
   setupSteps,
-}: AdminEventReleasePanelProps) {
+}: Readonly<AdminEventReleasePanelProps>) {
   const eventIsReleased = board.event.status === "ACTIVE" || board.event.status === "CLOSED";
   let releaseDetails: ReactNode;
   if (eventIsReleased) {

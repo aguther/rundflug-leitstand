@@ -116,10 +116,10 @@ function assistActionAvailability(input: {
 export function AircraftPickerMeta({
   aircraft,
   gateLabel,
-}: {
+}: Readonly<{
   aircraft: Aircraft;
   gateLabel?: string;
-}) {
+}>) {
   return (
     <div className="assist-v15-picker-meta">
       <span>
