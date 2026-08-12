@@ -42,7 +42,7 @@ export function simulationScenarioTemplateFileName(name: string): string {
     .normalize("NFKD")
     .replaceAll(/\p{Diacritic}/gu, "")
     .toLocaleLowerCase("de-DE")
-    .replace(/ß/g, "ss")
+    .replaceAll("ß", "ss")
     .replaceAll(/[^a-z0-9]+/g, "-")
     .replaceAll(/^-|-$/g, "");
   return `rundflug-szenario-${slug || "unbenannte-variante"}.json`;
