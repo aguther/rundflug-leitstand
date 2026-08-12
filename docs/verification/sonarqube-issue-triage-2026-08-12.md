@@ -13,6 +13,22 @@ Die kombinierte MCP-Abfrage aller Severities meldete abweichend nur 762 Code-Sme
 Deshalb verwendet dieses Inventar die getrennten Severity-Abfragen als nachprüfbare Messbasis und
 bewahrt die Serverdifferenz ausdrücklich auf, statt 16 Findings stillschweigend zu verlieren.
 
+## Lokaler Fortschritt des Web-/Forecast-Pakets
+
+Die reproduzierbare Vitest-Gesamtmessung wurde in diesem Paket von 64,89 % Statements,
+58,27 % Branches, 61,03 % Functions und 66,93 % Lines auf 74,75 % Statements,
+65,30 % Branches, 73,71 % Functions und 76,96 % Lines erhöht. 325 Testdateien mit
+1.793 bestandenen und sechs bewusst übersprungenen Tests bilden die Messbasis. Besonders erweitert
+wurden Forecast-Planung und -Capture, Simulation und Timeline, Flight-Director-Analyse,
+Flight-Line-Kommandos, FIDS-Einstellungen, API-Lifecycle und Public-Push.
+
+Die Ratchets wurden ohne zusätzliche Exclusion auf Statements 74, Branches 65, Functions 73 und
+Lines 76 angehoben. Das 80-%-Ziel ist damit noch nicht erreicht. Die verbleibende Lücke beträgt 476
+Lines und 2.152 Branches; wegen der deutlich größeren Branch-Lücke sind als nächste Pakete zuerst
+Event-Coordinator/Command-Services, Cashier-/Flight-Line-Zustandsvarianten und anschließend
+Admin-Workspaces vorgesehen. Ungedeckte Bootstrap- und Verdrahtungsdateien wurden nicht pauschal
+aus der Messung entfernt.
+
 `PENDING` bedeutet ausdrücklich, dass noch keine technische Bewertung oder Serveraktion erfolgt
 ist. Ein Eintrag darf erst nach Prüfung des konkreten Codes auf `FIX`, `ARCHITECTURE_BACKLOG`,
 `FALSE_POSITIVE`, `ACCEPTED` oder `ROOT_CAUSE` geändert werden.

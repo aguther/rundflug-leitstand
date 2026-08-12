@@ -33,10 +33,10 @@ describe("coverage configuration", () => {
     ]);
     expect(coverageConfiguration?.excludeAfterRemap).toBe(true);
     expect(coverageConfiguration?.thresholds).toEqual({
-      statements: 62,
-      branches: 56,
-      functions: 60,
-      lines: 64,
+      statements: 74,
+      branches: 65,
+      functions: 73,
+      lines: 76,
     });
   });
 });
