@@ -56,31 +56,42 @@ function timeLabel(value: LocalDateTime): string {
   return `${value.hour}:${value.minute}`;
 }
 
+function unavailableTimeWindowLabel(variant: TimeWindowVariant): string {
+  return variant === "compact" ? "–" : "Wird aktualisiert";
+}
+
+function displayTimeWindow(
+  window: string,
+  variant: TimeWindowVariant,
+  includeClockSuffix: boolean | undefined,
+): string {
+  if (variant === "compact") return window;
+  return `ca. ${window}${includeClockSuffix === false ? "" : " Uhr"}`;
+}
+
 export function formatAbsoluteTimeWindow(input: AbsoluteTimeWindowInput): string {
   const variant = input.variant ?? "regular";
   if (input.phase === "NOW") return "Jetzt";
   if (input.phase === "FINISHED") return "–";
   if (input.quality === "UNCERTAIN" || input.lowerAt === null || input.upperAt === null) {
-    return variant === "compact" ? "–" : "Wird aktualisiert";
+    return unavailableTimeWindowLabel(variant);
   }
   if (
     input.maximumWidthMinutes !== undefined &&
     Date.parse(input.upperAt) - Date.parse(input.lowerAt) > input.maximumWidthMinutes * 60_000
   ) {
-    return variant === "compact" ? "–" : "Wird aktualisiert";
+    return unavailableTimeWindowLabel(variant);
   }
 
   const lower = localDateTime(input.lowerAt, input.timeZone);
   const upper = localDateTime(input.upperAt, input.timeZone);
-  if (!lower || !upper) return variant === "compact" ? "–" : "Wird aktualisiert";
+  if (!lower || !upper) return unavailableTimeWindowLabel(variant);
 
   if (sameLocalDate(lower, upper)) {
     const window = `${timeLabel(lower)} – ${timeLabel(upper)}`;
-    if (variant === "compact") return window;
-    return `ca. ${window}${input.includeClockSuffix === false ? "" : " Uhr"}`;
+    return displayTimeWindow(window, variant, input.includeClockSuffix);
   }
 
   const window = `${dateLabel(lower)} ${timeLabel(lower)} – ${dateLabel(upper)} ${timeLabel(upper)}`;
-  if (variant === "compact") return window;
-  return `ca. ${window}${input.includeClockSuffix === false ? "" : " Uhr"}`;
+  return displayTimeWindow(window, variant, input.includeClockSuffix);
 }

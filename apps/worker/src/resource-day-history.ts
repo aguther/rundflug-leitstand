@@ -102,6 +102,48 @@ export function buildPilotPauseEventStatement(
   };
 }
 
+function closedPilotPause(
+  start: PilotPauseEventRow,
+  end: PilotPauseEventRow,
+  fromMs: number,
+  observedUntilMs: number,
+): PairedPilotPause | null {
+  const startedAtMs = Date.parse(start.occurredAt);
+  const endedAtMs = Date.parse(end.occurredAt);
+  if (
+    !Number.isFinite(startedAtMs) ||
+    !Number.isFinite(endedAtMs) ||
+    endedAtMs < fromMs ||
+    startedAtMs > observedUntilMs
+  ) {
+    return null;
+  }
+  return {
+    id: `pilot-pause-${start.id}`,
+    type: "PAUSE",
+    startedAt: new Date(Math.max(startedAtMs, fromMs)).toISOString(),
+    endedAt: new Date(Math.min(endedAtMs, observedUntilMs)).toISOString(),
+    active: false,
+  };
+}
+
+function activePilotPause(
+  start: PilotPauseEventRow | null,
+  fromMs: number,
+  observedUntilMs: number,
+): PairedPilotPause | null {
+  if (start === null) return null;
+  const startedAtMs = Date.parse(start.occurredAt);
+  if (!Number.isFinite(startedAtMs) || startedAtMs > observedUntilMs) return null;
+  return {
+    id: `pilot-pause-${start.id}`,
+    type: "PAUSE",
+    startedAt: new Date(Math.max(startedAtMs, fromMs)).toISOString(),
+    endedAt: null,
+    active: true,
+  };
+}
+
 export function pairPilotPauseEvents(
   events: readonly PilotPauseEventRow[],
   from: string,
@@ -118,35 +160,17 @@ export function pairPilotPauseEvents(
     const occurredAtMs = Date.parse(event.occurredAt);
     if (!Number.isFinite(occurredAtMs) || occurredAtMs > observedUntilMs) continue;
     if (event.eventType === "PILOT_PAUSE_STARTED") {
-      if (openStart === null) openStart = event;
+      openStart ??= event;
       continue;
     }
     if (openStart === null) continue;
 
-    const startedAtMs = Date.parse(openStart.occurredAt);
-    if (occurredAtMs >= fromMs && startedAtMs <= observedUntilMs) {
-      pauses.push({
-        id: `pilot-pause-${openStart.id}`,
-        type: "PAUSE",
-        startedAt: new Date(Math.max(startedAtMs, fromMs)).toISOString(),
-        endedAt: new Date(Math.min(occurredAtMs, observedUntilMs)).toISOString(),
-        active: false,
-      });
-    }
+    const pause = closedPilotPause(openStart, event, fromMs, observedUntilMs);
+    if (pause) pauses.push(pause);
     openStart = null;
   }
 
-  if (openStart !== null) {
-    const startedAtMs = Date.parse(openStart.occurredAt);
-    if (Number.isFinite(startedAtMs) && startedAtMs <= observedUntilMs) {
-      pauses.push({
-        id: `pilot-pause-${openStart.id}`,
-        type: "PAUSE",
-        startedAt: new Date(Math.max(startedAtMs, fromMs)).toISOString(),
-        endedAt: null,
-        active: true,
-      });
-    }
-  }
+  const activePause = activePilotPause(openStart, fromMs, observedUntilMs);
+  if (activePause) pauses.push(activePause);
   return pauses;
 }

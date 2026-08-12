@@ -11,6 +11,10 @@ function json(data: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(data), { ...init, headers });
 }
 
+function assistClaimConflictCode(action: "ACQUIRE_OR_RENEW" | "TAKEOVER"): string {
+  return action === "TAKEOVER" ? "AIRCRAFT_ASSIST_CLAIM_CHANGED" : "AIRCRAFT_ASSIST_CLAIMED";
+}
+
 export class AssistClaimService {
   constructor(
     private readonly env: Env,
@@ -75,7 +79,8 @@ export class AssistClaimService {
         revision: number;
         login_code: string;
       }>();
-    const active = current && Date.parse(current.expires_at) > now.getTime() ? current : null;
+    const active =
+      current?.expires_at && Date.parse(current.expires_at) > now.getTime() ? current : null;
 
     if (request.method === "DELETE") {
       if (!active || active.operator_account_id !== accountId)
@@ -160,10 +165,7 @@ export class AssistClaimService {
           {
             claim: conflict,
             error: {
-              code:
-                parsed.data.action === "TAKEOVER"
-                  ? "AIRCRAFT_ASSIST_CLAIM_CHANGED"
-                  : "AIRCRAFT_ASSIST_CLAIMED",
+              code: assistClaimConflictCode(parsed.data.action),
               message: `Dieses Flugzeug wird derzeit von ${active.login_code} betreut.`,
             },
           },

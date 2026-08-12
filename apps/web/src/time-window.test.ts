@@ -68,4 +68,23 @@ describe("formatAbsoluteTimeWindow", () => {
       }),
     ).toBe("ca. 12:00 – 13:01 Uhr");
   });
+
+  it("unterdrückt ungültige oder explizit zu breite Prognosefenster", () => {
+    expect(
+      formatAbsoluteTimeWindow({
+        lowerAt: "invalid",
+        upperAt: "2026-07-22T11:01:00.000Z",
+        timeZone: "Europe/Berlin",
+      }),
+    ).toBe("Wird aktualisiert");
+    expect(
+      formatAbsoluteTimeWindow({
+        lowerAt: "2026-07-22T10:00:00.000Z",
+        upperAt: "2026-07-22T11:01:00.000Z",
+        timeZone: "Europe/Berlin",
+        maximumWidthMinutes: 60,
+        variant: "compact",
+      }),
+    ).toBe("–");
+  });
 });

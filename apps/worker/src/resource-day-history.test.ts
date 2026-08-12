@@ -99,4 +99,39 @@ describe("pilot pause pairing", () => {
       },
     ]);
   });
+
+  it("ignores invalid and fully out-of-window pause pairs", () => {
+    const result = pairPilotPauseEvents(
+      [
+        {
+          id: "old-start",
+          sequence: 1,
+          eventType: "PILOT_PAUSE_STARTED",
+          occurredAt: "2026-07-11T06:00:00.000Z",
+        },
+        {
+          id: "old-end",
+          sequence: 2,
+          eventType: "PILOT_PAUSE_ENDED",
+          occurredAt: "2026-07-11T06:30:00.000Z",
+        },
+        {
+          id: "invalid-start",
+          sequence: 3,
+          eventType: "PILOT_PAUSE_STARTED",
+          occurredAt: "invalid",
+        },
+        {
+          id: "valid-end",
+          sequence: 4,
+          eventType: "PILOT_PAUSE_ENDED",
+          occurredAt: "2026-07-11T07:30:00.000Z",
+        },
+      ],
+      "2026-07-11T07:00:00.000Z",
+      "2026-07-11T09:00:00.000Z",
+    );
+
+    expect(result).toEqual([]);
+  });
 });
