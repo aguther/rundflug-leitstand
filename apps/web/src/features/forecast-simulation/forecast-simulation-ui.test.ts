@@ -106,7 +106,7 @@ describe("local and hosted forecast simulation surface", () => {
     expect(fidsPopoutSource.indexOf("copyPresentationHead(target)")).toBeLessThan(
       fidsPopoutSource.indexOf("appendPresentationStylesheet(target, fidsStylesheetUrl)"),
     );
-    expect(fidsPopoutSource).toContain('source.getAttribute("data-vite-dev-id")');
+    expect(fidsPopoutSource).toContain("source.dataset.viteDevId");
     expect(fidsPopoutSource).toContain('source.href.includes("/assets/ForecastSimulationView-")');
     expect(fidsPopoutSource).toContain('target.title = "Simuliertes FIDS · Rundflug-Leitstand"');
     expect(fidsPopoutSource).toContain('simulationBanner="Nur Simulation – keine Betriebsdaten"');

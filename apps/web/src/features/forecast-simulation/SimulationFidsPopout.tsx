@@ -55,7 +55,7 @@ function copyPresentationHead(target: Document): void {
   for (const source of document.head.querySelectorAll<HTMLStyleElement | HTMLLinkElement>(
     'style, link[rel="stylesheet"]',
   )) {
-    const developmentStyleId = source.getAttribute("data-vite-dev-id")?.replaceAll("\\", "/");
+    const developmentStyleId = source.dataset.viteDevId?.replaceAll("\\", "/");
     if (
       source instanceof HTMLLinkElement &&
       source.href.includes("/assets/ForecastSimulationView-") &&

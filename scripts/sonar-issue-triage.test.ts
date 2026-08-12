@@ -34,6 +34,26 @@ describe("Sonar issue triage exclusions", () => {
       "migration40",
       "migration68",
       "backupRestore",
+      "migration1Create",
+      "migration18Create",
+      "migration30Create",
+      "migration49Create",
+      "migration62Create",
+      "migration63Create",
+      "migration15Literals",
+      "migration19Literals",
+      "migration21Literals",
+      "migration29Literals",
+      "migration49Literals",
+      "migration50Literals",
+      "migration53Literals",
+      "migration55Literals",
+      "migration58Literals",
+      "migration60Literals",
+      "migration62Literals",
+      "migration64Literals",
+      "demoSeedLiterals",
+      "fidsSeedLiterals",
     ]);
     for (const criterion of criteria) {
       const ruleKey = property(`sonar.issue.ignore.multicriteria.${criterion}.ruleKey`);
@@ -42,6 +62,9 @@ describe("Sonar issue triage exclusions", () => {
       expect(resourceKey).toMatch(/^(apps|scripts)\/[A-Za-z0-9_./-]+$/);
       expect(ruleKey).not.toContain("*");
       expect(resourceKey).not.toContain("*");
+      if (ruleKey?.startsWith("plsql:")) {
+        expect(resourceKey).toMatch(/^apps\/worker\/(migrations|seed)\/[A-Za-z0-9_-]+\.sql$/);
+      }
     }
   });
 

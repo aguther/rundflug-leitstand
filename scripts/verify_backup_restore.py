@@ -16,6 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS = ROOT / "apps" / "worker" / "migrations"
 BACKUP_SOURCE = ROOT / "apps" / "worker" / "src" / "backup.ts"
+MEMORY_DATABASE = ":memory:"
 
 
 def backup_tables() -> list[str]:
@@ -348,7 +349,7 @@ def restore_backup(connection: sqlite3.Connection, serialized: bytes, checksum: 
 
 
 def verify_aircraft_state_backfill() -> None:
-    connection = sqlite3.connect(":memory:")
+    connection = sqlite3.connect(MEMORY_DATABASE)
     apply_schema(connection, "0037_cashier_ticket_search.sql")
     seed_source(connection, include_recurring=False)
     connection.execute(
@@ -400,9 +401,9 @@ def main() -> None:
     started = time.monotonic()
     verify_aircraft_state_backfill()
     tables = backup_tables()
-    source = sqlite3.connect(":memory:")
-    legacy_target = sqlite3.connect(":memory:")
-    target = sqlite3.connect(":memory:")
+    source = sqlite3.connect(MEMORY_DATABASE)
+    legacy_target = sqlite3.connect(MEMORY_DATABASE)
+    target = sqlite3.connect(MEMORY_DATABASE)
     apply_schema(source)
     apply_schema(legacy_target)
     apply_schema(target)

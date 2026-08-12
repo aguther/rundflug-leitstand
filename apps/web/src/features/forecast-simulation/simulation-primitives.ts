@@ -11,7 +11,7 @@ export function createSeededRandom(seed: number): RandomSource {
   let value = seed >>> 0;
   return {
     next() {
-      value = (value + 0x6d2b79f5) | 0;
+      value = (value + 0x6d2b79f5) >>> 0;
       let result = Math.imul(value ^ (value >>> 15), 1 | value);
       result = (result + Math.imul(result ^ (result >>> 7), 61 | result)) ^ result;
       return ((result ^ (result >>> 14)) >>> 0) / 4_294_967_296;

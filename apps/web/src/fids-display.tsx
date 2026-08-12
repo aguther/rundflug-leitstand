@@ -464,7 +464,7 @@ export function FidsBoardPresentation({
             >
               <ChevronRight aria-hidden="true" />
             </button>
-            <button onClick={() => void onCopyLink?.()} type="button">
+            <button onClick={onCopyLink} type="button">
               <Copy aria-hidden="true" /> {linkCopied ? "Kopiert" : "Link kopieren"}
             </button>
             <button onClick={onStopSetup} type="button">

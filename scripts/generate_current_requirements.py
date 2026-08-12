@@ -21,6 +21,9 @@ LEGACY_DELTA_SOURCES = sorted(
 CURRENT_YAML = ROOT / f"docs/requirements/requirements-v{VERSION}.yaml"
 CURRENT_MD = ROOT / f"docs/requirements/requirements-v{VERSION}.md"
 CURRENT_TRACE = ROOT / f"docs/requirements/traceability-v{VERSION}.csv"
+BASE_SOURCE = "1.4-konsolidiert"
+FLIGHT_DIRECTOR_ROLE = "Flight Director"
+PRIORITY_COLUMN = "Priorität"
 
 RELEASE_1_10_REQUIREMENTS = [
     {
@@ -408,10 +411,10 @@ def current_terms(value: object) -> str:
         ("Flight Line Assist", "Flight Line"),
         ("Flight-Line-Supervisor-Ansicht", "Flight-Director-Ansicht"),
         ("Desktop-Supervisor-Ansicht", "Flight-Director-Ansicht"),
-        ("Desktop-Supervisor", "Flight Director"),
+        ("Desktop-Supervisor", FLIGHT_DIRECTOR_ROLE),
         ("Assistenzansicht", "Flight-Line-Ansicht"),
-        ("Flugleitung", "Flight Director"),
-        ("Supervisor", "Flight Director"),
+        ("Flugleitung", FLIGHT_DIRECTOR_ROLE),
+        ("Supervisor", FLIGHT_DIRECTOR_ROLE),
     ]
     for old, new in replacements:
         text = text.replace(old, new)
@@ -426,7 +429,7 @@ def current_requirements() -> list[dict[str, object]]:
     normalized = [
         {
             "id": item["id"],
-            "source": "1.4-konsolidiert",
+            "source": BASE_SOURCE,
             "section": item["section"],
             "requirement": CURRENT_BASE_REQUIREMENT_OVERRIDES.get(
                 item["id"], current_terms(item["requirement"])
@@ -507,9 +510,9 @@ def render_markdown(requirements: list[dict[str, object]]) -> str:
     historical_deltas = [
         item
         for item in requirements
-        if item["id"] not in release_ids and item["source"] != "1.4-konsolidiert"
+        if item["id"] not in release_ids and item["source"] != BASE_SOURCE
     ]
-    base = [item for item in requirements if item["source"] == "1.4-konsolidiert"]
+    base = [item for item in requirements if item["source"] == BASE_SOURCE]
     lines = [
         f"# Kumulativer Anforderungskatalog – Release {VERSION}",
         "",
@@ -597,7 +600,7 @@ def render_traceability() -> str:
                 {
                     "ID": current_item["id"],
                     "Stufe": current_item["stage"],
-                    "Priorität": current_item["priority"],
+                    PRIORITY_COLUMN: current_item["priority"],
                     "Abschnitt": current_item["section"],
                     "Kurzbeschreibung": current_item["requirement"],
                     "Issue": "",
@@ -611,7 +614,7 @@ def render_traceability() -> str:
             {
                 "ID": item["id"],
                 "Stufe": "V1",
-                "Priorität": "MUSS",
+                PRIORITY_COLUMN: "MUSS",
                 "Abschnitt": item["section"],
                 "Kurzbeschreibung": item["requirement"],
                 "Issue": "",
@@ -625,7 +628,7 @@ def render_traceability() -> str:
             {
                 "ID": item["id"],
                 "Stufe": item["stage"],
-                "Priorität": item["priority"],
+                PRIORITY_COLUMN: item["priority"],
                 "Abschnitt": item["section"],
                 "Kurzbeschreibung": item["requirement"],
                 "Issue": "",
@@ -640,7 +643,7 @@ def render_traceability() -> str:
         fieldnames=[
             "ID",
             "Stufe",
-            "Priorität",
+            PRIORITY_COLUMN,
             "Abschnitt",
             "Kurzbeschreibung",
             "Issue",

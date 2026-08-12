@@ -1206,7 +1206,7 @@ export function CashierView() {
                 value={ticketSearch}
                 onChange={(event) => setTicketSearch(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") void runTicketSearch();
+                  if (event.key === "Enter") runTicketSearch();
                 }}
                 placeholder="Suche (z. B. Gruppe, Produkt)"
               />
