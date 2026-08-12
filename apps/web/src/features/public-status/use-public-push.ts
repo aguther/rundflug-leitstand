@@ -65,6 +65,108 @@ function capabilityMessage(capability: PushCapability): string | null {
   return null;
 }
 
+interface LoadedPushState {
+  enabled: boolean;
+  capability: PushCapability;
+  message: string | null;
+  publicKey: string | null;
+}
+
+async function loadPushState(storageKey: string): Promise<LoadedPushState> {
+  const [subscription, configuration] = await Promise.all([
+    navigator.serviceWorker.ready.then((registration) =>
+      registration.pushManager.getSubscription(),
+    ),
+    getPushConfiguration(),
+  ]);
+  const locallyEnabled = Boolean(subscription) && window.localStorage.getItem(storageKey) === "1";
+  if (configuration.configured) {
+    return {
+      enabled: locallyEnabled,
+      capability: "ready",
+      message:
+        Notification.permission === "denied"
+          ? "Benachrichtigungen wurden auf diesem Gerät abgelehnt. Bitte in den Systemeinstellungen erlauben."
+          : null,
+      publicKey: configuration.publicKey,
+    };
+  }
+  if (locallyEnabled) {
+    return { enabled: true, capability: "ready", message: null, publicKey: null };
+  }
+  return {
+    enabled: false,
+    capability: "unconfigured",
+    message: capabilityMessage("unconfigured"),
+    publicKey: null,
+  };
+}
+
+async function revokePush(
+  target: PublicStatusTarget,
+  code: string,
+  subscription: PushSubscription,
+): Promise<void> {
+  if (target === "group") await revokeGroupPush(code, subscription.endpoint);
+  else await revokeTicketPush(code, subscription.endpoint);
+}
+
+async function registerPush(
+  target: PublicStatusTarget,
+  code: string,
+  subscription: PushSubscription,
+): Promise<void> {
+  if (target === "group") await registerGroupPush(code, subscription);
+  else await registerTicketPush(code, subscription);
+}
+
+async function disablePush(
+  target: PublicStatusTarget,
+  code: string,
+  storageKey: string,
+  existing: PushSubscription | null,
+): Promise<string> {
+  if (existing) {
+    await revokePush(target, code, existing);
+    await existing.unsubscribe();
+  }
+  window.localStorage.removeItem(storageKey);
+  return "Benachrichtigungen wurden deaktiviert.";
+}
+
+async function enablePush(
+  target: PublicStatusTarget,
+  code: string,
+  storageKey: string,
+  publicKey: string | null,
+  registration: ServiceWorkerRegistration,
+  existing: PushSubscription | null,
+): Promise<string> {
+  if (Notification.permission === "denied") {
+    throw new Error(
+      "Benachrichtigungen wurden auf diesem Gerät abgelehnt. Bitte in den Systemeinstellungen erlauben.",
+    );
+  }
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") {
+    throw new Error("Benachrichtigungen wurden nicht erlaubt.");
+  }
+  if (!publicKey && !existing) {
+    throw new Error("Benachrichtigungen sind für diese Veranstaltung noch nicht eingerichtet.");
+  }
+  const subscription =
+    existing ??
+    (await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: publicKey as string,
+    }));
+  await registerPush(target, code, subscription);
+  window.localStorage.setItem(storageKey, "1");
+  return target === "group"
+    ? "Benachrichtigungen sind für diese Gruppe aktiviert."
+    : "Benachrichtigungen sind für dieses Ticket aktiviert.";
+}
+
 export function usePublicPush(target: PublicStatusTarget, code: string) {
   const storageKey = `${target}-push:${code}`;
   const [enabled, setEnabled] = useState(false);
@@ -84,31 +186,13 @@ export function usePublicPush(target: PublicStatusTarget, code: string) {
     setPublicKey(null);
     if (environment !== "checking") return () => undefined;
 
-    void Promise.all([
-      navigator.serviceWorker.ready.then((registration) =>
-        registration.pushManager.getSubscription(),
-      ),
-      getPushConfiguration(),
-    ])
-      .then(([subscription, configuration]) => {
+    void loadPushState(storageKey)
+      .then((state) => {
         if (!active) return;
-        const locallyEnabled =
-          Boolean(subscription) && window.localStorage.getItem(storageKey) === "1";
-        setEnabled(locallyEnabled);
-        if (configuration.configured) {
-          setPublicKey(configuration.publicKey);
-          setCapability("ready");
-          setMessage(
-            Notification.permission === "denied"
-              ? "Benachrichtigungen wurden auf diesem Gerät abgelehnt. Bitte in den Systemeinstellungen erlauben."
-              : null,
-          );
-        } else if (locallyEnabled) {
-          setCapability("ready");
-        } else {
-          setCapability("unconfigured");
-          setMessage(capabilityMessage("unconfigured"));
-        }
+        setEnabled(state.enabled);
+        setCapability(state.capability);
+        setMessage(state.message);
+        setPublicKey(state.publicKey);
       })
       .catch(() => {
         if (!active) return;
@@ -128,43 +212,21 @@ export function usePublicPush(target: PublicStatusTarget, code: string) {
       const registration = await navigator.serviceWorker.ready;
       const existing = await registration.pushManager.getSubscription();
       if (!nextEnabled) {
-        if (existing) {
-          if (target === "group") await revokeGroupPush(code, existing.endpoint);
-          else await revokeTicketPush(code, existing.endpoint);
-          await existing.unsubscribe();
-        }
-        window.localStorage.removeItem(storageKey);
+        const disabledMessage = await disablePush(target, code, storageKey, existing);
         setEnabled(false);
-        setMessage("Benachrichtigungen wurden deaktiviert.");
+        setMessage(disabledMessage);
         return;
       }
-      if (Notification.permission === "denied") {
-        throw new Error(
-          "Benachrichtigungen wurden auf diesem Gerät abgelehnt. Bitte in den Systemeinstellungen erlauben.",
-        );
-      }
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        throw new Error("Benachrichtigungen wurden nicht erlaubt.");
-      }
-      if (!publicKey && !existing) {
-        throw new Error("Benachrichtigungen sind für diese Veranstaltung noch nicht eingerichtet.");
-      }
-      const subscription =
-        existing ??
-        (await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: publicKey as string,
-        }));
-      if (target === "group") await registerGroupPush(code, subscription);
-      else await registerTicketPush(code, subscription);
-      window.localStorage.setItem(storageKey, "1");
-      setEnabled(true);
-      setMessage(
-        target === "group"
-          ? "Benachrichtigungen sind für diese Gruppe aktiviert."
-          : "Benachrichtigungen sind für dieses Ticket aktiviert.",
+      const enabledMessage = await enablePush(
+        target,
+        code,
+        storageKey,
+        publicKey,
+        registration,
+        existing,
       );
+      setEnabled(true);
+      setMessage(enabledMessage);
     } catch (reason) {
       setEnabled(false);
       setMessage(
