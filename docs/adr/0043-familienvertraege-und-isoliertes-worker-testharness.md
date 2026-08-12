@@ -31,6 +31,9 @@ Verifier konnten nicht sicher parallel laufen.
 - Verifier dürfen parallel laufen, ohne `.wrangler/state`, einen festen Port oder gebaute Web-Assets
   zu teilen. Spezialisierte Langzeit- und Performance-Harnesses dürfen eigene Ressourcensteuerung
   behalten, müssen ihre Zustände ebenfalls explizit isolieren.
+- Die semantisch identischen Aktiv-, Oberflächen- und Control-Regeln der Administration sowie von
+  Flight Director und Flight-Line-Assist werden in gemeinsamen Selektorgruppen konsolidiert. Die
+  vorhandenen Designsystem-Tokens, Selektorspezifitäten und sichtbaren Zustände bleiben unverändert.
 
 ## Folgen
 
@@ -42,3 +45,7 @@ Lokale Integrationsläufe benötigen kein vorheriges Web-Build und können siche
 Das Harness selbst bleibt ein Testwerkzeug ohne Produktionsabhängigkeit; temporäre Zustände und
 Worker-Prozesse werden auch bei Fehlern beseitigt. Die fachlichen Assertions der migrierten Verifier
 bleiben unverändert.
+
+Die konsolidierten CSS-Regeln reduzieren mehrfache Pflege derselben semantischen Zustände, ohne neue
+globale Utility-Klassen oder eine zusätzliche Stylesheet-Abhängigkeit einzuführen. Light- und
+Dark-Mode verwenden weiterhin ausschließlich die bestehenden `--ui-*`-Tokens.

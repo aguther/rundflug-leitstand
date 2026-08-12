@@ -599,11 +599,6 @@
   color: var(--ui-muted);
   font-size: 0.86rem;
 }
-.admin-side-nav button.active {
-  border-bottom-color: var(--ui-accent);
-  background: transparent;
-  color: var(--ui-accent);
-}
 .admin-nav-icon {
   width: 17px;
   height: 17px;
@@ -658,6 +653,7 @@
   background: transparent;
   text-align: center;
 }
+.admin-side-nav button.active,
 .admin-workspace.master-data-active > .master-data-nav button.active {
   border-bottom-color: var(--ui-accent);
   background: transparent;

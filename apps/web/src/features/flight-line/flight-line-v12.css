@@ -1070,7 +1070,9 @@
 }
 
 .flight-director-timeline,
-.flight-director-next-step {
+.flight-director-next-step,
+.flight-director-aircraft-details :is(strong, small),
+.flight-director-compact-table.tickets > div:not(.flight-director-compact-head) > * {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1591,12 +1593,6 @@ html:has(.flight-director-assignment-modal) {
   cursor: pointer;
 }
 
-.flight-director-pilot-options > label:has(input:checked) {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  box-shadow: inset 3px 0 var(--ui-accent);
-}
-
 .flight-director-pilot-options > label.disabled {
   cursor: not-allowed;
   opacity: 0.58;
@@ -2079,13 +2075,6 @@ html:has(.flight-director-assignment-modal) {
   gap: 3px;
 }
 
-.flight-director-aircraft-details :is(strong, small) {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .flight-director-aircraft-details small {
   color: var(--ui-muted);
   font-size: 0.65rem;
@@ -2251,7 +2240,8 @@ html:has(.flight-director-assignment-modal) {
   color: var(--ui-success);
 }
 
-.flight-director-phase-icon {
+.flight-director-phase-icon,
+.flight-director-compact-table.tickets .ticket-analytics-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2259,13 +2249,6 @@ html:has(.flight-director-assignment-modal) {
 
 .flight-director-compact-table.tickets {
   scrollbar-gutter: stable;
-}
-
-.flight-director-compact-table.tickets > div:not(.flight-director-compact-head) > * {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .flight-director-compact-table.tickets .flight-director-compact-head > span {
@@ -2308,12 +2291,6 @@ html:has(.flight-director-assignment-modal) {
   max-height: min(62vh, 560px);
   overflow: auto;
   scrollbar-gutter: stable;
-}
-
-.flight-director-compact-table.tickets .ticket-analytics-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .flight-director-compact-table.tickets .ticket-analytics-action .ds-icon-button {
@@ -2983,12 +2960,6 @@ html:has(.flight-director-assignment-modal) {
   cursor: pointer;
 }
 
-.flight-director-resource-layout > aside button:hover,
-.flight-director-resource-layout > aside button.active {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-}
-
 .flight-director-resource-layout > aside button > svg {
   width: 18px;
   height: 18px;
@@ -3158,6 +3129,7 @@ html:has(.flight-director-assignment-modal) {
   text-align: left;
 }
 
+.flight-director-pilot-options > label:has(input:checked),
 .aircraft-selector-rail button.selected {
   border-color: var(--ui-accent);
   background: var(--ui-accent-soft);
@@ -3273,7 +3245,22 @@ html:has(.flight-director-assignment-modal) {
 .flight-line-console-nav,
 .console-aircraft-list,
 .console-aircraft-table-head,
-.console-matrix-head {
+.console-matrix-head,
+.console-aircraft-rows > button,
+.console-matrix-row,
+.console-next-groups > button,
+.matrix-recommendation,
+.console-status-matrix,
+.console-next-groups,
+.console-aircraft-detail,
+.console-info-note,
+.assist-shell,
+.assist-header,
+.assist-pick-list,
+.assist-current,
+.assist-gate-groups,
+.assist-aircraft-cards article,
+.assist-current-summary {
   color: var(--ui-text);
   border-color: var(--ui-border);
   background: var(--ui-surface);
@@ -3324,7 +3311,10 @@ html:has(.flight-director-assignment-modal) {
   border-radius: 8px;
 }
 
-.queue-group-option.selected {
+.flight-director-resource-layout > aside button:hover,
+.flight-director-resource-layout > aside button.active,
+.queue-group-option.selected,
+.assist-gate-groups > div.selected {
   border-color: var(--ui-accent);
   background: var(--ui-accent-soft);
 }
@@ -3350,11 +3340,6 @@ html:has(.flight-director-assignment-modal) {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.assist-gate-groups > div.selected {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
 }
 
 .assist-gate-groups label {
@@ -3480,19 +3465,15 @@ html:has(.flight-director-assignment-modal) {
 .console-toolbar button,
 .console-toolbar summary,
 .matrix-details,
-.matrix-recommendation button {
+.matrix-recommendation button,
+.assist-live,
+.assist-device,
+.assist-actions button,
+.assist-section-heading > button,
+.assist-more {
   color: var(--ui-text);
   border-color: var(--ui-border);
   background: var(--ui-control);
-}
-
-.console-aircraft-rows > button,
-.console-matrix-row,
-.console-next-groups > button,
-.matrix-recommendation {
-  color: var(--ui-text);
-  border-color: var(--ui-border);
-  background: var(--ui-surface);
 }
 
 .console-aircraft-rows > button:hover,
@@ -3512,15 +3493,6 @@ html:has(.flight-director-assignment-modal) {
   background: var(--ui-control);
 }
 
-.console-status-matrix,
-.console-next-groups,
-.console-aircraft-detail,
-.console-info-note {
-  color: var(--ui-text);
-  border-color: var(--ui-border);
-  background: var(--ui-surface);
-}
-
 .flight-assist {
   --assist-border: var(--ui-border);
   --assist-panel: var(--ui-surface);
@@ -3531,34 +3503,12 @@ html:has(.flight-director-assignment-modal) {
   background: var(--ui-bg);
 }
 
-.assist-shell,
-.assist-header,
-.assist-pick-list,
-.assist-current,
-.assist-gate-groups,
-.assist-aircraft-cards article,
-.assist-current-summary {
-  color: var(--ui-text);
-  border-color: var(--ui-border);
-  background: var(--ui-surface);
-}
-
 .assist-header {
   grid-template-columns: minmax(250px, 1fr) auto auto minmax(320px, auto);
 }
 
 .assist-brand > .brand-mark {
   flex: 0 0 auto;
-}
-
-.assist-live,
-.assist-device,
-.assist-actions button,
-.assist-section-heading > button,
-.assist-more {
-  color: var(--ui-text);
-  border-color: var(--ui-border);
-  background: var(--ui-control);
 }
 
 .assist-header-tools {

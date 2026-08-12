@@ -199,6 +199,10 @@ Reset, `DISPLAY` besitzt ausschließlich Lesezugriff auf die Boardprojektion.
 - Kasse, Flight Line und Administration trennen Controller-Hooks von präsentierenden
   Feature-Komponenten. Ein Größen-Ratchet verhindert erneutes Wachstum der bisherigen Sammelmodule;
   `operation-workspace.tsx` ist nur noch eine Kompatibilitätsfassade.
+- Identische semantische Aktiv-, Oberflächen- und Control-Zustände innerhalb der Admin- und
+  Flight-Line-Stylesheets werden über gemeinsame Selektorgruppen auf die zentralen `--ui-*`-Tokens
+  abgebildet. Dadurch bleiben Light-/Dark-Darstellung und Spezifität erhalten, ohne die Regeln pro
+  Teiloberfläche zu duplizieren.
 
 ## 8.10 Zeit, Sprache und Texte
 
