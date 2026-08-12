@@ -1,6 +1,6 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import { CheckCircle2, Clock3, LockKeyhole } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { SetupStep } from "../../../admin-ux";
 import {
   Button,
@@ -27,6 +27,103 @@ interface AdminOperationsPanelProps {
   setupSteps: SetupStep[];
 }
 
+function AdminEventReleasePanel({
+  administrator,
+  board,
+  completedSetupSteps,
+  onEndOperations,
+  onOpenSetupStep,
+  onReleaseOperations,
+  setupComplete,
+  setupSteps,
+}: Pick<
+  AdminOperationsPanelProps,
+  | "administrator"
+  | "board"
+  | "completedSetupSteps"
+  | "onOpenSetupStep"
+  | "setupComplete"
+  | "setupSteps"
+> & {
+  onEndOperations: () => void;
+  onReleaseOperations: () => void | Promise<void>;
+}) {
+  const eventIsReleased = board.event.status === "ACTIVE" || board.event.status === "CLOSED";
+  let releaseDetails: ReactNode;
+  if (eventIsReleased) {
+    releaseDetails = (
+      <>
+        <p className="event-release-ready">
+          <CheckCircle2 aria-hidden="true" />{" "}
+          {board.event.status === "ACTIVE"
+            ? "Der Veranstaltungsbetrieb ist freigegeben."
+            : "Der Veranstaltungsbetrieb ist geschlossen."}
+        </p>
+        {board.event.status === "ACTIVE" ? (
+          <div className="event-release-action">
+            <Button disabled={!administrator} onClick={onEndOperations} variant="danger">
+              Betrieb beenden
+            </Button>
+          </div>
+        ) : null}
+      </>
+    );
+  } else if (!setupComplete) {
+    releaseDetails = (
+      <>
+        <p>
+          Die Veranstaltung ist noch nicht betriebsbereit. Bitte erledige die offenen Punkte, um den
+          Betrieb freizugeben.
+        </p>
+        <ul className="event-release-missing">
+          {setupSteps
+            .slice(0, 6)
+            .filter((step) => !step.complete)
+            .map((step) => (
+              <li key={step.id}>
+                <Clock3 aria-hidden="true" />
+                <Button onClick={() => onOpenSetupStep(step)} size="compact" variant="ghost">
+                  {step.label} fehlt
+                </Button>
+              </li>
+            ))}
+        </ul>
+      </>
+    );
+  } else {
+    releaseDetails = (
+      <p className="event-release-ready">
+        <CheckCircle2 aria-hidden="true" /> Alle Einrichtungsschritte sind abgeschlossen.
+      </p>
+    );
+  }
+  return (
+    <Panel className="event-release-v15" padding="compact">
+      <PageHeader
+        actions={
+          <StatusPill tone={eventIsReleased || setupComplete ? "success" : "warning"}>
+            {eventIsReleased ? "Freigegeben" : `${completedSetupSteps}/6 erledigt`}
+          </StatusPill>
+        }
+        level={2}
+        title="Betriebsfreigabe"
+      />
+      {releaseDetails}
+      {!eventIsReleased ? (
+        <div className="event-release-action">
+          <Button
+            disabled={!administrator || !setupComplete}
+            onClick={onReleaseOperations}
+            variant="primary"
+          >
+            <LockKeyhole aria-hidden="true" /> Betrieb freigeben
+          </Button>
+        </div>
+      ) : null}
+    </Panel>
+  );
+}
+
 export function AdminOperationsPanel({
   administrator,
   board,
@@ -44,8 +141,6 @@ export function AdminOperationsPanel({
   const [pendingEmergencyAction, setPendingEmergencyAction] = useState<EmergencyAction | null>(
     null,
   );
-  const eventIsReleased = board.event.status === "ACTIVE" || board.event.status === "CLOSED";
-
   async function confirmEmergencyAction() {
     const action = pendingEmergencyAction;
     setPendingEmergencyAction(null);
@@ -66,77 +161,18 @@ export function AdminOperationsPanel({
       <OperationsWorkspace
         board={board}
         release={
-          <Panel className="event-release-v15" padding="compact">
-            <PageHeader
-              actions={
-                <StatusPill tone={eventIsReleased || setupComplete ? "success" : "warning"}>
-                  {eventIsReleased ? "Freigegeben" : `${completedSetupSteps}/6 erledigt`}
-                </StatusPill>
-              }
-              level={2}
-              title="Betriebsfreigabe"
-            />
-            {eventIsReleased ? (
-              <>
-                <p className="event-release-ready">
-                  <CheckCircle2 aria-hidden="true" />{" "}
-                  {board.event.status === "ACTIVE"
-                    ? "Der Veranstaltungsbetrieb ist freigegeben."
-                    : "Der Veranstaltungsbetrieb ist geschlossen."}
-                </p>
-                {board.event.status === "ACTIVE" ? (
-                  <div className="event-release-action">
-                    <Button
-                      disabled={!administrator}
-                      onClick={() => setEndOperationsConfirmOpen(true)}
-                      variant="danger"
-                    >
-                      Betrieb beenden
-                    </Button>
-                  </div>
-                ) : null}
-              </>
-            ) : !setupComplete ? (
-              <>
-                <p>
-                  Die Veranstaltung ist noch nicht betriebsbereit. Bitte erledige die offenen
-                  Punkte, um den Betrieb freizugeben.
-                </p>
-                <ul className="event-release-missing">
-                  {setupSteps
-                    .slice(0, 6)
-                    .filter((step) => !step.complete)
-                    .map((step) => (
-                      <li key={step.id}>
-                        <Clock3 aria-hidden="true" />
-                        <Button
-                          onClick={() => onOpenSetupStep(step)}
-                          size="compact"
-                          variant="ghost"
-                        >
-                          {step.label} fehlt
-                        </Button>
-                      </li>
-                    ))}
-                </ul>
-              </>
-            ) : (
-              <p className="event-release-ready">
-                <CheckCircle2 aria-hidden="true" /> Alle Einrichtungsschritte sind abgeschlossen.
-              </p>
-            )}
-            {!eventIsReleased ? (
-              <div className="event-release-action">
-                <Button
-                  disabled={!administrator || !setupComplete}
-                  onClick={() => onRequestAdminAction(async () => onSetEventLifecycle("ACTIVE"))}
-                  variant="primary"
-                >
-                  <LockKeyhole aria-hidden="true" /> Betrieb freigeben
-                </Button>
-              </div>
-            ) : null}
-          </Panel>
+          <AdminEventReleasePanel
+            administrator={administrator}
+            board={board}
+            completedSetupSteps={completedSetupSteps}
+            onEndOperations={() => setEndOperationsConfirmOpen(true)}
+            onOpenSetupStep={onOpenSetupStep}
+            onReleaseOperations={() =>
+              onRequestAdminAction(async () => onSetEventLifecycle("ACTIVE"))
+            }
+            setupComplete={setupComplete}
+            setupSteps={setupSteps}
+          />
         }
         emergency={
           <Panel className="admin-emergency-section" padding="compact">
