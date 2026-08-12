@@ -132,6 +132,331 @@ describe("forecast pipeline module boundaries", () => {
     });
   });
 
+  it("projects availability, persisted dispatch state, plans, and split-group ordering", () => {
+    const draftRotation = {
+      id: "rotation-draft-1",
+      status: "DRAFT",
+      created_at: "2026-08-12T08:30:00.000Z",
+      called_at: null,
+      departed_at: null,
+      landed_at: null,
+      completed_at: null,
+      aircraft_id: null,
+      pilot_id: null,
+      flight_group_id: "flight-group-1",
+      flight_group_version: 2,
+      precalled_at: null,
+      precall_decision_status: "GO_TO_GATE",
+      resource_group_id: "resource-1",
+      resource_group_status: "ACTIVE",
+      resource_group_precall_enabled: 1,
+      product_id: "product-1",
+      queue_sequence: 1,
+      segment_order: 1,
+      communication_number: 1,
+      current_group_ids_json: '["booking-group-1"]',
+      sold_at: "2026-08-12T08:30:00.000Z",
+      standby: 0,
+      attendance_status: "PRESENT",
+      ticket_count: 2,
+      reference_duration_minutes: 20,
+      product_code: "P20",
+      aircraft_type: null,
+      gate_id: "gate-1",
+      gate_travel_lead_minutes: 3,
+      predicted_boarding_at: "2026-08-12T09:10:00.000Z",
+      predicted_departure_at: "2026-08-12T09:15:00.000Z",
+      predicted_landing_at: "2026-08-12T09:35:00.000Z",
+      predicted_completion_at: "2026-08-12T09:41:00.000Z",
+      prediction_lower_minutes: 5,
+      prediction_upper_minutes: 15,
+      forecast_assumed_aircraft_id: "aircraft-1",
+      turnaround_boarding_minutes: null,
+      turnaround_deboarding_minutes: null,
+      turnaround_buffer_minutes: null,
+      turnaround_boarding_source: null,
+      turnaround_deboarding_source: null,
+      turnaround_buffer_source: null,
+      dispatch_plan_id: "stored-plan",
+      dispatch_plan_revision: "stored-revision",
+      dispatch_batch_id: "stored-batch",
+      dispatch_order: 1,
+      dispatch_wave: 1,
+      dispatch_lane_id: "aircraft-1:pilot-1",
+      dispatch_group_ids_json: '["booking-group-1"]',
+      dispatch_occupied_seats: 2,
+      dispatch_available_seats: 4,
+      dispatch_commitment_level: "COME_TO_FLIGHT_LINE",
+      dispatch_decision_reasons_json: "[]",
+      dispatch_confirmed_overtake_count: 0,
+      dispatch_projected_overtake_count: 0,
+      dispatch_unplanned_reason: null,
+    };
+    const secondSegment = {
+      ...draftRotation,
+      id: "rotation-draft-2",
+      flight_group_id: "flight-group-2",
+      segment_order: 2,
+      dispatch_batch_id: null,
+      dispatch_order: null,
+      dispatch_lane_id: null,
+      dispatch_unplanned_reason: "NOT_IN_NEAR_DISPATCH_BATCH",
+    };
+    const activeRotation = {
+      ...draftRotation,
+      id: "rotation-active",
+      status: "CALLED",
+      called_at: "2026-08-12T08:50:00.000Z",
+      aircraft_id: "aircraft-1",
+      pilot_id: "pilot-1",
+      current_group_ids_json: '["booking-group-2"]',
+      dispatch_plan_revision: null,
+      dispatch_batch_id: null,
+      dispatch_order: null,
+      dispatch_lane_id: null,
+      turnaround_boarding_minutes: 6,
+      turnaround_deboarding_minutes: 5,
+      turnaround_buffer_minutes: 3,
+      turnaround_boarding_source: "AIRCRAFT_PRODUCT:aircraft-1:product-1",
+      turnaround_deboarding_source: "PRODUCT:product-1",
+      turnaround_buffer_source: "EVENT:event-1",
+    };
+    const data = {
+      event: EVENT_ROW,
+      rotationRows: {
+        ...emptyResult(),
+        results: [draftRotation, secondSegment, activeRotation],
+      },
+      durationRows: {
+        ...emptyResult(),
+        results: [
+          {
+            minutes: 23,
+            completed_at: "2026-08-12T08:00:00.000Z",
+            operation_day_id: "event-1",
+            product_code: "P20",
+            aircraft_type: "TYPE-A",
+          },
+        ],
+      },
+      capacityRows: {
+        ...emptyResult(),
+        results: [
+          {
+            resource_group_id: "resource-1",
+            current_pilot_id: "pilot-1",
+            aircraft_id: "aircraft-1",
+            passenger_seats: 4,
+            operational_state: "AVAILABLE",
+            operational_interrupted: 0,
+            predicted_completion_at: null,
+            expected_review_at: null,
+          },
+          {
+            resource_group_id: "resource-1",
+            current_pilot_id: null,
+            aircraft_id: "aircraft-2",
+            passenger_seats: 3,
+            operational_state: "REFUELING",
+            operational_interrupted: 0,
+            predicted_completion_at: "2026-08-12T09:20:00.000Z",
+            expected_review_at: "2026-08-12T09:10:00.000Z",
+          },
+        ],
+      },
+      turnaroundOverrideRows: {
+        ...emptyResult(),
+        results: [
+          {
+            product_id: "product-1",
+            aircraft_id: "aircraft-1",
+            product_boarding: 7,
+            product_deboarding: null,
+            product_buffer: 4,
+            aircraft_boarding: 8,
+            aircraft_deboarding: 6,
+            aircraft_buffer: null,
+          },
+        ],
+      },
+      pilotRows: {
+        ...emptyResult(),
+        results: [
+          {
+            id: "pilot-1",
+            paused: 0,
+            pause_expected_review_at: null,
+            predicted_completion_at: null,
+          },
+          {
+            id: "pilot-2",
+            paused: 1,
+            pause_expected_review_at: "2026-08-12T09:15:00.000Z",
+            predicted_completion_at: "2026-08-12T09:05:00.000Z",
+          },
+        ],
+      },
+      gateWaitRows: {
+        ...emptyResult(),
+        results: [{ minutes: 9, gate_travel_lead_minutes: 3 }],
+      },
+      plannedOperationRows: {
+        ...emptyResult(),
+        results: [
+          {
+            id: "plan-event",
+            scope_type: "EVENT",
+            scope_id: "event-1",
+            effect_mode: "SLOWDOWN",
+            duration_multiplier_percent: 150,
+            status: "ACTIVE",
+            activated_at: "2026-08-12T08:55:00.000Z",
+            earliest_start_at: null,
+            latest_start_at: null,
+            minimum_duration_minutes: 5,
+            typical_duration_minutes: 10,
+            maximum_duration_minutes: 15,
+            after_rotation_id: null,
+            predicted_completion_at: null,
+            completed_at: null,
+          },
+          {
+            id: "plan-aircraft",
+            scope_type: "AIRCRAFT",
+            scope_id: "aircraft-1",
+            effect_mode: "BLOCKING",
+            duration_multiplier_percent: null,
+            status: "PLANNED",
+            activated_at: null,
+            earliest_start_at: null,
+            latest_start_at: null,
+            minimum_duration_minutes: 5,
+            typical_duration_minutes: 10,
+            maximum_duration_minutes: 15,
+            after_rotation_id: "rotation-active",
+            predicted_completion_at: "2026-08-12T09:41:00.000Z",
+            completed_at: null,
+          },
+        ],
+      },
+      recurringRuleRows: {
+        ...emptyResult(),
+        results: [
+          {
+            id: "rule-1",
+            scope_type: "AIRCRAFT",
+            scope_id: "aircraft-1",
+            trigger_metric: "COMPLETED_ROTATIONS",
+            interval_value: 4,
+            progress_value: 2,
+            minimum_duration_minutes: 5,
+            typical_duration_minutes: 10,
+            maximum_duration_minutes: 15,
+          },
+        ],
+      },
+      activeBlockRows: {
+        ...emptyResult(),
+        results: [
+          {
+            scope_type: "RESOURCE_GROUP",
+            scope_id: "resource-1",
+            expected_review_at: "2026-08-12T09:05:00.000Z",
+          },
+        ],
+      },
+      activeDispatchLeaseRows: {
+        ...emptyResult(),
+        results: [
+          {
+            id: "lease-1",
+            aircraft_id: "aircraft-1",
+            dispatch_batch_id: "locked-batch",
+            member_rotation_ids_json: '["rotation-draft-1"]',
+          },
+        ],
+      },
+    } as unknown as Parameters<typeof projectForecastTimelineInput>[0];
+
+    const result = projectForecastTimelineInput(
+      data,
+      "event-1",
+      new Date("2026-08-12T09:00:00.000Z"),
+    );
+
+    expect(result.forecastInput.capacities).toEqual([
+      expect.objectContaining({
+        resourceGroupId: "resource-1",
+        activeAircraft: 0,
+        unavailableReason: null,
+        availabilityLanes: expect.arrayContaining([
+          expect.objectContaining({
+            laneId: "aircraft-1:pilot-1",
+            constraints: expect.arrayContaining([expect.objectContaining({ id: "plan-aircraft" })]),
+            recurringConstraints: [expect.objectContaining({ id: "rule-1" })],
+          }),
+        ]),
+      }),
+    ]);
+    expect(result.forecastInput.previousDispatchPlan).toMatchObject({
+      planId: "stored-plan",
+      revision: "stored-revision",
+      batches: [expect.objectContaining({ id: "stored-batch" })],
+    });
+    expect(result.forecastInput.lockedDispatchBatches).toEqual([
+      expect.objectContaining({ id: "locked-batch", memberIds: ["rotation-draft-1"] }),
+    ]);
+    expect(result.forecastInput.rotations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "rotation-draft-2",
+          dispatchPredecessorMemberIds: ["rotation-draft-1"],
+          publicStatus: "COME_TO_FLIGHT_LINE",
+        }),
+        expect.objectContaining({
+          id: "rotation-active",
+          confirmedTurnaroundProfile: expect.objectContaining({
+            boardingMinutes: 6,
+            boardingSource: "AIRCRAFT_PRODUCT:aircraft-1:product-1",
+          }),
+        }),
+      ]),
+    );
+    expect(result.forecastInput.durationSamples).toEqual([
+      expect.objectContaining({ minutes: 23, productCode: "P20" }),
+    ]);
+  });
+
+  it("rejects active leases that reference unavailable draft members", () => {
+    const data = {
+      event: EVENT_ROW,
+      rotationRows: emptyResult(),
+      durationRows: emptyResult(),
+      capacityRows: emptyResult(),
+      turnaroundOverrideRows: emptyResult(),
+      pilotRows: emptyResult(),
+      gateWaitRows: emptyResult(),
+      plannedOperationRows: emptyResult(),
+      recurringRuleRows: emptyResult(),
+      activeBlockRows: emptyResult(),
+      activeDispatchLeaseRows: {
+        ...emptyResult(),
+        results: [
+          {
+            id: "lease-invalid",
+            aircraft_id: "aircraft-1",
+            dispatch_batch_id: "batch-invalid",
+            member_rotation_ids_json: '["missing-rotation"]',
+          },
+        ],
+      },
+    } as unknown as Parameters<typeof projectForecastTimelineInput>[0];
+
+    expect(() =>
+      projectForecastTimelineInput(data, "event-1", new Date("2026-08-12T09:00:00.000Z")),
+    ).toThrow("Active dispatch lease lease-invalid references unavailable members.");
+  });
+
   it("selects only precalls backed by a fresh dispatch batch", () => {
     const rotation = {
       id: "rotation-1",
