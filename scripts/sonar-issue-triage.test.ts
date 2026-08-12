@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -13,7 +14,7 @@ function property(name: string): string | undefined {
     ?.slice(name.length + 1);
 }
 
-describe("Sonar issue triage exclusions", () => {
+describe("Sonar analysis configuration", () => {
   it("publishes the application version used by the previous-version baseline", () => {
     expect(property("sonar.projectVersion")).toBe(packageManifest.version);
     expect(property("sonar.projectVersion")).not.toBe("not provided");
@@ -24,37 +25,25 @@ describe("Sonar issue triage exclusions", () => {
     expect(property("sonar.coverage.exclusions")).toBe("scripts/**");
   });
 
+  it("uses the CI Python version and does not classify SQLite as Oracle PL/SQL", () => {
+    expect(property("sonar.python.version")).toBe("3.13");
+    expect(property("sonar.plsql.file.suffixes")?.split(",")).toEqual([".plsql", ".pkb", ".pks"]);
+    expect(property("sonar.plsql.file.suffixes")).not.toContain(".sql,");
+    expect(property("sonar.plsql.file.suffixes")).not.toBe(".sql");
+  });
+
+  it("keeps binary PWA icons outside source analysis without excluding application code", () => {
+    const exclusions = property("sonar.exclusions")?.split(",") ?? [];
+
+    expect(exclusions).toContain("apps/web/public/**/*.png");
+    expect(exclusions).not.toContain("apps/**");
+    expect(exclusions).not.toContain("packages/**");
+  });
+
   it("keeps every false-positive criterion limited to one exact rule and file", () => {
     const criteria = property("sonar.issue.ignore.multicriteria")?.split(",") ?? [];
 
-    expect(criteria).toEqual([
-      "migration15",
-      "migration36",
-      "migration38",
-      "migration40",
-      "migration68",
-      "backupRestore",
-      "migration1Create",
-      "migration18Create",
-      "migration30Create",
-      "migration49Create",
-      "migration62Create",
-      "migration63Create",
-      "migration15Literals",
-      "migration19Literals",
-      "migration21Literals",
-      "migration29Literals",
-      "migration49Literals",
-      "migration50Literals",
-      "migration53Literals",
-      "migration55Literals",
-      "migration58Literals",
-      "migration60Literals",
-      "migration62Literals",
-      "migration64Literals",
-      "demoSeedLiterals",
-      "fidsSeedLiterals",
-    ]);
+    expect(criteria).toEqual(["backupRestore"]);
     for (const criterion of criteria) {
       const ruleKey = property(`sonar.issue.ignore.multicriteria.${criterion}.ruleKey`);
       const resourceKey = property(`sonar.issue.ignore.multicriteria.${criterion}.resourceKey`);
@@ -62,10 +51,33 @@ describe("Sonar issue triage exclusions", () => {
       expect(resourceKey).toMatch(/^(apps|scripts)\/[A-Za-z0-9_./-]+$/);
       expect(ruleKey).not.toContain("*");
       expect(resourceKey).not.toContain("*");
-      if (ruleKey?.startsWith("plsql:")) {
-        expect(resourceKey).toMatch(/^apps\/worker\/(migrations|seed)\/[A-Za-z0-9_-]+\.sql$/);
+      expect(ruleKey).not.toMatch(/^plsql:/);
+    }
+  });
+
+  it("keeps every tracked source-like text file valid UTF-8", () => {
+    const trackedFiles = execFileSync("git", ["ls-files", "apps", "packages", "scripts"], {
+      encoding: "utf8",
+    })
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .filter((path) =>
+        /\.(?:c?js|mjs|mts|py|sql|css|html|json|webmanifest|ya?ml|md|txt|toml|properties|svg|ps1|cmd|sh|tsx?)$/i.test(
+          path,
+        ),
+      );
+    const decoder = new TextDecoder("utf-8", { fatal: true });
+    const invalidFiles: string[] = [];
+
+    for (const path of trackedFiles) {
+      try {
+        decoder.decode(readFileSync(new URL(`../${path}`, import.meta.url)));
+      } catch {
+        invalidFiles.push(path);
       }
     }
+
+    expect(invalidFiles).toEqual([]);
   });
 
   it("does not disable issue analysis globally", () => {

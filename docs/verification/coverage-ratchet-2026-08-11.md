@@ -41,3 +41,21 @@ unverändert und wird nicht durch die niedrigeren Bestands-Ratchets ersetzt.
 Die zwei besonders rechenintensiven Forecast-Testdateien sowie ein einzelner 300-Gruppen-Test
 bleiben nur im instrumentierten Lauf ausgenommen. Die zugehörigen Produktionsdateien bleiben im
 Coverage-Nenner und die Tests weiterhin Bestandteil von `npm test` und `npm run check`.
+
+## Ratchet-Anhebung vom 12. August 2026
+
+Nach den Sonar-orientierten Domain- und Worker-Refactorings wurde die unveränderte vollständige
+Grundmenge auf Commit `9ee468ab27b4e3decd19face88e1c60453c695d9` erneut gemessen. Der Lauf
+bestand mit 306 Testdateien, 1.664 erfolgreichen und sechs gezielt übersprungenen Tests:
+
+| Kennzahl | Messwert | neue abgerundete Mindestschwelle |
+| --- | ---: | ---: |
+| Statements | 62,91 % (10.838 / 17.227) | 62 % |
+| Branches | 56,93 % (8.339 / 14.647) | 56 % |
+| Functions | 60,01 % (2.676 / 4.459) | 60 % |
+| Lines | 64,80 % (10.149 / 15.661) | 64 % |
+
+Die höheren Schwellen verhindern, dass die erreichte Bestandsabdeckung in folgenden Paketen wieder
+verloren geht. Sie sind weiterhin ein Ratchet, nicht das Ziel: Nach jedem reproduzierbar höheren
+Paket werden sie erneut auf den abgerundeten Messwert angehoben. Es wurden keine neuen
+Coverage-Exclusions hinzugefügt.
