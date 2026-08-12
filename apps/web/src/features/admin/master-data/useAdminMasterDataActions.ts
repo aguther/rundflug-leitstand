@@ -43,6 +43,35 @@ interface UseAdminMasterDataActionsOptions {
   setSubmitAttempted: (attempted: boolean) => void;
 }
 
+function invalidProductField(
+  editor: UseAdminMasterDataActionsOptions["editors"]["product"],
+  priceCents: number | null,
+) {
+  if (editor.name.trim().length < 2) return "product-name";
+  if (!/^[A-Z0-9-]{2,12}$/.test(editor.code)) return "product-code";
+  if (priceCents === null) return "product-price";
+  if (!editor.resourceGroupId) return "product-resource-group";
+  if (!editor.gateId) return "product-gate";
+  return null;
+}
+
+function invalidResourceGroupField(
+  editor: UseAdminMasterDataActionsOptions["editors"]["resourceGroup"],
+) {
+  if (editor.name.trim().length < 2) return "resource-name";
+  if (!/^[A-Z0-9-]{2,8}$/.test(editor.shortCode.trim().toUpperCase())) {
+    return "resource-short-code";
+  }
+  if (!editor.gateId) return "resource-gate";
+  return undefined;
+}
+
+function invalidAircraftField(editor: UseAdminMasterDataActionsOptions["editors"]["aircraft"]) {
+  if (editor.registration.trim().length < 3) return "aircraft-registration";
+  if (editor.type.trim().length < 2) return "aircraft-type";
+  return undefined;
+}
+
 export function useAdminMasterDataActions({
   administrator,
   board,
@@ -621,18 +650,7 @@ export function useAdminMasterDataActions({
 
   function requestProductSave() {
     setSubmitAttempted(true);
-    const invalidFieldId =
-      productEditor.name.trim().length < 2
-        ? "product-name"
-        : !/^[A-Z0-9-]{2,12}$/.test(productEditor.code)
-          ? "product-code"
-          : productPriceCents === null
-            ? "product-price"
-            : !productEditor.resourceGroupId
-              ? "product-resource-group"
-              : !productEditor.gateId
-                ? "product-gate"
-                : null;
+    const invalidFieldId = invalidProductField(productEditor, productPriceCents);
     if (invalidFieldId) {
       window.requestAnimationFrame(() => document.getElementById(invalidFieldId)?.focus());
       return;
@@ -650,24 +668,12 @@ export function useAdminMasterDataActions({
       return;
     }
     if (category === "resource-groups") {
-      const invalidFieldId =
-        resourceEditor.name.trim().length < 2
-          ? "resource-name"
-          : !/^[A-Z0-9-]{2,8}$/.test(resourceEditor.shortCode.trim().toUpperCase())
-            ? "resource-short-code"
-            : !resourceEditor.gateId
-              ? "resource-gate"
-              : undefined;
+      const invalidFieldId = invalidResourceGroupField(resourceEditor);
       requestMasterSave("resource-group", !invalidFieldId, invalidFieldId);
       return;
     }
     if (category === "aircraft") {
-      const invalidFieldId =
-        aircraftEditor.registration.trim().length < 3
-          ? "aircraft-registration"
-          : aircraftEditor.type.trim().length < 2
-            ? "aircraft-type"
-            : undefined;
+      const invalidFieldId = invalidAircraftField(aircraftEditor);
       requestMasterSave("aircraft", !invalidFieldId, invalidFieldId);
       return;
     }

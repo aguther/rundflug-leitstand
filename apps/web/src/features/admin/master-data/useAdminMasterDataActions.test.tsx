@@ -82,10 +82,12 @@ function renderActions({
   administrator = true,
   board = baseBoard,
   category = "gates",
+  editors = baseEditors,
 }: {
   administrator?: boolean;
   board?: OperationBoard;
   category?: MasterDataCategory;
+  editors?: typeof baseEditors;
 } = {}) {
   const clearPinWhenLocked = vi.fn();
   const finishEditor = vi.fn();
@@ -107,7 +109,7 @@ function renderActions({
       board,
       category,
       clearPinWhenLocked,
-      editors: baseEditors as never,
+      editors: editors as never,
       finishEditor,
       getAdminPin: () => "123456",
       onAssignmentComplete,
@@ -140,6 +142,7 @@ function renderActions({
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.clearAllMocks();
 });
 
@@ -227,6 +230,46 @@ describe("admin master-data actions", () => {
         }),
       }),
     );
+  });
+
+  it("focuses the first invalid product field without opening an admin action", () => {
+    const editors = {
+      ...baseEditors,
+      product: { ...baseEditors.product, gateId: "", name: "" },
+    };
+    const focus = vi.fn();
+    vi.spyOn(document, "getElementById").mockReturnValue({ focus } as unknown as HTMLElement);
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+    const { result, requestAdminAction } = renderActions({ category: "products", editors });
+
+    act(() => result.current.requestCurrentMasterSave());
+
+    expect(document.getElementById).toHaveBeenCalledWith("product-name");
+    expect(focus).toHaveBeenCalledOnce();
+    expect(requestAdminAction).not.toHaveBeenCalled();
+  });
+
+  it("validates aircraft registration before aircraft type", () => {
+    const editors = {
+      ...baseEditors,
+      aircraft: { ...baseEditors.aircraft, registration: "", type: "" },
+    };
+    const focus = vi.fn();
+    vi.spyOn(document, "getElementById").mockReturnValue({ focus } as unknown as HTMLElement);
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+    const { result, requestAdminAction } = renderActions({ category: "aircraft", editors });
+
+    act(() => result.current.requestCurrentMasterSave());
+
+    expect(document.getElementById).toHaveBeenCalledWith("aircraft-registration");
+    expect(focus).toHaveBeenCalledOnce();
+    expect(requestAdminAction).not.toHaveBeenCalled();
   });
 
   it("keeps aircraft assignment behind the authenticated busy boundary", async () => {
