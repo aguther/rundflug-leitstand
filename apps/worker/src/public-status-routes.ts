@@ -12,7 +12,14 @@ import {
   withBookingGroupPartProjection,
 } from "./booking-group-part-projection";
 import { sha256Hex } from "./crypto";
-import { PUBLIC_STATUS_MESSAGES, publicServicePausedMessage } from "./public-status-copy";
+import {
+  hasPublicServicePause,
+  type PredictionQuality,
+  publicDraftStatus,
+  publicPredictionQuality,
+  publicStatusMessage,
+  type ResourceGroupStatus,
+} from "./public-status-presentation";
 import {
   activeTicketGroupRecallProjection,
   predictedBoardingWindow,
@@ -25,8 +32,6 @@ type WorkerApp = Hono<{
 }>;
 
 type RotationStatus = NonCanceledRotationState;
-type PredictionQuality = "STABLE" | "CHANGING" | "UNCERTAIN";
-type ResourceGroupStatus = "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
 type DispatchUnplannedReason =
   | "NO_FORECAST_CAPACITY"
   | "WAITING_FOR_FITTING_LANE"
@@ -187,13 +192,15 @@ export function registerPublicStatusRoutes(
       predictionUpdatedAt: row.prediction_updated_at,
       now: new Date().toISOString(),
     });
-    const effectivePredictionQuality =
-      row.emergency_mode === 1 ||
-      row.operational_interrupted === 1 ||
-      row.resource_group_status === "INTERRUPTED" ||
-      row.resource_group_status === "ENDED"
-        ? "UNCERTAIN"
-        : forecastFreshness.quality;
+    const serviceState = {
+      emergencyMode: row.emergency_mode === 1,
+      operationalInterrupted: row.operational_interrupted === 1,
+      resourceGroupStatus: row.resource_group_status,
+    };
+    const effectivePredictionQuality = publicPredictionQuality(
+      serviceState,
+      forecastFreshness.quality,
+    );
     const prepare =
       row.status === "DRAFT" &&
       row.resource_group_status === "ACTIVE" &&
@@ -202,12 +209,9 @@ export function registerPublicStatusRoutes(
       row.precall_decision_status === "PREPARE";
     const publicStatus = derivePublicRotationStatus({
       rotationState: row.status,
-      draftStatus: row.precalled_at ? "COME_TO_FLIGHT_LINE" : prepare ? "PREPARE" : "WAITING",
+      draftStatus: publicDraftStatus(row.precalled_at, prepare),
     });
-    const servicePaused =
-      row.emergency_mode === 1 ||
-      row.operational_interrupted === 1 ||
-      row.resource_group_status !== "ACTIVE";
+    const servicePaused = hasPublicServicePause(serviceState);
     const lowerMinutes = row.prediction_lower_minutes ?? Math.max(0, (row.queue_sequence - 1) * 20);
     const upperMinutes = row.prediction_upper_minutes ?? row.queue_sequence * 30;
     const boardingWindow = predictedBoardingWindow({
@@ -265,15 +269,12 @@ export function registerPublicStatusRoutes(
       ...publicForecast,
       timeZone: row.time_zone,
       predictionQuality: effectivePredictionQuality,
-      message: servicePaused
-        ? publicServicePausedMessage({
-            emergencyMode: row.emergency_mode === 1,
-            resourceGroupActive: row.resource_group_status === "ACTIVE",
-            operationalInterrupted: row.operational_interrupted === 1,
-          })
-        : forecastFreshness.reason === "STALE_PREDICTION"
-          ? "Prognose wird aktualisiert – bitte Status erneut prüfen."
-          : PUBLIC_STATUS_MESSAGES[publicStatus],
+      message: publicStatusMessage({
+        ...serviceState,
+        forecastFreshnessReason: forecastFreshness.reason,
+        lifecycleStatus: publicStatus,
+        servicePaused,
+      }),
       operationalNotice:
         row.planned_public_note ||
         row.resource_group_operational_note ||
@@ -350,23 +351,19 @@ export function registerPublicStatusRoutes(
     }
 
     const readAt = new Date().toISOString();
-    const servicePaused =
-      group.emergency_mode === 1 ||
-      group.operational_interrupted === 1 ||
-      group.resource_group_status !== "ACTIVE";
+    const serviceState = {
+      emergencyMode: group.emergency_mode === 1,
+      operationalInterrupted: group.operational_interrupted === 1,
+      resourceGroupStatus: group.resource_group_status,
+    };
+    const servicePaused = hasPublicServicePause(serviceState);
     const parts = rotations.results.map((rotation) => {
       const freshness = assessForecastFreshness({
         predictionQuality: rotation.prediction_quality,
         predictionUpdatedAt: rotation.prediction_updated_at,
         now: readAt,
       });
-      const predictionQuality =
-        group.emergency_mode === 1 ||
-        group.operational_interrupted === 1 ||
-        group.resource_group_status === "INTERRUPTED" ||
-        group.resource_group_status === "ENDED"
-          ? "UNCERTAIN"
-          : freshness.quality;
+      const predictionQuality = publicPredictionQuality(serviceState, freshness.quality);
       const lowerMinutes =
         rotation.prediction_lower_minutes ?? Math.max(0, (rotation.queue_position - 1) * 20);
       const upperMinutes =
@@ -377,14 +374,9 @@ export function registerPublicStatusRoutes(
         rotation.precall_decision_status === "PREPARE";
       const lifecycleStatus = derivePublicRotationStatus({
         rotationState: rotation.status,
-        draftStatus: rotation.precalled_at
-          ? "COME_TO_FLIGHT_LINE"
-          : prepare
-            ? "PREPARE"
-            : "WAITING",
+        draftStatus: publicDraftStatus(rotation.precalled_at, prepare),
       });
       const publicStatus = servicePaused ? ("SERVICE_PAUSED" as const) : lifecycleStatus;
-      const lifecycleMessage = PUBLIC_STATUS_MESSAGES[lifecycleStatus];
       const boardingWindow = predictedBoardingWindow({
         status: rotation.status,
         quality: predictionQuality,
@@ -408,15 +400,12 @@ export function registerPublicStatusRoutes(
       const publishesWindow =
         publicForecast.forecastState === "DISPATCH_WINDOW" ||
         publicForecast.forecastState === "LONG_RANGE_WINDOW";
-      const message = servicePaused
-        ? publicServicePausedMessage({
-            emergencyMode: group.emergency_mode === 1,
-            resourceGroupActive: group.resource_group_status === "ACTIVE",
-            operationalInterrupted: group.operational_interrupted === 1,
-          })
-        : freshness.reason === "STALE_PREDICTION"
-          ? "Prognose wird aktualisiert – bitte Status erneut prüfen."
-          : lifecycleMessage;
+      const message = publicStatusMessage({
+        ...serviceState,
+        forecastFreshnessReason: freshness.reason,
+        lifecycleStatus,
+        servicePaused,
+      });
       const partContext = bookingGroupPartContextFromColumns(rotation);
       if (!partContext) {
         throw new Error("Canonical booking group part projection is incomplete.");
