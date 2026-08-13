@@ -168,12 +168,14 @@ export function shouldQueuePreparationNotification(input: {
   notificationLeadMinutes: number;
   now: string;
 }): boolean {
-  const predictionQuality =
-    input.predictionQuality === "STABLE" || input.predictionQuality === "CHANGING"
-      ? input.predictionQuality
-      : input.predictionQuality === "UNCERTAIN"
-        ? "UNCERTAIN"
-        : null;
+  let predictionQuality: "STABLE" | "CHANGING" | "UNCERTAIN" | null = null;
+  if (
+    input.predictionQuality === "STABLE" ||
+    input.predictionQuality === "CHANGING" ||
+    input.predictionQuality === "UNCERTAIN"
+  ) {
+    predictionQuality = input.predictionQuality;
+  }
   const freshness = assessForecastFreshness({
     predictionQuality,
     predictionUpdatedAt: input.predictionUpdatedAt,
