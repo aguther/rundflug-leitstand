@@ -140,6 +140,87 @@ function isListItem(line) {
   return parseListItem(line) !== null;
 }
 
+function renderHeading(line, headings, usedHeadingIds) {
+  const heading = parseHeading(line);
+  if (!heading) return null;
+  const { level, text } = heading;
+  const baseId = slugify(text) || `section-${headings.length + 1}`;
+  const count = usedHeadingIds.get(baseId) ?? 0;
+  usedHeadingIds.set(baseId, count + 1);
+  const id = count === 0 ? baseId : `${baseId}-${count + 1}`;
+  headings.push({ level, id, text });
+  return `<h${level} id="${id}">${renderInline(text)}</h${level}>`;
+}
+
+function consumeFence(lines, startIndex, renderFence) {
+  if (!lines[startIndex].startsWith("```")) return null;
+  const language = lines[startIndex].slice(3).trim();
+  const content = [];
+  let index = startIndex + 1;
+  while (index < lines.length && !lines[index].startsWith("```")) {
+    content.push(lines[index]);
+    index += 1;
+  }
+  const code = content.join("\n");
+  const fallback = `<pre class="code"><code>${escapeHtml(code)}</code></pre>`;
+  return {
+    html: renderFence ? renderFence(language, code, fallback) : fallback,
+    nextIndex: index + 1,
+  };
+}
+
+function consumeTable(lines, startIndex) {
+  if (!isTableRow(lines[startIndex])) return null;
+  const rows = [];
+  let index = startIndex;
+  while (index < lines.length && isTableRow(lines[index])) {
+    rows.push(lines[index]);
+    index += 1;
+  }
+  return { html: renderTable(rows), nextIndex: index };
+}
+
+function consumeList(lines, startIndex) {
+  const firstEntry = parseListItem(lines[startIndex]);
+  if (!firstEntry) return null;
+  const items = [];
+  let index = startIndex;
+  while (index < lines.length) {
+    const current = lines[index];
+    const entry = parseListItem(current);
+    if (entry) {
+      items.push(entry.text);
+      index += 1;
+      continue;
+    }
+    if (!/^\s+\S/.test(current) || items.length === 0) break;
+    items[items.length - 1] += ` ${current.trim()}`;
+    index += 1;
+  }
+  return { html: renderList(items, firstEntry.ordered), nextIndex: index };
+}
+
+function consumeParagraph(lines, startIndex) {
+  const paragraph = [];
+  let index = startIndex;
+  while (
+    index < lines.length &&
+    lines[index].trim().length > 0 &&
+    !lines[index].startsWith("```") &&
+    !isTableRow(lines[index]) &&
+    !parseHeading(lines[index]) &&
+    !isListItem(lines[index])
+  ) {
+    paragraph.push(lines[index].trim());
+    index += 1;
+  }
+  const text = paragraph.join(" ");
+  const html = /^!\[[^\]]*]\([^)]+\)$/.test(text)
+    ? `<figure>${renderInline(text)}</figure>`
+    : `<p>${renderInline(text)}</p>`;
+  return { html, nextIndex: index };
+}
+
 export function renderMarkdown(markdown, { renderFence } = {}) {
   const lines = markdown.split("\n");
   const html = [];
@@ -152,80 +233,19 @@ export function renderMarkdown(markdown, { renderFence } = {}) {
       index += 1;
       continue;
     }
-    const heading = parseHeading(line);
-    if (heading) {
-      const { level, text } = heading;
-      const baseId = slugify(text) || `section-${headings.length + 1}`;
-      const count = usedHeadingIds.get(baseId) ?? 0;
-      usedHeadingIds.set(baseId, count + 1);
-      const id = count === 0 ? baseId : `${baseId}-${count + 1}`;
-      html.push(`<h${level} id="${id}">${renderInline(text)}</h${level}>`);
-      headings.push({ level, id, text });
+    const headingHtml = renderHeading(line, headings, usedHeadingIds);
+    if (headingHtml) {
+      html.push(headingHtml);
       index += 1;
       continue;
     }
-    if (line.startsWith("```")) {
-      const language = line.slice(3).trim();
-      const content = [];
-      index += 1;
-      while (index < lines.length && !lines[index].startsWith("```")) {
-        content.push(lines[index]);
-        index += 1;
-      }
-      index += 1;
-      const code = content.join("\n");
-      const fallback = `<pre class="code"><code>${escapeHtml(code)}</code></pre>`;
-      html.push(renderFence ? renderFence(language, code, fallback) : fallback);
-      continue;
-    }
-    if (isTableRow(line)) {
-      const rows = [];
-      while (index < lines.length && isTableRow(lines[index])) {
-        rows.push(lines[index]);
-        index += 1;
-      }
-      html.push(renderTable(rows));
-      continue;
-    }
-    if (isListItem(line)) {
-      const firstEntry = parseListItem(line);
-      const ordered = firstEntry?.ordered ?? false;
-      const items = [];
-      while (index < lines.length) {
-        const current = lines[index];
-        const entry = parseListItem(current);
-        if (entry) {
-          items.push(entry.text);
-          index += 1;
-          continue;
-        }
-        if (/^\s+\S/.test(current) && items.length > 0) {
-          items[items.length - 1] += ` ${current.trim()}`;
-          index += 1;
-          continue;
-        }
-        break;
-      }
-      html.push(renderList(items, ordered));
-      continue;
-    }
-    const paragraph = [];
-    while (
-      index < lines.length &&
-      lines[index].trim().length > 0 &&
-      !lines[index].startsWith("```") &&
-      !isTableRow(lines[index]) &&
-      !parseHeading(lines[index]) &&
-      !isListItem(lines[index])
-    ) {
-      paragraph.push(lines[index].trim());
-      index += 1;
-    }
-    const text = paragraph.join(" ");
-    const isImageOnly = /^!\[[^\]]*]\([^)]+\)$/.test(text);
-    html.push(
-      isImageOnly ? `<figure>${renderInline(text)}</figure>` : `<p>${renderInline(text)}</p>`,
-    );
+    const block =
+      consumeFence(lines, index, renderFence) ??
+      consumeTable(lines, index) ??
+      consumeList(lines, index) ??
+      consumeParagraph(lines, index);
+    html.push(block.html);
+    index = block.nextIndex;
   }
   return { html: html.join("\n"), headings };
 }
