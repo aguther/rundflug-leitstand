@@ -824,6 +824,7 @@ body:has(> #root > .public-status-shell) {
 }
 
 .public-push-message {
+  display: block;
   margin: 0;
   padding: 10px 0;
   color: var(--public-muted);

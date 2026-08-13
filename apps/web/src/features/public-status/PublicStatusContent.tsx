@@ -99,6 +99,12 @@ interface StatusPart {
     | null;
 }
 
+function publicForecastPhase(part: StatusPart): "NOW" | "FINISHED" | "FORECAST" {
+  if (part.status === "COME_TO_FLIGHT_LINE" || part.status === "BOARDING") return "NOW";
+  if (["IN_FLIGHT", "LANDED", "COMPLETED"].includes(part.status)) return "FINISHED";
+  return "FORECAST";
+}
+
 function statusWindow(part: StatusPart, timeZone: string): string {
   if (part.forecastState === "AFTER_OPERATIONS_END") {
     return "Voraussichtlich heute nicht mehr";
@@ -114,12 +120,7 @@ function statusWindow(part: StatusPart, timeZone: string): string {
     upperAt: part.boardingWindowUpperAt,
     timeZone,
     quality: part.predictionQuality,
-    phase:
-      part.status === "COME_TO_FLIGHT_LINE" || part.status === "BOARDING"
-        ? "NOW"
-        : ["IN_FLIGHT", "LANDED", "COMPLETED"].includes(part.status)
-          ? "FINISHED"
-          : "FORECAST",
+    phase: publicForecastPhase(part),
   });
 }
 
@@ -146,13 +147,13 @@ export function PublicStatusIdentity({
           ) : null}
         </div>
       </div>
-      <div className="public-status-live" role="status">
+      <output className="public-status-live">
         <span>
           <RefreshCw aria-hidden="true" />
           Live
         </span>
         <small>Verbindung stabil</small>
-      </div>
+      </output>
     </div>
   );
 }
@@ -292,11 +293,7 @@ export function PublicStatusFooter({
             type="checkbox"
           />
         </label>
-        {push.message ? (
-          <p className="public-push-message" role="status">
-            {push.message}
-          </p>
-        ) : null}
+        {push.message ? <output className="public-push-message">{push.message}</output> : null}
         <button className="public-privacy-link" onClick={() => setPrivacyOpen(true)} type="button">
           Datenschutz
         </button>
