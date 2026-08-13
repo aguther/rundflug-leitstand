@@ -11,6 +11,9 @@ vi.mock("./flight-line-view", () => ({ FlightLineView: () => <p>Flight-Line-Rout
 vi.mock("./features/forecast-simulation/ForecastSimulationView", () => ({
   default: () => <p>Simulations-Route</p>,
 }));
+vi.mock("./features/forecast-simulation/SimulationFidsView", () => ({
+  default: () => <p>Simulations-FIDS-Route</p>,
+}));
 vi.mock("./privacy-view", () => ({ PrivacyView: () => <p>Datenschutz-Route</p> }));
 vi.mock("./setup-view", () => ({ SetupView: () => <p>Setup-Route</p> }));
 vi.mock("./ticket-status-view", () => ({
@@ -44,6 +47,7 @@ describe("feature router", () => {
       ["/fids", "FIDS-Route"],
       ["/admin", "Administration-Route"],
       ["/simulation", "Simulations-Route"],
+      ["/simulation/fids", "Simulations-FIDS-Route"],
       ["/unbekannt", "Kassen-Route"],
     ] as const) {
       await expectRoute(path, text);

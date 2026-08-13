@@ -7,7 +7,6 @@ import { ForecastSimulationView } from "./ForecastSimulationView";
 import type { SimulationConfig } from "./model";
 
 const mocks = vi.hoisted(() => ({
-  fidsOpen: vi.fn(),
   workers: [] as MockWorker[],
 }));
 
@@ -124,22 +123,12 @@ vi.mock("./SimulationFoundationDialog", async () => {
     ),
   };
 });
-vi.mock("./SimulationFidsPopout", async () => {
-  const { forwardRef, useImperativeHandle } = await import("react");
-  return {
-    SimulationFidsPopout: forwardRef(function MockFidsPopout(
-      { onWindowError }: { onWindowError: (message: string) => void },
-      ref,
-    ) {
-      useImperativeHandle(ref, () => ({ open: mocks.fidsOpen }));
-      return (
-        <button onClick={() => onWindowError("Popout wurde blockiert")} type="button">
-          FIDS-Fehler auslösen
-        </button>
-      );
-    }),
-  };
-});
+vi.mock("./simulation-fids-channel", () => ({
+  useSimulationFidsPublisher: () => ({
+    fidsHref: "/simulation/fids?source=synthetic-source",
+    sourceId: "synthetic-source",
+  }),
+}));
 
 beforeEach(() => {
   mocks.workers.length = 0;
@@ -187,8 +176,10 @@ describe("forecast simulation view", () => {
     const user = userEvent.setup();
     render(<ForecastSimulationView />);
 
-    await user.click(screen.getByRole("button", { name: /FIDS öffnen/ }));
-    expect(mocks.fidsOpen).toHaveBeenCalledOnce();
+    const fidsLink = screen.getByRole("link", { name: /FIDS in neuem Tab öffnen/ });
+    expect(fidsLink.getAttribute("href")).toBe("/simulation/fids?source=synthetic-source");
+    expect(fidsLink.getAttribute("target")).toBe("_blank");
+    expect(fidsLink.getAttribute("rel")).toBe("noopener");
 
     await user.click(screen.getByRole("button", { name: /Szenario konfigurieren/ }));
     expect(screen.getByRole("region", { name: "Szenarioeditor" })).toBeTruthy();
@@ -323,7 +314,7 @@ describe("forecast simulation view", () => {
     await user.click(screen.getByRole("button", { name: /Neu starten/ }));
   });
 
-  it("applies an edited scenario and reports a blocked FIDS popout", async () => {
+  it("applies an edited scenario without replacing the standalone FIDS link", async () => {
     const user = userEvent.setup();
     render(<ForecastSimulationView />);
 
@@ -332,8 +323,7 @@ describe("forecast simulation view", () => {
     await user.click(screen.getByRole("button", { name: "Editor anwenden" }));
     expect(screen.queryByRole("region", { name: "Szenarioeditor" })).toBeNull();
 
-    await user.click(screen.getByRole("button", { name: "FIDS-Fehler auslösen" }));
-    expect(await screen.findByText("Popout wurde blockiert")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /FIDS in neuem Tab öffnen/ })).toBeTruthy();
   });
 
   it("contains comparison worker failures and allows a clean retry", async () => {

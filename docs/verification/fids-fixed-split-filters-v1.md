@@ -1,6 +1,6 @@
 # Verifikation: feste FIDS-Seiten, Split, Filter und gemeinsame Simulation
 
-Stand: 2026-08-02
+Stand: 2026-08-13
 Anforderungen: V173-FID-010, V173-PRI-010, V173-LAY-010, V173-SET-010, V173-AUT-010,
 V173-API-010, V173-DAT-010, V173-OPS-010, V173-QA-010
 
@@ -13,6 +13,7 @@ V173-API-010, V173-DAT-010, V173-OPS-010, V173-QA-010
 | Worker | explizite Actionable-/Recent-/Lower-Bänder, reale D1-Runtime-Projektion, Rollen und Public-Kompatibilität |
 | React-Controller | URL-Seite, untere Rotation, Einmal-Ablauftimer, Schleifenfreiheit, ungültige Unterseite und letzter Offline-Stand |
 | Simulation | derselbe Kapazitätsplan, dieselbe Reihenfolge und identische Seitenmetadaten ohne Live-Schreibpfad |
+| Simulator-Tabs | eigenständige Route, ADMIN-Berechtigung, Quellenbindung, Initialzustand, kleine Heartbeats, Ergebniswechsel, Trennung und Wiederaufnahme ohne Persistenz |
 | Darstellung | Bereichs-Leerzustände, feste Slotanzahl, Seitentext, kompakte Zeitfenster, Langtext und zugängliche Ellipsen |
 
 ## Endpunkt- und Datenbankabnahme
@@ -120,13 +121,14 @@ WebSocket-Neuanmeldungen; der vorgesehene 15-Sekunden-Polling-Fallback stellte d
 Andere Konsolen-, Seiten- oder unerwartete Ressourcenfehler traten nicht auf.
 
 Screenshots und JSON-Messberichte liegen ausschließlich im auftragsbezogenen lokalen
-Visualisierungsverzeichnis und werden nicht committed. Das native Simulations-Popup wurde vom
-In-App-Browser-Testtreiber nicht als eigener Tab exponiert; deshalb erfolgte die vollständige
-Messung mit lokalem Playwright und installiertem Edge gegen dieselbe laufende Anwendung.
+Visualisierungsverzeichnis und werden nicht committed. Seit ADR-0044 ist `/simulation/fids` eine
+eigenständige Route. Der In-App-Browser kann Simulator und FIDS daher als getrennte reguläre Tabs
+prüfen; ein Popup- oder Portal-Fallback ist nicht mehr erforderlich.
 
 ## Datenschutzkontrolle
 
-- Teilbare Links enthalten nur Route, Veranstaltungs-ID und feste Seite.
+- Live-FIDS-Links enthalten nur Route, Veranstaltungs-ID und feste Seite. Das Simulations-FIDS führt
+  zusätzlich eine zufällige lokale Quellen-ID ohne Konto-, Sitzungs- oder Betriebsdaten.
 - `setup`, PIN, Sitzung, Filterauswahl, Kontocode und Ticket-Token fehlen im Link.
 - Audit und Outbox enthalten lediglich nicht sensitive Einstellungsmetadaten beziehungsweise Version.
 - Die öffentliche Projektion enthält keine geschützten IDs oder Kontoeinstellungen.

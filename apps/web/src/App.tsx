@@ -3,10 +3,7 @@ import { ActionNotificationProvider } from "./app/PageNotifications";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
 import { EventScopedApplication } from "./features/auth/EventScopedApplication";
 import { LoginPage } from "./features/auth/LoginPage";
-
-const ForecastSimulationView = lazy(
-  () => import("./features/forecast-simulation/ForecastSimulationView"),
-);
+import { isSimulatorRoute, SimulatorRouter } from "./SimulatorRouter";
 
 const FeatureRouter = lazy(async () => {
   const module = await import("./FeatureRouter");
@@ -41,13 +38,8 @@ function AuthenticatedApplication() {
 }
 
 export function App() {
-  if (import.meta.env.MODE === "simulator" && window.location.pathname === "/simulation") {
-    return (
-      <Suspense fallback={<ApplicationLoading />}>
-        <ForecastSimulationView />
-      </Suspense>
-    );
-  }
+  if (import.meta.env.MODE === "simulator" && isSimulatorRoute(window.location.pathname))
+    return <SimulatorRouter />;
   return (
     <ActionNotificationProvider>
       <AuthProvider>

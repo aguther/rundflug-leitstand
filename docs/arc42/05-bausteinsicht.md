@@ -199,6 +199,27 @@ flowchart LR
 Die Tick-Reihenfolge ist Teil des reproduzierbaren Simulationsvertrags. Beide Orchestratoren dürfen
 keine fachliche Phasenlogik zurückübernehmen; Golden-Seed-Tests und Größenratchets sichern diese Grenze.
 
+Das simulierte FIDS läuft gemäß ADR-0044 als eigenständiger Tab und eigener React-Baum. Es verwendet
+dieselben FIDS-Komponenten wie der Livebetrieb, erhält seinen flüchtigen Zustand aber ausschließlich
+über einen versionierten, gleichursprünglichen Browserkanal:
+
+```mermaid
+flowchart LR
+    SIM["Simulator-Tab<br/>/simulation"]
+    CHANNEL["BroadcastChannel v1<br/>STATE · TICK · REQUEST_STATE"]
+    FIDS["FIDS-Tab<br/>/simulation/fids"]
+    COMMON["gemeinsame FIDS-Experience<br/>Controller · URL · Dialog · Paging"]
+
+    SIM -->|"Ergebnisänderung und Heartbeat"| CHANNEL
+    FIDS -->|"Zustandsanfrage"| CHANNEL
+    CHANNEL --> FIDS --> COMMON
+```
+
+Große Simulationsergebnisse werden nur bei Initialisierung, Anfrage oder Ergebnisänderung
+übertragen. Uhr, sichtbarer Tick, Geschwindigkeit und Laufstatus verwenden kleine Heartbeats. Eine
+lokale Quellen-ID bindet mehrere FIDS-Tabs eindeutig an einen Simulator; der Kanal persistiert keine
+Daten und besitzt keine Verbindung zu Worker, D1, R2 oder Service Worker.
+
 ## 5.4 Ebene 3 – Fachlogik `packages/domain`
 
 | Modul | Inhalt |

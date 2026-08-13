@@ -226,10 +226,18 @@ festgeschriebenen Preset- und 25-Seed-Werte.
 
 ## Simuliertes Live-FIDS
 
-Die Hauptansicht öffnet über `FIDS öffnen` genau ein separates, fokussierbares Browserfenster. Das
-Fenster wird als React-Portal direkt aus dem lokalen Simulatorzustand gerendert und besitzt keine
-eigene Route, Authentifizierung, API-Abfrage, WebSocket-Verbindung, Browser-Persistenz oder
-Service-Worker-Registrierung. Ein blockiertes Pop-up wird in der Hauptansicht verständlich gemeldet.
+Die Hauptansicht verlinkt über `FIDS in neuem Tab öffnen` die eigenständige Route
+`/simulation/fids`. Der FIDS-Tab verwendet einen eigenen React-Baum und dieselbe gemeinsame
+FIDS-Experience wie der Livebetrieb. Er besitzt keine API-Abfrage, WebSocket-Verbindung,
+Browser-Persistenz oder Service-Worker-Registrierung. Im lokalen Simulator-Modus ist die Route ohne
+Anmeldung erreichbar; im gehosteten Build bleibt sie wie `/simulation` auf `ADMIN` beschränkt.
+
+Ein versionierter gleichursprünglicher `BroadcastChannel` überträgt den vollständigen
+Simulatorzustand nur beim Start, auf Anfrage und nach Ergebnisänderungen. Kleine Heartbeats führen
+virtuelle Uhr, sichtbaren Tick, Geschwindigkeit und Laufstatus fort. Eine lokale Quellen-ID bindet
+den FIDS-Tab eindeutig an seinen Simulator. Ein Direktaufruf ohne laufende Quelle zeigt einen
+Wartezustand und verbindet sich automatisch; nach einem Abbruch bleibt der letzte In-Memory-Stand
+mit `SIMULATION GETRENNT` sichtbar.
 
 Die Projektion verwendet den bestehenden `PublicBoard`-Vertrag ausschließlich im Speicher. Sie
 berücksichtigt nur Gruppen, Meilensteine und den letzten Prognosesnapshot bis zum sichtbaren
@@ -301,9 +309,11 @@ Light und Dark Mode wurden jeweils im In-App-Browser geprüft:
 - die Flugzeugansicht zeigt gebundene Umläufe mit Boarding, Off-Block, On-Block und Abschluss sowie
   Tanken, geplante Pause und jeweils das bestätigte Rückkehrereignis;
 - kein horizontaler Dokument- oder Arbeitsbereichsüberlauf in den geprüften Viewports;
-- das FIDS-Pop-out folgt Start, Pause, `+5 Min.`, Szenariowechsel und Betriebsunterbrechung, ohne die
-  Bedienung des Simulatorfensters zu blockieren;
-- ein zweiter Klick auf `FIDS öffnen` fokussiert das vorhandene Fenster und erzeugt kein Duplikat;
+- der eigenständige FIDS-Tab folgt Start, Pause, `+5 Min.`, Szenariowechsel und
+  Betriebsunterbrechung, ohne die Bedienung oder den Lebenszyklus des Simulator-Tabs zu verändern;
+- ein Direktaufruf von `/simulation/fids` wartet ohne eigenen Standardlauf und verbindet sich nach
+  dem Öffnen von `/simulation` automatisch; mehrere FIDS-Tabs dürfen dieselbe Quelle beobachten;
+- Reload, Navigation und Schließen eines FIDS-Tabs beenden oder pausieren die Simulation nicht;
 - das simulierte FIDS zeigt bei 1920 × 1080 und 1280 × 720 seine bis zu 20 Einträge in zwei
   Zehn-Zeilen-Spalten, hält Gruppe, Gate, Status und Zeitfenster jeweils einzeilig, erzeugt weder
   Dokument- noch Tabellen-Scrollbars und bleibt in heller wie dunkler Darstellung lesbar;

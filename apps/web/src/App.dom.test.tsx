@@ -25,6 +25,9 @@ vi.mock("./FeatureRouter", () => ({ FeatureRouter: () => <p>Öffentliche Route</
 vi.mock("./features/forecast-simulation/ForecastSimulationView", () => ({
   default: () => <p>Eigenständige Simulation</p>,
 }));
+vi.mock("./features/forecast-simulation/SimulationFidsView", () => ({
+  default: () => <p>Eigenständiges Simulations-FIDS</p>,
+}));
 
 describe("application access routing", () => {
   beforeEach(() => {
@@ -79,10 +82,20 @@ describe("application access routing", () => {
     }
   });
 
-  it("opens the standalone simulation only in simulator mode", async () => {
+  it("opens the standalone simulation routes only in simulator mode", async () => {
     vi.stubEnv("MODE", "simulator");
     window.history.replaceState({}, "", "/simulation");
     render(<App />);
     expect(await screen.findByText("Eigenständige Simulation")).toBeTruthy();
+    cleanup();
+
+    window.history.replaceState({}, "", "/simulation/fids");
+    render(<App />);
+    expect(await screen.findByText("Eigenständiges Simulations-FIDS")).toBeTruthy();
+    cleanup();
+
+    window.history.replaceState({}, "", "/simulation/unknown");
+    render(<App />);
+    expect(screen.getByText("Anmeldeseite")).toBeTruthy();
   });
 });

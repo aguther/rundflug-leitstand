@@ -1,0 +1,82 @@
+.simulation-fids-waiting {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: clamp(24px, 5vw, 72px);
+  color: var(--ui-text);
+  background:
+    radial-gradient(circle at 50% 0%, var(--ui-accent-soft), transparent 48%), var(--ui-bg);
+}
+
+.simulation-fids-waiting > section {
+  width: min(100%, 620px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.simulation-fids-waiting-icon {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 50%;
+  color: var(--ui-accent);
+  background: var(--ui-control);
+}
+
+.simulation-fids-waiting-icon svg {
+  width: 34px;
+  height: 34px;
+}
+
+.simulation-fids-waiting-kicker {
+  margin: 8px 0 0;
+  color: var(--ui-warning);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.simulation-fids-waiting h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1;
+}
+
+.simulation-fids-waiting p:not(.simulation-fids-waiting-kicker) {
+  max-width: 54ch;
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+
+.simulation-fids-waiting-action {
+  min-height: var(--control-touch);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 18px;
+  border: 1px solid var(--ui-accent);
+  border-radius: var(--radius-md);
+  color: #fff;
+  background: var(--ui-accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.simulation-fids-waiting-action:hover {
+  background: var(--ui-accent-hover);
+}
+
+.simulation-fids-waiting-action svg {
+  width: 18px;
+  height: 18px;
+}

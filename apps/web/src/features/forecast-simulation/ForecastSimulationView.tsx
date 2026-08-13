@@ -38,13 +38,13 @@ import {
 } from "./model";
 import { ScenarioEditor } from "./ScenarioEditor";
 import { SimulationComparisonDialog } from "./SimulationComparisonDialog";
-import { SimulationFidsPopout, type SimulationFidsPopoutHandle } from "./SimulationFidsPopout";
 import {
   nextSimulationVariantName,
   SimulationFoundationDialog,
 } from "./SimulationFoundationDialog";
 import { SimulationHistoryDialog } from "./SimulationHistoryDialog";
 import { createSimulationExport } from "./simulation-export";
+import { useSimulationFidsPublisher } from "./simulation-fids-channel";
 import {
   createSimulationScenarioTemplate,
   simulationScenarioTemplateFileName,
@@ -370,9 +370,7 @@ export function ForecastSimulationView() {
   const comparison = useSimulationComparison();
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importingCsv, setImportingCsv] = useState(false);
-  const [fidsWindowError, setFidsWindowError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const fidsPopoutRef = useRef<SimulationFidsPopoutHandle>(null);
   const editorErrors = validateSimulationConfig(editorConfig);
   const simulationEnd = Date.parse(result.runWindow.endAt);
 
@@ -417,6 +415,13 @@ export function ForecastSimulationView() {
     if (validateSimulationConfig(nextConfig).length === 0) restart(nextConfig);
   };
   const visibleAt = Math.floor(currentMs / TICK_MS) * TICK_MS;
+  const { fidsHref } = useSimulationFidsPublisher({
+    result,
+    clockMs: currentMs,
+    running,
+    speed,
+    visibleAt,
+  });
   const operationsAvailableNow =
     visibleAt >= Date.parse(config.schedule.operationsStartAt) &&
     visibleAt < Date.parse(config.schedule.operationsEndAt);
@@ -595,10 +600,15 @@ export function ForecastSimulationView() {
           <AlertTriangle aria-hidden="true" />
           Nur Simulation – keine Tickets oder Ist-Zustände
         </div>
-        <Button className="sim-fids-button" onClick={() => fidsPopoutRef.current?.open()}>
+        <a
+          className="sim-fids-button ds-button ds-button--default ds-button--secondary"
+          href={fidsHref}
+          rel="noopener"
+          target="_blank"
+        >
           <Monitor aria-hidden="true" />
-          FIDS öffnen
-        </Button>
+          FIDS in neuem Tab öffnen
+        </a>
         <div className="sim-run-label">
           <Clock3 aria-hidden="true" />
           Synthetischer Lauf
@@ -611,12 +621,6 @@ export function ForecastSimulationView() {
         ) : null}
         <ThemeToggle />
       </header>
-      {fidsWindowError ? (
-        <p className="sim-fids-window-error" role="alert">
-          {fidsWindowError}
-        </p>
-      ) : null}
-
       <main className="sim-layout">
         <aside className="sim-sidebar">
           <section className="sim-variant-manager">
@@ -940,15 +944,6 @@ export function ForecastSimulationView() {
         onClose={() => setEditorOpen(false)}
         open={editorOpen}
         rotations={result.rotations}
-      />
-
-      <SimulationFidsPopout
-        clockMs={currentMs}
-        onWindowError={setFidsWindowError}
-        ref={fidsPopoutRef}
-        result={result}
-        speed={speed}
-        visibleAt={visibleAt}
       />
 
       <SimulationHistoryDialog

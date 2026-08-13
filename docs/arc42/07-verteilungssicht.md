@@ -51,7 +51,7 @@ flowchart TB
 | Umgebung | Zweck | Besonderheiten |
 | --- | --- | --- |
 | Lokale Entwicklung | `npm run dev` | Vite auf `http://localhost:5173`, Wrangler/Miniflare auf `http://localhost:8787`; Vite leitet `/api` und WebSockets weiter; lokale D1 mit synthetischen Seed-Daten; `APP_ENV=development` verzichtet auf die EU-Jurisdiktionsanforderung, weil workerd sie lokal nicht abbildet |
-| Prognosesimulator | `npm run simulator` | reine Browserausführung unter `/simulation`, ohne Worker, D1 oder Anmeldung; im Cloudflare-Build zusätzlich lazy hinter Anmeldung und Rolle `ADMIN` |
+| Prognosesimulator | `npm run simulator` | reine Browserausführung unter `/simulation` und eigenständiges FIDS unter `/simulation/fids`, ohne Worker, D1 oder Anmeldung; beide Tabs synchronisieren flüchtigen Zustand über einen gleichursprünglichen `BroadcastChannel`; im Cloudflare-Build zusätzlich lazy hinter Anmeldung und Rolle `ADMIN` |
 | Abnahme (aktuell) | Cloudflare, `APP_ENV=acceptance` | einzige betriebene Cloudflare-Umgebung; `/api/meta` meldet `productionReady: false` |
 | Produktion (Gate) | erst nach vollständiger V1-Abnahme | verbindlich getrennte D1-Datenbank, separater EU-R2-Bucket und getrennte Secret-Sätze (ADR-0007) |
 

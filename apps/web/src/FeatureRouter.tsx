@@ -14,6 +14,7 @@ const FlightLineView = lazy(() =>
 const ForecastSimulationView = lazy(
   () => import("./features/forecast-simulation/ForecastSimulationView"),
 );
+const SimulationFidsView = lazy(() => import("./features/forecast-simulation/SimulationFidsView"));
 const PrivacyView = lazy(() =>
   import("./privacy-view").then((module) => ({ default: module.PrivacyView })),
 );
@@ -55,5 +56,6 @@ export function FeatureRouter() {
   else if (path === "/fids") view = <FidsView />;
   else if (path === "/admin") view = <AdminView />;
   else if (path === "/simulation") view = <ForecastSimulationView />;
+  else if (path === "/simulation/fids") view = <SimulationFidsView />;
   return <FeatureBoundary routeKey={path}>{view}</FeatureBoundary>;
 }

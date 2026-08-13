@@ -12,17 +12,23 @@ import {
 } from "@rundflug/domain";
 import type { SimulationOperationalModel } from "../forecast-simulation/model";
 import type { SimulationFidsBoard } from "../forecast-simulation/simulation-fids";
-import type { FidsDataSource } from "./fids-data-source";
+import type { FidsConnectionState, FidsDataSource } from "./fids-data-source";
 
 export function createSimulationFidsDataSource(input: {
   board: SimulationFidsBoard;
   operationalModel?: SimulationOperationalModel;
   preferences: FidsPreferences;
   onPreferencesChanged: (preferences: FidsPreferences) => void;
+  connection?: FidsConnectionState;
 }): FidsDataSource {
+  const connection = input.connection ?? {
+    connected: true,
+    label: "LIVE-SIMULATION",
+    tone: "simulation",
+  };
   return {
     kind: "simulation",
-    initialConnection: { connected: true, label: "LIVE-SIMULATION", tone: "simulation" },
+    initialConnection: connection,
     loadPreferences: async () => input.preferences,
     loadFilterOptions: async () => ({
       gates: (input.operationalModel?.gates ?? []).map((gate) => ({
@@ -83,7 +89,7 @@ export function createSimulationFidsDataSource(input: {
       return saved;
     },
     subscribe: (_refresh, connectionChanged) => {
-      connectionChanged({ connected: true, label: "LIVE-SIMULATION", tone: "simulation" });
+      connectionChanged(connection);
       return () => undefined;
     },
   };

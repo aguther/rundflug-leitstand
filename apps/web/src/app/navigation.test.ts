@@ -43,10 +43,15 @@ describe("V1.2 app navigation", () => {
 
   it("keeps the standalone simulator route ADMIN-only and out of the global switcher", () => {
     expect(mayOpenEventRoute("ADMIN", "/simulation")).toBe(true);
+    expect(mayOpenEventRoute("ADMIN", "/simulation/fids")).toBe(true);
     expect(mayOpenEventRoute("CASHIER", "/simulation")).toBe(false);
+    expect(mayOpenEventRoute("CASHIER", "/simulation/fids")).toBe(false);
     expect(mayOpenEventRoute("FLIGHT_LINE", "/simulation")).toBe(false);
+    expect(mayOpenEventRoute("FLIGHT_LINE", "/simulation/fids")).toBe(false);
     expect(mayOpenEventRoute("FLIGHT_DIRECTOR", "/simulation")).toBe(false);
+    expect(mayOpenEventRoute("FLIGHT_DIRECTOR", "/simulation/fids")).toBe(false);
     expect(mayOpenEventRoute("DISPLAY", "/simulation")).toBe(false);
+    expect(mayOpenEventRoute("DISPLAY", "/simulation/fids")).toBe(false);
     expect(appDestinations.some((entry) => entry.href === "/simulation")).toBe(false);
   });
 

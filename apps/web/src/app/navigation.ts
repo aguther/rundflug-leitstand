@@ -49,7 +49,7 @@ export function isDestinationActive(pathname: string, href: string): boolean {
 }
 
 export function mayOpenEventRoute(role: OperatorRole, pathname: string): boolean {
-  if (pathname === "/simulation") return role === "ADMIN";
+  if (pathname === "/simulation" || pathname === "/simulation/fids") return role === "ADMIN";
   return destinationsForRole(role).some((destination) =>
     isDestinationActive(pathname, destination.href),
   );

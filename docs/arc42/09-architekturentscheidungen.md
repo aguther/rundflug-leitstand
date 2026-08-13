@@ -48,6 +48,7 @@ ist die Übersicht; verbindlich ist jeweils der ADR-Text mit Kontext, Alternativ
 | [0041](../adr/0041-modulare-forecast-pipeline-und-legacy-abschaltung.md) | Modulare Forecast-Pipeline und Legacy-Abschaltung | explizite Adapter- und Domain-Phasen, Persist-before-publish und messbares Abschaltkriterium |
 | [0042](../adr/0042-modulare-deterministische-simulationspipeline.md) | Modulare deterministische Simulationspipeline | gemeinsame Seed-Primitive und fachliche Phasen für Legacy-/Operational-Simulation; operative Tests sind Teil der Coverage |
 | [0043](../adr/0043-familienvertraege-und-isoliertes-worker-testharness.md) | Familienverträge und isoliertes Worker-Testharness | kompatible Operations-Fassade mit vier Command-Familien; parallele lokale Verifier ohne geteilten Port oder D1-Zustand |
+| [0044](../adr/0044-eigenstaendiger-simulations-fids-tab.md) | Eigenständiger Simulations-FIDS-Tab mit lokalem Zustandskanal | direkte Route ohne Popup-/Portal-Kopplung; versionierte flüchtige Tab-Synchronisation ohne Backend oder Browser-Storage |
 
 ## Offene Entscheidungen
 
