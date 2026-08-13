@@ -34,6 +34,34 @@ const tabs = [
   { value: "pilots", label: "Piloten" },
 ] satisfies Array<{ value: AnalyticsTab; label: string }>;
 
+function selectedRotationId(rotationIds: readonly string[], preferredRotationId?: string): string {
+  if (preferredRotationId && rotationIds.includes(preferredRotationId)) return preferredRotationId;
+  if (rotationIds.length > 1) return "all";
+  return rotationIds[0] ?? "";
+}
+
+function analyticsFooterNote(tab: AnalyticsTab): string {
+  if (tab === "groups") return "Prognosen sind Entscheidungshilfen und keine garantierten Zeiten.";
+  if (tab === "pilots") {
+    return "Organisatorische Übersicht · keine Dienst-, Flugzeit- oder Einsatzfreigabe.";
+  }
+  return "Organisatorischer Tagesverlauf · keine flugbetriebliche Freigabe.";
+}
+
+function AnalyticsLoadingFallback() {
+  return (
+    <output
+      aria-busy="true"
+      aria-label="Tagesauswertung wird geladen"
+      className="flight-director-analytics-loading"
+    >
+      <span />
+      <span />
+      <span />
+    </output>
+  );
+}
+
 export function FlightDirectorAnalyticsDialog({
   board,
   initialSelection,
@@ -55,13 +83,7 @@ export function FlightDirectorAnalyticsDialog({
       const rotationIds =
         ticketGroups.find((group) => group.id === nextTicketGroupId)?.rotationIds ?? [];
       setTicketGroupId(nextTicketGroupId);
-      setRotationId(
-        preferredRotationId && rotationIds.includes(preferredRotationId)
-          ? preferredRotationId
-          : rotationIds.length > 1
-            ? "all"
-            : (rotationIds[0] ?? ""),
-      );
+      setRotationId(selectedRotationId(rotationIds, preferredRotationId));
     },
     [ticketGroups],
   );
@@ -80,17 +102,17 @@ export function FlightDirectorAnalyticsDialog({
       tab: "aircraft" as const,
       id: fallbackAircraftId,
     };
-    const selectedRotation =
-      next.tab === "groups"
-        ? board.rotations.find((rotation) => rotation.id === (next.rotationId ?? next.id))
-        : undefined;
-    const selectedTicketGroupId =
-      next.tab === "groups"
-        ? (ticketGroups.find((group) => group.id === next.id)?.id ??
-          selectedRotation?.bookingGroups[0]?.id ??
-          selectedRotation?.ticketGroupId ??
-          fallbackTicketGroupId)
-        : fallbackTicketGroupId;
+    const selectedRotation = board.rotations.find(
+      (rotation) => rotation.id === (next.rotationId ?? next.id),
+    );
+    let selectedTicketGroupId = fallbackTicketGroupId;
+    if (next.tab === "groups") {
+      selectedTicketGroupId =
+        ticketGroups.find((group) => group.id === next.id)?.id ??
+        selectedRotation?.bookingGroups[0]?.id ??
+        selectedRotation?.ticketGroupId ??
+        fallbackTicketGroupId;
+    }
     setTab(next.tab);
     selectTicketGroup(
       selectedTicketGroupId,
@@ -108,12 +130,7 @@ export function FlightDirectorAnalyticsDialog({
     ticketGroups,
   ]);
 
-  const footerNote =
-    tab === "groups"
-      ? "Prognosen sind Entscheidungshilfen und keine garantierten Zeiten."
-      : tab === "pilots"
-        ? "Organisatorische Übersicht · keine Dienst-, Flugzeit- oder Einsatzfreigabe."
-        : "Organisatorischer Tagesverlauf · keine flugbetriebliche Freigabe.";
+  const footerNote = analyticsFooterNote(tab);
 
   return (
     <ModalDialog
@@ -136,20 +153,7 @@ export function FlightDirectorAnalyticsDialog({
     >
       <Tabs items={tabs} label="Auswertungsbereich" onChange={setTab} value={tab} />
       <div className="flight-director-analytics-scroll">
-        <Suspense
-          fallback={
-            <div
-              aria-busy="true"
-              aria-label="Tagesauswertung wird geladen"
-              className="flight-director-analytics-loading"
-              role="status"
-            >
-              <span />
-              <span />
-              <span />
-            </div>
-          }
-        >
+        <Suspense fallback={<AnalyticsLoadingFallback />}>
           <FlightDirectorAnalyticsContent
             aircraftId={aircraftId}
             board={board}

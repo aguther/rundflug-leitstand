@@ -56,7 +56,7 @@ export interface FlightDirectorOperationsDialogProps {
 
 interface OperationalNoticeEditorProps {
   busy: boolean;
-  context?: { name: string; shortCode: string };
+  context: { name: string; shortCode: string } | undefined;
   draft: string;
   help: string;
   published: boolean;
@@ -107,6 +107,245 @@ function OperationalNoticeEditor({
           {published ? "Speichern" : "Hinweis veröffentlichen"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+function dialogDescription(
+  noticeTarget: NoticeEditorTarget | null,
+  selectedResourceGroup: ResourceGroup | null,
+): string {
+  if (noticeTarget?.kind === "event") {
+    return "Der Hinweis gilt veranstaltungsweit und hat Vorrang vor Hinweisen einzelner Ressourcengruppen.";
+  }
+  if (selectedResourceGroup) return "Der Hinweis gilt ausschließlich für diese Ressourcengruppe.";
+  return "Organisatorische Betriebslage steuern. Keine Aktion besitzt flugbetriebliche oder sicherheitsbezogene Freigabewirkung.";
+}
+
+function dialogTitle(
+  noticeTarget: NoticeEditorTarget | null,
+  selectedResourceGroup: ResourceGroup | null,
+): string {
+  if (noticeTarget?.kind === "event") return "Veranstaltungsweiter Hinweis";
+  if (selectedResourceGroup) return `Hinweis für ${selectedResourceGroup.name}`;
+  return "Betrieb steuern";
+}
+
+function OperationsOverview({
+  busy,
+  emergencyMode,
+  eventInterrupted,
+  onEditEventNotice,
+  onSetEventInterruption,
+  onTriggerEmergency,
+  publishedEventNotice,
+}: Readonly<{
+  busy: boolean;
+  emergencyMode: boolean;
+  eventInterrupted: boolean;
+  onEditEventNotice: () => void;
+  onSetEventInterruption: (interrupted: boolean) => Promise<void>;
+  onTriggerEmergency: () => Promise<void>;
+  publishedEventNotice: string;
+}>) {
+  const noticeStatus = publishedEventNotice
+    ? "Hinweis veröffentlicht"
+    : "Kein Hinweis veröffentlicht";
+  const noticeAction = publishedEventNotice ? "Hinweis bearbeiten" : "Hinweis veröffentlichen";
+  const operationStatus = eventInterrupted ? "unterbrochen" : "laufend";
+  const interruptionAction = eventInterrupted ? "Betrieb fortsetzen" : "Betrieb unterbrechen";
+  const interruptionVariant = eventInterrupted ? "primary" : "danger";
+  return (
+    <div className="flight-director-operation-panel" role="tabpanel">
+      <section className="flight-director-event-notice-summary">
+        <div>
+          <h3>Veranstaltungsweiter Hinweis</h3>
+          <p>{noticeStatus}</p>
+        </div>
+        <Button
+          className="flight-director-notice-action"
+          disabled={busy}
+          onClick={onEditEventNotice}
+          size="compact"
+          type="button"
+          variant="secondary"
+        >
+          {noticeAction}
+        </Button>
+      </section>
+      <section className="flight-director-interruption">
+        <div>
+          <h3>Veranstaltungsbetrieb</h3>
+          <p>
+            Aktuell: <strong>{operationStatus}</strong>
+          </p>
+        </div>
+        <Button
+          disabled={busy}
+          onClick={() => onSetEventInterruption(!eventInterrupted)}
+          type="button"
+          variant={interruptionVariant}
+        >
+          {interruptionAction}
+        </Button>
+      </section>
+      <section className="flight-director-emergency-panel">
+        <div className={emergencyMode ? "active" : ""}>
+          <strong>{emergencyMode ? "Not-Halt aktiv" : "Kein Not-Halt aktiv"}</strong>
+          <p>
+            Der Not-Halt stoppt operative Kommandos. Die Aufhebung bleibt ausschließlich im
+            Admin-Bereich möglich.
+          </p>
+        </div>
+        {!emergencyMode && (
+          <Button disabled={busy} onClick={onTriggerEmergency} type="button" variant="danger">
+            Not-Halt auslösen
+          </Button>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function ResourceGroupsOverview({
+  busy,
+  onEditResourceNotice,
+  onSetResourceGroupStatus,
+  resourceGroups,
+}: Readonly<{
+  busy: boolean;
+  onEditResourceNotice: (group: ResourceGroup) => void;
+  onSetResourceGroupStatus: (resourceGroupId: string, status: ResourceGroupStatus) => Promise<void>;
+  resourceGroups: ResourceGroup[];
+}>) {
+  return (
+    <div className="flight-director-operation-list" role="tabpanel">
+      {resourceGroups.map((group) => {
+        const noticeAction = group.operationalNote
+          ? "Hinweis bearbeiten"
+          : "Hinweis veröffentlichen";
+        return (
+          <article key={group.id}>
+            <div>
+              <strong>{group.name}</strong>
+              <span>{group.shortCode}</span>
+              <small>
+                {group.activeAircraftIds.length} Flugzeuge
+                {group.operationalNote ? " · Hinweis veröffentlicht" : ""}
+              </small>
+            </div>
+            <span className={`operation-status status-${group.status.toLowerCase()}`}>
+              {group.status}
+            </span>
+            <div className="flight-director-operation-actions">
+              {resourceStatusActions.map(({ status, label }) => (
+                <Button
+                  disabled={busy || group.status === status}
+                  key={status}
+                  onClick={() => onSetResourceGroupStatus(group.id, status)}
+                  size="compact"
+                  type="button"
+                  variant="secondary"
+                >
+                  {label}
+                </Button>
+              ))}
+              <Button
+                className="flight-director-notice-action"
+                disabled={busy}
+                onClick={() => onEditResourceNotice(group)}
+                size="compact"
+                type="button"
+                variant="secondary"
+              >
+                {noticeAction}
+              </Button>
+              <Button
+                disabled={busy || group.status === endedStatusAction.status}
+                onClick={() => onSetResourceGroupStatus(group.id, endedStatusAction.status)}
+                size="compact"
+                type="button"
+                variant="danger"
+              >
+                {endedStatusAction.label}
+              </Button>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+interface OperationsTabContentProps {
+  aircraft: OperationBoard["aircraft"];
+  busy: boolean;
+  emergencyMode: boolean;
+  eventId: string;
+  eventInterrupted: boolean;
+  eventTimeZone: string;
+  onCancelPlannedOperation: (plan: PlannedOperation) => Promise<void>;
+  onConfirmPlannedOperation: (plan: PlannedOperation, activate: boolean) => Promise<void>;
+  onDisableRecurringRule: (rule: RecurringOperationalRule) => Promise<void>;
+  onEditEventNotice: () => void;
+  onEditResourceNotice: (group: ResourceGroup) => void;
+  onSetEventInterruption: (interrupted: boolean) => Promise<void>;
+  onSetResourceGroupStatus: (resourceGroupId: string, status: ResourceGroupStatus) => Promise<void>;
+  onTriggerEmergency: () => Promise<void>;
+  onUpsertPlannedOperation: (payload: UpsertPlannedOperationPayload) => Promise<void>;
+  onUpsertRecurringRule: (payload: UpsertRecurringOperationalRulePayload) => Promise<void>;
+  pilots: OperationBoard["pilots"];
+  plannedOperations: OperationBoard["plannedOperations"];
+  publishedEventNotice: string;
+  recurringOperationalRules: OperationBoard["recurringOperationalRules"];
+  resourceGroups: ResourceGroup[];
+  rotations: OperationBoard["rotations"];
+  tab: OperationsTab;
+}
+
+function OperationsTabContent(props: Readonly<OperationsTabContentProps>) {
+  if (props.tab === "operations") {
+    return (
+      <OperationsOverview
+        busy={props.busy}
+        emergencyMode={props.emergencyMode}
+        eventInterrupted={props.eventInterrupted}
+        onEditEventNotice={props.onEditEventNotice}
+        onSetEventInterruption={props.onSetEventInterruption}
+        onTriggerEmergency={props.onTriggerEmergency}
+        publishedEventNotice={props.publishedEventNotice}
+      />
+    );
+  }
+  if (props.tab === "resources") {
+    return (
+      <ResourceGroupsOverview
+        busy={props.busy}
+        onEditResourceNotice={props.onEditResourceNotice}
+        onSetResourceGroupStatus={props.onSetResourceGroupStatus}
+        resourceGroups={props.resourceGroups}
+      />
+    );
+  }
+  return (
+    <div role="tabpanel">
+      <OperationalPlanPanel
+        aircraft={props.aircraft}
+        busy={props.busy}
+        eventId={props.eventId}
+        eventTimeZone={props.eventTimeZone}
+        mode="flight-director"
+        onCancel={props.onCancelPlannedOperation}
+        onConfirm={props.onConfirmPlannedOperation}
+        onDisableRecurringRule={props.onDisableRecurringRule}
+        onUpsert={props.onUpsertPlannedOperation}
+        onUpsertRecurringRule={props.onUpsertRecurringRule}
+        pilots={props.pilots}
+        plannedOperations={props.plannedOperations}
+        recurringOperationalRules={props.recurringOperationalRules}
+        resourceGroups={props.resourceGroups}
+        rotations={props.rotations}
+      />
     </div>
   );
 }
@@ -195,15 +434,61 @@ export function FlightDirectorOperationsDialog({
     if (saved) returnFromNoticeEditor();
   }
 
+  const noticeContext = selectedResourceGroup
+    ? { name: selectedResourceGroup.name, shortCode: selectedResourceGroup.shortCode }
+    : undefined;
+  const noticeHelp =
+    noticeTarget?.kind === "event"
+      ? "Maximal 240 Zeichen. Der Hinweis wird veranstaltungsweit veröffentlicht."
+      : "Maximal 240 Zeichen. Der Hinweis wird in den operativen Ansichten dieser Ressourcengruppe angezeigt.";
+  let dialogContent = (
+    <div className="flight-director-operations-dialog">
+      <Tabs items={operationsTabs} label="Betriebssteuerung" onChange={setTab} value={tab} />
+      <OperationsTabContent
+        aircraft={aircraft}
+        busy={busy}
+        emergencyMode={emergencyMode}
+        eventId={eventId}
+        eventInterrupted={eventInterrupted}
+        eventTimeZone={eventTimeZone}
+        onCancelPlannedOperation={onCancelPlannedOperation}
+        onConfirmPlannedOperation={onConfirmPlannedOperation}
+        onDisableRecurringRule={onDisableRecurringRule}
+        onEditEventNotice={editEventNotice}
+        onEditResourceNotice={editResourceNotice}
+        onSetEventInterruption={onSetEventInterruption}
+        onSetResourceGroupStatus={onSetResourceGroupStatus}
+        onTriggerEmergency={onTriggerEmergency}
+        onUpsertPlannedOperation={onUpsertPlannedOperation}
+        onUpsertRecurringRule={onUpsertRecurringRule}
+        pilots={pilots}
+        plannedOperations={plannedOperations}
+        publishedEventNotice={publishedEventNotice}
+        recurringOperationalRules={recurringOperationalRules}
+        resourceGroups={resourceGroups}
+        rotations={rotations}
+        tab={tab}
+      />
+    </div>
+  );
+  if (noticeEditorOpen) {
+    dialogContent = (
+      <OperationalNoticeEditor
+        busy={busy}
+        context={noticeContext}
+        draft={noticeDraft}
+        help={noticeHelp}
+        onChange={setNoticeDraft}
+        onDelete={deleteNotice}
+        onSave={saveNotice}
+        published={publishedNotice.length > 0}
+      />
+    );
+  }
+
   return (
     <ModalDialog
-      description={
-        noticeTarget?.kind === "event"
-          ? "Der Hinweis gilt veranstaltungsweit und hat Vorrang vor Hinweisen einzelner Ressourcengruppen."
-          : selectedResourceGroup
-            ? "Der Hinweis gilt ausschließlich für diese Ressourcengruppe."
-            : "Organisatorische Betriebslage steuern. Keine Aktion besitzt flugbetriebliche oder sicherheitsbezogene Freigabewirkung."
-      }
+      description={dialogDescription(noticeTarget, selectedResourceGroup)}
       footer={
         <Button
           onClick={noticeEditorOpen ? returnFromNoticeEditor : onClose}
@@ -216,171 +501,9 @@ export function FlightDirectorOperationsDialog({
       onClose={onClose}
       open={open}
       size="wide"
-      title={
-        noticeTarget?.kind === "event"
-          ? "Veranstaltungsweiter Hinweis"
-          : selectedResourceGroup
-            ? `Hinweis für ${selectedResourceGroup.name}`
-            : "Betrieb steuern"
-      }
+      title={dialogTitle(noticeTarget, selectedResourceGroup)}
     >
-      {noticeEditorOpen ? (
-        <OperationalNoticeEditor
-          busy={busy}
-          draft={noticeDraft}
-          help={
-            noticeTarget?.kind === "event"
-              ? "Maximal 240 Zeichen. Der Hinweis wird veranstaltungsweit veröffentlicht."
-              : "Maximal 240 Zeichen. Der Hinweis wird in den operativen Ansichten dieser Ressourcengruppe angezeigt."
-          }
-          onChange={setNoticeDraft}
-          onDelete={deleteNotice}
-          onSave={saveNotice}
-          published={publishedNotice.length > 0}
-          {...(selectedResourceGroup
-            ? {
-                context: {
-                  name: selectedResourceGroup.name,
-                  shortCode: selectedResourceGroup.shortCode,
-                },
-              }
-            : {})}
-        />
-      ) : (
-        <div className="flight-director-operations-dialog">
-          <Tabs items={operationsTabs} label="Betriebssteuerung" onChange={setTab} value={tab} />
-          {tab === "operations" ? (
-            <div className="flight-director-operation-panel" role="tabpanel">
-              <section className="flight-director-event-notice-summary">
-                <div>
-                  <h3>Veranstaltungsweiter Hinweis</h3>
-                  <p>
-                    {publishedEventNotice
-                      ? "Hinweis veröffentlicht"
-                      : "Kein Hinweis veröffentlicht"}
-                  </p>
-                </div>
-                <Button
-                  className="flight-director-notice-action"
-                  disabled={busy}
-                  onClick={editEventNotice}
-                  size="compact"
-                  type="button"
-                  variant="secondary"
-                >
-                  {publishedEventNotice ? "Hinweis bearbeiten" : "Hinweis veröffentlichen"}
-                </Button>
-              </section>
-              <section className="flight-director-interruption">
-                <div>
-                  <h3>Veranstaltungsbetrieb</h3>
-                  <p>
-                    Aktuell: <strong>{eventInterrupted ? "unterbrochen" : "laufend"}</strong>
-                  </p>
-                </div>
-                <Button
-                  disabled={busy}
-                  onClick={() => onSetEventInterruption(!eventInterrupted)}
-                  type="button"
-                  variant={eventInterrupted ? "primary" : "danger"}
-                >
-                  {eventInterrupted ? "Betrieb fortsetzen" : "Betrieb unterbrechen"}
-                </Button>
-              </section>
-              <section className="flight-director-emergency-panel">
-                <div className={emergencyMode ? "active" : ""}>
-                  <strong>{emergencyMode ? "Not-Halt aktiv" : "Kein Not-Halt aktiv"}</strong>
-                  <p>
-                    Der Not-Halt stoppt operative Kommandos. Die Aufhebung bleibt ausschließlich im
-                    Admin-Bereich möglich.
-                  </p>
-                </div>
-                {!emergencyMode ? (
-                  <Button
-                    disabled={busy}
-                    onClick={onTriggerEmergency}
-                    type="button"
-                    variant="danger"
-                  >
-                    Not-Halt auslösen
-                  </Button>
-                ) : null}
-              </section>
-            </div>
-          ) : tab === "plan" ? (
-            <div role="tabpanel">
-              <OperationalPlanPanel
-                aircraft={aircraft}
-                busy={busy}
-                eventId={eventId}
-                eventTimeZone={eventTimeZone}
-                mode="flight-director"
-                onCancel={onCancelPlannedOperation}
-                onConfirm={onConfirmPlannedOperation}
-                onDisableRecurringRule={onDisableRecurringRule}
-                onUpsert={onUpsertPlannedOperation}
-                onUpsertRecurringRule={onUpsertRecurringRule}
-                pilots={pilots}
-                plannedOperations={plannedOperations}
-                recurringOperationalRules={recurringOperationalRules}
-                resourceGroups={resourceGroups}
-                rotations={rotations}
-              />
-            </div>
-          ) : (
-            <div className="flight-director-operation-list" role="tabpanel">
-              {resourceGroups.map((group) => (
-                <article key={group.id}>
-                  <div>
-                    <strong>{group.name}</strong>
-                    <span>{group.shortCode}</span>
-                    <small>
-                      {group.activeAircraftIds.length} Flugzeuge
-                      {group.operationalNote ? " · Hinweis veröffentlicht" : ""}
-                    </small>
-                  </div>
-                  <span className={`operation-status status-${group.status.toLowerCase()}`}>
-                    {group.status}
-                  </span>
-                  <div className="flight-director-operation-actions">
-                    {resourceStatusActions.map(({ status, label }) => (
-                      <Button
-                        disabled={busy || group.status === status}
-                        key={status}
-                        onClick={() => onSetResourceGroupStatus(group.id, status)}
-                        size="compact"
-                        type="button"
-                        variant="secondary"
-                      >
-                        {label}
-                      </Button>
-                    ))}
-                    <Button
-                      className="flight-director-notice-action"
-                      disabled={busy}
-                      onClick={() => editResourceNotice(group)}
-                      size="compact"
-                      type="button"
-                      variant="secondary"
-                    >
-                      {group.operationalNote ? "Hinweis bearbeiten" : "Hinweis veröffentlichen"}
-                    </Button>
-                    <Button
-                      disabled={busy || group.status === endedStatusAction.status}
-                      onClick={() => onSetResourceGroupStatus(group.id, endedStatusAction.status)}
-                      size="compact"
-                      type="button"
-                      variant="danger"
-                    >
-                      {endedStatusAction.label}
-                    </Button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {dialogContent}
     </ModalDialog>
   );
 }
