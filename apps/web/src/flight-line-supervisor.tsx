@@ -215,6 +215,33 @@ export function compareTicketRows(left: TicketRow, right: TicketRow, sort: Ticke
   );
 }
 
+function operationalStatusTone(
+  tone: "critical" | "warning" | "notice" | "normal",
+): "danger" | "warning" | "info" | "neutral" {
+  switch (tone) {
+    case "critical":
+      return "danger";
+    case "warning":
+      return "warning";
+    case "notice":
+      return "info";
+    default:
+      return "neutral";
+  }
+}
+
+function initialAnalyticsSelection(
+  aircraft: Aircraft[],
+  board: OperationBoard,
+): FlightDirectorAnalyticsSelection {
+  if (aircraft[0]) return { tab: "aircraft", id: aircraft[0].id };
+  if (board.pilots[0]) return { tab: "pilots", id: board.pilots[0].id };
+  return {
+    tab: "groups",
+    id: board.rotations[0]?.bookingGroups[0]?.id ?? board.rotations[0]?.ticketGroupId ?? "",
+  };
+}
+
 export function FlightLineSupervisorConsole({
   board,
   deviceId,
@@ -521,15 +548,7 @@ export function FlightLineSupervisorConsole({
             <StatusPill
               aria-live="polite"
               className={`flight-director-operational-summary tone-${operationalSummaryTone}`}
-              tone={
-                operationalSummaryTone === "critical"
-                  ? "danger"
-                  : operationalSummaryTone === "warning"
-                    ? "warning"
-                    : operationalSummaryTone === "notice"
-                      ? "info"
-                      : "neutral"
-              }
+              tone={operationalStatusTone(operationalSummaryTone)}
             >
               {operationalSummary}
             </StatusPill>
@@ -542,22 +561,7 @@ export function FlightLineSupervisorConsole({
               Betrieb
             </Button>
             <Button
-              onClick={() =>
-                setAnalyticsSelection({
-                  tab:
-                    aircraft.length > 0
-                      ? "aircraft"
-                      : board.pilots.length > 0
-                        ? "pilots"
-                        : "groups",
-                  id:
-                    aircraft[0]?.id ??
-                    board.pilots[0]?.id ??
-                    board.rotations[0]?.bookingGroups[0]?.id ??
-                    board.rotations[0]?.ticketGroupId ??
-                    "",
-                })
-              }
+              onClick={() => setAnalyticsSelection(initialAnalyticsSelection(aircraft, board))}
               type="button"
               variant="secondary"
             >
@@ -862,6 +866,128 @@ export function FlightLineSupervisorConsole({
   );
 }
 
+function RotationPhaseIcon({ rotation }: Readonly<{ rotation: Rotation }>) {
+  const label = rotationStateLabels[rotation.status];
+  let Icon = CircleCheck;
+  switch (rotation.status) {
+    case "DRAFT":
+      Icon = Clock3;
+      break;
+    case "CALLED":
+      Icon = TicketsPlane;
+      break;
+    case "IN_FLIGHT":
+      Icon = PlaneTakeoff;
+      break;
+    case "LANDED":
+      Icon = PlaneLanding;
+      break;
+  }
+  return (
+    <span className="flight-director-phase-icon" role="img" aria-label={label} title={label}>
+      <Icon aria-hidden="true" size={15} />
+    </span>
+  );
+}
+
+function rotationWindowPhase(rotation: Rotation): "NOW" | "FORECAST" | "FINISHED" {
+  if (rotation.status === "CALLED") return "NOW";
+  if (rotation.status === "DRAFT" && rotation.precalledAt) return "NOW";
+  if (rotation.status === "DRAFT") return "FORECAST";
+  return "FINISHED";
+}
+
+function compactRotationTimeWindow(rotation: Rotation, timeZone: string): string {
+  const window = formatAbsoluteTimeWindow({
+    lowerAt: rotation.boardingWindowLowerAt,
+    upperAt: rotation.boardingWindowUpperAt,
+    timeZone,
+    variant: "compact",
+    quality: rotation.timeline.predictionQuality,
+    phase: rotationWindowPhase(rotation),
+  });
+  if (!rotation.timeline.extendsBeyondOperationsEnd) return window;
+  return `${window} · Ende +${rotation.timeline.overtimeMinutes} Min.`;
+}
+
+function ticketSortAriaLabel(columnLabel: string, active: boolean, sort: TicketSort): string {
+  if (!active) return `${columnLabel} sortieren · Standardsortierung`;
+  const direction = sort?.direction === "ascending" ? "aufsteigend" : "absteigend";
+  return `${columnLabel} sortieren · ${direction}`;
+}
+
+function TicketSortIndicator({ active, sort }: Readonly<{ active: boolean; sort: TicketSort }>) {
+  if (!active) return null;
+  return sort?.direction === "ascending" ? (
+    <ArrowUp aria-hidden="true" />
+  ) : (
+    <ArrowDown aria-hidden="true" />
+  );
+}
+
+function PrecallDecisionIcon({ rotation }: Readonly<{ rotation: Rotation }>) {
+  if (rotation.status === "DRAFT" && rotation.precalledAt) {
+    return <Check aria-hidden="true" size={14} />;
+  }
+  if (rotation.precallDecision?.status === "PREPARE") {
+    return <Clock3 aria-hidden="true" size={14} />;
+  }
+  return null;
+}
+
+function CompactTicketRows({
+  onOpenAnalytics,
+  rows,
+  timeZone,
+}: Readonly<{
+  onOpenAnalytics: (ticketGroupId: string, rotationId: string) => void;
+  rows: TicketRow[];
+  timeZone: string;
+}>) {
+  if (rows.length === 0) {
+    return (
+      <p>
+        <Plane aria-hidden="true" /> Noch keine verkauften Tickets.
+      </p>
+    );
+  }
+  return rows.map(({ group, queue, rotation }) => (
+    <div key={`${rotation.id}-${group.id}`}>
+      <strong>{rotationBookingGroupLabel(rotation, group)}</strong>
+      <span>{rotation.communicationLabel}</span>
+      <span>{queue ? `${queue.resourceGroupName} · ${queue.sequence}` : "–"}</span>
+      <span>{group.ticketCount}</span>
+      <span>
+        <RotationPhaseIcon rotation={rotation} />
+      </span>
+      <span>{rotation.aircraftRegistration ?? "Noch offen"}</span>
+      <span>{rotation.productName}</span>
+      <span
+        className={`precall-decision precall-decision--${rotation.precallDecision?.status.toLowerCase() ?? "unknown"}`}
+        title={precallDecisionLabel(rotation)}
+      >
+        <PrecallDecisionIcon rotation={rotation} />
+        {precallDecisionLabel(rotation)}
+      </span>
+      <span>{compactRotationTimeWindow(rotation, timeZone)}</span>
+      <span>{formatFlightLineTime(rotation.timeline.actual.boardingAt, timeZone)}</span>
+      <span>{formatFlightLineTime(rotation.timeline.actual.departureAt, timeZone)}</span>
+      <span>{formatFlightLineTime(rotation.timeline.actual.landingAt, timeZone)}</span>
+      <span>{formatFlightLineTime(rotation.timeline.actual.completionAt, timeZone)}</span>
+      <span className="ticket-analytics-action">
+        <IconButton
+          label={`Tagesauswertung für ${rotationBookingGroupLabel(rotation, group)} anzeigen`}
+          onClick={() => onOpenAnalytics(group.id, rotation.id)}
+          size="compact"
+          type="button"
+        >
+          <ChartNoAxesCombined aria-hidden="true" />
+        </IconButton>
+      </span>
+    </div>
+  ));
+}
+
 function CompactTickets({
   rows,
   timeZone,
@@ -875,46 +1001,6 @@ function CompactTickets({
   onSort: (key: TicketSortKey) => void;
   onOpenAnalytics: (ticketGroupId: string, rotationId: string) => void;
 }>) {
-  const phaseIcon = (rotation: Rotation) => {
-    const label = rotationStateLabels[rotation.status];
-    const props = { "aria-hidden": true, size: 15 } as const;
-    const icon =
-      rotation.status === "DRAFT" ? (
-        <Clock3 {...props} />
-      ) : rotation.status === "CALLED" ? (
-        <TicketsPlane {...props} />
-      ) : rotation.status === "IN_FLIGHT" ? (
-        <PlaneTakeoff {...props} />
-      ) : rotation.status === "LANDED" ? (
-        <PlaneLanding {...props} />
-      ) : (
-        <CircleCheck {...props} />
-      );
-    return (
-      <span className="flight-director-phase-icon" role="img" aria-label={label} title={label}>
-        {icon}
-      </span>
-    );
-  };
-  const timeWindow = (rotation: Rotation) => {
-    const window = formatAbsoluteTimeWindow({
-      lowerAt: rotation.boardingWindowLowerAt,
-      upperAt: rotation.boardingWindowUpperAt,
-      timeZone,
-      variant: "compact",
-      quality: rotation.timeline.predictionQuality,
-      phase:
-        rotation.status === "CALLED" ||
-        (rotation.status === "DRAFT" && Boolean(rotation.precalledAt))
-          ? "NOW"
-          : rotation.status === "DRAFT"
-            ? "FORECAST"
-            : "FINISHED",
-    });
-    return rotation.timeline.extendsBeyondOperationsEnd
-      ? `${window} · Ende +${rotation.timeline.overtimeMinutes} Min.`
-      : window;
-  };
   return (
     <div className="flight-director-compact-table tickets">
       <div className="flight-director-compact-head">
@@ -924,7 +1010,7 @@ function CompactTickets({
           return (
             <span key={column.key}>
               <button
-                aria-label={`${column.label} sortieren · ${active ? (sort.direction === "ascending" ? "aufsteigend" : "absteigend") : "Standardsortierung"}`}
+                aria-label={ticketSortAriaLabel(column.label, active, sort)}
                 aria-pressed={active}
                 onClick={() => onSort(column.key)}
                 title={column.label}
@@ -932,13 +1018,7 @@ function CompactTickets({
               >
                 <HeaderIcon aria-hidden="true" />
                 <span className="visually-hidden">{column.label}</span>
-                {active ? (
-                  sort.direction === "ascending" ? (
-                    <ArrowUp aria-hidden="true" />
-                  ) : (
-                    <ArrowDown aria-hidden="true" />
-                  )
-                ) : null}
+                <TicketSortIndicator active={active} sort={sort} />
               </button>
             </span>
           );
@@ -948,49 +1028,7 @@ function CompactTickets({
           <span className="visually-hidden">Prognoseverlauf</span>
         </span>
       </div>
-      {rows.length > 0 ? (
-        rows.map(({ group, queue, rotation }) => (
-          <div key={`${rotation.id}-${group.id}`}>
-            <strong>{rotationBookingGroupLabel(rotation, group)}</strong>
-            <span>{rotation.communicationLabel}</span>
-            <span>{queue ? `${queue.resourceGroupName} · ${queue.sequence}` : "–"}</span>
-            <span>{group.ticketCount}</span>
-            <span>{phaseIcon(rotation)}</span>
-            <span>{rotation.aircraftRegistration ?? "Noch offen"}</span>
-            <span>{rotation.productName}</span>
-            <span
-              className={`precall-decision precall-decision--${rotation.precallDecision?.status.toLowerCase() ?? "unknown"}`}
-              title={precallDecisionLabel(rotation)}
-            >
-              {rotation.status === "DRAFT" && rotation.precalledAt ? (
-                <Check aria-hidden="true" size={14} />
-              ) : rotation.precallDecision?.status === "PREPARE" ? (
-                <Clock3 aria-hidden="true" size={14} />
-              ) : null}
-              {precallDecisionLabel(rotation)}
-            </span>
-            <span>{timeWindow(rotation)}</span>
-            <span>{formatFlightLineTime(rotation.timeline.actual.boardingAt, timeZone)}</span>
-            <span>{formatFlightLineTime(rotation.timeline.actual.departureAt, timeZone)}</span>
-            <span>{formatFlightLineTime(rotation.timeline.actual.landingAt, timeZone)}</span>
-            <span>{formatFlightLineTime(rotation.timeline.actual.completionAt, timeZone)}</span>
-            <span className="ticket-analytics-action">
-              <IconButton
-                label={`Tagesauswertung für ${rotationBookingGroupLabel(rotation, group)} anzeigen`}
-                onClick={() => onOpenAnalytics(group.id, rotation.id)}
-                size="compact"
-                type="button"
-              >
-                <ChartNoAxesCombined aria-hidden="true" />
-              </IconButton>
-            </span>
-          </div>
-        ))
-      ) : (
-        <p>
-          <Plane aria-hidden="true" /> Noch keine verkauften Tickets.
-        </p>
-      )}
+      <CompactTicketRows onOpenAnalytics={onOpenAnalytics} rows={rows} timeZone={timeZone} />
     </div>
   );
 }
