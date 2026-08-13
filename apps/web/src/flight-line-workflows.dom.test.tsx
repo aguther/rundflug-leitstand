@@ -148,10 +148,14 @@ vi.mock("./features/flight-line/FlightDirectorOperationsDialog", () => ({
     onCancelPlannedOperation: (plan: { id: string; version: number }) => Promise<void>;
     onConfirmPlannedOperation: (
       plan: {
+        scopeId?: string;
+        scopeType?: "AIRCRAFT" | "EVENT" | "PILOT" | "RESOURCE_GROUP";
         id: string;
         version: number;
-        durationMultiplierPercent: number;
-        effectMode: "SLOWDOWN";
+        durationMultiplierPercent?: number;
+        effectMode: "INTERRUPTION" | "SLOWDOWN";
+        kind?: "INTERRUPTION" | "PAUSE" | "REFUELING";
+        typicalDurationMinutes?: number;
       },
       activate: boolean,
     ) => Promise<void>;
@@ -165,7 +169,7 @@ vi.mock("./features/flight-line/FlightDirectorOperationsDialog", () => ({
     ) => Promise<void>;
     onSetResourceGroupStatus: (
       resourceGroupId: string,
-      status: "PAUSED",
+      status: "ACTIVE" | "ENDED" | "INTERRUPTED" | "PAUSED",
       plannedOperationId?: string,
       expectedReviewAt?: string | null,
     ) => Promise<void>;
@@ -184,6 +188,15 @@ vi.mock("./features/flight-line/FlightDirectorOperationsDialog", () => ({
         >
           Gruppenhinweis senden
         </button>
+        <button onClick={() => void props.onPublishEventNotice("   ")} type="button">
+          Veranstaltungshinweis löschen
+        </button>
+        <button
+          onClick={() => void props.onPublishResourceNotice("resource-group-1", "   ")}
+          type="button"
+        >
+          Gruppenhinweis löschen
+        </button>
         <button
           onClick={() =>
             void props.onSetEventInterruption(
@@ -195,6 +208,9 @@ vi.mock("./features/flight-line/FlightDirectorOperationsDialog", () => ({
           type="button"
         >
           Betrieb unterbrechen
+        </button>
+        <button onClick={() => void props.onSetEventInterruption(false)} type="button">
+          Betrieb fortsetzen
         </button>
         <button
           onClick={() =>
@@ -208,6 +224,12 @@ vi.mock("./features/flight-line/FlightDirectorOperationsDialog", () => ({
           type="button"
         >
           Gruppe pausieren
+        </button>
+        <button
+          onClick={() => void props.onSetResourceGroupStatus("resource-group-1", "ACTIVE")}
+          type="button"
+        >
+          Gruppe aktivieren
         </button>
         <button onClick={() => void props.onTriggerEmergency()} type="button">
           Notfall auslösen
@@ -233,6 +255,81 @@ vi.mock("./features/flight-line/FlightDirectorOperationsDialog", () => ({
           type="button"
         >
           Plan bestätigen
+        </button>
+        <button
+          onClick={() =>
+            void props.onConfirmPlannedOperation(
+              {
+                effectMode: "INTERRUPTION",
+                id: "event-plan",
+                kind: "INTERRUPTION",
+                scopeType: "EVENT",
+                typicalDurationMinutes: 15,
+                version: 3,
+              },
+              true,
+            )
+          }
+          type="button"
+        >
+          Veranstaltungsplan starten
+        </button>
+        <button
+          onClick={() =>
+            void props.onConfirmPlannedOperation(
+              {
+                effectMode: "INTERRUPTION",
+                id: "group-plan",
+                kind: "PAUSE",
+                scopeId: "resource-group-1",
+                scopeType: "RESOURCE_GROUP",
+                typicalDurationMinutes: 20,
+                version: 3,
+              },
+              false,
+            )
+          }
+          type="button"
+        >
+          Gruppenplan beenden
+        </button>
+        <button
+          onClick={() =>
+            void props.onConfirmPlannedOperation(
+              {
+                effectMode: "INTERRUPTION",
+                id: "aircraft-plan",
+                kind: "REFUELING",
+                scopeId: "aircraft-1",
+                scopeType: "AIRCRAFT",
+                typicalDurationMinutes: 10,
+                version: 3,
+              },
+              true,
+            )
+          }
+          type="button"
+        >
+          Flugzeugplan starten
+        </button>
+        <button
+          onClick={() =>
+            void props.onConfirmPlannedOperation(
+              {
+                effectMode: "INTERRUPTION",
+                id: "pilot-plan",
+                kind: "PAUSE",
+                scopeId: "pilot-1",
+                scopeType: "PILOT",
+                typicalDurationMinutes: 10,
+                version: 3,
+              },
+              false,
+            )
+          }
+          type="button"
+        >
+          Pilotenplan beenden
         </button>
         <button
           onClick={() =>
@@ -597,11 +694,19 @@ describe("flight line workflows", () => {
     const actions = [
       "Veranstaltungshinweis senden",
       "Gruppenhinweis senden",
+      "Veranstaltungshinweis löschen",
+      "Gruppenhinweis löschen",
       "Betrieb unterbrechen",
+      "Betrieb fortsetzen",
       "Gruppe pausieren",
+      "Gruppe aktivieren",
       "Notfall auslösen",
       "Plan speichern",
       "Plan bestätigen",
+      "Veranstaltungsplan starten",
+      "Gruppenplan beenden",
+      "Flugzeugplan starten",
+      "Pilotenplan beenden",
       "Plan absagen",
       "Regel speichern",
       "Regel deaktivieren",
@@ -614,32 +719,40 @@ describe("flight line workflows", () => {
     expect(api.sendCommand.mock.calls.map(([command]) => command.type)).toEqual([
       "SET_OPERATIONAL_NOTE",
       "SET_RESOURCE_GROUP_NOTICE",
+      "SET_OPERATIONAL_NOTE",
+      "SET_RESOURCE_GROUP_NOTICE",
       "SET_EVENT_INTERRUPTION",
+      "SET_EVENT_INTERRUPTION",
+      "SET_RESOURCE_GROUP_STATUS",
       "SET_RESOURCE_GROUP_STATUS",
       "TRIGGER_EMERGENCY",
       "UPSERT_PLANNED_OPERATION",
       "SET_PLANNED_SLOWDOWN_ACTIVE",
+      "SET_EVENT_INTERRUPTION",
+      "SET_RESOURCE_GROUP_STATUS",
+      "SET_AIRCRAFT_OPERATIONAL_STATE",
+      "SET_PILOT_PAUSE",
       "CANCEL_PLANNED_OPERATION",
       "UPSERT_RECURRING_OPERATIONAL_RULE",
       "DISABLE_RECURRING_OPERATIONAL_RULE",
     ]);
     expect(api.sendCommand.mock.calls[0]?.[0].payload).toEqual({ note: "Testhinweis" });
-    expect(api.sendCommand.mock.calls[2]?.[0].payload).toEqual({
+    expect(api.sendCommand.mock.calls[4]?.[0].payload).toEqual({
       interrupted: true,
       reason: "Operative Entscheidung Flight Director",
       expectedReviewAt: "2026-08-11T10:30:00.000Z",
       plannedOperationId: "planned-operation-1",
     });
-    expect(api.sendCommand.mock.calls[7]?.[0].payload).toEqual({
+    expect(api.sendCommand.mock.calls[15]?.[0].payload).toEqual({
       planId: "planned-operation-1",
       planExpectedVersion: 2,
     });
-    expect(api.sendCommand.mock.calls[9]?.[0].payload).toEqual({
+    expect(api.sendCommand.mock.calls[17]?.[0].payload).toEqual({
       ruleId: "recurring-rule-1",
       ruleExpectedVersion: 4,
       reason: "Wiederkehrende Tagesregel deaktiviert.",
     });
-    expect(workspace.state.refresh).toHaveBeenCalledTimes(10);
+    expect(workspace.state.refresh).toHaveBeenCalledTimes(18);
   });
 
   it("coordinates aircraft state, pilot assignment and paginated history requests", async () => {
