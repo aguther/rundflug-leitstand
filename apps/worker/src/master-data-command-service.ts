@@ -16,6 +16,71 @@ function json(data: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(data), { ...init, headers });
 }
 
+type GateUpsertCommand = Extract<CommandEnvelope, { type: "UPSERT_GATE" }>;
+type AircraftUpsertCommand = Extract<CommandEnvelope, { type: "UPSERT_AIRCRAFT" }>;
+type ResourceGroupUpsertCommand = Extract<CommandEnvelope, { type: "UPSERT_RESOURCE_GROUP" }>;
+type AircraftAssignmentCommand = Extract<
+  CommandEnvelope,
+  { type: "ASSIGN_AIRCRAFT_RESOURCE_GROUP" }
+>;
+
+interface MasterDataMutationPlan {
+  eventType: "GATE_UPSERTED" | "PRODUCT_UPSERTED";
+  aggregate: { type: "GATE" | "PRODUCT"; id: string };
+  mutation: D1PreparedStatement;
+  auditPayload: Record<string, unknown>;
+}
+
+interface ResourceMutationPlan {
+  eventType: "RESOURCE_GROUP_UPSERTED" | "AIRCRAFT_UPSERTED" | "AIRCRAFT_RESOURCE_GROUP_ASSIGNED";
+  aggregate: { type: "RESOURCE_GROUP" | "AIRCRAFT"; id: string };
+  auditPayload: Record<string, unknown>;
+  mutations: D1PreparedStatement[];
+}
+
+interface ActiveResourceGroupMembership {
+  id: string;
+  aircraft_id: string;
+  resource_group_id: string;
+}
+
+function resourceGroupReferenceConflict(
+  duplicateName: boolean,
+  duplicateShortCode: boolean,
+): Response {
+  if (duplicateName) {
+    return json(
+      {
+        error: {
+          code: "RESOURCE_GROUP_NAME_EXISTS",
+          message: "Ressourcengruppen-Bezeichnung ist bereits vergeben.",
+        },
+      },
+      { status: 409 },
+    );
+  }
+  if (duplicateShortCode) {
+    return json(
+      {
+        error: {
+          code: "RESOURCE_GROUP_SHORT_CODE_EXISTS",
+          message: "Ressourcengruppen-Kurzzeichen ist bereits vergeben.",
+        },
+      },
+      { status: 409 },
+    );
+  }
+  return json(
+    {
+      error: {
+        code: "GATE_NOT_AVAILABLE",
+        message: "Das ausgewählte Gate ist nicht aktiv verfügbar.",
+      },
+    },
+    { status: 409 },
+  );
+}
+
 export class MasterDataCommandService {
   constructor(
     private readonly env: Env,
@@ -34,102 +99,9 @@ export class MasterDataCommandService {
     let auditPayload: Record<string, unknown>;
 
     if (command.type === "UPSERT_GATE") {
-      const [duplicate, existing] = await Promise.all([
-        this.env.DB.prepare(
-          "SELECT id FROM gates WHERE operation_day_id = ?1 AND label = ?2 AND id <> ?3",
-        )
-          .bind(command.eventId, command.payload.label, command.payload.gateId)
-          .first<{ id: string }>(),
-        this.env.DB.prepare(
-          "SELECT display_filter_json FROM gates WHERE id = ?1 AND operation_day_id = ?2",
-        )
-          .bind(command.payload.gateId, command.eventId)
-          .first<{ display_filter_json: string }>(),
-      ]);
-      if (duplicate) {
-        return json(
-          {
-            error: { code: "GATE_LABEL_EXISTS", message: "Gate-Bezeichnung ist bereits vergeben." },
-          },
-          { status: 409 },
-        );
-      }
-      const displayFilter: GateDisplayFilter =
-        command.payload.displayFilter ??
-        (existing
-          ? gateDisplayFilterSchema.parse(JSON.parse(existing.display_filter_json))
-          : { productIds: [], rotationStatuses: [] });
-      if (displayFilter.productIds.length > 0) {
-        const placeholders = displayFilter.productIds.map((_, index) => `?${index + 2}`).join(",");
-        const products = await this.env.DB.prepare(
-          `SELECT COUNT(*) AS count FROM products
-            WHERE operation_day_id = ?1 AND id IN (${placeholders})`,
-        )
-          .bind(command.eventId, ...displayFilter.productIds)
-          .first<{ count: number }>();
-        if ((products?.count ?? 0) !== displayFilter.productIds.length) {
-          return json(
-            {
-              error: {
-                code: "GATE_DISPLAY_FILTER_REFERENCE_INVALID",
-                message: "Der Anzeigefilter verweist auf ein unbekanntes Produkt.",
-              },
-            },
-            { status: 409 },
-          );
-        }
-      }
-      if (!command.payload.active) {
-        const usage = await this.env.DB.prepare(
-          `SELECT COUNT(*) AS count FROM products
-            WHERE operation_day_id = ?1 AND gate_id = ?2 AND sale_enabled = 1`,
-        )
-          .bind(command.eventId, command.payload.gateId)
-          .first<{ count: number }>();
-        if ((usage?.count ?? 0) > 0) {
-          return json(
-            {
-              error: {
-                code: "GATE_IN_ACTIVE_USE",
-                message: "Ein Gate mit verkaufbaren Produkten kann nicht deaktiviert werden.",
-              },
-            },
-            { status: 409 },
-          );
-        }
-      }
-      eventType = "GATE_UPSERTED";
-      aggregate = { type: "GATE", id: command.payload.gateId };
-      auditPayload = {
-        label: command.payload.label,
-        gateType: command.payload.gateType,
-        active: command.payload.active,
-        sortOrder: command.payload.sortOrder,
-        travelLeadMinutes: command.payload.travelLeadMinutes,
-        displayFilter,
-        reason: command.payload.reason,
-      };
-      mutation = this.env.DB.prepare(
-        `INSERT INTO gates
-          (id, operation_day_id, label, gate_type, active, sort_order, travel_lead_minutes,
-           display_filter_json, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)
-         ON CONFLICT(id) DO UPDATE SET label = excluded.label, gate_type = excluded.gate_type,
-          active = excluded.active, sort_order = excluded.sort_order,
-          travel_lead_minutes = excluded.travel_lead_minutes,
-          display_filter_json = excluded.display_filter_json, updated_at = excluded.updated_at
-         WHERE gates.operation_day_id = excluded.operation_day_id`,
-      ).bind(
-        command.payload.gateId,
-        command.eventId,
-        command.payload.label,
-        command.payload.gateType,
-        command.payload.active ? 1 : 0,
-        command.payload.sortOrder,
-        command.payload.travelLeadMinutes,
-        JSON.stringify(displayFilter),
-        now,
-      );
+      const plan = await this.prepareGateUpsert(command, now);
+      if (plan instanceof Response) return plan;
+      ({ eventType, aggregate, mutation, auditPayload } = plan);
     } else {
       const [resourceGroup, gate, duplicateCode, existing, nextOrder] = await Promise.all([
         this.env.DB.prepare(
@@ -306,6 +278,110 @@ export class MasterDataCommandService {
     ]);
     this.broadcast(result);
     return json(result);
+  }
+
+  private async prepareGateUpsert(
+    command: GateUpsertCommand,
+    now: string,
+  ): Promise<MasterDataMutationPlan | Response> {
+    const [duplicate, existing] = await Promise.all([
+      this.env.DB.prepare(
+        "SELECT id FROM gates WHERE operation_day_id = ?1 AND label = ?2 AND id <> ?3",
+      )
+        .bind(command.eventId, command.payload.label, command.payload.gateId)
+        .first<{ id: string }>(),
+      this.env.DB.prepare(
+        "SELECT display_filter_json FROM gates WHERE id = ?1 AND operation_day_id = ?2",
+      )
+        .bind(command.payload.gateId, command.eventId)
+        .first<{ display_filter_json: string }>(),
+    ]);
+    if (duplicate) {
+      return json(
+        {
+          error: { code: "GATE_LABEL_EXISTS", message: "Gate-Bezeichnung ist bereits vergeben." },
+        },
+        { status: 409 },
+      );
+    }
+    const displayFilter: GateDisplayFilter =
+      command.payload.displayFilter ??
+      (existing
+        ? gateDisplayFilterSchema.parse(JSON.parse(existing.display_filter_json))
+        : { productIds: [], rotationStatuses: [] });
+    if (displayFilter.productIds.length > 0) {
+      const placeholders = displayFilter.productIds.map((_, index) => `?${index + 2}`).join(",");
+      const products = await this.env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM products
+          WHERE operation_day_id = ?1 AND id IN (${placeholders})`,
+      )
+        .bind(command.eventId, ...displayFilter.productIds)
+        .first<{ count: number }>();
+      if ((products?.count ?? 0) !== displayFilter.productIds.length) {
+        return json(
+          {
+            error: {
+              code: "GATE_DISPLAY_FILTER_REFERENCE_INVALID",
+              message: "Der Anzeigefilter verweist auf ein unbekanntes Produkt.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+    }
+    if (!command.payload.active) {
+      const usage = await this.env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM products
+          WHERE operation_day_id = ?1 AND gate_id = ?2 AND sale_enabled = 1`,
+      )
+        .bind(command.eventId, command.payload.gateId)
+        .first<{ count: number }>();
+      if ((usage?.count ?? 0) > 0) {
+        return json(
+          {
+            error: {
+              code: "GATE_IN_ACTIVE_USE",
+              message: "Ein Gate mit verkaufbaren Produkten kann nicht deaktiviert werden.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+    }
+    return {
+      eventType: "GATE_UPSERTED",
+      aggregate: { type: "GATE", id: command.payload.gateId },
+      auditPayload: {
+        label: command.payload.label,
+        gateType: command.payload.gateType,
+        active: command.payload.active,
+        sortOrder: command.payload.sortOrder,
+        travelLeadMinutes: command.payload.travelLeadMinutes,
+        displayFilter,
+        reason: command.payload.reason,
+      },
+      mutation: this.env.DB.prepare(
+        `INSERT INTO gates
+          (id, operation_day_id, label, gate_type, active, sort_order, travel_lead_minutes,
+           display_filter_json, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)
+         ON CONFLICT(id) DO UPDATE SET label = excluded.label, gate_type = excluded.gate_type,
+          active = excluded.active, sort_order = excluded.sort_order,
+          travel_lead_minutes = excluded.travel_lead_minutes,
+          display_filter_json = excluded.display_filter_json, updated_at = excluded.updated_at
+         WHERE gates.operation_day_id = excluded.operation_day_id`,
+      ).bind(
+        command.payload.gateId,
+        command.eventId,
+        command.payload.label,
+        command.payload.gateType,
+        command.payload.active ? 1 : 0,
+        command.payload.sortOrder,
+        command.payload.travelLeadMinutes,
+        JSON.stringify(displayFilter),
+        now,
+      ),
+    };
   }
 
   async handleAircraftProductTurnaroundOverride(
@@ -741,23 +817,7 @@ export class MasterDataCommandService {
           .first<{ id: string }>(),
       ]);
       if (!gate || duplicateName || duplicateShortCode) {
-        return json(
-          {
-            error: {
-              code: duplicateName
-                ? "RESOURCE_GROUP_NAME_EXISTS"
-                : duplicateShortCode
-                  ? "RESOURCE_GROUP_SHORT_CODE_EXISTS"
-                  : "GATE_NOT_AVAILABLE",
-              message: duplicateName
-                ? "Ressourcengruppen-Bezeichnung ist bereits vergeben."
-                : duplicateShortCode
-                  ? "Ressourcengruppen-Kurzzeichen ist bereits vergeben."
-                  : "Das ausgewählte Gate ist nicht aktiv verfügbar.",
-            },
-          },
-          { status: 409 },
-        );
+        return resourceGroupReferenceConflict(Boolean(duplicateName), Boolean(duplicateShortCode));
       }
       const desiredAircraftIds = [...new Set(command.payload.aircraftIds ?? [])];
       const [availableAircraft, activeMemberships, activeRotations] = await Promise.all([
@@ -850,219 +910,24 @@ export class MasterDataCommandService {
           command.payload.automaticPrecallEnabled ? 1 : 0,
           now,
         ),
+        ...this.buildResourceGroupMembershipMutations(
+          command,
+          now,
+          activeMemberships.results,
+          desiredAircraftIds,
+          desiredAircraftIdSet,
+        ),
       );
-      if (command.payload.aircraftIds) {
-        for (const membership of activeMemberships.results) {
-          if (
-            membership.resource_group_id === command.payload.resourceGroupId &&
-            !desiredAircraftIdSet.has(membership.aircraft_id)
-          ) {
-            mutations.push(
-              this.env.DB.prepare(
-                "UPDATE resource_group_memberships SET active_until = ?1 WHERE id = ?2 AND active_until IS NULL",
-              ).bind(now, membership.id),
-            );
-          }
-        }
-        for (const aircraftId of desiredAircraftIds) {
-          const activeMembership = activeMemberships.results.find(
-            (membership) => membership.aircraft_id === aircraftId,
-          );
-          if (activeMembership?.resource_group_id === command.payload.resourceGroupId) continue;
-          if (activeMembership) {
-            mutations.push(
-              this.env.DB.prepare(
-                "UPDATE resource_group_memberships SET active_until = ?1 WHERE id = ?2 AND active_until IS NULL",
-              ).bind(now, activeMembership.id),
-            );
-          }
-          mutations.push(
-            this.env.DB.prepare(
-              `INSERT INTO resource_group_memberships
-                (id, operation_day_id, resource_group_id, aircraft_id, active_from, active_until,
-                 created_at, change_reason, changed_by_device_id)
-               VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?5, ?6, ?7)`,
-            ).bind(
-              crypto.randomUUID(),
-              command.eventId,
-              command.payload.resourceGroupId,
-              aircraftId,
-              now,
-              command.payload.reason,
-              command.deviceId,
-            ),
-          );
-        }
-      }
     } else if (command.type === "UPSERT_AIRCRAFT") {
-      const [duplicate, activeRotation] = await Promise.all([
-        this.env.DB.prepare("SELECT id FROM aircraft WHERE registration = ?1 AND id <> ?2")
-          .bind(command.payload.registration, command.payload.aircraftId)
-          .first<{ id: string }>(),
-        this.env.DB.prepare(
-          `SELECT id FROM rotations WHERE aircraft_id = ?1
-            AND status IN ('CALLED', 'IN_FLIGHT', 'LANDED') LIMIT 1`,
-        )
-          .bind(command.payload.aircraftId)
-          .first<{ id: string }>(),
-      ]);
-      if (duplicate || activeRotation) {
-        return json(
-          {
-            error: {
-              code: duplicate ? "AIRCRAFT_REGISTRATION_EXISTS" : "AIRCRAFT_LIFECYCLE_ACTIVE",
-              message: duplicate
-                ? "Kennzeichen ist bereits vergeben."
-                : "Flugzeugstammdaten sind während eines aktiven Umlaufs gesperrt.",
-            },
-          },
-          { status: 409 },
-        );
-      }
-      eventType = "AIRCRAFT_UPSERTED";
-      aggregate = { type: "AIRCRAFT", id: command.payload.aircraftId };
-      auditPayload = {
-        registration: command.payload.registration,
-        aircraftType: command.payload.aircraftType,
-        passengerSeats: command.payload.passengerSeats,
-        maximumPassengerPayloadKg: command.payload.maximumPassengerPayloadKg,
-        reason: command.payload.reason,
-      };
-      mutations.push(
-        this.env.DB.prepare(
-          `INSERT INTO aircraft
-            (id, registration, aircraft_type, passenger_seats, maximum_passenger_payload_kg,
-             operational_state_changed_at, created_at, updated_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6, ?6)
-           ON CONFLICT(id) DO UPDATE SET registration = excluded.registration,
-            aircraft_type = excluded.aircraft_type, passenger_seats = excluded.passenger_seats,
-            maximum_passenger_payload_kg = excluded.maximum_passenger_payload_kg,
-            version = aircraft.version + 1, updated_at = excluded.updated_at`,
-        ).bind(
-          command.payload.aircraftId,
-          command.payload.registration,
-          command.payload.aircraftType,
-          command.payload.passengerSeats,
-          command.payload.maximumPassengerPayloadKg,
-          now,
-        ),
-      );
+      const plan = await this.prepareAircraftUpsert(command, now);
+      if (plan instanceof Response) return plan;
+      ({ eventType, aggregate, auditPayload } = plan);
+      mutations.push(...plan.mutations);
     } else {
-      const [aircraft, target, activeMembership, activeRotation] = await Promise.all([
-        this.env.DB.prepare("SELECT id, aircraft_type FROM aircraft WHERE id = ?1")
-          .bind(command.payload.aircraftId)
-          .first<{ id: string; aircraft_type: string }>(),
-        this.env.DB.prepare(
-          `SELECT id, compatible_aircraft_types_json FROM resource_groups
-            WHERE id = ?1 AND operation_day_id = ?2 AND status <> 'ENDED'`,
-        )
-          .bind(command.payload.resourceGroupId, command.eventId)
-          .first<{ id: string; compatible_aircraft_types_json: string }>(),
-        this.env.DB.prepare(
-          `SELECT id, resource_group_id, active_from FROM resource_group_memberships
-            WHERE operation_day_id = ?1 AND aircraft_id = ?2 AND active_until IS NULL`,
-        )
-          .bind(command.eventId, command.payload.aircraftId)
-          .first<{ id: string; resource_group_id: string; active_from: string }>(),
-        this.env.DB.prepare(
-          `SELECT id FROM rotations WHERE operation_day_id = ?1 AND aircraft_id = ?2
-            AND status IN ('CALLED', 'IN_FLIGHT', 'LANDED') LIMIT 1`,
-        )
-          .bind(command.eventId, command.payload.aircraftId)
-          .first<{ id: string }>(),
-      ]);
-      if (!aircraft || !target) {
-        return json(
-          {
-            error: {
-              code: "ASSIGNMENT_REFERENCE_INVALID",
-              message: "Flugzeug oder Ressourcengruppe fehlt.",
-            },
-          },
-          { status: 404 },
-        );
-      }
-      if (activeRotation) {
-        return json(
-          {
-            error: {
-              code: "AIRCRAFT_LIFECYCLE_ACTIVE",
-              message: "Zuordnung ist während eines aktiven Umlaufs gesperrt.",
-            },
-          },
-          { status: 409 },
-        );
-      }
-      if (activeMembership?.resource_group_id === target.id) {
-        return json(
-          {
-            error: {
-              code: "ASSIGNMENT_UNCHANGED",
-              message: "Flugzeug ist bereits dieser Ressourcengruppe zugeordnet.",
-            },
-          },
-          { status: 409 },
-        );
-      }
-      if (
-        activeMembership &&
-        Date.parse(command.payload.effectiveAt) <= Date.parse(activeMembership.active_from)
-      ) {
-        return json(
-          {
-            error: {
-              code: "ASSIGNMENT_TIME_INVALID",
-              message: "Wirksamkeit muss nach Beginn der bisherigen Zuordnung liegen.",
-            },
-          },
-          { status: 409 },
-        );
-      }
-      const compatibleTypes = JSON.parse(target.compatible_aircraft_types_json) as string[];
-      if (compatibleTypes.length > 0 && !compatibleTypes.includes(aircraft.aircraft_type)) {
-        return json(
-          {
-            error: {
-              code: "AIRCRAFT_TYPE_INCOMPATIBLE",
-              message: "Flugzeugtyp ist für diese Ressourcengruppe nicht freigegeben.",
-            },
-          },
-          { status: 409 },
-        );
-      }
-      eventType = "AIRCRAFT_RESOURCE_GROUP_ASSIGNED";
-      aggregate = { type: "AIRCRAFT", id: aircraft.id };
-      auditPayload = {
-        fromResourceGroupId: activeMembership?.resource_group_id ?? null,
-        toResourceGroupId: target.id,
-        effectiveAt: command.payload.effectiveAt,
-        reason: command.payload.reason,
-      };
-      if (activeMembership) {
-        mutations.push(
-          this.env.DB.prepare(
-            `UPDATE resource_group_memberships SET active_until = ?1
-              WHERE id = ?2 AND active_until IS NULL`,
-          ).bind(command.payload.effectiveAt, activeMembership.id),
-        );
-      }
-      mutations.push(
-        this.env.DB.prepare(
-          `INSERT INTO resource_group_memberships
-            (id, operation_day_id, resource_group_id, aircraft_id, active_from, active_until,
-             created_at, change_reason, changed_by_device_id)
-           VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8)`,
-        ).bind(
-          crypto.randomUUID(),
-          command.eventId,
-          target.id,
-          aircraft.id,
-          command.payload.effectiveAt,
-          now,
-          command.payload.reason,
-          command.deviceId,
-        ),
-      );
+      const plan = await this.prepareAircraftAssignment(command, now);
+      if (plan instanceof Response) return plan;
+      ({ eventType, aggregate, auditPayload } = plan);
+      mutations.push(...plan.mutations);
     }
 
     const result: CommandResult = {
@@ -1111,5 +976,243 @@ export class MasterDataCommandService {
     ]);
     this.broadcast(result);
     return json(result);
+  }
+
+  private async prepareAircraftUpsert(
+    command: AircraftUpsertCommand,
+    now: string,
+  ): Promise<ResourceMutationPlan | Response> {
+    const [duplicate, activeRotation] = await Promise.all([
+      this.env.DB.prepare("SELECT id FROM aircraft WHERE registration = ?1 AND id <> ?2")
+        .bind(command.payload.registration, command.payload.aircraftId)
+        .first<{ id: string }>(),
+      this.env.DB.prepare(
+        `SELECT id FROM rotations WHERE aircraft_id = ?1
+          AND status IN ('CALLED', 'IN_FLIGHT', 'LANDED') LIMIT 1`,
+      )
+        .bind(command.payload.aircraftId)
+        .first<{ id: string }>(),
+    ]);
+    if (duplicate || activeRotation) {
+      return json(
+        {
+          error: {
+            code: duplicate ? "AIRCRAFT_REGISTRATION_EXISTS" : "AIRCRAFT_LIFECYCLE_ACTIVE",
+            message: duplicate
+              ? "Kennzeichen ist bereits vergeben."
+              : "Flugzeugstammdaten sind während eines aktiven Umlaufs gesperrt.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    return {
+      eventType: "AIRCRAFT_UPSERTED",
+      aggregate: { type: "AIRCRAFT", id: command.payload.aircraftId },
+      auditPayload: {
+        registration: command.payload.registration,
+        aircraftType: command.payload.aircraftType,
+        passengerSeats: command.payload.passengerSeats,
+        maximumPassengerPayloadKg: command.payload.maximumPassengerPayloadKg,
+        reason: command.payload.reason,
+      },
+      mutations: [
+        this.env.DB.prepare(
+          `INSERT INTO aircraft
+            (id, registration, aircraft_type, passenger_seats, maximum_passenger_payload_kg,
+             operational_state_changed_at, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6, ?6)
+           ON CONFLICT(id) DO UPDATE SET registration = excluded.registration,
+            aircraft_type = excluded.aircraft_type, passenger_seats = excluded.passenger_seats,
+            maximum_passenger_payload_kg = excluded.maximum_passenger_payload_kg,
+            version = aircraft.version + 1, updated_at = excluded.updated_at`,
+        ).bind(
+          command.payload.aircraftId,
+          command.payload.registration,
+          command.payload.aircraftType,
+          command.payload.passengerSeats,
+          command.payload.maximumPassengerPayloadKg,
+          now,
+        ),
+      ],
+    };
+  }
+
+  private buildResourceGroupMembershipMutations(
+    command: ResourceGroupUpsertCommand,
+    now: string,
+    activeMemberships: ActiveResourceGroupMembership[],
+    desiredAircraftIds: string[],
+    desiredAircraftIdSet: Set<string>,
+  ): D1PreparedStatement[] {
+    if (!command.payload.aircraftIds) return [];
+    const mutations: D1PreparedStatement[] = [];
+    for (const membership of activeMemberships) {
+      if (
+        membership.resource_group_id === command.payload.resourceGroupId &&
+        !desiredAircraftIdSet.has(membership.aircraft_id)
+      ) {
+        mutations.push(
+          this.env.DB.prepare(
+            "UPDATE resource_group_memberships SET active_until = ?1 WHERE id = ?2 AND active_until IS NULL",
+          ).bind(now, membership.id),
+        );
+      }
+    }
+    for (const aircraftId of desiredAircraftIds) {
+      const activeMembership = activeMemberships.find(
+        (membership) => membership.aircraft_id === aircraftId,
+      );
+      if (activeMembership?.resource_group_id === command.payload.resourceGroupId) continue;
+      if (activeMembership) {
+        mutations.push(
+          this.env.DB.prepare(
+            "UPDATE resource_group_memberships SET active_until = ?1 WHERE id = ?2 AND active_until IS NULL",
+          ).bind(now, activeMembership.id),
+        );
+      }
+      mutations.push(
+        this.env.DB.prepare(
+          `INSERT INTO resource_group_memberships
+            (id, operation_day_id, resource_group_id, aircraft_id, active_from, active_until,
+             created_at, change_reason, changed_by_device_id)
+           VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?5, ?6, ?7)`,
+        ).bind(
+          crypto.randomUUID(),
+          command.eventId,
+          command.payload.resourceGroupId,
+          aircraftId,
+          now,
+          command.payload.reason,
+          command.deviceId,
+        ),
+      );
+    }
+    return mutations;
+  }
+
+  private async prepareAircraftAssignment(
+    command: AircraftAssignmentCommand,
+    now: string,
+  ): Promise<ResourceMutationPlan | Response> {
+    const [aircraft, target, activeMembership, activeRotation] = await Promise.all([
+      this.env.DB.prepare("SELECT id, aircraft_type FROM aircraft WHERE id = ?1")
+        .bind(command.payload.aircraftId)
+        .first<{ id: string; aircraft_type: string }>(),
+      this.env.DB.prepare(
+        `SELECT id, compatible_aircraft_types_json FROM resource_groups
+          WHERE id = ?1 AND operation_day_id = ?2 AND status <> 'ENDED'`,
+      )
+        .bind(command.payload.resourceGroupId, command.eventId)
+        .first<{ id: string; compatible_aircraft_types_json: string }>(),
+      this.env.DB.prepare(
+        `SELECT id, resource_group_id, active_from FROM resource_group_memberships
+          WHERE operation_day_id = ?1 AND aircraft_id = ?2 AND active_until IS NULL`,
+      )
+        .bind(command.eventId, command.payload.aircraftId)
+        .first<{ id: string; resource_group_id: string; active_from: string }>(),
+      this.env.DB.prepare(
+        `SELECT id FROM rotations WHERE operation_day_id = ?1 AND aircraft_id = ?2
+          AND status IN ('CALLED', 'IN_FLIGHT', 'LANDED') LIMIT 1`,
+      )
+        .bind(command.eventId, command.payload.aircraftId)
+        .first<{ id: string }>(),
+    ]);
+    if (!aircraft || !target) {
+      return json(
+        {
+          error: {
+            code: "ASSIGNMENT_REFERENCE_INVALID",
+            message: "Flugzeug oder Ressourcengruppe fehlt.",
+          },
+        },
+        { status: 404 },
+      );
+    }
+    if (activeRotation) {
+      return json(
+        {
+          error: {
+            code: "AIRCRAFT_LIFECYCLE_ACTIVE",
+            message: "Zuordnung ist während eines aktiven Umlaufs gesperrt.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    if (activeMembership?.resource_group_id === target.id) {
+      return json(
+        {
+          error: {
+            code: "ASSIGNMENT_UNCHANGED",
+            message: "Flugzeug ist bereits dieser Ressourcengruppe zugeordnet.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    if (
+      activeMembership &&
+      Date.parse(command.payload.effectiveAt) <= Date.parse(activeMembership.active_from)
+    ) {
+      return json(
+        {
+          error: {
+            code: "ASSIGNMENT_TIME_INVALID",
+            message: "Wirksamkeit muss nach Beginn der bisherigen Zuordnung liegen.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const compatibleTypes = JSON.parse(target.compatible_aircraft_types_json) as string[];
+    if (compatibleTypes.length > 0 && !compatibleTypes.includes(aircraft.aircraft_type)) {
+      return json(
+        {
+          error: {
+            code: "AIRCRAFT_TYPE_INCOMPATIBLE",
+            message: "Flugzeugtyp ist für diese Ressourcengruppe nicht freigegeben.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const mutations: D1PreparedStatement[] = [];
+    if (activeMembership) {
+      mutations.push(
+        this.env.DB.prepare(
+          `UPDATE resource_group_memberships SET active_until = ?1
+            WHERE id = ?2 AND active_until IS NULL`,
+        ).bind(command.payload.effectiveAt, activeMembership.id),
+      );
+    }
+    mutations.push(
+      this.env.DB.prepare(
+        `INSERT INTO resource_group_memberships
+          (id, operation_day_id, resource_group_id, aircraft_id, active_from, active_until,
+           created_at, change_reason, changed_by_device_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        target.id,
+        aircraft.id,
+        command.payload.effectiveAt,
+        now,
+        command.payload.reason,
+        command.deviceId,
+      ),
+    );
+    return {
+      eventType: "AIRCRAFT_RESOURCE_GROUP_ASSIGNED",
+      aggregate: { type: "AIRCRAFT", id: aircraft.id },
+      auditPayload: {
+        fromResourceGroupId: activeMembership?.resource_group_id ?? null,
+        toResourceGroupId: target.id,
+        effectiveAt: command.payload.effectiveAt,
+        reason: command.payload.reason,
+      },
+      mutations,
+    };
   }
 }
