@@ -13,6 +13,18 @@ function numberValue(value: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function recurringRuleDueLabel(
+  rule: SimulationRecurringOperationalRule,
+  remaining: number,
+): string {
+  if (remaining === 0) return "jetzt fällig";
+  if (rule.triggerMetric === "OPERATING_MINUTES") {
+    return `voraussichtlich in ${remaining} Betriebsminuten`;
+  }
+  const unit = remaining === 1 ? "Umlauf" : "Umläufen";
+  return `voraussichtlich in ${remaining} ${unit}`;
+}
+
 export function SimulationRecurringRulesEditor({
   config,
   onChange,
@@ -87,17 +99,7 @@ export function SimulationRecurringRulesEditor({
               <header>
                 <div>
                   <strong>{rule.kind === "REFUELING" ? "Tanken" : "Pause"}</strong>
-                  <small className="sim-rule-due">
-                    {remaining === 0
-                      ? "jetzt fällig"
-                      : `voraussichtlich in ${remaining} ${
-                          rule.triggerMetric === "COMPLETED_ROTATIONS"
-                            ? remaining === 1
-                              ? "Umlauf"
-                              : "Umläufen"
-                            : "Betriebsminuten"
-                        }`}
-                  </small>
+                  <small className="sim-rule-due">{recurringRuleDueLabel(rule, remaining)}</small>
                 </div>
                 <button
                   aria-label={`${rule.key} löschen`}
