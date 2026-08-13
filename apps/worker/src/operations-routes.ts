@@ -210,7 +210,7 @@ function precallDecisionProjection(rotation: {
 function dispatchPlanProjection(
   rotation: {
     dispatch_plan_id: string | null;
-  dispatch_plan_revision: string | null;
+    dispatch_plan_revision: string | null;
     dispatch_batch_id: string | null;
     dispatch_order: number | null;
     dispatch_wave: number | null;
