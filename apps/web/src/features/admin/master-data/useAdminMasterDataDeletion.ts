@@ -21,57 +21,80 @@ interface UseAdminMasterDataDeletionOptions {
   onRefreshHistory: () => Promise<unknown>;
 }
 
+function countBlocker(count: number, label: string): string[] {
+  return count > 0 ? [`${count} ${label}`] : [];
+}
+
 export function getMasterDataDeletionBlockers(
   board: OperationBoard | null | undefined,
   entityType: MasterDataEntityType,
   entityId: string,
 ): string[] {
   if (!board) return ["Der bestätigte Betriebsstand wird noch geladen"];
-  if (entityType === "GATE") {
-    const groups = board.resourceGroups.filter((group) => group.gateId === entityId).length;
-    const products = board.products.filter((product) => product.gateId === entityId).length;
-    const rotations = board.rotations.filter((rotation) => rotation.gateId === entityId).length;
-    return [
-      ...(groups ? [`${groups} Ressourcengruppe(n)`] : []),
-      ...(products ? [`${products} Produkt(e)`] : []),
-      ...(rotations ? [`${rotations} Umlauf/Umläufe`] : []),
-    ];
+  switch (entityType) {
+    case "GATE":
+      return [
+        ...countBlocker(
+          board.resourceGroups.filter((group) => group.gateId === entityId).length,
+          "Ressourcengruppe(n)",
+        ),
+        ...countBlocker(
+          board.products.filter((product) => product.gateId === entityId).length,
+          "Produkt(e)",
+        ),
+        ...countBlocker(
+          board.rotations.filter((rotation) => rotation.gateId === entityId).length,
+          "Umlauf/Umläufe",
+        ),
+      ];
+    case "RESOURCE_GROUP":
+      return [
+        ...countBlocker(
+          board.products.filter((product) => product.resourceGroupId === entityId).length,
+          "Produkt(e)",
+        ),
+        ...countBlocker(
+          board.aircraft.filter((aircraft) => aircraft.resourceGroupId === entityId).length,
+          "Flugzeugzuordnung(en)",
+        ),
+      ];
+    case "PRODUCT": {
+      const code = board.products.find((product) => product.id === entityId)?.code;
+      return countBlocker(
+        board.rotations.filter((rotation) => rotation.productCode === code).length,
+        "Umlauf/Umläufe",
+      );
+    }
+    case "AIRCRAFT": {
+      const assigned = board.aircraft.some(
+        (entry) => entry.id === entityId && Boolean(entry.resourceGroupId),
+      );
+      return [
+        ...countBlocker(assigned ? 1 : 0, "Flugzeugzuordnung"),
+        ...countBlocker(
+          board.rotations.filter((rotation) => rotation.aircraftId === entityId).length,
+          "Umlauf/Umläufe",
+        ),
+      ];
+    }
+    case "PILOT": {
+      const active = board.pilots.some(
+        (entry) => entry.id === entityId && Boolean(entry.currentRotationId),
+      );
+      return [
+        ...countBlocker(active ? 1 : 0, "aktiver Umlauf"),
+        ...countBlocker(
+          board.aircraft.filter((entry) => entry.currentPilotId === entityId).length,
+          "Flugzeugbindung(en)",
+        ),
+      ];
+    }
+    default:
+      return countBlocker(
+        board.rotations.filter((rotation) => rotation.aircraftId === entityId).length,
+        "Umlauf/Umläufe",
+      );
   }
-  if (entityType === "RESOURCE_GROUP") {
-    const products = board.products.filter(
-      (product) => product.resourceGroupId === entityId,
-    ).length;
-    const assignments = board.aircraft.filter(
-      (aircraft) => aircraft.resourceGroupId === entityId,
-    ).length;
-    return [
-      ...(products ? [`${products} Produkt(e)`] : []),
-      ...(assignments ? [`${assignments} Flugzeugzuordnung(en)`] : []),
-    ];
-  }
-  if (entityType === "PRODUCT") {
-    const code = board.products.find((product) => product.id === entityId)?.code;
-    const rotations = board.rotations.filter((rotation) => rotation.productCode === code).length;
-    return rotations ? [`${rotations} Umlauf/Umläufe`] : [];
-  }
-  if (entityType === "AIRCRAFT") {
-    const aircraft = board.aircraft.find((entry) => entry.id === entityId);
-    const rotations = board.rotations.filter((rotation) => rotation.aircraftId === entityId).length;
-    return [
-      ...(aircraft?.resourceGroupId ? ["1 Flugzeugzuordnung"] : []),
-      ...(rotations ? [`${rotations} Umlauf/Umläufe`] : []),
-    ];
-  }
-  if (entityType === "PILOT") {
-    const pilot = board.pilots.find((entry) => entry.id === entityId);
-    const aircraft = board.aircraft.filter((entry) => entry.currentPilotId === entityId).length;
-    return [
-      ...(pilot?.currentRotationId ? ["1 aktiver Umlauf"] : []),
-      ...(aircraft ? [`${aircraft} Flugzeugbindung(en)`] : []),
-    ];
-  }
-  const rotations = board.rotations.filter((rotation) => rotation.aircraftId === entityId).length;
-  return rotations ? [`${rotations} Umlauf/Umläufe`] : [];
 }
 
 export function useAdminMasterDataDeletion({
