@@ -74,16 +74,20 @@ export async function clearFactoryResetCoordinators(
   }
 }
 
+interface FactoryResetStatementInput {
+  commandId: string;
+  completedAt: string;
+  r2CleanupPending: boolean;
+  requestHash: string;
+  response: FactoryResetResponse;
+  setupBrowserBindingHash: string;
+  setupGrantExpiresAt: string;
+  setupGrantHash: string;
+}
+
 export function factoryResetStatements(
   env: Env,
-  commandId: string,
-  requestHash: string,
-  completedAt: string,
-  r2CleanupPending: boolean,
-  response: FactoryResetResponse,
-  setupGrantHash: string,
-  setupGrantExpiresAt: string,
-  setupBrowserBindingHash: string,
+  input: FactoryResetStatementInput,
 ): D1PreparedStatement[] {
   return [
     // Planning captures contain self-referencing lineage (anchor_run_id and previous_*_id).
@@ -101,14 +105,14 @@ export function factoryResetStatements(
          setup_browser_binding_hash)
        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, ?8)`,
     ).bind(
-      commandId,
-      requestHash,
-      completedAt,
-      r2CleanupPending ? 1 : 0,
-      JSON.stringify(response),
-      setupGrantHash,
-      setupGrantExpiresAt,
-      setupBrowserBindingHash,
+      input.commandId,
+      input.requestHash,
+      input.completedAt,
+      input.r2CleanupPending ? 1 : 0,
+      JSON.stringify(input.response),
+      input.setupGrantHash,
+      input.setupGrantExpiresAt,
+      input.setupBrowserBindingHash,
     ),
   ];
 }

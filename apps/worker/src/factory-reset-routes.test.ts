@@ -402,14 +402,16 @@ describe("factory reset route", () => {
     ]);
     expect(factoryResetStatements).toHaveBeenCalledWith(
       env,
-      COMMAND_ID,
-      REQUEST_HASH,
-      NOW.toISOString(),
-      false,
-      expect.objectContaining({ recoveryBackupKey: "backups/synthetic-recovery.json" }),
-      GRANT_HASH,
-      GRANT_EXPIRES_AT,
-      BROWSER_BINDING_HASH,
+      expect.objectContaining({
+        commandId: COMMAND_ID,
+        completedAt: NOW.toISOString(),
+        r2CleanupPending: false,
+        requestHash: REQUEST_HASH,
+        response: expect.objectContaining({ recoveryBackupKey: "backups/synthetic-recovery.json" }),
+        setupBrowserBindingHash: BROWSER_BINDING_HASH,
+        setupGrantExpiresAt: GRANT_EXPIRES_AT,
+        setupGrantHash: GRANT_HASH,
+      }),
     );
     expect(batch).toHaveBeenCalledOnce();
     expect(resetSetupCookie).toHaveBeenCalledWith(GRANT_TOKEN, expect.any(Request));
