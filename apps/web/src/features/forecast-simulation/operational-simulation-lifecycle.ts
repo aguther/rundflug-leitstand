@@ -47,62 +47,66 @@ export function advanceOperationalSimulationLifecycle(input: OperationalLifecycl
 }
 
 function processManualIncidents(input: OperationalLifecycleInput): void {
-  const {
-    nowMs,
-    manualIncidents,
-    aircraft,
-    processedIncidentIds,
-    recordedIncidentBoundaries,
-    recordEvent,
-    startBlock,
-  } = input;
+  for (const incident of input.manualIncidents) processManualIncident(incident, input);
+}
 
-  for (const incident of manualIncidents) {
-    const startsAt = roundedTick(Date.parse(incident.at));
-    if (
-      incident.type === "EVENT_INTERRUPTION" &&
-      nowMs >= startsAt &&
-      !recordedIncidentBoundaries.has(`${incident.id}:start`)
-    ) {
-      recordedIncidentBoundaries.add(`${incident.id}:start`);
-      recordEvent("EVENT_INTERRUPTED", nowMs, {
-        details: "Simulierte globale Betriebsunterbrechung bestätigt.",
-      });
-    }
-    const endsAt = roundedTick(addMinutes(Date.parse(incident.at), incident.durationMinutes));
-    if (
-      incident.type === "EVENT_INTERRUPTION" &&
-      nowMs >= endsAt &&
-      !recordedIncidentBoundaries.has(`${incident.id}:end`)
-    ) {
-      recordedIncidentBoundaries.add(`${incident.id}:end`);
-      recordEvent("EVENT_RESUMED", nowMs, {
-        details: "Simulierte Wiederaufnahme des Betriebs bestätigt.",
-      });
-    }
-    if (
-      incident.type !== "EVENT_INTERRUPTION" &&
-      nowMs >= startsAt &&
-      !processedIncidentIds.has(incident.id)
-    ) {
-      const entry = aircraft.find((candidate) => candidate.id === incident.aircraftId);
-      processedIncidentIds.add(incident.id);
-      if (entry) {
-        const block: OperationalBlock = {
-          key: incident.id,
-          state: manualIncidentBlockState(incident),
-          durationMinutes: incident.durationMinutes,
-          dayOutage: incident.dayOutage,
-          source: "MANUAL",
-        };
-        if (entry.activeRotationId === null && entry.state === "AVAILABLE") {
-          startBlock(entry, block, nowMs);
-        } else {
-          entry.pendingBlocks.push(block);
-        }
-      }
-    }
+function processManualIncident(incident: ManualIncident, input: OperationalLifecycleInput): void {
+  recordInterruptionBoundaries(incident, input);
+  queueManualAircraftBlock(incident, input);
+}
+
+function recordInterruptionBoundaries(
+  incident: ManualIncident,
+  input: OperationalLifecycleInput,
+): void {
+  if (incident.type !== "EVENT_INTERRUPTION") return;
+  const { nowMs, recordedIncidentBoundaries, recordEvent } = input;
+  const startsAt = roundedTick(Date.parse(incident.at));
+  const startKey = `${incident.id}:start`;
+  if (nowMs >= startsAt && !recordedIncidentBoundaries.has(startKey)) {
+    recordedIncidentBoundaries.add(startKey);
+    recordEvent("EVENT_INTERRUPTED", nowMs, {
+      details: "Simulierte globale Betriebsunterbrechung bestätigt.",
+    });
   }
+  const endsAt = roundedTick(addMinutes(Date.parse(incident.at), incident.durationMinutes));
+  const endKey = `${incident.id}:end`;
+  if (nowMs >= endsAt && !recordedIncidentBoundaries.has(endKey)) {
+    recordedIncidentBoundaries.add(endKey);
+    recordEvent("EVENT_RESUMED", nowMs, {
+      details: "Simulierte Wiederaufnahme des Betriebs bestätigt.",
+    });
+  }
+}
+
+function queueManualAircraftBlock(
+  incident: ManualIncident,
+  input: OperationalLifecycleInput,
+): void {
+  const { nowMs, aircraft, processedIncidentIds, startBlock } = input;
+  const startsAt = roundedTick(Date.parse(incident.at));
+  if (
+    incident.type === "EVENT_INTERRUPTION" ||
+    nowMs < startsAt ||
+    processedIncidentIds.has(incident.id)
+  ) {
+    return;
+  }
+  processedIncidentIds.add(incident.id);
+  const entry = aircraft.find((candidate) => candidate.id === incident.aircraftId);
+  if (!entry) return;
+  const block: OperationalBlock = {
+    key: incident.id,
+    state: manualIncidentBlockState(incident),
+    durationMinutes: incident.durationMinutes,
+    dayOutage: incident.dayOutage,
+    source: "MANUAL",
+  };
+  if (entry.activeRotationId === null && entry.state === "AVAILABLE") {
+    startBlock(entry, block, nowMs);
+    return;
+  }
+  entry.pendingBlocks.push(block);
 }
 
 function manualIncidentBlockState(incident: ManualIncident): OperationalBlock["state"] {
@@ -112,28 +116,30 @@ function manualIncidentBlockState(incident: ManualIncident): OperationalBlock["s
 }
 
 function completeEndedPlans(input: OperationalLifecycleInput): void {
-  const { nowMs, plans, recurringRules, recordEvent } = input;
+  for (const plan of input.plans) completeEndedPlan(plan, input);
+}
 
-  for (const plan of plans) {
-    if (
-      plan.actualStartMs !== null &&
-      plan.actualEndMs !== null &&
-      nowMs >= plan.actualEndMs &&
-      !plan.completed
-    ) {
-      plan.completed = true;
-      if (plan.recurringRuleKey) {
-        const rule = recurringRules.find((entry) => entry.key === plan.recurringRuleKey);
-        if (rule) rule.currentProgress = 0;
-      }
-      recordEvent("PLANNED_OPERATION_ENDED", nowMs, {
-        aircraftId: plan.scopeType === "AIRCRAFT" ? plan.scopeId : null,
-        pilotId: plan.scopeType === "PILOT" ? plan.scopeId : null,
-        plannedOperationId: plan.key,
-        details: `Geplanter Eintrag ${plan.kind} beendet.`,
-      });
-    }
+function completeEndedPlan(plan: OperationalPlan, input: OperationalLifecycleInput): void {
+  const { nowMs, recurringRules, recordEvent } = input;
+  if (
+    plan.actualStartMs === null ||
+    plan.actualEndMs === null ||
+    nowMs < plan.actualEndMs ||
+    plan.completed
+  ) {
+    return;
   }
+  plan.completed = true;
+  if (plan.recurringRuleKey) {
+    const rule = recurringRules.find((entry) => entry.key === plan.recurringRuleKey);
+    if (rule) rule.currentProgress = 0;
+  }
+  recordEvent("PLANNED_OPERATION_ENDED", nowMs, {
+    aircraftId: plan.scopeType === "AIRCRAFT" ? plan.scopeId : null,
+    pilotId: plan.scopeType === "PILOT" ? plan.scopeId : null,
+    plannedOperationId: plan.key,
+    details: `Geplanter Eintrag ${plan.kind} beendet.`,
+  });
 }
 
 function advanceOperationalRotations(input: OperationalLifecycleInput): void {
@@ -217,60 +223,69 @@ function releaseBlockedAircraft(input: OperationalLifecycleInput): void {
 }
 
 function startReadyOperationalPlans(input: OperationalLifecycleInput): void {
-  const {
-    config,
-    nowMs,
-    aircraft,
-    pilots,
-    rotations,
-    plans,
-    recordEvent,
-    planAppliesToRotation,
-    activeSlowdownPercent,
-    applySlowdownToRemainingPhases,
-  } = input;
+  for (const plan of input.plans) startOperationalPlanWhenReady(plan, input);
+}
 
-  for (const plan of plans) {
-    if (plan.actualStartMs !== null || plan.completed) continue;
-    const afterRotationReady =
-      plan.startMode === "AFTER_CURRENT_ROTATION" &&
-      plan.afterRotationId &&
-      rotations.some(
-        (rotation) => rotation.id === plan.afterRotationId && rotation.status === "COMPLETED",
+function startOperationalPlanWhenReady(
+  plan: OperationalPlan,
+  input: OperationalLifecycleInput,
+): void {
+  if (plan.actualStartMs !== null || plan.completed) return;
+  if (!isOperationalPlanReady(plan, input)) return;
+  if (!isOperationalPlanTargetIdle(plan, input.aircraft, input.pilots)) return;
+  scheduleOperationalPlanDuration(plan, input.config, input.nowMs);
+  applyOperationalPlanSlowdown(plan, input);
+  input.recordEvent("PLANNED_OPERATION_STARTED", input.nowMs, {
+    aircraftId: plan.scopeType === "AIRCRAFT" ? plan.scopeId : null,
+    pilotId: plan.scopeType === "PILOT" ? plan.scopeId : null,
+    plannedOperationId: plan.key,
+    details: plan.publicNote ? `${plan.kind} · ${plan.publicNote}` : plan.kind,
+  });
+}
+
+function isOperationalPlanReady(plan: OperationalPlan, input: OperationalLifecycleInput): boolean {
+  if (plan.startMode === "TIME_WINDOW") {
+    return plan.candidateStartMs !== null && input.nowMs >= plan.candidateStartMs;
+  }
+  if (plan.startMode !== "AFTER_CURRENT_ROTATION" || !plan.afterRotationId) return false;
+  return input.rotations.some(
+    (rotation) => rotation.id === plan.afterRotationId && rotation.status === "COMPLETED",
+  );
+}
+
+function scheduleOperationalPlanDuration(
+  plan: OperationalPlan,
+  config: SimulationConfig,
+  nowMs: number,
+): void {
+  plan.actualStartMs = nowMs;
+  plan.actualEndMs = roundedTick(
+    addMinutes(
+      nowMs,
+      deterministicSample(config.seed, `${plan.key}:duration`, {
+        minimum: plan.minimumDurationMinutes,
+        typical: plan.typicalDurationMinutes,
+        maximum: plan.maximumDurationMinutes,
+      }),
+    ),
+  );
+}
+
+function applyOperationalPlanSlowdown(
+  plan: OperationalPlan,
+  input: OperationalLifecycleInput,
+): void {
+  if ((plan.effectMode ?? "BLOCKING") !== "SLOWDOWN") return;
+  for (const rotation of input.rotations) {
+    if (
+      ["CALLED", "IN_FLIGHT", "LANDED"].includes(rotation.status) &&
+      input.planAppliesToRotation(plan, rotation)
+    ) {
+      input.applySlowdownToRemainingPhases(
+        rotation,
+        input.activeSlowdownPercent(rotation, input.nowMs),
       );
-    const timeReady =
-      plan.startMode === "TIME_WINDOW" &&
-      plan.candidateStartMs !== null &&
-      nowMs >= plan.candidateStartMs;
-    if (!afterRotationReady && !timeReady) continue;
-    if (!isOperationalPlanTargetIdle(plan, aircraft, pilots)) continue;
-    plan.actualStartMs = nowMs;
-    plan.actualEndMs = roundedTick(
-      addMinutes(
-        nowMs,
-        deterministicSample(config.seed, `${plan.key}:duration`, {
-          minimum: plan.minimumDurationMinutes,
-          typical: plan.typicalDurationMinutes,
-          maximum: plan.maximumDurationMinutes,
-        }),
-      ),
-    );
-    if ((plan.effectMode ?? "BLOCKING") === "SLOWDOWN") {
-      for (const rotation of rotations) {
-        if (
-          ["CALLED", "IN_FLIGHT", "LANDED"].includes(rotation.status) &&
-          planAppliesToRotation(plan, rotation)
-        ) {
-          applySlowdownToRemainingPhases(rotation, activeSlowdownPercent(rotation, nowMs));
-        }
-      }
     }
-    recordEvent("PLANNED_OPERATION_STARTED", nowMs, {
-      aircraftId: plan.scopeType === "AIRCRAFT" ? plan.scopeId : null,
-      pilotId: plan.scopeType === "PILOT" ? plan.scopeId : null,
-      plannedOperationId: plan.key,
-      details: plan.publicNote ? `${plan.kind} · ${plan.publicNote}` : plan.kind,
-    });
   }
 }
 
