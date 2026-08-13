@@ -1,5 +1,5 @@
 import { type FactoryResetResponse, factoryResetRequestSchema } from "@rundflug/contracts";
-import type { Context, Hono } from "hono";
+import type { Hono } from "hono";
 import { authorizeSession, type SessionActor, sessionBrowserBindingHash } from "./auth";
 import { createPortableBackup } from "./backup";
 import { sha256Hex, verifyPin } from "./crypto";
@@ -10,15 +10,16 @@ import {
   factoryResetStatements,
   finishR2Cleanup,
 } from "./factory-reset";
+import {
+  type FactoryResetReceipt,
+  finalizeFactoryReset,
+  replayFactoryReset,
+} from "./factory-reset-route-support";
 import { allowLoginAttempt } from "./public-access";
 import { resetSetupCookie, resetSetupGrantExpiry, resetSetupToken } from "./reset-setup-grant";
 import type { Env } from "./types";
 
 type WorkerApp = Hono<{
-  Bindings: Env;
-  Variables: { sessionActor: SessionActor | null };
-}>;
-type WorkerContext = Context<{
   Bindings: Env;
   Variables: { sessionActor: SessionActor | null };
 }>;
@@ -48,77 +49,7 @@ const defaultDependencies = {
   verifyPin,
 };
 
-type FactoryResetRouteDependencies = typeof defaultDependencies;
-type FactoryResetInput = Parameters<typeof factoryResetRequestHash>[0];
-interface FactoryResetReceipt {
-  completed_at: string;
-  r2_cleanup_pending: number;
-  request_hash: string;
-  response_json: string;
-  setup_browser_binding_hash: string | null;
-}
-
-async function replayFactoryReset(
-  context: WorkerContext,
-  dependencies: FactoryResetRouteDependencies,
-  input: FactoryResetInput,
-  requestHash: string,
-  prior: FactoryResetReceipt,
-): Promise<Response> {
-  const browserBindingHash = await dependencies.sessionBrowserBindingHash(context.req.raw);
-  if (
-    !browserBindingHash ||
-    !prior.setup_browser_binding_hash ||
-    browserBindingHash !== prior.setup_browser_binding_hash
-  ) {
-    return context.json(
-      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
-      403,
-    );
-  }
-  if (prior.request_hash !== requestHash) {
-    return context.json(
-      { error: { code: "IDEMPOTENCY_CONFLICT", message: "Reset-ID ist bereits belegt." } },
-      409,
-    );
-  }
-  let response = JSON.parse(prior.response_json) as FactoryResetResponse;
-  if (prior.r2_cleanup_pending) {
-    response = await dependencies.finishR2Cleanup(context.env, input.commandId, response);
-  }
-  const token = await dependencies.resetSetupToken(
-    context.env,
-    input.commandId,
-    prior.completed_at,
-  );
-  if (token) context.header("set-cookie", dependencies.resetSetupCookie(token, context.req.raw));
-  return context.json(response);
-}
-
-async function finalizeFactoryReset(
-  context: WorkerContext,
-  dependencies: FactoryResetRouteDependencies,
-  input: FactoryResetInput,
-  response: FactoryResetResponse,
-  grantToken: string,
-): Promise<Response> {
-  if (input.deleteAllBackups) {
-    try {
-      const completedResponse = await dependencies.finishR2Cleanup(
-        context.env,
-        input.commandId,
-        response,
-      );
-      context.header("set-cookie", dependencies.resetSetupCookie(grantToken, context.req.raw));
-      return context.json(completedResponse);
-    } catch {
-      context.header("set-cookie", dependencies.resetSetupCookie(grantToken, context.req.raw));
-      return context.json(response, 202);
-    }
-  }
-  context.header("set-cookie", dependencies.resetSetupCookie(grantToken, context.req.raw));
-  return context.json(response);
-}
+export type FactoryResetRouteDependencies = typeof defaultDependencies;
 
 export function registerFactoryResetRoutes(
   app: WorkerApp,

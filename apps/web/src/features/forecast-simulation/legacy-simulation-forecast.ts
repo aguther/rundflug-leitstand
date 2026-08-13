@@ -3,6 +3,7 @@ import {
   type DispatchPlan,
   type ForecastRotationStatus,
 } from "@rundflug/domain";
+import { expectedAircraftAvailability } from "./legacy-simulation-availability";
 import {
   dispatchPublicStatus,
   EVENT_ID,
@@ -18,19 +19,6 @@ import {
   toSimulationIso as iso,
   SIMULATION_MINUTE_MS as MINUTE_MS,
 } from "./simulation-primitives";
-
-function expectedAircraftAvailability(
-  aircraft: RuntimeAircraft,
-  activeRotation: RuntimeRotation | null,
-  nowMs: number,
-  referenceTotalMinutes: number,
-): number {
-  if (typeof aircraft.blockedUntilMs === "number") return aircraft.blockedUntilMs;
-  if (activeRotation?.predictedCompletionAt)
-    return Date.parse(activeRotation.predictedCompletionAt);
-  if (aircraft.state === "ACTIVE") return addMinutes(nowMs, referenceTotalMinutes);
-  return nowMs;
-}
 
 export function calculateLegacySimulationProjections(input: {
   config: SimulationConfig;

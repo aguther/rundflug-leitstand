@@ -272,7 +272,6 @@ export class AttendanceCommandService {
       openRecall && Date.parse(openRecall.expires_at) > nowDate.getTime() ? openRecall : null;
     const nextVersion = current.version + 1;
     const nextEvent = rowToSnapshot({ ...current, version: nextVersion, updated_at: now });
-
     if (command.type === "CLEAR_TICKET_GROUP_RECALL") {
       if (!activeRecall) {
         return json(

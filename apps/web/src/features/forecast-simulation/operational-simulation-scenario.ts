@@ -13,13 +13,10 @@ import type {
   SimulationRecurringOperationalRule,
   SimulationRotation,
 } from "./model";
+import { productDemandArrivals } from "./operational-simulation-demand";
 import {
-  addSimulationMinutes as addMinutes,
-  createSeededRandom,
   deterministicChance,
-  hashSimulationSeed,
   toSimulationIso as iso,
-  SIMULATION_MINUTE_MS as MINUTE_MS,
   roundSimulationTick as roundedTick,
 } from "./simulation-primitives";
 export const EVENT_ID = "LOCAL_OPERATIONAL_SIMULATION";
@@ -94,42 +91,6 @@ export type MetricsCalculator = (input: {
   aircraftCount?: number;
   dispatchDiagnostics?: SimulationDispatchDiagnostics;
 }) => SimulationMetrics;
-
-function productDemandArrivals(
-  config: SimulationConfig,
-  product: NonNullable<SimulationConfig["operationalModel"]>["products"][number],
-  salesStartMs: number,
-): Array<{ at: number; productId: string }> {
-  const demand = config.demandByProduct?.[product.id];
-  if (!demand) return [];
-  const arrivals: Array<{ at: number; productId: string }> = [];
-  const windows = [...demand.windows].sort(
-    (left, right) =>
-      left.startOffsetMinutes - right.startOffsetMinutes ||
-      left.endOffsetMinutes - right.endOffsetMinutes,
-  );
-  for (const [index, window] of windows.entries()) {
-    if (window.personsPerHour === 0) continue;
-    const random = createSeededRandom(
-      hashSimulationSeed(
-        config.seed,
-        `demand:${product.id}:${index}:${window.startOffsetMinutes}:${window.endOffsetMinutes}`,
-      ),
-    );
-    const expectedGroupSize = (product.referenceCapacity + 1) / 2;
-    const groupRatePerHour = window.personsPerHour / expectedGroupSize;
-    const windowEndMs = addMinutes(salesStartMs, window.endOffsetMinutes);
-    let arrivalMs = addMinutes(salesStartMs, window.startOffsetMinutes);
-    while (arrivalMs < windowEndMs) {
-      const draw = Math.max(Number.EPSILON, random.next());
-      arrivalMs += (-Math.log(draw) / groupRatePerHour) * 60 * MINUTE_MS;
-      if (arrivalMs < windowEndMs) {
-        arrivals.push({ at: roundedTick(arrivalMs), productId: product.id });
-      }
-    }
-  }
-  return arrivals;
-}
 
 export function createOperationalDemand(config: SimulationConfig): OperationalRotation[] {
   const model = config.operationalModel;

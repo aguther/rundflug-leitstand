@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { cloneEvent, deleteEvent, downloadMasterDataTemplate, getEventCatalog } from "../../../api";
 import { forgetActiveEvent, rememberActiveEvent } from "../../../event-context";
 import { useAdminOperationIdentity } from "../../operations/operation-identity";
+import { nextEventSortDirection } from "./admin-event-catalog-sort";
 import type { EventDialogView, EventSortKey, EventSortState } from "./EventCatalogDialog";
 
 interface UseAdminEventCatalogOptions {
@@ -17,12 +18,6 @@ const eventCatalogCollator = new Intl.Collator("de-DE", {
   numeric: true,
   sensitivity: "base",
 });
-
-function nextSortDirection(direction: EventSortState["direction"]): EventSortState["direction"] {
-  if (direction === "asc") return "desc";
-  if (direction === "desc") return null;
-  return "asc";
-}
 
 export function useAdminEventCatalog({
   administrator,
@@ -147,7 +142,7 @@ export function useAdminEventCatalog({
       current.key === key
         ? {
             key,
-            direction: nextSortDirection(current.direction),
+            direction: nextEventSortDirection(current.direction),
           }
         : { key, direction: "asc" },
     );

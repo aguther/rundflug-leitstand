@@ -3,11 +3,12 @@ import type {
   MasterDataTemplateValidation,
   OperationBoard,
 } from "@rundflug/contracts";
-import { CheckCircle2, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import type { RefObject } from "react";
 import { ValidationHint } from "../../../admin-ux";
 import { Button, Field, ModalDialog } from "../../../design-system/components";
 import type { MasterDataDeleteTarget } from "../../../operation-workspace";
+import { MasterDataDeleteEffects } from "./MasterDataDeleteEffects";
 
 interface MasterDataDeleteDialogProps {
   busy: boolean;
@@ -19,39 +20,6 @@ interface MasterDataDeleteDialogProps {
   onPinChange: (value: string) => void;
   pin: string;
   target: MasterDataDeleteTarget | null;
-}
-
-function DeleteEffects({
-  preparation,
-  target,
-}: Readonly<{ preparation: boolean; target: MasterDataDeleteTarget }>) {
-  if (!preparation) {
-    return (
-      <output className="delete-blockers">
-        <strong>Löschen ist nach Betriebsfreigabe gesperrt.</strong>
-        <span>Stammdaten können jetzt nur noch deaktiviert werden.</span>
-      </output>
-    );
-  }
-  if (target.blockers.length > 0) {
-    return (
-      <output className="delete-blockers">
-        <strong>Löschen noch nicht möglich</strong>
-        <span>Zuerst entfernen:</span>
-        <ul>
-          {target.blockers.map((blocker) => (
-            <li key={blocker}>{blocker}</li>
-          ))}
-        </ul>
-      </output>
-    );
-  }
-  return (
-    <div className="delete-ready-copy">
-      <CheckCircle2 aria-hidden="true" />
-      <span>Keine erkennbaren Abhängigkeiten. Der Server prüft sie vor dem Löschen erneut.</span>
-    </div>
-  );
 }
 
 export function MasterDataDeleteDialog({
@@ -108,7 +76,7 @@ export function MasterDataDeleteDialog({
       </div>
       <section aria-labelledby="master-delete-effects">
         <h3 id="master-delete-effects">Auswirkungen</h3>
-        <DeleteEffects preparation={preparation} target={target} />
+        <MasterDataDeleteEffects preparation={preparation} target={target} />
       </section>
       {!modeUnlocked ? (
         <div className="ds-field master-delete-pin-field">

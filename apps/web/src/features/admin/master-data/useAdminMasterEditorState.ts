@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { hasMasterEditorChanges } from "../../../admin-master-editor-state";
 import type { MasterDataCategory } from "../../../admin-ux";
+import { masterEditorForCategory } from "./master-editor-category";
 
 interface MasterEditorAdapter {
   select: (id: string) => string;
@@ -20,24 +21,13 @@ interface UseAdminMasterEditorStateOptions {
   editors: MasterEditorAdapters;
 }
 
-function editorForCategory(
-  category: MasterDataCategory,
-  editors: MasterEditorAdapters,
-): MasterEditorAdapter {
-  if (category === "gates") return editors.gates;
-  if (category === "products") return editors.products;
-  if (category === "resource-groups") return editors.resourceGroups;
-  if (category === "pilots") return editors.pilots;
-  return editors.aircraft;
-}
-
 export function useAdminMasterEditorState({ category, editors }: UseAdminMasterEditorStateOptions) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"general" | "details">("general");
   const [discardChangesOpen, setDiscardChangesOpen] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const initialSnapshotRef = useRef<string | null>(null);
-  const currentEditor = editorForCategory(category, editors);
+  const currentEditor = masterEditorForCategory(category, editors);
   const dirty = open && hasMasterEditorChanges(initialSnapshotRef.current, currentEditor.snapshot);
 
   function select(editor: MasterEditorAdapter, id: string, resetTab: boolean) {

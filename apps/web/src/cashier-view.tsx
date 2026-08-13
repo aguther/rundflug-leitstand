@@ -1,15 +1,9 @@
-import type {
-  OperationBoard,
-  TicketGroupPrintData,
-  TicketSearchRequest,
-  TicketSearchResult,
-} from "@rundflug/contracts";
+import type { OperationBoard, TicketGroupPrintData, TicketSearchResult } from "@rundflug/contracts";
 import {
   Activity,
   AlertTriangle,
   ArrowDown,
   ArrowUp,
-  Check,
   CircleArrowRight,
   CircleCheck,
   Clock3,
@@ -17,7 +11,6 @@ import {
   Flag,
   GripVertical,
   ListOrdered,
-  Maximize2,
   Minus,
   Package,
   PlaneLanding,
@@ -39,7 +32,6 @@ import {
 import QRCode from "qrcode";
 import {
   type DragEvent,
-  type ReactNode,
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
@@ -49,7 +41,7 @@ import {
 } from "react";
 import { getTicketGroupPrintData, searchTickets, sendCommand } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
-import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
+import { useActionMessageBridge } from "./app/PageNotifications";
 import {
   Button,
   CheckboxField,
@@ -67,8 +59,25 @@ import {
   CashierCompletionIcon,
   QrScanDialog,
   TableIconHeader,
-  TicketPaper,
 } from "./features/cashier/CashierTicketPresentation";
+import {
+  activeFlightEmptyLabel,
+  CashierNotifications,
+  CashierTicketGroupHeader,
+  CashierTicketPaperPreview,
+  cancellationDescription,
+  goToGateIcon,
+  measurePerformanceSafely,
+  printableTicketDocument,
+  rotationPhaseClass,
+  rotationStatusLabel,
+  rotationTimeWindowPhase,
+  type TicketListTab,
+  ticketListEmptyLabel,
+  ticketListSentinelLabel,
+  ticketMatchesListStatus,
+  ticketSearchRequest,
+} from "./features/cashier/CashierViewPresentation";
 import {
   cashierProductOrderChanged,
   moveCashierProduct,
@@ -80,12 +89,6 @@ import {
 } from "./features/cashier/cashier-ticket-status-sync";
 import { useTemporaryRowHighlights } from "./features/cashier/use-temporary-row-highlights";
 import { useOperationIdentity } from "./features/operations/operation-identity";
-import {
-  ConnectionNotice,
-  EmergencyNotice,
-  InterruptionNotice,
-  OperationalNotice,
-} from "./features/operations/operation-notices";
 import type { TicketReceipt } from "./features/operations/operation-types";
 import { useOperationBoard } from "./features/operations/use-operation-board";
 import {
@@ -100,194 +103,6 @@ import {
 import { oversizeSplitPreview } from "./operational-exceptions";
 import { useConnectivity } from "./shared/hooks/use-connectivity";
 import { formatAbsoluteTimeWindow } from "./time-window";
-
-type TicketListTab = TicketSearchRequest["status"];
-
-function ticketMatchesListStatus(entry: TicketSearchResult, status: TicketListTab) {
-  if (status === "CANCELED") return entry.groupStatus === "CANCELED";
-  if (status === "OPEN") {
-    return entry.groupStatus !== "CANCELED" && entry.groupStatus !== "COMPLETED";
-  }
-  return entry.groupStatus !== "CANCELED";
-}
-
-function ticketListEmptyLabel(status: TicketListTab) {
-  if (status === "CANCELED") return "Keine stornierten Tickets vorhanden.";
-  if (status === "OPEN") return "Keine offenen Tickets vorhanden.";
-  return "Noch keine Tickets verkauft.";
-}
-
-function ticketListSentinelLabel(loading: boolean, nextCursor: string | null) {
-  if (loading) return "Liste wird aktualisiert …";
-  if (nextCursor) return "Weitere Buchungsgruppen werden beim Scrollen geladen.";
-  return "Listenende";
-}
-
-function rotationStatusLabel(status: OperationBoard["rotations"][number]["status"]) {
-  return {
-    DRAFT: "Wartet",
-    CALLED: "Boarding",
-    IN_FLIGHT: "Im Flug",
-    LANDED: "Gelandet",
-    COMPLETED: "Abgeschlossen",
-  }[status];
-}
-
-function rotationTimeWindowPhase(
-  rotation: OperationBoard["rotations"][number],
-): "NOW" | "FORECAST" | "FINISHED" {
-  if (rotation.status === "CALLED" || (rotation.status === "DRAFT" && rotation.precalledAt)) {
-    return "NOW";
-  }
-  return rotation.status === "DRAFT" ? "FORECAST" : "FINISHED";
-}
-
-function measurePerformanceSafely(name: string, startedAt: number) {
-  try {
-    performance.measure(name, { start: startedAt, end: performance.now() });
-  } catch {
-    // Performance measurement must never affect a confirmed sale.
-  }
-}
-
-function ticketSearchRequest(input: {
-  query: string;
-  status: TicketListTab;
-  preserveLoaded: boolean;
-  loadedCount: number;
-  append: boolean;
-  nextCursor: string | null;
-  soldByOperatorAccountId?: string;
-}): Partial<TicketSearchRequest> {
-  const request: Partial<TicketSearchRequest> = {
-    q: input.query,
-    status: input.status,
-    limit: input.preserveLoaded ? Math.min(Math.max(input.loadedCount, 20), 50) : 20,
-  };
-  if (input.append && input.nextCursor) request.cursor = input.nextCursor;
-  if (input.soldByOperatorAccountId) {
-    request.soldByOperatorAccountId = input.soldByOperatorAccountId;
-  }
-  return request;
-}
-
-function CashierNotifications({
-  error,
-  lastConfirmedAt,
-  pendingDraftCount,
-  serverConfirmed,
-  board,
-}: {
-  error: string | null;
-  lastConfirmedAt: string | null;
-  pendingDraftCount: number;
-  serverConfirmed: boolean;
-  board: OperationBoard | null;
-}) {
-  let draftNotice: ReactNode = null;
-  if (pendingDraftCount > 0) {
-    draftNotice = (
-      <PageNotice
-        noticeKey={`cashier-draft:${serverConfirmed ? "restored" : "local"}:${pendingDraftCount}`}
-        tone="warning"
-      >
-        {serverConfirmed
-          ? "Offline-Entwurf wiederhergestellt · aktuellen Stand prüfen und Verkauf bewusst bestätigen."
-          : "Entwurf lokal gespeichert · noch nicht bestätigt · ohne operative Wirkung."}
-      </PageNotice>
-    );
-  }
-  return (
-    <>
-      <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
-      {draftNotice}
-      <EmergencyNotice active={board?.event.emergencyMode ?? false} />
-      <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
-      <OperationalNotice note={board?.event.operationalNote} />
-    </>
-  );
-}
-
-function CashierTicketGroupHeader({ group }: { group: TicketSearchResult | undefined }) {
-  if (!group) {
-    return (
-      <header>
-        <div>
-          <h2>Ticketgruppe auswählen</h2>
-        </div>
-      </header>
-    );
-  }
-  return (
-    <header>
-      <div>
-        <h2>Gruppe {group.bookingGroupLabel}</h2>
-        <span>
-          {group.groupSize} Person{group.groupSize === 1 ? "" : "en"}
-        </span>
-      </div>
-      <div className="cashier-ticket-sale-meta">
-        <small>Kasse: {group.soldByOperatorLoginCode ?? "Nicht zugeordnet"}</small>
-        <time>
-          Verkauft:{" "}
-          {new Date(group.soldAt).toLocaleTimeString("de-DE", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}{" "}
-          Uhr
-        </time>
-      </div>
-    </header>
-  );
-}
-
-function CashierTicketPaperPreview({
-  receipt,
-  onEnlarge,
-}: {
-  receipt: TicketReceipt | null;
-  onEnlarge: () => void;
-}) {
-  if (!receipt) return <span>Ticketzettel wird nach Auswahl angezeigt.</span>;
-  return (
-    <>
-      <TicketPaper compact ticket={receipt} />
-      <button
-        aria-label={`QR-Code der Gruppe ${receipt.communicationLabel} vergrößern`}
-        className="cashier-ticket-enlarge"
-        onClick={onEnlarge}
-        type="button"
-        title="QR-Code vergrößern"
-      >
-        <Maximize2 aria-hidden="true" size={15} />
-      </button>
-    </>
-  );
-}
-
-function rotationPhaseClass(status: OperationBoard["rotations"][number]["status"]) {
-  return status === "COMPLETED" ? "cashier-phase-icon is-complete" : "cashier-phase-icon";
-}
-
-function goToGateIcon(rotation: OperationBoard["rotations"][number]) {
-  return rotation.status === "DRAFT" && rotation.precalledAt ? (
-    <Check aria-label="GoToGate-Aktiv" size={18} />
-  ) : null;
-}
-
-function activeFlightEmptyLabel(group: TicketSearchResult | undefined) {
-  return group ? "Keine aktive Fluggruppe vorhanden." : "Ticketgruppe auswählen.";
-}
-
-function printableTicketDocument(receipt: TicketReceipt | null) {
-  return receipt ? <TicketPaper ticket={receipt} /> : null;
-}
-
-function cancellationDescription(group: TicketSearchResult | undefined) {
-  const label = group?.bookingGroupLabel ?? "Buchungsgruppe";
-  const size = group?.groupSize ?? 0;
-  return `${label} · ${size} Ticket${size === 1 ? "" : "s"}. Die aktive Belegung wird gelöst und die Kapazität sofort freigegeben.`;
-}
 
 export function CashierView() {
   const { session } = useAuth();

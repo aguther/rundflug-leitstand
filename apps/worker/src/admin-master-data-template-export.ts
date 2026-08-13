@@ -34,7 +34,6 @@ export async function loadAdminMasterDataTemplate(
     .bind(eventId)
     .first<Record<string, MasterDataExportValue>>();
   if (!event) return null;
-
   const [gates, resourceGroups, products, pilots, assignments, turnaroundOverrides] =
     await Promise.all([
       database

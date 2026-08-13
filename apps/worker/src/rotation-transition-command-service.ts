@@ -56,7 +56,6 @@ export class RotationTransitionCommandService {
       resourceGroupId: string,
     ) => Promise<Array<{ rotationId: string; queueSequence: number }>>,
   ) {}
-
   async handle(
     command: RotationTransitionCommand,
     current: StoredEventRow,

@@ -369,7 +369,6 @@ export class RotationCorrectionCommandService {
       }
       throw reason;
     }
-
     const now = new Date().toISOString();
     const nextVersion = current.version + 1;
     const changedAfterCall =

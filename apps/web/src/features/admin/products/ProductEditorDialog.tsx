@@ -1,25 +1,7 @@
-import type { OperationBoard } from "@rundflug/contracts";
-import type { ReactNode } from "react";
 import { ModalDialog, Tabs } from "../../../design-system/components";
 import { FieldLabel } from "../../../operation-workspace";
 import { ProductReferenceRotation } from "../../../product-reference-rotation";
-import type { useProductEditorState } from "./useProductEditorState";
-
-type EditorTab = "general" | "details";
-
-interface ProductEditorDialogProps {
-  board: OperationBoard | null;
-  editor: ReturnType<typeof useProductEditorState>;
-  footer: ReactNode;
-  furtherActions: ReactNode;
-  initialFocusSelector: string;
-  onClose: () => void;
-  onTabChange: (tab: EditorTab) => void;
-  open: boolean;
-  resourceGroups: OperationBoard["resourceGroups"];
-  submitAttempted: boolean;
-  tab: EditorTab;
-}
+import type { ProductEditorDialogProps } from "./product-editor-dialog-types";
 
 export function ProductEditorDialog({
   board,

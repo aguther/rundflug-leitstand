@@ -123,7 +123,6 @@ interface GroupRotationRow {
 }
 
 type UnknownTicketResponse = (env: Env, request: Request) => Promise<Response>;
-
 export function registerPublicStatusRoutes(
   app: WorkerApp,
   unknownTicketResponse: UnknownTicketResponse,

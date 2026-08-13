@@ -14,6 +14,11 @@ const cashierTicketPresentation = readFileSync(
   new URL("./features/cashier/CashierTicketPresentation.tsx", import.meta.url),
   "utf8",
 );
+const cashierTablePresentation = readFileSync(
+  new URL("./features/cashier/CashierTablePresentation.tsx", import.meta.url),
+  "utf8",
+);
+const cashierCompletionSource = `${cashierTicketPresentation}\n${cashierTablePresentation}`;
 
 describe("V1.9 approved UI delta", () => {
   it("uses the approved cashier tabs and icon headers", () => {
@@ -44,9 +49,9 @@ describe("V1.9 approved UI delta", () => {
   });
 
   it("shows progress and success semantics for ticket and rotation completion", () => {
-    expect(cashierTicketPresentation).toContain("cashierTicketCompletionIndicator");
-    expect(cashierTicketPresentation).toContain("<CircleEllipsis");
-    expect(cashierTicketPresentation).toContain("<CircleCheck");
+    expect(cashierCompletionSource).toContain("cashierTicketCompletionIndicator");
+    expect(cashierCompletionSource).toContain("<CircleEllipsis");
+    expect(cashierCompletionSource).toContain("<CircleCheck");
     expect(cashierStyles).toMatch(
       /\.cashier-phase-icon\.is-complete,[\s\S]*?color: var\(--ui-success\);/,
     );

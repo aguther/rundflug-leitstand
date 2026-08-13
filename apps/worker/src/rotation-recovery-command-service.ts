@@ -100,7 +100,6 @@ export class RotationRecoveryCommandService {
         { status: 409 },
       );
     }
-
     const segmentRows = await this.env.DB.prepare(
       `SELECT tg.id AS ticket_group_id, tg.queue_sequence, MIN(rt.assigned_at) AS assigned_at
          FROM rotation_tickets rt
@@ -123,7 +122,6 @@ export class RotationRecoveryCommandService {
         { status: 409 },
       );
     }
-
     const queueMaximum = await this.env.DB.prepare(
       `SELECT COALESCE(MAX(tg.queue_sequence), 0) AS maximum_queue_sequence
          FROM ticket_groups tg

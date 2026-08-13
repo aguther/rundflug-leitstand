@@ -134,7 +134,6 @@ export class TicketGroupMutationCommandService {
       }
       throw reason;
     }
-
     const targetProductId = group.product_id;
     const targetResourceGroupId = group.resource_group_id;
     const currentProduct = await this.env.DB.prepare(

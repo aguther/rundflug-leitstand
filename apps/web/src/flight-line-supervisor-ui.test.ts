@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import analyticsViewportSource from "./features/flight-line/analytics-diagram-viewport.ts?raw";
 import analyticsContentSource from "./features/flight-line/FlightDirectorAnalyticsContent.tsx?raw";
@@ -11,6 +12,11 @@ import appSource from "./flight-line-view.tsx?raw";
 import { readCssSource } from "./test-css-source";
 
 const flightLineSource = `${supervisorSource}\n${sharedSource}\n${operationsDialogSource}\n${operationalPlanSource}\n${analyticsDialogSource}\n${analyticsContentSource}`;
+const appPresentationSource = readFileSync(
+  new URL("./features/flight-line/FlightLineViewPresentation.tsx", import.meta.url),
+  "utf8",
+);
+const flightLineAppSource = `${appSource}\n${appPresentationSource}`;
 const flightLineStyles = readCssSource(
   new URL("./features/flight-line/flight-line-v12.css", import.meta.url),
 );
@@ -245,8 +251,8 @@ describe("Flight Director", () => {
     expect(operationsDialogSource).toContain('{ value: "plan", label: "Betriebsplan" }');
     expect(operationsDialogSource).toContain('{ value: "resources", label: "Ressourcengruppen" }');
     expect(operationsDialogSource).toContain("Not-Halt aktiv");
-    expect(appSource).toContain("Betrieb unterbrochen");
-    expect(appSource).toContain("Betrieb normal");
+    expect(flightLineAppSource).toContain("Betrieb unterbrochen");
+    expect(flightLineAppSource).toContain("Betrieb normal");
     expect(appSource).toContain('type: "SET_OPERATIONAL_NOTE"');
     expect(appSource).toContain('type: "SET_RESOURCE_GROUP_NOTICE"');
     expect(appSource).toContain('type: "SET_RESOURCE_GROUP_STATUS"');

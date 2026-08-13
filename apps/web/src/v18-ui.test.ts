@@ -14,6 +14,10 @@ const buttonStyles = readFileSync(
   new URL("./design-system/components.css", import.meta.url),
   "utf8",
 );
+const cashierPresentation = readFileSync(
+  new URL("./features/cashier/CashierViewPresentation.tsx", import.meta.url),
+  "utf8",
+);
 
 describe("V1.8 approved UI deltas", () => {
   it("keeps busy content width stable and limits the indicator to the initiating button", () => {
@@ -33,7 +37,7 @@ describe("V1.8 approved UI deltas", () => {
     expect(list).not.toContain('key: "flight-group"');
     expect(list).not.toContain('key: "status"');
     expect(cashier).toContain('label="GoToGate-Aktiv"');
-    expect(cashier).toContain('rotation.status === "DRAFT" && rotation.precalledAt');
+    expect(cashierPresentation).toContain('rotation.status === "DRAFT" && rotation.precalledAt');
     expect(cashier).toContain("Ticket drucken");
     expect(cashier).not.toContain("Ticketzettel erneut drucken");
     expect(cashier).toContain("ticketCount: size");

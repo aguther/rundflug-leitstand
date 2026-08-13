@@ -7,7 +7,20 @@ const ticketPresentationSource = readFileSync(
   new URL("./features/cashier/CashierTicketPresentation.tsx", import.meta.url),
   "utf8",
 );
-const cashierFeatureSource = `${cashierSource}\n${ticketPresentationSource}`;
+const viewPresentationSource = readFileSync(
+  new URL("./features/cashier/CashierViewPresentation.tsx", import.meta.url),
+  "utf8",
+);
+const tablePresentationSource = readFileSync(
+  new URL("./features/cashier/CashierTablePresentation.tsx", import.meta.url),
+  "utf8",
+);
+const cashierFeatureSource = [
+  cashierSource,
+  ticketPresentationSource,
+  viewPresentationSource,
+  tablePresentationSource,
+].join("\n");
 
 const styles = readFileSync(new URL("./features/cashier/cashier-v12.css", import.meta.url), "utf8");
 
@@ -97,7 +110,7 @@ describe("cashier release 1.7.0 acceptance coverage", () => {
   it("shows a complete compact preview and a dedicated QR scan dialog", () => {
     expect(cashierFeatureSource).toContain("function QrScanDialog");
     expect(cashierFeatureSource).toContain("dialog.showModal()");
-    expect(cashierSource).toContain("QR-Code vergrößern");
+    expect(cashierFeatureSource).toContain("QR-Code vergrößern");
     expect(cashierSource).toContain("width: 768");
     expect(styles).toMatch(/\.cashier-ticket-paper \{[\s\S]*?overflow: hidden;/);
     expect(styles).toContain(".ticket-paper-preview");
@@ -121,6 +134,6 @@ describe("cashier release 1.7.0 acceptance coverage", () => {
     expect(cashierSource).not.toContain("Tickets ausgewählt.");
     expect(cashierSource).not.toContain("Ticketzettel stehen zum Nachdruck bereit.");
     expect(cashierSource).toContain("selectedRowKey");
-    expect(cashierSource).toContain('title="QR-Code vergrößern"');
+    expect(cashierFeatureSource).toContain('title="QR-Code vergrößern"');
   });
 });

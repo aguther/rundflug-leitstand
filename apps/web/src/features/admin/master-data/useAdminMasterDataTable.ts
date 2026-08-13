@@ -1,148 +1,19 @@
-import type { OperationBoard } from "@rundflug/contracts";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { MasterDataCategory } from "../../../admin-ux";
+import {
+  type AdminMasterDataSort,
+  aircraftSortValue,
+  countForCategory,
+  gateSortValue,
+  nextSortDirection,
+  pilotSortValue,
+  productSortValue,
+  resourceGroupSortValue,
+  sortRows,
+  tableCollator,
+  type UseAdminMasterDataTableOptions,
+} from "./admin-master-data-sorting";
 
-type SortDirection = "asc" | "desc" | null;
-type Gate = OperationBoard["gates"][number];
-type ResourceGroup = OperationBoard["resourceGroups"][number];
-type Aircraft = OperationBoard["aircraft"][number];
-type Pilot = OperationBoard["pilots"][number];
-type Product = OperationBoard["products"][number];
-
-interface CategoryCount {
-  filtered: number;
-  total: number;
-}
-
-export interface AdminMasterDataSort {
-  category: MasterDataCategory;
-  key: string;
-  direction: SortDirection;
-}
-
-interface UseAdminMasterDataTableOptions {
-  board: OperationBoard | null | undefined;
-  category: MasterDataCategory;
-}
-
-const tableCollator = new Intl.Collator("de-DE", {
-  numeric: true,
-  sensitivity: "base",
-});
-
-function sortRows<T extends { id: string }>(
-  category: MasterDataCategory,
-  rows: readonly T[],
-  sort: AdminMasterDataSort,
-  valueFor: (row: T, key: string) => string | number,
-): T[] {
-  if (sort.category !== category || sort.direction === null) return [...rows];
-  return rows.toSorted((left, right) => {
-    const leftValue = valueFor(left, sort.key);
-    const rightValue = valueFor(right, sort.key);
-    const comparison =
-      typeof leftValue === "number" && typeof rightValue === "number"
-        ? leftValue - rightValue
-        : tableCollator.compare(String(leftValue), String(rightValue));
-    return sort.direction === "asc" ? comparison : -comparison;
-  });
-}
-
-function nextSortDirection(direction: SortDirection): SortDirection {
-  switch (direction) {
-    case "asc":
-      return "desc";
-    case "desc":
-      return null;
-    default:
-      return "asc";
-  }
-}
-
-function gateSortValue(gate: Gate, key: string): string | number {
-  switch (key) {
-    case "status":
-      return Number(gate.active);
-    case "sortOrder":
-      return gate.sortOrder;
-    case "type":
-      return gate.gateType;
-    default:
-      return gate.label;
-  }
-}
-
-function resourceGroupSortValue(group: ResourceGroup, key: string): string | number {
-  switch (key) {
-    case "status":
-      return group.status;
-    case "gate":
-      return group.gateLabel;
-    case "capacity":
-      return group.referenceCapacity;
-    case "aircraft":
-      return group.activeAircraftIds.length;
-    default:
-      return group.name;
-  }
-}
-
-function aircraftSortValue(aircraft: Aircraft, key: string): string | number {
-  switch (key) {
-    case "type":
-      return aircraft.aircraftType;
-    case "seats":
-      return aircraft.passengerSeats;
-    case "group":
-      return aircraft.resourceGroupName;
-    case "pilot":
-      return aircraft.currentPilotOperationalCode ?? "";
-    case "status":
-      return aircraft.operationalState;
-    default:
-      return aircraft.registration;
-  }
-}
-
-function pilotSortValue(pilot: Pilot, key: string): string | number {
-  switch (key) {
-    case "note":
-      return pilot.operationalNote;
-    case "status":
-      return Number(pilot.active) + Number(pilot.paused);
-    case "rotation":
-      return pilot.currentCommunicationNumber ?? 0;
-    default:
-      return pilot.operationalCode;
-  }
-}
-
-function productSortValue(product: Product, key: string): string | number {
-  switch (key) {
-    case "name":
-      return product.name;
-    case "group":
-      return product.resourceGroupName;
-    case "gate":
-      return product.gateLabel;
-    case "price":
-      return product.priceCents;
-    case "duration":
-      return product.referenceDurationMinutes;
-    case "status":
-      return Number(product.saleEnabled);
-    default:
-      return product.code;
-  }
-}
-
-function countForCategory(
-  category: MasterDataCategory,
-  counts: Readonly<Partial<Record<MasterDataCategory, CategoryCount>>>,
-  fallback: CategoryCount,
-): CategoryCount {
-  return counts[category] ?? fallback;
-}
+export type { AdminMasterDataSort } from "./admin-master-data-sorting";
 
 export function useAdminMasterDataTable({ board, category }: UseAdminMasterDataTableOptions) {
   const [search, setSearch] = useState("");

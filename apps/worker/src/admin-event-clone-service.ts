@@ -1,4 +1,8 @@
 import { type CloneEventRequest, gateDisplayFilterSchema } from "@rundflug/contracts";
+import {
+  adminEventCloneErrorResult as errorResult,
+  remapOptionalId,
+} from "./admin-event-clone-support";
 import type { Env } from "./types";
 
 export interface AdminEventCloneResponse {
@@ -7,7 +11,7 @@ export interface AdminEventCloneResponse {
   adminDeviceId?: string;
 }
 
-interface AdminEventCloneErrorResponse {
+export interface AdminEventCloneErrorResponse {
   error: {
     code: "IDEMPOTENCY_CONFLICT" | "EVENT_ID_EXISTS" | "EVENT_NOT_FOUND" | "STALE_VERSION";
     message: string;
@@ -24,28 +28,6 @@ const defaultDependencies = {
 };
 
 type AdminEventCloneDependencies = typeof defaultDependencies;
-
-function remapOptionalId(
-  value: unknown,
-  mappedIds: ReadonlyMap<string, string>,
-  field: string,
-): string | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value !== "string") {
-    throw new TypeError(`${field} must contain a text identifier.`);
-  }
-  const mappedId = mappedIds.get(value);
-  if (!mappedId) throw new TypeError(`${field} references an unknown identifier.`);
-  return mappedId;
-}
-
-function errorResult(
-  status: 404 | 409,
-  code: AdminEventCloneErrorResponse["error"]["code"],
-  message: string,
-): AdminEventCloneResult {
-  return { status, body: { error: { code, message } } };
-}
 
 export async function cloneAdminEvent(
   env: Env,

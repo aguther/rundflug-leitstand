@@ -29,7 +29,7 @@ Monolithen aufgelöst:
 
 | Kennzahl | Ausgangsstand | Stand 1.12.0 |
 | --- | ---: | ---: |
-| `apps/worker/src/event-coordinator.ts` | 12.571 Zeilen | 1.394 Zeilen |
+| `apps/worker/src/event-coordinator.ts` | 12.571 Zeilen | 721 Zeilen |
 | `apps/worker/src/index.ts` | 8.277 Zeilen | 219 Zeilen |
 | `apps/web/src/admin-view.tsx` | 5.546 Zeilen | 663 Zeilen |
 | `packages/contracts/src/index.ts` | 3.793 Zeilen | 8 Zeilen |
@@ -42,10 +42,9 @@ Verbleibende, bewusst priorisierte Schulden:
 
 | Priorität | Befund | Nächster geplanter Schnitt |
 | --- | --- | --- |
-| Mittel | Der Coordinator liegt mit 1.394 Zeilen nahe an seiner Grenze von 1.500 Zeilen; größter zusammenhängender Pfad ist der Ticketverkauf | `SELL_TICKET_GROUP` in einen eigenen Kommandoservice extrahieren, abgesichert über Sale-Guards und Skalierungsnachweis |
 | Mittel | Der Forecast-Legacy-Vergleichspfad bleibt bis zum zweifachen Release-/Replay-Nachweis erhalten | Abschaltkriterien aus ADR-0041 erfüllen; keine neuen Fachregeln im Legacy-Pfad ergänzen |
-| Mittel | 135 ältere `?raw`-Importe in Produktionsquellen und 1.805 `.toContain(`-Assertions koppeln Tests an Quelltext statt an Verhalten | bestehenden Ratchet halten und bei jeder Änderung zuerst hochfrequentierte Tests auf DOM-, HTTP- oder Runtime-Verhalten umstellen |
-| Mittel | `master-data-command-service.ts` (1.300 Zeilen) und `operations-routes.ts` (1.043 Zeilen) | Stammdatenfamilien trennen; Operations-Routen weiter auf Transport und Response-Mapping reduzieren |
+| Mittel | 128 ältere `?raw`-Importe in Produktionsquellen und 1.910 `.toContain(`-Assertions koppeln Tests an Quelltext statt an Verhalten | bestehenden Ratchet halten und bei jeder Änderung zuerst hochfrequentierte Tests auf DOM-, HTTP- oder Runtime-Verhalten umstellen |
+| Mittel | `cashier-view.tsx` (1.435 Zeilen), `flight-line-view.tsx` (2.148 Zeilen), `master-data-command-service.ts` (1.218 Zeilen) und `operations-routes.ts` (966 Zeilen) bleiben trotz ausgelagerter Präsentations-, Validierungs- und Projektionsmodule umfangreiche Orchestratoren | Zustands- und Seiteneffektfamilien einzeln unter Verhaltenstests extrahieren; keine Fachlogik in Präsentationshelfer verschieben |
 | Mittel | Haupt-Entry, Flight-Line-CSS und größter JavaScript-Chunk mit begrenztem Abstand zu den Assetbudgets | routentransitive Manifestwerte vor und nach jeder Änderung vergleichen; schwere Analysebausteine lazy halten |
 | Niedrig | Die Migrationsnummer `0036` existiert historisch zweimal; beide Dateien sind angewandt | eingefroren lassen, Register und Eindeutigkeitsprüfung beibehalten, neue Migrationen mit der nächsten freien Nummer |
 
