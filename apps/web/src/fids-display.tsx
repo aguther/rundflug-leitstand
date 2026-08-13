@@ -51,6 +51,12 @@ function statusPresentation(status: FidsBoardRow["status"]): {
   return { label: "WARTEN", tone: "standby", icon: Clock3 };
 }
 
+function forecastPhase(status: FidsBoardRow["status"]): "NOW" | "FINISHED" | "FORECAST" {
+  if (status === "COME_TO_FLIGHT_LINE" || status === "BOARDING") return "NOW";
+  if (["IN_FLIGHT", "LANDED", "COMPLETED"].includes(status)) return "FINISHED";
+  return "FORECAST";
+}
+
 function timeWindow(group: FidsBoardRow, timeZone: string): string {
   if (
     ["COME_TO_FLIGHT_LINE", "BOARDING", "IN_FLIGHT", "LANDED", "COMPLETED"].includes(group.status)
@@ -72,12 +78,7 @@ function timeWindow(group: FidsBoardRow, timeZone: string): string {
     timeZone,
     variant: "compact",
     quality: group.predictionQuality,
-    phase:
-      group.status === "COME_TO_FLIGHT_LINE" || group.status === "BOARDING"
-        ? "NOW"
-        : ["IN_FLIGHT", "LANDED", "COMPLETED"].includes(group.status)
-          ? "FINISHED"
-          : "FORECAST",
+    phase: forecastPhase(group.status),
   }).replace(" – ", "–");
 }
 
@@ -91,17 +92,16 @@ function Status({ group }: Readonly<{ group: FidsBoardRow }>) {
         <span>{presentation.label}</span>
       </strong>
       {group.activeRecall ? (
-        <strong
+        <output
           aria-label={group.activeRecall.fidsMessage}
           className="fids-recall-status"
-          role="status"
           title={group.activeRecall.fidsMessage}
         >
           <span aria-hidden="true" className="fids-recall-bell">
             <Bell />
           </span>
           <span>NACHRUF</span>
-        </strong>
+        </output>
       ) : null}
     </div>
   );
@@ -197,9 +197,19 @@ function FidsTable({
   );
 }
 
-function FidsEmptyState({ message, tone }: Readonly<{ message: string; tone?: "error" }>) {
+function FidsEmptyState({
+  message,
+  tone,
+}: Readonly<{ message: string; tone: "error" | undefined }>) {
+  if (!tone) {
+    return (
+      <output className="fids-section-empty" data-tone="empty">
+        {message}
+      </output>
+    );
+  }
   return (
-    <p className="fids-section-empty" data-tone={tone ?? "empty"} role={tone ? "alert" : "status"}>
+    <p className="fids-section-empty" data-tone={tone} role="alert">
       {message}
     </p>
   );
@@ -222,7 +232,7 @@ function FidsSection({
   rows: number;
   timeZone: string;
   emptyMessage: string;
-  emptyTone?: "error";
+  emptyTone: "error" | undefined;
 }>) {
   const leftColumn = groups.filter((_, index) => index % 2 === 0);
   const rightColumn = groups.filter((_, index) => index % 2 === 1);
@@ -254,9 +264,7 @@ function FidsSection({
           rowCapacity={rows}
           timeZone={timeZone}
         />
-        {emptyState ? (
-          <FidsEmptyState message={emptyMessage} {...(emptyTone ? { tone: emptyTone } : {})} />
-        ) : null}
+        {emptyState ? <FidsEmptyState message={emptyMessage} tone={emptyTone} /> : null}
       </div>
       <div className="fids-double-board">
         <FidsTable
@@ -273,12 +281,23 @@ function FidsSection({
           rowCapacity={rightColumnCapacity}
           timeZone={timeZone}
         />
-        {emptyState ? (
-          <FidsEmptyState message={emptyMessage} {...(emptyTone ? { tone: emptyTone } : {})} />
-        ) : null}
+        {emptyState ? <FidsEmptyState message={emptyMessage} tone={emptyTone} /> : null}
       </div>
     </section>
   );
+}
+
+function selectLogoTheme(
+  preferences: FidsPreferences,
+  systemTheme: "light" | "dark",
+): "light" | "dark" {
+  if (preferences.theme === "SYSTEM") return systemTheme;
+  return preferences.theme === "DARK" ? "dark" : "light";
+}
+
+function fixedBoardEmptyMessage(board: FidsBoardResponse | null, error: string | null): string {
+  if (board) return "Aktuell keine Gruppen auf dieser Seite.";
+  return error ?? "FIDS-Anzeige wird geladen …";
 }
 
 export interface FidsBoardPresentationProps {
@@ -321,8 +340,7 @@ export function FidsBoardPresentation({
   subtitle,
 }: Readonly<FidsBoardPresentationProps>) {
   const { system: systemTheme } = useTheme();
-  const logoTheme =
-    preferences.theme === "SYSTEM" ? systemTheme : preferences.theme === "DARK" ? "dark" : "light";
+  const logoTheme = selectLogoTheme(preferences, systemTheme);
   const timeZone = board?.timeZone ?? "Europe/Berlin";
   const time = new Intl.DateTimeFormat("de-DE", {
     hour: "2-digit",
@@ -349,6 +367,66 @@ export function FidsBoardPresentation({
     Math.ceil(priorityRows / 2) + Math.ceil(lowerRows / 2),
   );
   const displayedPage = page;
+  const fixedEmptyTone = !board && error ? ("error" as const) : undefined;
+
+  function renderBoardRegion() {
+    return (
+      <section className="fids-board-region" aria-label="Abflugtafel">
+        {board?.emergencyMode || board?.operationalInterrupted ? (
+          <div className="standard-alert">Der Rundflugbetrieb ist vorübergehend unterbrochen.</div>
+        ) : null}
+        {split ? (
+          <div className="fids-split-board">
+            <FidsSection
+              emptyMessage="Derzeit keine unmittelbar relevanten Gruppen."
+              emptyTone={undefined}
+              groups={board?.priority?.groups ?? []}
+              highlightedRows={highlightedRows}
+              label="JETZT RELEVANT"
+              meta={
+                (board?.priority?.overflowCount ?? 0) > 0 ? (
+                  <output className="fids-priority-overflow">
+                    +{board?.priority?.overflowCount} weitere relevante Gruppen
+                  </output>
+                ) : null
+              }
+              rows={priorityRows}
+              timeZone={timeZone}
+            />
+            <FidsSection
+              emptyMessage="Derzeit keine weiteren Gruppen."
+              emptyTone={undefined}
+              groups={board?.page.groups ?? []}
+              highlightedRows={highlightedRows}
+              label="WEITERE FLÜGE"
+              meta={
+                (board?.page.totalItems ?? 0) > 0 ? (
+                  <output
+                    className="fids-section-page"
+                    aria-label={`Seite ${board?.page.requestedPage ?? 1} von ${board?.page.totalPages ?? 1}`}
+                  >
+                    <span className="fids-section-page-prefix">SEITE </span>
+                    {board?.page.requestedPage ?? 1} / {board?.page.totalPages ?? 1}
+                  </output>
+                ) : null
+              }
+              rows={lowerRows}
+              timeZone={timeZone}
+            />
+          </div>
+        ) : (
+          <FidsSection
+            emptyMessage={fixedBoardEmptyMessage(board, error)}
+            emptyTone={fixedEmptyTone}
+            groups={board?.page.groups ?? []}
+            highlightedRows={highlightedRows}
+            rows={preferences.visibleRows}
+            timeZone={timeZone}
+          />
+        )}
+      </section>
+    );
+  }
 
   return (
     <main
@@ -384,63 +462,7 @@ export function FidsBoardPresentation({
         </div>
       </header>
 
-      <section className="fids-board-region" aria-label="Abflugtafel">
-        {board?.emergencyMode || board?.operationalInterrupted ? (
-          <div className="standard-alert">Der Rundflugbetrieb ist vorübergehend unterbrochen.</div>
-        ) : null}
-        {split ? (
-          <div className="fids-split-board">
-            <FidsSection
-              emptyMessage="Derzeit keine unmittelbar relevanten Gruppen."
-              groups={board?.priority?.groups ?? []}
-              highlightedRows={highlightedRows}
-              label="JETZT RELEVANT"
-              meta={
-                (board?.priority?.overflowCount ?? 0) > 0 ? (
-                  <span className="fids-priority-overflow" role="status">
-                    +{board?.priority?.overflowCount} weitere relevante Gruppen
-                  </span>
-                ) : null
-              }
-              rows={priorityRows}
-              timeZone={timeZone}
-            />
-            <FidsSection
-              emptyMessage="Derzeit keine weiteren Gruppen."
-              groups={board?.page.groups ?? []}
-              highlightedRows={highlightedRows}
-              label="WEITERE FLÜGE"
-              meta={
-                (board?.page.totalItems ?? 0) > 0 ? (
-                  <span
-                    className="fids-section-page"
-                    aria-label={`Seite ${board?.page.requestedPage ?? 1} von ${board?.page.totalPages ?? 1}`}
-                    role="status"
-                  >
-                    <span className="fids-section-page-prefix">SEITE </span>
-                    {board?.page.requestedPage ?? 1} / {board?.page.totalPages ?? 1}
-                  </span>
-                ) : null
-              }
-              rows={lowerRows}
-              timeZone={timeZone}
-            />
-          </div>
-        ) : (
-          <FidsSection
-            emptyMessage={
-              board
-                ? "Aktuell keine Gruppen auf dieser Seite."
-                : (error ?? "FIDS-Anzeige wird geladen …")
-            }
-            {...(!board && error ? { emptyTone: "error" as const } : {})}
-            groups={board?.page.groups ?? []}
-            highlightedRows={highlightedRows}
-            rows={preferences.visibleRows}
-            timeZone={timeZone}
-          />
-        )}
-      </section>
+      {renderBoardRegion()}
 
       <footer className="fids-footer">
         {setupMode ? (
