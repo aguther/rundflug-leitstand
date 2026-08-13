@@ -71,6 +71,90 @@ function numberValue(value: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function OperationStartFields({
+  config,
+  operation,
+  replaceOperation,
+  rotations,
+}: Readonly<{
+  config: SimulationConfig;
+  operation: SimulationPlannedOperation;
+  replaceOperation: (
+    key: string,
+    update: (operation: SimulationPlannedOperation) => SimulationPlannedOperation,
+  ) => void;
+  rotations: readonly SimulationRotation[];
+}>) {
+  if (operation.unresolvedAfterCurrentRotation) {
+    return (
+      <div className="sim-plan-unresolved" role="alert">
+        <span>
+          Der operative Bezugsumlauf ist nicht Teil des Imports. Vor dem Lauf ist eine Umwandlung
+          oder der Ausschluss erforderlich.
+        </span>
+        <Button
+          onClick={() => {
+            const window = defaultWindow(config);
+            replaceOperation(operation.key, (entry) => ({
+              ...entry,
+              startMode: "TIME_WINDOW",
+              ...window,
+              afterRotationId: null,
+              unresolvedAfterCurrentRotation: false,
+            }));
+          }}
+        >
+          In Zeitfenster umwandeln
+        </Button>
+      </div>
+    );
+  }
+  if (operation.startMode === "AFTER_CURRENT_ROTATION") {
+    return (
+      <label className="sim-plan-note">
+        <span>Bezugsumlauf</span>
+        <select
+          onChange={(event) =>
+            replaceOperation(operation.key, (entry) => ({
+              ...entry,
+              afterRotationId: event.currentTarget.value,
+            }))
+          }
+          value={operation.afterRotationId ?? ""}
+        >
+          {rotations.map((rotation) => (
+            <option key={rotation.id} value={rotation.id}>
+              {rotation.communicationNumber} · {rotation.productCode ?? "SIM"}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
+  return (
+    <div className="sim-plan-grid sim-plan-grid--times">
+      {(["earliestStartAt", "latestStartAt"] as const).map((field) => (
+        <label key={field}>
+          <span>{field === "earliestStartAt" ? "Frühester Beginn" : "Spätester Beginn"}</span>
+          <input
+            onChange={(event) =>
+              replaceOperation(operation.key, (entry) => ({
+                ...entry,
+                [field]: eventLocalDateTimeToIso(
+                  event.currentTarget.value,
+                  config.schedule.timeZone,
+                ),
+              }))
+            }
+            type="datetime-local"
+            value={formatEventLocalDateTime(operation[field], config.schedule.timeZone)}
+          />
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export function SimulationPlanEditor({
   config,
   rotations,
@@ -300,88 +384,12 @@ export function SimulationPlanEditor({
                     </select>
                   </label>
                 </div>
-                {operation.unresolvedAfterCurrentRotation ? (
-                  <div className="sim-plan-unresolved" role="alert">
-                    <span>
-                      Der operative Bezugsumlauf ist nicht Teil des Imports. Vor dem Lauf ist eine
-                      Umwandlung oder der Ausschluss erforderlich.
-                    </span>
-                    <Button
-                      onClick={() => {
-                        const window = defaultWindow(config);
-                        replaceOperation(operation.key, (entry) => ({
-                          ...entry,
-                          startMode: "TIME_WINDOW",
-                          ...window,
-                          afterRotationId: null,
-                          unresolvedAfterCurrentRotation: false,
-                        }));
-                      }}
-                    >
-                      In Zeitfenster umwandeln
-                    </Button>
-                  </div>
-                ) : operation.startMode === "AFTER_CURRENT_ROTATION" ? (
-                  <label className="sim-plan-note">
-                    <span>Bezugsumlauf</span>
-                    <select
-                      onChange={(event) =>
-                        replaceOperation(operation.key, (entry) => ({
-                          ...entry,
-                          afterRotationId: event.currentTarget.value,
-                        }))
-                      }
-                      value={operation.afterRotationId ?? ""}
-                    >
-                      {rotations.map((rotation) => (
-                        <option key={rotation.id} value={rotation.id}>
-                          {rotation.communicationNumber} · {rotation.productCode ?? "SIM"}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ) : (
-                  <div className="sim-plan-grid sim-plan-grid--times">
-                    <label>
-                      <span>Frühester Beginn</span>
-                      <input
-                        onChange={(event) =>
-                          replaceOperation(operation.key, (entry) => ({
-                            ...entry,
-                            earliestStartAt: eventLocalDateTimeToIso(
-                              event.currentTarget.value,
-                              config.schedule.timeZone,
-                            ),
-                          }))
-                        }
-                        type="datetime-local"
-                        value={formatEventLocalDateTime(
-                          operation.earliestStartAt,
-                          config.schedule.timeZone,
-                        )}
-                      />
-                    </label>
-                    <label>
-                      <span>Spätester Beginn</span>
-                      <input
-                        onChange={(event) =>
-                          replaceOperation(operation.key, (entry) => ({
-                            ...entry,
-                            latestStartAt: eventLocalDateTimeToIso(
-                              event.currentTarget.value,
-                              config.schedule.timeZone,
-                            ),
-                          }))
-                        }
-                        type="datetime-local"
-                        value={formatEventLocalDateTime(
-                          operation.latestStartAt,
-                          config.schedule.timeZone,
-                        )}
-                      />
-                    </label>
-                  </div>
-                )}
+                <OperationStartFields
+                  config={config}
+                  operation={operation}
+                  replaceOperation={replaceOperation}
+                  rotations={rotations}
+                />
                 <div className="sim-plan-duration">
                   <span>Dauer Minimum / typisch / Maximum</span>
                   {(

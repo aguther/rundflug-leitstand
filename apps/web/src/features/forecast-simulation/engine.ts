@@ -34,6 +34,14 @@ import {
 export { calculateSimulationMetrics } from "./simulation-metrics";
 export { sampleTriangular } from "./simulation-primitives";
 
+function blockDetails(block: PendingBlock): string {
+  if (block.dayOutage) {
+    return "Simulierter Tagesausfall an zulässiger organisatorischer Grenze bestätigt.";
+  }
+  const source = block.source === "AUTOMATIC" ? "Automatisch erzeugte" : "Manuell injizierte";
+  return `${source} Sperre für ${rounded(block.durationMinutes)} Minuten.`;
+}
+
 export function runSimulation(
   config: SimulationConfig,
   manualIncidents: readonly ManualIncident[] = [],
@@ -109,9 +117,7 @@ export function runSimulation(
       nowMs,
       entry.id,
       null,
-      block.dayOutage
-        ? "Simulierter Tagesausfall an zulässiger organisatorischer Grenze bestätigt."
-        : `${block.source === "AUTOMATIC" ? "Automatisch erzeugte" : "Manuell injizierte"} Sperre für ${rounded(block.durationMinutes)} Minuten.`,
+      blockDetails(block),
     );
   };
 
