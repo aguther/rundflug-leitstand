@@ -52,6 +52,28 @@ const navigationItems: Array<{ id: AdminArea; label: string; Icon: LucideIcon }>
   { id: "backup", label: "Sicherung & Reset", Icon: ShieldCheck },
 ];
 
+function currentSetupStepIndex(steps: SetupStep[], currentStepId?: AdminEventStep): number {
+  const requestedIndex = currentStepId ? steps.findIndex((step) => step.id === currentStepId) : -1;
+  if (requestedIndex >= 0) return requestedIndex;
+  const firstIncomplete = steps.findIndex((step) => !step.complete);
+  return firstIncomplete === -1 ? steps.length - 1 : firstIncomplete;
+}
+
+function keyboardStepIndex(key: string, index: number, stepCount: number): number | null {
+  switch (key) {
+    case "Home":
+      return 0;
+    case "End":
+      return stepCount - 1;
+    case "ArrowRight":
+      return (index + 1) % stepCount;
+    case "ArrowLeft":
+      return (index - 1 + stepCount) % stepCount;
+    default:
+      return null;
+  }
+}
+
 export function AdminNavigation({
   activeArea,
   onChange,
@@ -94,14 +116,7 @@ export function SetupProgress({
     canScrollForward: false,
     overflowing: false,
   });
-  const firstIncomplete = steps.findIndex((step) => !step.complete);
-  const requestedIndex = currentStepId ? steps.findIndex((step) => step.id === currentStepId) : -1;
-  const currentIndex =
-    requestedIndex >= 0
-      ? requestedIndex
-      : firstIncomplete === -1
-        ? steps.length - 1
-        : firstIncomplete;
+  const currentIndex = currentSetupStepIndex(steps, currentStepId);
 
   const scrollCurrentIntoView = useCallback(() => {
     const progress = progressRef.current;
@@ -176,16 +191,9 @@ export function SetupProgress({
   }
 
   function selectFromKeyboard(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    const nextIndex = keyboardStepIndex(event.key, index, steps.length);
+    if (nextIndex === null) return;
     event.preventDefault();
-    const nextIndex =
-      event.key === "Home"
-        ? 0
-        : event.key === "End"
-          ? steps.length - 1
-          : event.key === "ArrowRight"
-            ? (index + 1) % steps.length
-            : (index - 1 + steps.length) % steps.length;
     const nextStep = steps[nextIndex];
     if (!nextStep) return;
     onSelect(nextStep);
@@ -216,7 +224,7 @@ export function SetupProgress({
             .filter(Boolean)
             .join(" ");
           return (
-            <div className={`setup-progress-item ${state}`} key={step.id} role="presentation">
+            <div className={`setup-progress-item ${state}`} key={step.id}>
               <button
                 aria-controls={`admin-event-step-${step.id}-panel`}
                 aria-current={current ? "step" : undefined}
@@ -296,10 +304,20 @@ export function ValidationHint({
   children: ReactNode;
   tone?: "info" | "warning" | "error";
 }>) {
-  return (
-    <div className={`admin-validation ${tone}`} role={tone === "error" ? "alert" : "status"}>
-      <span aria-hidden="true">{tone === "info" ? "i" : "!"}</span>
-      <p>{children}</p>
-    </div>
+  const content = (
+    <>
+      <span aria-hidden="true" className="admin-validation-icon">
+        {tone === "info" ? "i" : "!"}
+      </span>
+      <span className="admin-validation-message">{children}</span>
+    </>
   );
+  if (tone === "error") {
+    return (
+      <div className="admin-validation error" role="alert">
+        {content}
+      </div>
+    );
+  }
+  return <output className={`admin-validation ${tone}`}>{content}</output>;
 }

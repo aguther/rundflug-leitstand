@@ -2181,7 +2181,7 @@ p {
   color: #194e8c;
   background: #f1f7ff;
 }
-.admin-validation > span {
+.admin-validation > .admin-validation-icon {
   width: 20px;
   height: 20px;
   flex: 0 0 auto;
@@ -2192,7 +2192,7 @@ p {
   font-size: 0.75rem;
   font-weight: 850;
 }
-.admin-validation p {
+.admin-validation :is(p, .admin-validation-message) {
   margin: 0;
 }
 .admin-validation.error {
