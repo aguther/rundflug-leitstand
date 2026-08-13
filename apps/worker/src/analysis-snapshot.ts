@@ -173,6 +173,142 @@ function parseJson(value: string, code: string): unknown {
   }
 }
 
+const ANALYSIS_SNAPSHOT_DATA_INCOMPLETE = "ANALYSIS_SNAPSHOT_DATA_INCOMPLETE";
+
+async function loadReplayChain(input: {
+  database: D1Database;
+  eventId: string;
+  expectedEventVersion: number;
+  run: PlanningRunExportRow;
+}): Promise<PlanningRunLineageRow[]> {
+  const replayChain: PlanningRunLineageRow[] = [];
+  let lineageRunId: string | null = input.run.id;
+  for (let distance = 0; lineageRunId && distance <= 10; distance += 1) {
+    const lineageRow: PlanningRunLineageRow | null = await input.database
+      .prepare(
+        `SELECT id, previous_run_id, anchor_run_id, context_id, operation_day_version,
+                replay_distance, calculation_now, captured_at, trigger_event_type, capture_mode,
+                source_revision, dispatch_plan_revision, forecast_digest, precall_digest,
+                previous_forecast_state_chunk_id, previous_dispatch_state_chunk_id,
+                dispatch_result_chunk_id, precall_result_chunk_id
+           FROM planning_runs
+          WHERE id = ?1 AND operation_day_id = ?2 AND status = 'SUCCEEDED'`,
+      )
+      .bind(lineageRunId, input.eventId)
+      .first<PlanningRunLineageRow>();
+    if (
+      lineageRow?.operation_day_version !== input.expectedEventVersion ||
+      lineageRow.anchor_run_id !== input.run.anchor_run_id
+    ) {
+      throw new Error(ANALYSIS_SNAPSHOT_DATA_INCOMPLETE);
+    }
+    replayChain.unshift(lineageRow);
+    if (lineageRow.id === input.run.anchor_run_id) break;
+    lineageRunId = lineageRow.previous_run_id;
+  }
+  if (
+    replayChain.length < 1 ||
+    replayChain[0]?.id !== input.run.anchor_run_id ||
+    replayChain.at(-1)?.id !== input.run.id
+  ) {
+    throw new Error(ANALYSIS_SNAPSHOT_DATA_INCOMPLETE);
+  }
+  return replayChain;
+}
+
+async function loadPlanningContext(input: {
+  database: D1Database;
+  eventId: string;
+  expectedEventVersion: number;
+  contextId: string;
+}): Promise<{
+  context: PlanningContextExportRow;
+  manifest: AnalysisSnapshot["planning"]["context"]["manifest"];
+}> {
+  const context = await input.database
+    .prepare(
+      `SELECT id, operation_day_version, schema_version, manifest_json, manifest_hash
+         FROM planning_contexts WHERE id = ?1 AND operation_day_id = ?2`,
+    )
+    .bind(input.contextId, input.eventId)
+    .first<PlanningContextExportRow>();
+  if (context?.operation_day_version !== input.expectedEventVersion) {
+    throw new Error(ANALYSIS_SNAPSHOT_DATA_INCOMPLETE);
+  }
+  const manifest = parseJson(
+    context.manifest_json,
+    ANALYSIS_SNAPSHOT_DATA_INCOMPLETE,
+  ) as AnalysisSnapshot["planning"]["context"]["manifest"];
+  if (!Array.isArray(manifest)) throw new Error(ANALYSIS_SNAPSHOT_DATA_INCOMPLETE);
+  return { context, manifest };
+}
+
+function planningChunkIds(
+  manifest: AnalysisSnapshot["planning"]["context"]["manifest"],
+  replayChain: readonly PlanningRunLineageRow[],
+): string[] {
+  const chunkIds = new Set(manifest.map((entry) => entry.chunkId));
+  for (const lineageRun of replayChain) {
+    for (const chunkId of [
+      lineageRun.previous_forecast_state_chunk_id,
+      lineageRun.previous_dispatch_state_chunk_id,
+      lineageRun.dispatch_result_chunk_id,
+      lineageRun.precall_result_chunk_id,
+    ]) {
+      if (chunkId) chunkIds.add(chunkId);
+    }
+  }
+  return [...chunkIds].sort(compareTechnicalStrings);
+}
+
+async function loadPlanningChunks(
+  database: D1Database,
+  eventId: string,
+  ids: readonly string[],
+): Promise<PlanningChunkExportRow[]> {
+  if (ids.length === 0) return [];
+  const chunks = await database
+    .prepare(
+      `SELECT id, chunk_kind, schema_version, payload_hash, payload_json, byte_size
+         FROM planning_chunks
+        WHERE operation_day_id = ?1 AND id IN (${ids.map((_, index) => `?${index + 2}`).join(", ")})
+        ORDER BY id`,
+    )
+    .bind(eventId, ...ids)
+    .all<PlanningChunkExportRow>();
+  if (chunks.results.length !== ids.length) {
+    throw new Error(ANALYSIS_SNAPSHOT_DATA_INCOMPLETE);
+  }
+  return chunks.results;
+}
+
+async function loadForecastSnapshots(
+  database: D1Database,
+  replayChain: readonly PlanningRunLineageRow[],
+): Promise<ForecastSnapshotExportRow[]> {
+  const replayRunIds = replayChain.map((lineageRun) => lineageRun.id);
+  const forecastSnapshots = await database
+    .prepare(
+      `SELECT id, planning_run_id, rotation_id, captured_at, quality, lower_minutes, upper_minutes,
+              predicted_boarding_at, predicted_departure_at, predicted_landing_at,
+              predicted_completion_at, dispatch_plan_revision
+         FROM forecast_snapshots
+        WHERE planning_run_id IN (${replayRunIds.map((_, index) => `?${index + 1}`).join(", ")})
+        ORDER BY captured_at, rotation_id, id`,
+    )
+    .bind(...replayRunIds)
+    .all<ForecastSnapshotExportRow>();
+  const dispatchRevisionByRunId = new Map(
+    replayChain.map((lineageRun) => [lineageRun.id, lineageRun.dispatch_plan_revision]),
+  );
+  const hasMismatchedRevision = forecastSnapshots.results.some(
+    (snapshot) =>
+      snapshot.dispatch_plan_revision !== dispatchRevisionByRunId.get(snapshot.planning_run_id),
+  );
+  if (hasMismatchedRevision) throw new Error(ANALYSIS_SNAPSHOT_DATA_INCOMPLETE);
+  return forecastSnapshots.results;
+}
+
 export async function buildAnalysisSnapshot(input: {
   env: Env;
   eventId: string;
@@ -213,99 +349,24 @@ export async function buildAnalysisSnapshot(input: {
   if (dispatchRevision !== null && run.dispatch_plan_revision !== dispatchRevision) {
     throw new Error("ANALYSIS_SNAPSHOT_CHANGED");
   }
-  const replayChain: PlanningRunLineageRow[] = [];
-  let lineageRunId: string | null = run.id;
-  for (let distance = 0; lineageRunId && distance <= 10; distance += 1) {
-    const lineageRow: PlanningRunLineageRow | null = await input.env.DB.prepare(
-      `SELECT id, previous_run_id, anchor_run_id, context_id, operation_day_version,
-              replay_distance, calculation_now, captured_at, trigger_event_type, capture_mode,
-              source_revision, dispatch_plan_revision, forecast_digest, precall_digest,
-              previous_forecast_state_chunk_id, previous_dispatch_state_chunk_id,
-              dispatch_result_chunk_id, precall_result_chunk_id
-         FROM planning_runs
-        WHERE id = ?1 AND operation_day_id = ?2 AND status = 'SUCCEEDED'`,
-    )
-      .bind(lineageRunId, input.eventId)
-      .first<PlanningRunLineageRow>();
-    if (
-      lineageRow?.operation_day_version !== input.expectedEventVersion ||
-      lineageRow.anchor_run_id !== run.anchor_run_id
-    ) {
-      throw new Error("ANALYSIS_SNAPSHOT_DATA_INCOMPLETE");
-    }
-    replayChain.unshift(lineageRow);
-    if (lineageRow.id === run.anchor_run_id) break;
-    lineageRunId = lineageRow.previous_run_id;
-  }
-  if (
-    replayChain.length < 1 ||
-    replayChain[0]?.id !== run.anchor_run_id ||
-    replayChain.at(-1)?.id !== run.id
-  ) {
-    throw new Error("ANALYSIS_SNAPSHOT_DATA_INCOMPLETE");
-  }
-  const context = await input.env.DB.prepare(
-    `SELECT id, operation_day_version, schema_version, manifest_json, manifest_hash
-       FROM planning_contexts WHERE id = ?1 AND operation_day_id = ?2`,
-  )
-    .bind(run.context_id, input.eventId)
-    .first<PlanningContextExportRow>();
-  if (context?.operation_day_version !== input.expectedEventVersion) {
-    throw new Error("ANALYSIS_SNAPSHOT_DATA_INCOMPLETE");
-  }
-  const manifest = parseJson(
-    context.manifest_json,
-    "ANALYSIS_SNAPSHOT_DATA_INCOMPLETE",
-  ) as AnalysisSnapshot["planning"]["context"]["manifest"];
-  if (!Array.isArray(manifest)) throw new Error("ANALYSIS_SNAPSHOT_DATA_INCOMPLETE");
-  const chunkIds = new Set(manifest.map((entry) => entry.chunkId));
-  for (const lineageRun of replayChain) {
-    for (const chunkId of [
-      lineageRun.previous_forecast_state_chunk_id,
-      lineageRun.previous_dispatch_state_chunk_id,
-      lineageRun.dispatch_result_chunk_id,
-      lineageRun.precall_result_chunk_id,
-    ]) {
-      if (chunkId) chunkIds.add(chunkId);
-    }
-  }
-  const ids = [...chunkIds].sort(compareTechnicalStrings);
-  const chunks =
-    ids.length === 0
-      ? []
-      : (
-          await input.env.DB.prepare(
-            `SELECT id, chunk_kind, schema_version, payload_hash, payload_json, byte_size
-               FROM planning_chunks
-              WHERE operation_day_id = ?1 AND id IN (${ids.map((_, index) => `?${index + 2}`).join(", ")})
-              ORDER BY id`,
-          )
-            .bind(input.eventId, ...ids)
-            .all<PlanningChunkExportRow>()
-        ).results;
-  if (chunks.length !== ids.length) throw new Error("ANALYSIS_SNAPSHOT_DATA_INCOMPLETE");
-  const replayRunIds = replayChain.map((lineageRun) => lineageRun.id);
-  const forecastSnapshots = await input.env.DB.prepare(
-    `SELECT id, planning_run_id, rotation_id, captured_at, quality, lower_minutes, upper_minutes,
-            predicted_boarding_at, predicted_departure_at, predicted_landing_at,
-            predicted_completion_at, dispatch_plan_revision
-       FROM forecast_snapshots
-      WHERE planning_run_id IN (${replayRunIds.map((_, index) => `?${index + 1}`).join(", ")})
-      ORDER BY captured_at, rotation_id, id`,
-  )
-    .bind(...replayRunIds)
-    .all<ForecastSnapshotExportRow>();
-  const dispatchRevisionByRunId = new Map(
-    replayChain.map((lineageRun) => [lineageRun.id, lineageRun.dispatch_plan_revision]),
+  const replayChain = await loadReplayChain({
+    database: input.env.DB,
+    eventId: input.eventId,
+    expectedEventVersion: input.expectedEventVersion,
+    run,
+  });
+  const { context, manifest } = await loadPlanningContext({
+    database: input.env.DB,
+    eventId: input.eventId,
+    expectedEventVersion: input.expectedEventVersion,
+    contextId: run.context_id,
+  });
+  const chunks = await loadPlanningChunks(
+    input.env.DB,
+    input.eventId,
+    planningChunkIds(manifest, replayChain),
   );
-  if (
-    forecastSnapshots.results.some(
-      (snapshot) =>
-        snapshot.dispatch_plan_revision !== dispatchRevisionByRunId.get(snapshot.planning_run_id),
-    )
-  ) {
-    throw new Error("ANALYSIS_SNAPSHOT_DATA_INCOMPLETE");
-  }
+  const forecastSnapshots = await loadForecastSnapshots(input.env.DB, replayChain);
 
   const snapshot: AnalysisSnapshot = {
     format: "rundflug-analysis-snapshot",
@@ -389,7 +450,7 @@ export async function buildAnalysisSnapshot(input: {
         byteSize: chunk.byte_size,
         payload: parseJson(chunk.payload_json, "ANALYSIS_SNAPSHOT_DATA_INCOMPLETE") as never,
       })),
-      forecastSnapshots: forecastSnapshots.results.map((snapshot) => ({
+      forecastSnapshots: forecastSnapshots.map((snapshot) => ({
         id: snapshot.id,
         planningRunId: snapshot.planning_run_id,
         rotationId: snapshot.rotation_id,
