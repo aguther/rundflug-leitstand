@@ -18,6 +18,11 @@ export type EventParameterSaveLifecycle = {
   onConflict: (currentVersion?: number) => void;
 };
 
+function optionalError(error: string | undefined): { error: string } | Record<string, never> {
+  if (error) return { error };
+  return {};
+}
+
 export function EventParametersWorkspace({
   event,
   administrator,
@@ -152,21 +157,21 @@ export function EventParametersWorkspace({
               </div>
               <div className="event-period-fields">
                 <LocalizedDateTimeInput
-                  error={errors.saleOpensAt}
+                  {...optionalError(errors.saleOpensAt)}
                   id="event-sale-opens-at"
                   label="Verkaufsbeginn"
                   onChange={(value) => setStringValue("saleOpensAt", value)}
                   value={form.values.saleOpensAt}
                 />
                 <LocalizedDateTimeInput
-                  error={errors.operationsStartAt}
+                  {...optionalError(errors.operationsStartAt)}
                   id="event-operations-start-at"
                   label="Betriebsbeginn (Plan)"
                   onChange={(value) => setStringValue("operationsStartAt", value)}
                   value={form.values.operationsStartAt}
                 />
                 <LocalizedDateTimeInput
-                  error={errors.operationsEndAt}
+                  {...optionalError(errors.operationsEndAt)}
                   id="event-operations-end-at"
                   label="Betriebsende"
                   onChange={(value) => setStringValue("operationsEndAt", value)}

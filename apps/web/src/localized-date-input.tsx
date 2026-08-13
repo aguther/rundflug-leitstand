@@ -8,10 +8,10 @@ type LocalizedInputProps = {
   onChange: (value: string) => void;
   dateLabel?: string;
   timeLabel?: string;
-  id?: string | undefined;
-  error?: string | undefined;
-  required?: boolean | undefined;
-  disabled?: boolean | undefined;
+  id?: string;
+  error?: string;
+  required?: boolean;
+  disabled?: boolean;
 };
 
 export function formatGermanDate(value: string): string {
@@ -58,7 +58,8 @@ export function replaceLocalDate(value: string, date: string): string {
 
 export function replaceLocalTime(value: string, time: string): string {
   const date = /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : "";
-  return date && valid24HourTime(time) ? `${date}T${time}` : date ? `${date}T00:00` : "";
+  if (!date) return "";
+  return valid24HourTime(time) ? `${date}T${time}` : `${date}T00:00`;
 }
 
 function PickerIcon({ type }: Readonly<{ type: "date" | "time" }>) {
@@ -79,11 +80,11 @@ function GermanDateControl({
   value: string;
   onChange: (value: string) => void;
   ariaLabel: string;
-  id?: string | undefined;
-  describedBy?: string | undefined;
-  disabled?: boolean | undefined;
-  invalid?: boolean | undefined;
-  required?: boolean | undefined;
+  id?: string;
+  describedBy?: string;
+  disabled?: boolean;
+  invalid?: boolean;
+  required?: boolean;
 }>) {
   const [displayValue, setDisplayValue] = useState(() => formatGermanDate(value));
   useEffect(() => setDisplayValue(formatGermanDate(value)), [value]);
@@ -139,9 +140,9 @@ function GermanTimeControl({
   onChange: (value: string) => void;
   ariaLabel: string;
   disabled: boolean;
-  describedBy?: string | undefined;
-  invalid?: boolean | undefined;
-  required?: boolean | undefined;
+  describedBy?: string;
+  invalid?: boolean;
+  required?: boolean;
 }>) {
   const [displayValue, setDisplayValue] = useState(value);
   useEffect(() => setDisplayValue(value), [value]);
@@ -199,12 +200,12 @@ export function LocalizedDateInput({
       <span>{labelContent ?? label}</span>
       <GermanDateControl
         ariaLabel={`${label}: ${dateLabel}`}
-        describedBy={errorId}
-        disabled={disabled}
-        id={id}
+        {...(errorId ? { describedBy: errorId } : {})}
+        {...(disabled === undefined ? {} : { disabled })}
+        {...(id ? { id } : {})}
         invalid={Boolean(error)}
         onChange={onChange}
-        required={required}
+        {...(required === undefined ? {} : { required })}
         value={value}
       />
       {error ? <small id={errorId}>{error}</small> : null}
@@ -233,22 +234,22 @@ export function LocalizedDateTimeInput({
       <div className="localized-date-time">
         <GermanDateControl
           ariaLabel={`${label}: ${dateLabel}`}
-          describedBy={errorId}
-          disabled={disabled}
-          id={id}
+          {...(errorId ? { describedBy: errorId } : {})}
+          {...(disabled === undefined ? {} : { disabled })}
+          {...(id ? { id } : {})}
           invalid={Boolean(error)}
           onChange={(nextDate) => onChange(replaceLocalDate(value, nextDate))}
-          required={required}
+          {...(required === undefined ? {} : { required })}
           value={date}
         />
         <span aria-hidden="true">um</span>
         <GermanTimeControl
           ariaLabel={`${label}: ${timeLabel}`}
-          describedBy={errorId}
+          {...(errorId ? { describedBy: errorId } : {})}
           disabled={Boolean(disabled) || !date}
           invalid={Boolean(error)}
           onChange={(nextTime) => onChange(replaceLocalTime(value, nextTime))}
-          required={required}
+          {...(required === undefined ? {} : { required })}
           value={time}
         />
       </div>
