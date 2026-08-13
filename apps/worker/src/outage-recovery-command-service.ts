@@ -28,6 +28,12 @@ function json(data: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(data), { ...init, headers });
 }
 
+function recoveredAircraftState(state: RotationState): "BOARDING" | "IN_FLIGHT" | "LANDED" {
+  if (state === "CALLED") return "BOARDING";
+  if (state === "IN_FLIGHT") return "IN_FLIGHT";
+  return "LANDED";
+}
+
 export class OutageRecoveryCommandService {
   constructor(
     private readonly env: Env,
@@ -554,12 +560,7 @@ export class OutageRecoveryCommandService {
         }
         activeRecoveredAircraft.set(reference.aircraftId, reference.rotationId);
         activeRecoveredPilots.set(reference.pilotId, reference.rotationId);
-        const aircraftState =
-          reference.state === "CALLED"
-            ? "BOARDING"
-            : reference.state === "IN_FLIGHT"
-              ? "IN_FLIGHT"
-              : "LANDED";
+        const aircraftState = recoveredAircraftState(reference.state);
         statements.push(
           this.env.DB.prepare(
             `UPDATE aircraft SET operational_state = ?1,
