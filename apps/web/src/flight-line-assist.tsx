@@ -530,19 +530,39 @@ export function FlightLineAssist({
     }
   }
 
+  const takeoverDialog = (
+    <ConfirmationDialog
+      body={
+        takeoverClaim
+          ? `Das Flugzeug wird derzeit von ${takeoverClaim.ownerLoginCode} betreut. Möchtest du die Übernahme wirklich überschreiben?`
+          : ""
+      }
+      cancelLabel="Abbrechen"
+      confirmLabel="Trotzdem übernehmen"
+      confirmBusy={claimingAircraftId === takeoverClaim?.aircraftId}
+      onCancel={() => setTakeoverClaim(null)}
+      onConfirm={() => void takeover()}
+      open={takeoverClaim !== null}
+      title="Flugzeug bereits übernommen"
+    />
+  );
+
   if (!activeAircraft) {
     return (
-      <AircraftSelection
-        aircraft={availableAircraft}
-        assistClaims={assistClaims}
-        board={board}
-        claimingAircraftId={claimingAircraftId}
-        onClaim={claim}
-        onRefresh={refreshAircraftList}
-        onShowMore={() => setVisibleAircraftCount((current) => current + 5)}
-        refreshing={refreshing}
-        visibleAircraftCount={visibleAircraftCount}
-      />
+      <>
+        <AircraftSelection
+          aircraft={availableAircraft}
+          assistClaims={assistClaims}
+          board={board}
+          claimingAircraftId={claimingAircraftId}
+          onClaim={claim}
+          onRefresh={refreshAircraftList}
+          onShowMore={() => setVisibleAircraftCount((current) => current + 5)}
+          refreshing={refreshing}
+          visibleAircraftCount={visibleAircraftCount}
+        />
+        {takeoverDialog}
+      </>
     );
   }
 
@@ -735,20 +755,7 @@ export function FlightLineAssist({
           open={pilotOpen}
         />
       ) : null}
-      <ConfirmationDialog
-        body={
-          takeoverClaim
-            ? `Das Flugzeug wird derzeit von ${takeoverClaim.ownerLoginCode} betreut. Möchtest du die Übernahme wirklich überschreiben?`
-            : ""
-        }
-        cancelLabel="Abbrechen"
-        confirmLabel="Trotzdem übernehmen"
-        confirmBusy={claimingAircraftId === takeoverClaim?.aircraftId}
-        onCancel={() => setTakeoverClaim(null)}
-        onConfirm={() => void takeover()}
-        open={takeoverClaim !== null}
-        title="Flugzeug bereits übernommen"
-      />
+      {takeoverDialog}
     </section>
   );
 }
