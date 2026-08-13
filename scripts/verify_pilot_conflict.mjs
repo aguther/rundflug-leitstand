@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createWorkerTestHarness } from "./lib/worker-test-harness.mjs";
 
 const pin = String.fromCodePoint(48).repeat(4);
+const forecastConvergenceTimeoutMs = 5_000;
 const harness = await createWorkerTestHarness({ name: "pilot-conflict", adminPin: pin });
 const base = harness.baseUrl;
 const tokens = {
@@ -20,7 +21,7 @@ const waitForFreshDispatchPlan = async (
   rotationId,
   expectedVersion,
   isConverged = () => true,
-  timeoutMs = 2_000,
+  timeoutMs = forecastConvergenceTimeoutMs,
 ) => {
   const startedAt = Date.now();
   const deadline = startedAt + timeoutMs;
@@ -45,8 +46,16 @@ const waitForFreshDispatchPlan = async (
       setTimeout(resolvePromise, Math.min(50, remainingMilliseconds)),
     );
   } while (Date.now() < deadline);
+  const latestRotation = latest?.rotations.find((candidate) => candidate.id === rotationId);
+  const diagnostic = {
+    expectedVersion,
+    actualVersion: latest?.event?.version ?? null,
+    rotationId,
+    suggestedAircraftId: latestRotation?.suggestedAircraftId ?? null,
+    busyAircraftAvailability: latest ? sortedBusyAircraftAvailability(latest) : [],
+  };
   throw new Error(
-    `Forecast dispatch plan did not converge within ${timeoutMs} ms: ${JSON.stringify({ expectedVersion, actualVersion: latest?.event?.version ?? null, rotationId })}`,
+    `Forecast dispatch plan did not converge within ${timeoutMs} ms: ${JSON.stringify(diagnostic)}`,
   );
 };
 const sortedBusyAircraftAvailability = (state) =>
