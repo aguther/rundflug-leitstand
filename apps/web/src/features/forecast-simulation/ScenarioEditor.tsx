@@ -41,6 +41,11 @@ type EditorTab = "ADMIN" | "PLAN" | "REALITY" | "TUNING";
 type DistributionKey = keyof SimulationConfig["realityModel"]["phases"];
 type DistributionValue = keyof TriangularDistribution;
 
+function tickTextAnchor(ratio: number): "start" | "middle" | "end" {
+  if (ratio === 0) return "start";
+  return ratio === 1 ? "end" : "middle";
+}
+
 const PHASE_LABELS: Record<DistributionKey, string> = {
   boarding: "Boarding",
   flight: "Flug",
@@ -385,12 +390,7 @@ function DemandProfileChart({
       {ticks.map((ratio) => {
         const offset = Math.round(salesMinutes * ratio);
         return (
-          <text
-            key={ratio}
-            textAnchor={ratio === 0 ? "start" : ratio === 1 ? "end" : "middle"}
-            x={xAt(offset)}
-            y={height - 7}
-          >
+          <text key={ratio} textAnchor={tickTextAnchor(ratio)} x={xAt(offset)} y={height - 7}>
             {timeAtDemandOffset(config, offset)}
           </text>
         );

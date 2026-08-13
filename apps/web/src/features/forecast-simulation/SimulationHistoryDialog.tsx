@@ -279,10 +279,9 @@ function GroupForecastChart({
           </text>
         </svg>
         {activeSnapshot && activeSnapshotX !== null ? (
-          <div
+          <output
             className="sim-chart-tooltip"
             data-align={activeSnapshotX > width * 0.68 ? "right" : "center"}
-            role="status"
             style={{ left: `${(activeSnapshotX / width) * 100}%` }}
           >
             <strong>Snapshot {formatTime(activeSnapshot.capturedAt)}</strong>
@@ -294,7 +293,7 @@ function GroupForecastChart({
                 </div>
               ))}
             </dl>
-          </div>
+          </output>
         ) : null}
       </div>
     </div>

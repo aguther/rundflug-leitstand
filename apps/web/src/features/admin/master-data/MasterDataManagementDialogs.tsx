@@ -21,6 +21,39 @@ interface MasterDataDeleteDialogProps {
   target: MasterDataDeleteTarget | null;
 }
 
+function DeleteEffects({
+  preparation,
+  target,
+}: Readonly<{ preparation: boolean; target: MasterDataDeleteTarget }>) {
+  if (!preparation) {
+    return (
+      <output className="delete-blockers">
+        <strong>Löschen ist nach Betriebsfreigabe gesperrt.</strong>
+        <span>Stammdaten können jetzt nur noch deaktiviert werden.</span>
+      </output>
+    );
+  }
+  if (target.blockers.length > 0) {
+    return (
+      <output className="delete-blockers">
+        <strong>Löschen noch nicht möglich</strong>
+        <span>Zuerst entfernen:</span>
+        <ul>
+          {target.blockers.map((blocker) => (
+            <li key={blocker}>{blocker}</li>
+          ))}
+        </ul>
+      </output>
+    );
+  }
+  return (
+    <div className="delete-ready-copy">
+      <CheckCircle2 aria-hidden="true" />
+      <span>Keine erkennbaren Abhängigkeiten. Der Server prüft sie vor dem Löschen erneut.</span>
+    </div>
+  );
+}
+
 export function MasterDataDeleteDialog({
   busy,
   eventStatus,
@@ -75,29 +108,7 @@ export function MasterDataDeleteDialog({
       </div>
       <section aria-labelledby="master-delete-effects">
         <h3 id="master-delete-effects">Auswirkungen</h3>
-        {!preparation ? (
-          <div className="delete-blockers" role="status">
-            <strong>Löschen ist nach Betriebsfreigabe gesperrt.</strong>
-            <span>Stammdaten können jetzt nur noch deaktiviert werden.</span>
-          </div>
-        ) : target.blockers.length > 0 ? (
-          <div className="delete-blockers" role="status">
-            <strong>Löschen noch nicht möglich</strong>
-            <span>Zuerst entfernen:</span>
-            <ul>
-              {target.blockers.map((blocker) => (
-                <li key={blocker}>{blocker}</li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          <div className="delete-ready-copy">
-            <CheckCircle2 aria-hidden="true" />
-            <span>
-              Keine erkennbaren Abhängigkeiten. Der Server prüft sie vor dem Löschen erneut.
-            </span>
-          </div>
-        )}
+        <DeleteEffects preparation={preparation} target={target} />
       </section>
       {!modeUnlocked ? (
         <div className="ds-field master-delete-pin-field">
@@ -186,7 +197,7 @@ export function MasterDataTemplateImportDialog({
           />
         </Field>
         {fileName ? <p className="help-text">{fileName}</p> : null}
-        {busy ? <p role="status">Vorlage wird geprüft …</p> : null}
+        {busy ? <output className="help-text">Vorlage wird geprüft …</output> : null}
         {error ? <ValidationHint tone="error">{error}</ValidationHint> : null}
         {validation ? (
           <>
