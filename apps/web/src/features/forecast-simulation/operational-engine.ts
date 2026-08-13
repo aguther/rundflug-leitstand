@@ -26,20 +26,13 @@ import {
   publicRotation,
 } from "./operational-simulation-scenario";
 import { captureOperationalSimulationSnapshots } from "./operational-simulation-snapshot";
+import { simulationBlockDetails } from "./simulation-block-details";
 import {
   addSimulationMinutes as addMinutes,
   toSimulationIso as iso,
   roundSimulationTick as roundedTick,
   SIMULATION_TICK_MS as TICK_MS,
 } from "./simulation-primitives";
-
-function blockDetails(block: OperationalBlock): string {
-  if (block.dayOutage) {
-    return "Simulierter Tagesausfall an zulässiger organisatorischer Grenze bestätigt.";
-  }
-  const source = block.source === "AUTOMATIC" ? "Automatisch erzeugte" : "Manuell injizierte";
-  return `${source} Sperre für ${Math.round(block.durationMinutes)} Minuten.`;
-}
 
 export function runOperationalSimulation(
   config: SimulationConfig,
@@ -216,7 +209,7 @@ export function runOperationalSimulation(
     entry.blockedUntilMs = block.dayOutage ? null : addMinutes(nowMs, block.durationMinutes);
     recordEvent(eventTypeForBlock(entry.state as OperationalBlock["state"]), nowMs, {
       aircraftId: entry.id,
-      details: blockDetails(block),
+      details: simulationBlockDetails(block, Math.round(block.durationMinutes)),
     });
   };
 

@@ -23,6 +23,7 @@ import type {
 } from "./model";
 import { validateSimulationConfig } from "./model";
 import { runOperationalSimulation } from "./operational-engine";
+import { simulationBlockDetails } from "./simulation-block-details";
 import { calculateSimulationMetrics } from "./simulation-metrics";
 import {
   addSimulationMinutes as addMinutes,
@@ -33,14 +34,6 @@ import {
 
 export { calculateSimulationMetrics } from "./simulation-metrics";
 export { sampleTriangular } from "./simulation-primitives";
-
-function blockDetails(block: PendingBlock): string {
-  if (block.dayOutage) {
-    return "Simulierter Tagesausfall an zulässiger organisatorischer Grenze bestätigt.";
-  }
-  const source = block.source === "AUTOMATIC" ? "Automatisch erzeugte" : "Manuell injizierte";
-  return `${source} Sperre für ${rounded(block.durationMinutes)} Minuten.`;
-}
 
 export function runSimulation(
   config: SimulationConfig,
@@ -117,7 +110,7 @@ export function runSimulation(
       nowMs,
       entry.id,
       null,
-      blockDetails(block),
+      simulationBlockDetails(block, rounded(block.durationMinutes)),
     );
   };
 
