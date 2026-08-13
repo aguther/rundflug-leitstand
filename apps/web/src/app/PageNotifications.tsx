@@ -7,6 +7,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -56,8 +57,9 @@ export function ActionNotificationProvider({ children }: Readonly<{ children: Re
     const notice = { id: nextActionNoticeId++, message, tone };
     setNotices((current) => [...current.slice(-4), notice]);
   }, []);
+  const value = useMemo(() => ({ dismiss, notices, notify }), [dismiss, notices, notify]);
   return (
-    <ActionNotificationContext.Provider value={{ dismiss, notices, notify }}>
+    <ActionNotificationContext.Provider value={value}>
       {children}
     </ActionNotificationContext.Provider>
   );
