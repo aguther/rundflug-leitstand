@@ -243,9 +243,12 @@ describe("local and hosted forecast simulation surface", () => {
     );
     expect(stylesSource).toMatch(/\.sim-export-row\s*\{[^}]*flex-wrap:\s*wrap;[^}]*gap:\s*8px;/s);
     expect(timelineSource).toContain('aria-label="Tagesplan und Flugzeuge"');
-    expect(timelineSource).toContain('<section\n        aria-label="Tagesplan und Flugzeuge"');
-    expect(timelineSource).toContain("onKeyDown={scrollTimelineWithKeyboard}");
-    expect(timelineSource).toContain("tabIndex={0}");
+    expect(timelineSource).toMatch(
+      /<section\s+\{\.\.\.keyboardScrollableRegionProps\}\s+aria-label="Tagesplan und Flugzeuge"/,
+    );
+    expect(timelineSource).toContain("onKeyDown: scrollTimelineWithKeyboard");
+    expect(timelineSource).toContain("tabIndex: 0");
+    expect(timelineSource).toContain("{...keyboardScrollableRegionProps}");
     expect(stylesSource).toContain(".forecast-simulator .ds-sidepanel");
     expect(stylesSource).toContain("width: min(760px, 100%)");
     expect(stylesSource).not.toContain(".ds-sidepanel:has(");

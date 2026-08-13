@@ -5,6 +5,7 @@ import {
   type SimulationEvent,
   type SimulationEventType,
   type SimulationForecastSnapshot,
+  type SimulationPlannedOperation,
   type SimulationResult,
   type SimulationRotation,
 } from "./model";
@@ -70,6 +71,11 @@ function scrollTimelineWithKeyboard(event: KeyboardEvent<HTMLElement>) {
   }
   event.preventDefault();
 }
+
+const keyboardScrollableRegionProps = {
+  onKeyDown: scrollTimelineWithKeyboard,
+  tabIndex: 0,
+} as const;
 
 function phaseStyle(from: number, until: number, start: number, end: number) {
   return {
@@ -182,6 +188,59 @@ function interruptionTitle(interruption: TimelineInterruption): string {
   return `${interruption.label} · ${formatTime(interruption.start)}–${until} · ${interruption.details}`;
 }
 
+function buildPlannedSegments(input: {
+  events: readonly SimulationEvent[];
+  plans: readonly SimulationPlannedOperation[];
+  simulationEnd: number;
+  windowEnd: number;
+  windowStart: number;
+}) {
+  return input.plans.flatMap((plan) => {
+    const startEvent = input.events.find(
+      (event) =>
+        event.type === "PLANNED_OPERATION_STARTED" && event.plannedOperationId === plan.key,
+    );
+    if (!startEvent) return [];
+    const start = Date.parse(startEvent.occurredAt);
+    const endEvent = input.events.find(
+      (event) =>
+        event.type === "PLANNED_OPERATION_ENDED" &&
+        event.plannedOperationId === plan.key &&
+        Date.parse(event.occurredAt) >= start,
+    );
+    const end = endEvent ? Date.parse(endEvent.occurredAt) : input.simulationEnd;
+    if (start >= input.windowEnd || end <= input.windowStart) return [];
+    return [{ plan, start, end }];
+  });
+}
+
+function isPrecalled(rotation: SimulationRotation, currentMs: number): boolean {
+  return rotation.precalledAt !== null && Date.parse(rotation.precalledAt) <= currentMs;
+}
+
+function queueRotationLabel(
+  rotation: SimulationRotation,
+  index: number,
+  currentMs: number,
+): string {
+  if (isPrecalled(rotation, currentMs)) return rotation.gateLabel ?? "Gate";
+  const productPrefix = rotation.productCode ? `${rotation.productCode} · ` : "";
+  return `${productPrefix}${index + 1}`;
+}
+
+function selectedForecastLabel(snapshot: SimulationForecastSnapshot | undefined): string {
+  if (!snapshot) return "Noch keine Prognose";
+  const boarding = formatTime(snapshot.predictedBoardingAt);
+  if (snapshot.quality !== "UNCERTAIN") return `Prognose Boarding ${boarding}`;
+  return `Rohprognose Boarding ${boarding} · nicht freigegeben · ${forecastUncertaintyLabel(snapshot.uncertaintyReasons)}`;
+}
+
+function forecastQualityLabel(quality: SimulationForecastSnapshot["quality"] | undefined): string {
+  if (quality === "STABLE") return "stabil";
+  if (quality === "CHANGING") return "veränderlich";
+  return "unsicher";
+}
+
 export function ForecastTimeline({
   currentMs,
   result,
@@ -224,22 +283,12 @@ export function ForecastTimeline({
     ? latestSnapshot(result.snapshots, selected.id, currentMs)
     : undefined;
   const nowPosition = clampPercent(percent(currentMs, windowStart, windowEnd));
-  const plannedSegments = (result.plannedOperations ?? []).flatMap((plan) => {
-    const startEvent = result.events.find(
-      (event) =>
-        event.type === "PLANNED_OPERATION_STARTED" && event.plannedOperationId === plan.key,
-    );
-    if (!startEvent) return [];
-    const endEvent = result.events.find(
-      (event) =>
-        event.type === "PLANNED_OPERATION_ENDED" &&
-        event.plannedOperationId === plan.key &&
-        Date.parse(event.occurredAt) >= Date.parse(startEvent.occurredAt),
-    );
-    const start = Date.parse(startEvent.occurredAt);
-    const end = endEvent ? Date.parse(endEvent.occurredAt) : simulationEnd;
-    if (start >= windowEnd || end <= windowStart) return [];
-    return [{ plan, start, end }];
+  const plannedSegments = buildPlannedSegments({
+    events: result.events,
+    plans: result.plannedOperations ?? [],
+    simulationEnd,
+    windowEnd,
+    windowStart,
   });
   const sharedPlannedSegments = plannedSegments.filter(({ plan }) => plan.scopeType !== "AIRCRAFT");
   const sharedInterruptions = buildTimelineInterruptions(
@@ -277,11 +326,9 @@ export function ForecastTimeline({
         ))}
       </div>
       <section
+        {...keyboardScrollableRegionProps}
         aria-label="Tagesplan und Flugzeuge"
         className="sim-timeline-lanes"
-        onKeyDown={scrollTimelineWithKeyboard}
-        // biome-ignore lint/a11y/noNoninteractiveTabindex: the overflow region must accept focus for keyboard scrolling.
-        tabIndex={0}
       >
         <div className="sim-now-track">
           <div className="sim-now-line" style={{ left: `${nowPosition}%` }}>
@@ -453,22 +500,14 @@ export function ForecastTimeline({
           ) : null}
           {queue.slice(0, 20).map((rotation, index) => (
             <button
-              data-precalled={
-                rotation.precalledAt && Date.parse(rotation.precalledAt) <= currentMs
-                  ? "true"
-                  : undefined
-              }
+              data-precalled={isPrecalled(rotation, currentMs) ? "true" : undefined}
               data-selected={rotation.id === selectedRotationId}
               key={rotation.id}
               onClick={() => onSelectRotation(rotation.id)}
               type="button"
             >
               <strong>{rotation.communicationNumber}</strong>
-              <small>
-                {rotation.precalledAt && Date.parse(rotation.precalledAt) <= currentMs
-                  ? (rotation.gateLabel ?? "Gate")
-                  : `${rotation.productCode ?? ""}${rotation.productCode ? " · " : ""}${index + 1}`}
-              </small>
+              <small>{queueRotationLabel(rotation, index, currentMs)}</small>
             </button>
           ))}
         </div>
@@ -478,13 +517,7 @@ export function ForecastTimeline({
           <>
             <strong>Fluggruppe {selected.communicationNumber}</strong>
             <i>·</i>
-            <span>
-              {selectedSnapshot?.quality === "UNCERTAIN"
-                ? `Rohprognose Boarding ${formatTime(selectedSnapshot.predictedBoardingAt)} · nicht freigegeben · ${forecastUncertaintyLabel(selectedSnapshot.uncertaintyReasons)}`
-                : selectedSnapshot
-                  ? `Prognose Boarding ${formatTime(selectedSnapshot.predictedBoardingAt)}`
-                  : "Noch keine Prognose"}
-            </span>
+            <span>{selectedForecastLabel(selectedSnapshot)}</span>
             <i>·</i>
             <span>
               Ist {statusAt(selected, currentMs) === "COMPLETED" ? "abgeschlossen" : "noch offen"}
@@ -496,14 +529,7 @@ export function ForecastTimeline({
               </>
             ) : null}
             <i>·</i>
-            <span>
-              Qualität{" "}
-              {selectedSnapshot?.quality === "STABLE"
-                ? "stabil"
-                : selectedSnapshot?.quality === "CHANGING"
-                  ? "veränderlich"
-                  : "unsicher"}
-            </span>
+            <span>Qualität {forecastQualityLabel(selectedSnapshot?.quality)}</span>
           </>
         ) : (
           <span>Fluggruppe auswählen, um Prognose und Ist-Verlauf zu vergleichen.</span>
