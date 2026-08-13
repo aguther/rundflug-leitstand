@@ -297,96 +297,101 @@ export function registerAdminMasterDataTemplateRoutes(
       SELECT 1 FROM idempotency_receipts
        WHERE operation_day_id = ?1 AND command_id = ?2
     )`;
-    const statements: D1PreparedStatement[] = [
-      context.env.DB.prepare(
-        `INSERT INTO idempotency_receipts
+    const deviceId = device.id;
+    function appendAircraftStatements(statements: D1PreparedStatement[]): void {
+      for (const aircraft of input.template.aircraft) {
+        if (aircraftValidation.existingByRegistration.has(aircraft.registration)) continue;
+        statements.push(
+          context.env.DB.prepare(
+            `INSERT INTO aircraft
+              (id, registration, aircraft_type, passenger_seats, created_at, updated_at,
+               maximum_passenger_payload_kg, refuel_reminder_threshold)
+             SELECT ?3, ?4, ?5, ?6, ?7, ?7, ?8, ?9 WHERE ${receiptGuard}`,
+          ).bind(
+            eventId,
+            input.commandId,
+            aircraftIds.get(aircraft.key),
+            aircraft.registration,
+            aircraft.aircraftType,
+            aircraft.passengerSeats,
+            now,
+            aircraft.maximumPassengerPayloadKg,
+            aircraft.refuelReminderThreshold,
+          ),
+        );
+      }
+    }
+    function buildImportStatements(): D1PreparedStatement[] {
+      const statements: D1PreparedStatement[] = [
+        context.env.DB.prepare(
+          `INSERT INTO idempotency_receipts
           (command_id, operation_day_id, device_id, command_type, received_at, response_json)
          SELECT ?1, ?2, ?3, 'IMPORT_MASTER_DATA_TEMPLATE', ?4, ?5
           WHERE EXISTS (
             SELECT 1 FROM operation_days
              WHERE id = ?2 AND version = ?6 AND status = 'PREPARATION'
           )`,
-      ).bind(
-        input.commandId,
-        eventId,
-        device.id,
-        now,
-        JSON.stringify(responseBody),
-        input.expectedVersion,
-      ),
-    ];
-    for (const aircraft of input.template.aircraft) {
-      if (aircraftValidation.existingByRegistration.has(aircraft.registration)) continue;
-      statements.push(
-        context.env.DB.prepare(
-          `INSERT INTO aircraft
-            (id, registration, aircraft_type, passenger_seats, created_at, updated_at,
-             maximum_passenger_payload_kg, refuel_reminder_threshold)
-           SELECT ?3, ?4, ?5, ?6, ?7, ?7, ?8, ?9 WHERE ${receiptGuard}`,
         ).bind(
-          eventId,
           input.commandId,
-          aircraftIds.get(aircraft.key),
-          aircraft.registration,
-          aircraft.aircraftType,
-          aircraft.passengerSeats,
+          eventId,
+          deviceId,
           now,
-          aircraft.maximumPassengerPayloadKg,
-          aircraft.refuelReminderThreshold,
+          JSON.stringify(responseBody),
+          input.expectedVersion,
         ),
-      );
-    }
-    for (const gate of input.template.gates) {
-      statements.push(
-        context.env.DB.prepare(
-          `INSERT INTO gates
+      ];
+      appendAircraftStatements(statements);
+      for (const gate of input.template.gates) {
+        statements.push(
+          context.env.DB.prepare(
+            `INSERT INTO gates
             (id, operation_day_id, label, gate_type, active, sort_order, travel_lead_minutes,
              display_filter_json, created_at, updated_at)
            SELECT ?3, ?1, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10 WHERE ${receiptGuard}`,
-        ).bind(
-          eventId,
-          input.commandId,
-          gateIds.get(gate.key),
-          gate.label,
-          gate.gateType,
-          gate.active ? 1 : 0,
-          gate.sortOrder,
-          gate.travelLeadMinutes,
-          JSON.stringify({
-            productIds: gate.displayFilter.productKeys.map((key) => productIds.get(key)),
-            rotationStatuses: gate.displayFilter.rotationStatuses,
-          }),
-          now,
-        ),
-      );
-    }
-    for (const group of input.template.resourceGroups) {
-      statements.push(
-        context.env.DB.prepare(
-          `INSERT INTO resource_groups
+          ).bind(
+            eventId,
+            input.commandId,
+            gateIds.get(gate.key),
+            gate.label,
+            gate.gateType,
+            gate.active ? 1 : 0,
+            gate.sortOrder,
+            gate.travelLeadMinutes,
+            JSON.stringify({
+              productIds: gate.displayFilter.productKeys.map((key) => productIds.get(key)),
+              rotationStatuses: gate.displayFilter.rotationStatuses,
+            }),
+            now,
+          ),
+        );
+      }
+      for (const group of input.template.resourceGroups) {
+        statements.push(
+          context.env.DB.prepare(
+            `INSERT INTO resource_groups
             (id, operation_day_id, name, short_code, status, version, created_at, updated_at,
              gate_id, reference_capacity,
              compatible_aircraft_types_json, automatic_precall_enabled)
            SELECT ?3, ?1, ?4, ?5, 'ACTIVE', 0, ?6, ?6, ?7, ?8, ?9, ?10
             WHERE ${receiptGuard}`,
-        ).bind(
-          eventId,
-          input.commandId,
-          resourceGroupIds.get(group.key),
-          group.name,
-          group.shortCode,
-          now,
-          gateIds.get(group.gateKey),
-          group.referenceCapacity,
-          JSON.stringify(group.compatibleAircraftTypes),
-          group.automaticPrecallEnabled ? 1 : 0,
-        ),
-      );
-    }
-    for (const product of input.template.products) {
-      statements.push(
-        context.env.DB.prepare(
-          `INSERT INTO products
+          ).bind(
+            eventId,
+            input.commandId,
+            resourceGroupIds.get(group.key),
+            group.name,
+            group.shortCode,
+            now,
+            gateIds.get(group.gateKey),
+            group.referenceCapacity,
+            JSON.stringify(group.compatibleAircraftTypes),
+            group.automaticPrecallEnabled ? 1 : 0,
+          ),
+        );
+      }
+      for (const product of input.template.products) {
+        statements.push(
+          context.env.DB.prepare(
+            `INSERT INTO products
             (id, operation_day_id, resource_group_id, name, price_cents, sale_enabled,
              created_at, updated_at, capacity_warning_threshold, capacity_critical_threshold,
              code, public_description, child_companion_required, sort_order, weight_classes_json,
@@ -395,116 +400,116 @@ export function registerAdminMasterDataTemplateRoutes(
              planned_buffer_minutes_override)
            SELECT ?3, ?1, ?4, ?5, ?6, 0, ?7, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
                   ?15, ?16, ?17, ?18, ?19, ?20, ?21 WHERE ${receiptGuard}`,
-        ).bind(
-          eventId,
-          input.commandId,
-          productIds.get(product.key),
-          resourceGroupIds.get(product.resourceGroupKey),
-          product.name,
-          product.priceCents,
-          now,
-          product.capacityWarningThreshold,
-          product.capacityCriticalThreshold,
-          product.code,
-          product.publicDescription,
-          product.childCompanionRequired ? 1 : 0,
-          product.sortOrder,
-          JSON.stringify(product.weightClasses),
-          gateIds.get(product.gateKey),
-          product.referenceCapacity,
-          product.referenceDurationMinutes,
-          product.promisedFlightMinutes,
-          product.plannedBoardingMinutesOverride,
-          product.plannedDeboardingMinutesOverride,
-          product.plannedBufferMinutesOverride,
-        ),
-      );
-    }
-    for (const pilot of input.template.pilots) {
-      statements.push(
-        context.env.DB.prepare(
-          `INSERT INTO pilots
+          ).bind(
+            eventId,
+            input.commandId,
+            productIds.get(product.key),
+            resourceGroupIds.get(product.resourceGroupKey),
+            product.name,
+            product.priceCents,
+            now,
+            product.capacityWarningThreshold,
+            product.capacityCriticalThreshold,
+            product.code,
+            product.publicDescription,
+            product.childCompanionRequired ? 1 : 0,
+            product.sortOrder,
+            JSON.stringify(product.weightClasses),
+            gateIds.get(product.gateKey),
+            product.referenceCapacity,
+            product.referenceDurationMinutes,
+            product.promisedFlightMinutes,
+            product.plannedBoardingMinutesOverride,
+            product.plannedDeboardingMinutesOverride,
+            product.plannedBufferMinutesOverride,
+          ),
+        );
+      }
+      for (const pilot of input.template.pilots) {
+        statements.push(
+          context.env.DB.prepare(
+            `INSERT INTO pilots
             (id, operation_day_id, operational_code, operational_note, active, created_at, updated_at)
            SELECT ?3, ?1, ?4, ?5, ?6, ?7, ?7 WHERE ${receiptGuard}`,
-        ).bind(
-          eventId,
-          input.commandId,
-          dependencies.randomUUID(),
-          pilot.operationalCode,
-          pilot.operationalNote,
-          pilot.active ? 1 : 0,
-          now,
-        ),
-      );
-    }
-    for (const assignment of input.template.assignments) {
-      statements.push(
-        context.env.DB.prepare(
-          `INSERT INTO resource_group_memberships
+          ).bind(
+            eventId,
+            input.commandId,
+            dependencies.randomUUID(),
+            pilot.operationalCode,
+            pilot.operationalNote,
+            pilot.active ? 1 : 0,
+            now,
+          ),
+        );
+      }
+      for (const assignment of input.template.assignments) {
+        statements.push(
+          context.env.DB.prepare(
+            `INSERT INTO resource_group_memberships
             (id, operation_day_id, resource_group_id, aircraft_id, active_from, created_at,
              change_reason, changed_by_device_id)
            SELECT ?3, ?1, ?4, ?5, ?6, ?6, 'Stammdatenvorlage importiert', ?7
             WHERE ${receiptGuard}`,
-        ).bind(
-          eventId,
-          input.commandId,
-          dependencies.randomUUID(),
-          resourceGroupIds.get(assignment.resourceGroupKey),
-          aircraftIds.get(assignment.aircraftKey),
-          now,
-          device.id,
-        ),
-      );
-    }
-    for (const override of input.template.aircraftProductTurnaroundOverrides) {
-      statements.push(
-        context.env.DB.prepare(
-          `INSERT INTO aircraft_product_turnaround_overrides
+          ).bind(
+            eventId,
+            input.commandId,
+            dependencies.randomUUID(),
+            resourceGroupIds.get(assignment.resourceGroupKey),
+            aircraftIds.get(assignment.aircraftKey),
+            now,
+            deviceId,
+          ),
+        );
+      }
+      for (const override of input.template.aircraftProductTurnaroundOverrides) {
+        statements.push(
+          context.env.DB.prepare(
+            `INSERT INTO aircraft_product_turnaround_overrides
             (operation_day_id, aircraft_id, product_id, planned_boarding_minutes_override,
              planned_deboarding_minutes_override, planned_buffer_minutes_override, version,
              created_at, updated_at)
            SELECT ?1, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?8 WHERE ${receiptGuard}`,
-        ).bind(
-          eventId,
-          input.commandId,
-          aircraftIds.get(override.aircraftKey),
-          productIds.get(override.productKey),
-          override.plannedBoardingMinutesOverride,
-          override.plannedDeboardingMinutesOverride,
-          override.plannedBufferMinutesOverride,
-          now,
-        ),
-      );
-    }
-    const parameters = input.template.eventParameters;
-    statements.push(
-      context.env.DB.prepare(
-        `INSERT INTO operational_events
+          ).bind(
+            eventId,
+            input.commandId,
+            aircraftIds.get(override.aircraftKey),
+            productIds.get(override.productKey),
+            override.plannedBoardingMinutesOverride,
+            override.plannedDeboardingMinutesOverride,
+            override.plannedBufferMinutesOverride,
+            now,
+          ),
+        );
+      }
+      const parameters = input.template.eventParameters;
+      statements.push(
+        context.env.DB.prepare(
+          `INSERT INTO operational_events
           (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
            aggregate_id, aggregate_version, payload_json)
          SELECT ?3, ?1, 'MASTER_DATA_TEMPLATE_IMPORTED', ?4, ?5, 'OPERATION_DAY', ?1, ?6, ?7
           WHERE ${receiptGuard}`,
-      ).bind(
-        eventId,
-        input.commandId,
-        dependencies.randomUUID(),
-        now,
-        device.id,
-        input.expectedVersion + 1,
-        JSON.stringify({ formatVersion: input.template.formatVersion, counts }),
-      ),
-      context.env.DB.prepare(
-        `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
+        ).bind(
+          eventId,
+          input.commandId,
+          dependencies.randomUUID(),
+          now,
+          deviceId,
+          input.expectedVersion + 1,
+          JSON.stringify({ formatVersion: input.template.formatVersion, counts }),
+        ),
+        context.env.DB.prepare(
+          `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
          SELECT ?3, ?1, 'MASTER_DATA_TEMPLATE_IMPORTED', ?4, ?5 WHERE ${receiptGuard}`,
-      ).bind(
-        eventId,
-        input.commandId,
-        dependencies.randomUUID(),
-        JSON.stringify({ eventId, version: input.expectedVersion + 1, counts }),
-        now,
-      ),
-      context.env.DB.prepare(
-        `UPDATE operation_days
+        ).bind(
+          eventId,
+          input.commandId,
+          dependencies.randomUUID(),
+          JSON.stringify({ eventId, version: input.expectedVersion + 1, counts }),
+          now,
+        ),
+        context.env.DB.prepare(
+          `UPDATE operation_days
             SET no_show_after_minutes = ?3, max_ticket_deferrals = ?4,
                 notification_lead_minutes = ?5, automatic_precall_enabled = ?6,
                 precall_lead_minutes = ?7, max_gate_wait_minutes = ?8,
@@ -518,28 +523,31 @@ export function registerAdminMasterDataTemplateRoutes(
               SELECT 1 FROM idempotency_receipts
                WHERE operation_day_id = ?1 AND command_id = ?19
             )`,
-      ).bind(
-        eventId,
-        input.expectedVersion,
-        parameters.noShowAfterMinutes,
-        parameters.maxTicketDeferrals,
-        parameters.notificationLeadMinutes,
-        parameters.automaticPrecallEnabled ? 1 : 0,
-        parameters.precallLeadMinutes,
-        parameters.maximumGateWaitMinutes,
-        parameters.precallMinimumQuality,
-        parameters.precallGateCooldownMinutes,
-        parameters.referenceWeightsKg.child,
-        parameters.referenceWeightsKg.normal,
-        parameters.referenceWeightsKg.heavy,
-        parameters.plannedBoardingMinutes,
-        parameters.plannedDeboardingMinutes,
-        parameters.plannedBufferMinutes,
-        parameters.departedVisibilitySeconds,
-        now,
-        input.commandId,
-      ),
-    );
+        ).bind(
+          eventId,
+          input.expectedVersion,
+          parameters.noShowAfterMinutes,
+          parameters.maxTicketDeferrals,
+          parameters.notificationLeadMinutes,
+          parameters.automaticPrecallEnabled ? 1 : 0,
+          parameters.precallLeadMinutes,
+          parameters.maximumGateWaitMinutes,
+          parameters.precallMinimumQuality,
+          parameters.precallGateCooldownMinutes,
+          parameters.referenceWeightsKg.child,
+          parameters.referenceWeightsKg.normal,
+          parameters.referenceWeightsKg.heavy,
+          parameters.plannedBoardingMinutes,
+          parameters.plannedDeboardingMinutes,
+          parameters.plannedBufferMinutes,
+          parameters.departedVisibilitySeconds,
+          now,
+          input.commandId,
+        ),
+      );
+      return statements;
+    }
+    const statements = buildImportStatements();
     const results = await context.env.DB.batch(statements);
     const updateResult = results.at(-1);
     if (updateResult?.meta.changes !== 1) {
