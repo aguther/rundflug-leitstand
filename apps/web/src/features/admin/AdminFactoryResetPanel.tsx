@@ -5,7 +5,10 @@ interface AdminFactoryResetPanelProps {
   onOpen: () => void;
 }
 
-export function AdminFactoryResetPanel({ administrator, onOpen }: AdminFactoryResetPanelProps) {
+export function AdminFactoryResetPanel({
+  administrator,
+  onOpen,
+}: Readonly<AdminFactoryResetPanelProps>) {
   return (
     <section className="reset-levels">
       {!administrator ? (
