@@ -77,28 +77,36 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function firstArrayDifference(expected, actual, path) {
+  if (expected.length !== actual.length) {
+    return { path: `${path}.length`, expected: expected.length, actual: actual.length };
+  }
+  for (let index = 0; index < expected.length; index += 1) {
+    const difference = firstDifference(expected[index], actual[index], `${path}[${index}]`);
+    if (difference) return difference;
+  }
+  return null;
+}
+
+function firstObjectDifference(expected, actual, path) {
+  const keys = [...new Set([...Object.keys(expected), ...Object.keys(actual)])].sort(
+    compareTechnicalStrings,
+  );
+  for (const key of keys) {
+    const difference = firstDifference(expected[key], actual[key], `${path}.${key}`);
+    if (difference) return difference;
+  }
+  return null;
+}
+
 function firstDifference(expected, actual, path = "$") {
   if (Object.is(expected, actual)) return null;
   if (Array.isArray(expected) && Array.isArray(actual)) {
-    if (expected.length !== actual.length) {
-      return { path: `${path}.length`, expected: expected.length, actual: actual.length };
-    }
-    for (let index = 0; index < expected.length; index += 1) {
-      const difference = firstDifference(expected[index], actual[index], `${path}[${index}]`);
-      if (difference) return difference;
-    }
-    return null;
+    return firstArrayDifference(expected, actual, path);
   }
-  if (expected && actual && typeof expected === "object" && typeof actual === "object") {
-    const keys = [...new Set([...Object.keys(expected), ...Object.keys(actual)])].sort(
-      compareTechnicalStrings,
-    );
-    for (const key of keys) {
-      const difference = firstDifference(expected[key], actual[key], `${path}.${key}`);
-      if (difference) return difference;
-    }
-    return null;
-  }
+  const bothObjects =
+    expected && actual && typeof expected === "object" && typeof actual === "object";
+  if (bothObjects) return firstObjectDifference(expected, actual, path);
   return { path, expected, actual };
 }
 
@@ -339,9 +347,9 @@ function verifyVersions(model, allowMismatch) {
   return differences;
 }
 
-function verifyIntegrity(model) {
+function verifiedChunks(chunks) {
   const chunkById = new Map();
-  for (const chunk of model.chunks) {
+  for (const chunk of chunks) {
     if (chunkById.has(chunk.id)) throw new ReplayError("ANALYSIS_CHUNK_DUPLICATE", chunk.id);
     const json = canonicalJson(chunk.payload);
     const hash = sha256(json);
@@ -364,8 +372,12 @@ function verifyIntegrity(model) {
     }
     chunkById.set(chunk.id, chunk);
   }
+  return chunkById;
+}
+
+function verifiedContexts(contexts, chunkById) {
   const contextById = new Map();
-  for (const context of model.contexts) {
+  for (const context of contexts) {
     if (!Array.isArray(context.manifest))
       throw new ReplayError("ANALYSIS_CONTEXT_MANIFEST_INVALID", context.id);
     if (sha256(canonicalJson(context.manifest)) !== context.manifestHash) {
@@ -387,47 +399,121 @@ function verifyIntegrity(model) {
     }
     contextById.set(context.id, context);
   }
-  const runById = new Map(
-    model.runs.filter((run) => run.status === "SUCCEEDED").map((run) => [run.id, run]),
-  );
-  for (const run of runById.values()) {
-    if (run.replayDistance < 0 || run.replayDistance > 10)
-      throw new ReplayError("ANALYSIS_REPLAY_DISTANCE_INVALID", run.id);
-    if (!contextById.has(run.contextId))
-      throw new ReplayError("ANALYSIS_RUN_CONTEXT_MISSING", run.id);
-    for (const chunkId of [
-      run.previousForecastStateChunkId,
-      run.previousDispatchStateChunkId,
-      run.dispatchResultChunkId,
-      run.precallResultChunkId,
-    ]) {
-      if (chunkId && !chunkById.has(chunkId))
-        throw new ReplayError("ANALYSIS_RUN_CHUNK_MISSING", `${run.id}: ${chunkId}`);
-    }
-    let cursor = run;
-    let distance = 0;
-    const seen = new Set();
-    while (cursor.id !== run.anchorRunId) {
-      if (seen.has(cursor.id) || distance >= 10 || !cursor.previousRunId) {
-        throw new ReplayError("ANALYSIS_REPLAY_CHAIN_INVALID", run.id);
-      }
-      seen.add(cursor.id);
-      cursor = runById.get(cursor.previousRunId);
-      if (!cursor) throw new ReplayError("ANALYSIS_REPLAY_CHAIN_MISSING", run.id);
-      distance += 1;
-    }
-    if (distance !== run.replayDistance || cursor.mode !== "ANCHOR") {
-      throw new ReplayError("ANALYSIS_REPLAY_CHAIN_INVALID", run.id, {
-        expectedDistance: run.replayDistance,
-        actualDistance: distance,
-      });
+  return contextById;
+}
+
+function verifyRunChunkReferences(run, chunkById) {
+  const referencedChunkIds = [
+    run.previousForecastStateChunkId,
+    run.previousDispatchStateChunkId,
+    run.dispatchResultChunkId,
+    run.precallResultChunkId,
+  ];
+  for (const chunkId of referencedChunkIds) {
+    if (chunkId && !chunkById.has(chunkId)) {
+      throw new ReplayError("ANALYSIS_RUN_CHUNK_MISSING", `${run.id}: ${chunkId}`);
     }
   }
-  return { chunkById, contextById, runById };
+}
+
+function verifyRunLineage(run, runById) {
+  let cursor = run;
+  let distance = 0;
+  const seen = new Set();
+  while (cursor.id !== run.anchorRunId) {
+    if (seen.has(cursor.id) || distance >= 10 || !cursor.previousRunId) {
+      throw new ReplayError("ANALYSIS_REPLAY_CHAIN_INVALID", run.id);
+    }
+    seen.add(cursor.id);
+    cursor = runById.get(cursor.previousRunId);
+    if (!cursor) throw new ReplayError("ANALYSIS_REPLAY_CHAIN_MISSING", run.id);
+    distance += 1;
+  }
+  if (distance !== run.replayDistance || cursor.mode !== "ANCHOR") {
+    throw new ReplayError("ANALYSIS_REPLAY_CHAIN_INVALID", run.id, {
+      expectedDistance: run.replayDistance,
+      actualDistance: distance,
+    });
+  }
+}
+
+function verifiedRuns(runs, chunkById, contextById) {
+  const runById = new Map(
+    runs.filter((run) => run.status === "SUCCEEDED").map((run) => [run.id, run]),
+  );
+  for (const run of runById.values()) {
+    if (run.replayDistance < 0 || run.replayDistance > 10) {
+      throw new ReplayError("ANALYSIS_REPLAY_DISTANCE_INVALID", run.id);
+    }
+    if (!contextById.has(run.contextId)) {
+      throw new ReplayError("ANALYSIS_RUN_CONTEXT_MISSING", run.id);
+    }
+    verifyRunChunkReferences(run, chunkById);
+    verifyRunLineage(run, runById);
+  }
+  return runById;
+}
+
+function verifyIntegrity(model) {
+  const chunkById = verifiedChunks(model.chunks);
+  const contextById = verifiedContexts(model.contexts, chunkById);
+  return {
+    chunkById,
+    contextById,
+    runById: verifiedRuns(model.runs, chunkById, contextById),
+  };
 }
 
 function clone(value) {
   return structuredClone(value);
+}
+
+function chunkPayloads(chunks, kind) {
+  return chunks.filter((chunk) => chunk.kind === kind).flatMap((chunk) => clone(chunk.payload));
+}
+
+function applyRotationConstraint(entry, rotations) {
+  const rotation = rotations.find((candidate) => candidate.id === String(entry.id).slice(9));
+  if (!rotation) return;
+  rotation.constraints = entry.constraints;
+  rotation.turnaroundProfiles = entry.turnaroundProfiles;
+  rotation.confirmedTurnaroundProfile = entry.confirmedTurnaroundProfile;
+}
+
+function applyCapacityConstraint(entry, capacities) {
+  const capacity = capacities.find(
+    (candidate) => candidate.resourceGroupId === entry.resourceGroupId,
+  );
+  if (!capacity) return;
+  capacity.sharedConstraints = entry.sharedConstraints;
+  for (const laneState of entry.lanes ?? []) {
+    const lane = capacity.availabilityLanes?.find(
+      (candidate) => candidate.laneId === laneState.laneId,
+    );
+    if (lane) {
+      lane.constraints = laneState.constraints;
+      lane.recurringConstraints = laneState.recurringConstraints;
+    }
+  }
+}
+
+function applyOperationalConstraints(operational, rotations, capacities) {
+  for (const entry of operational) {
+    const entryId = String(entry.id);
+    if (entryId.startsWith("rotation:")) applyRotationConstraint(entry, rotations);
+    if (entryId.startsWith("capacity:")) applyCapacityConstraint(entry, capacities);
+  }
+}
+
+function applyForecastState(rotations, forecastState) {
+  const stateByRotation = new Map((forecastState ?? []).map((entry) => [entry.rotationId, entry]));
+  for (const rotation of rotations) {
+    const prior = stateByRotation.get(rotation.id);
+    if (!prior) continue;
+    rotation.predictedDepartureAt = prior.predictedDepartureAt;
+    rotation.predictedLandingAt = prior.predictedLandingAt;
+    rotation.predictedCompletionAt = prior.predictedCompletionAt;
+  }
 }
 
 function reconstructInput(context, chunkById, calculationNow, forecastState, dispatchState) {
@@ -435,53 +521,15 @@ function reconstructInput(context, chunkById, calculationNow, forecastState, dis
   const eventChunk = chunks.find((chunk) => chunk.kind === "EVENT_CONFIGURATION");
   if (!eventChunk) throw new ReplayError("ANALYSIS_EVENT_CONTEXT_MISSING", context.id);
   const configuration = clone(eventChunk.payload);
-  const rotations = chunks
-    .filter((chunk) => chunk.kind === "ROTATIONS_QUEUE")
-    .flatMap((chunk) => clone(chunk.payload));
-  const capacities = chunks
-    .filter((chunk) => chunk.kind === "CAPACITIES")
-    .flatMap((chunk) => clone(chunk.payload));
-  const durationSamples = chunks
-    .filter((chunk) => chunk.kind === "DURATION_SAMPLES")
-    .flatMap((chunk) => clone(chunk.payload));
-  const operational = chunks
-    .filter((chunk) => chunk.kind === "OPERATIONAL_CONSTRAINTS")
-    .flatMap((chunk) => clone(chunk.payload));
-  for (const entry of operational) {
-    if (String(entry.id).startsWith("rotation:")) {
-      const rotation = rotations.find((candidate) => candidate.id === String(entry.id).slice(9));
-      if (rotation) {
-        rotation.constraints = entry.constraints;
-        rotation.turnaroundProfiles = entry.turnaroundProfiles;
-        rotation.confirmedTurnaroundProfile = entry.confirmedTurnaroundProfile;
-      }
-    } else if (String(entry.id).startsWith("capacity:")) {
-      const capacity = capacities.find(
-        (candidate) => candidate.resourceGroupId === entry.resourceGroupId,
-      );
-      if (capacity) {
-        capacity.sharedConstraints = entry.sharedConstraints;
-        for (const laneState of entry.lanes ?? []) {
-          const lane = capacity.availabilityLanes?.find(
-            (candidate) => candidate.laneId === laneState.laneId,
-          );
-          if (lane) {
-            lane.constraints = laneState.constraints;
-            lane.recurringConstraints = laneState.recurringConstraints;
-          }
-        }
-      }
-    }
-  }
-  const stateByRotation = new Map((forecastState ?? []).map((entry) => [entry.rotationId, entry]));
-  for (const rotation of rotations) {
-    const prior = stateByRotation.get(rotation.id);
-    if (prior) {
-      rotation.predictedDepartureAt = prior.predictedDepartureAt;
-      rotation.predictedLandingAt = prior.predictedLandingAt;
-      rotation.predictedCompletionAt = prior.predictedCompletionAt;
-    }
-  }
+  const rotations = chunkPayloads(chunks, "ROTATIONS_QUEUE");
+  const capacities = chunkPayloads(chunks, "CAPACITIES");
+  const durationSamples = chunkPayloads(chunks, "DURATION_SAMPLES");
+  applyOperationalConstraints(
+    chunkPayloads(chunks, "OPERATIONAL_CONSTRAINTS"),
+    rotations,
+    capacities,
+  );
+  applyForecastState(rotations, forecastState);
   return {
     event: { ...configuration.event, now: calculationNow },
     rotations,
@@ -540,6 +588,79 @@ function comparableProjection(projection) {
   return Object.fromEntries(keys.map((key) => [key, projection[key] ?? null]));
 }
 
+function verifyForecastReplay(run, calculated, snapshots) {
+  const digest = sha256(canonicalJson(calculated.projections));
+  const expected = snapshots
+    .filter((snapshot) => snapshotRunId(snapshot) === run.id)
+    .map(storedProjection)
+    .sort((left, right) => left.rotationId.localeCompare(right.rotationId));
+  const actual = calculated.projections
+    .map(comparableProjection)
+    .sort((left, right) => left.rotationId.localeCompare(right.rotationId));
+  const projectionDifference = firstDifference(expected, actual);
+  if (digest === run.forecastDigest && !projectionDifference) return;
+  throw new ReplayError(
+    "ANALYSIS_FORECAST_REPLAY_MISMATCH",
+    `Forecast weicht in Lauf ${run.id} ab.`,
+    {
+      runId: run.id,
+      calculationNow: run.calculationNow,
+      triggerEventType: run.trigger,
+      operationDayVersion: run.eventVersion,
+      digestExpected: run.forecastDigest,
+      digestActual: digest,
+      firstDifference: projectionDifference,
+    },
+  );
+}
+
+function verifyDispatchReplay(run, calculated, chunkById) {
+  if (calculated.diagnostics.dispatchPlan.revision !== run.dispatchPlanRevision) {
+    throw new ReplayError(
+      "ANALYSIS_DISPATCH_REVISION_MISMATCH",
+      `Dispatch-Revision weicht in Lauf ${run.id} ab.`,
+      {
+        runId: run.id,
+        expected: run.dispatchPlanRevision,
+        actual: calculated.diagnostics.dispatchPlan.revision,
+      },
+    );
+  }
+  if (!run.dispatchResultChunkId) return;
+  const expectedDispatch = chunkById.get(run.dispatchResultChunkId).payload;
+  const difference = firstDifference(expectedDispatch, calculated.diagnostics.dispatchPlan);
+  if (difference) {
+    throw new ReplayError(
+      "ANALYSIS_DISPATCH_REPLAY_MISMATCH",
+      `Dispatch weicht in Lauf ${run.id} ab.`,
+      { runId: run.id, firstDifference: difference },
+    );
+  }
+}
+
+function verifyPrecallReplay(run, domain, chunkById) {
+  if (!run.precallResultChunkId) return;
+  const precall = chunkById.get(run.precallResultChunkId).payload;
+  const actualPrecall = domain.selectAutomaticPrecalls(precall.input);
+  const difference = firstDifference(precall.output, actualPrecall);
+  const digest = sha256(canonicalJson(actualPrecall));
+  if (!difference && digest === run.precallDigest) return;
+  throw new ReplayError(
+    "ANALYSIS_PRECALL_REPLAY_MISMATCH",
+    `Voraufruf weicht in Lauf ${run.id} ab.`,
+    { runId: run.id, firstDifference: difference },
+  );
+}
+
+function forecastReplayState(calculated) {
+  return calculated.projections.map((projection) => ({
+    rotationId: projection.rotationId,
+    predictedDepartureAt: projection.predictedDepartureAt,
+    predictedLandingAt: projection.predictedLandingAt,
+    predictedCompletionAt: projection.predictedCompletionAt,
+  }));
+}
+
 async function replayTarget(input) {
   const lineage = lineageFor(input.target, input.runById);
   let priorForecastState = null;
@@ -560,73 +681,10 @@ async function replayTarget(input) {
       priorDispatchState,
     );
     const calculated = input.domain.calculateForecastTimelineResult(forecastInput);
-    const digest = sha256(canonicalJson(calculated.projections));
-    const storedSnapshots = input.snapshots.filter(
-      (snapshot) => snapshotRunId(snapshot) === run.id,
-    );
-    const expected = storedSnapshots
-      .map(storedProjection)
-      .sort((left, right) => left.rotationId.localeCompare(right.rotationId));
-    const actual = calculated.projections
-      .map(comparableProjection)
-      .sort((left, right) => left.rotationId.localeCompare(right.rotationId));
-    const projectionDifference = firstDifference(expected, actual);
-    if (digest !== run.forecastDigest || projectionDifference) {
-      throw new ReplayError(
-        "ANALYSIS_FORECAST_REPLAY_MISMATCH",
-        `Forecast weicht in Lauf ${run.id} ab.`,
-        {
-          runId: run.id,
-          calculationNow: run.calculationNow,
-          triggerEventType: run.trigger,
-          operationDayVersion: run.eventVersion,
-          digestExpected: run.forecastDigest,
-          digestActual: digest,
-          firstDifference: projectionDifference,
-        },
-      );
-    }
-    if (calculated.diagnostics.dispatchPlan.revision !== run.dispatchPlanRevision) {
-      throw new ReplayError(
-        "ANALYSIS_DISPATCH_REVISION_MISMATCH",
-        `Dispatch-Revision weicht in Lauf ${run.id} ab.`,
-        {
-          runId: run.id,
-          expected: run.dispatchPlanRevision,
-          actual: calculated.diagnostics.dispatchPlan.revision,
-        },
-      );
-    }
-    if (run.dispatchResultChunkId) {
-      const expectedDispatch = input.chunkById.get(run.dispatchResultChunkId).payload;
-      const difference = firstDifference(expectedDispatch, calculated.diagnostics.dispatchPlan);
-      if (difference) {
-        throw new ReplayError(
-          "ANALYSIS_DISPATCH_REPLAY_MISMATCH",
-          `Dispatch weicht in Lauf ${run.id} ab.`,
-          { runId: run.id, firstDifference: difference },
-        );
-      }
-    }
-    if (run.precallResultChunkId) {
-      const precall = input.chunkById.get(run.precallResultChunkId).payload;
-      const actualPrecall = input.domain.selectAutomaticPrecalls(precall.input);
-      const difference = firstDifference(precall.output, actualPrecall);
-      const digest = sha256(canonicalJson(actualPrecall));
-      if (difference || digest !== run.precallDigest) {
-        throw new ReplayError(
-          "ANALYSIS_PRECALL_REPLAY_MISMATCH",
-          `Voraufruf weicht in Lauf ${run.id} ab.`,
-          { runId: run.id, firstDifference: difference },
-        );
-      }
-    }
-    priorForecastState = calculated.projections.map((projection) => ({
-      rotationId: projection.rotationId,
-      predictedDepartureAt: projection.predictedDepartureAt,
-      predictedLandingAt: projection.predictedLandingAt,
-      predictedCompletionAt: projection.predictedCompletionAt,
-    }));
+    verifyForecastReplay(run, calculated, input.snapshots);
+    verifyDispatchReplay(run, calculated, input.chunkById);
+    verifyPrecallReplay(run, input.domain, input.chunkById);
+    priorForecastState = forecastReplayState(calculated);
     priorDispatchState = calculated.diagnostics.dispatchPlan;
     results.push({
       runId: run.id,
