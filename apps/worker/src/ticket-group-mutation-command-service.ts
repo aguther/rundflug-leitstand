@@ -1,24 +1,23 @@
-import type { CommandEnvelope, CommandResult } from "@rundflug/contracts";
+import type { CommandResult } from "@rundflug/contracts";
 import {
   assertQueueMutationAllowed,
   DomainRuleError,
-  type NonCanceledRotationState,
   planBookingGroupSplit,
 } from "@rundflug/domain";
 import { rowToSnapshot } from "./snapshot";
+import {
+  ticketGroupMutationJson as json,
+  queueMutationAction,
+  type TicketGroupMutationCommand,
+  type TicketGroupMutationRow,
+  type TicketGroupRotationRow,
+  terminalTicketStatus,
+} from "./ticket-group-mutation-support";
 import type {
   StoredTicketGroupRecall,
   TicketGroupRecallClosureInput,
 } from "./ticket-group-recall-persistence-service";
 import type { Env, StoredEventRow } from "./types";
-
-const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
-
-function json(data: unknown, init: ResponseInit = {}): Response {
-  const headers = new Headers(init.headers);
-  headers.set("content-type", JSON_HEADERS["content-type"]);
-  return new Response(JSON.stringify(data), { ...init, headers });
-}
 
 export class TicketGroupMutationCommandService {
   constructor(
@@ -34,16 +33,8 @@ export class TicketGroupMutationCommandService {
     ) => D1PreparedStatement[],
   ) {}
 
-  async handleTicketGroupMutation(
-    command: Extract<
-      CommandEnvelope,
-      {
-        type: "CANCEL_TICKET_GROUP" | "DEFER_TICKET_GROUP" | "MARK_NO_SHOW";
-      }
-    >,
-    current: StoredEventRow,
-  ): Promise<Response> {
-    const group = await this.env.DB.prepare(
+  private async loadTicketGroup(command: TicketGroupMutationCommand) {
+    return this.env.DB.prepare(
       `SELECT tg.id, tg.product_id, tg.version, tg.deferral_count,
               p.resource_group_id, COUNT(t.id) AS group_size
          FROM ticket_groups tg
@@ -53,21 +44,11 @@ export class TicketGroupMutationCommandService {
         GROUP BY tg.id, tg.product_id, tg.version, tg.deferral_count, p.resource_group_id`,
     )
       .bind(command.payload.ticketGroupId, command.eventId)
-      .first<{
-        id: string;
-        product_id: string;
-        version: number;
-        deferral_count: number;
-        resource_group_id: string;
-        group_size: number;
-      }>();
-    if (!group) {
-      return json(
-        { error: { code: "TICKET_GROUP_NOT_FOUND", message: "Ticketgruppe nicht gefunden." } },
-        { status: 404 },
-      );
-    }
-    const rotationRows = await this.env.DB.prepare(
+      .first<TicketGroupMutationRow>();
+  }
+
+  private async loadTicketGroupRotations(groupId: string): Promise<TicketGroupRotationRow[]> {
+    const rows = await this.env.DB.prepare(
       `SELECT DISTINCT r.id, r.status, r.called_at, r.aircraft_id,
               (SELECT COUNT(DISTINCT grouped_ticket.ticket_group_id)
                  FROM rotation_tickets grouped_rt
@@ -80,15 +61,17 @@ export class TicketGroupMutationCommandService {
         WHERE t.ticket_group_id = ?1
         ORDER BY r.created_at, r.id`,
     )
-      .bind(group.id)
-      .all<{
-        id: string;
-        status: NonCanceledRotationState;
-        called_at: string | null;
-        aircraft_id: string | null;
-        rotation_group_count: number;
-      }>();
-    if (rotationRows.results.length === 0) {
+      .bind(groupId)
+      .all<TicketGroupRotationRow>();
+    return rows.results;
+  }
+
+  private validateRotationMutation(
+    command: TicketGroupMutationCommand,
+    current: StoredEventRow,
+    rotations: readonly TicketGroupRotationRow[],
+  ): Response | null {
+    if (rotations.length === 0) {
       return json(
         {
           error: { code: "TICKET_GROUP_UNASSIGNED", message: "Ticketgruppe ist nicht zugeordnet." },
@@ -96,16 +79,16 @@ export class TicketGroupMutationCommandService {
         { status: 409 },
       );
     }
-    if (
+    const noShowDeadlinePending =
       command.type === "MARK_NO_SHOW" &&
-      rotationRows.results.some(
+      rotations.some(
         (rotation) =>
           rotation.status !== "CALLED" ||
           !rotation.called_at ||
           Date.now() - Date.parse(rotation.called_at) <
             (current.no_show_after_minutes ?? 10) * 60_000,
-      )
-    ) {
+      );
+    if (noShowDeadlinePending) {
       return json(
         {
           error: {
@@ -116,24 +99,59 @@ export class TicketGroupMutationCommandService {
         { status: 409 },
       );
     }
+    const action = queueMutationAction(command.type);
     try {
-      for (const rotation of rotationRows.results) {
-        assertQueueMutationAllowed({
-          rotationState: rotation.status,
-          action:
-            command.type === "CANCEL_TICKET_GROUP"
-              ? "CANCEL"
-              : command.type === "MARK_NO_SHOW"
-                ? "NO_SHOW"
-                : "DEFER",
-        });
+      for (const rotation of rotations) {
+        assertQueueMutationAllowed({ rotationState: rotation.status, action });
       }
+      return null;
     } catch (reason: unknown) {
       if (reason instanceof DomainRuleError) {
         return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
       }
       throw reason;
     }
+  }
+
+  private appendReleasedRotationStatements(
+    statements: D1PreparedStatement[],
+    rotations: readonly TicketGroupRotationRow[],
+    now: string,
+  ): void {
+    for (const rotation of rotations) {
+      if (rotation.rotation_group_count !== 1) continue;
+      statements.push(
+        this.env.DB.prepare(
+          "UPDATE rotations SET status = 'CANCELED', version = version + 1, updated_at = ?1 WHERE id = ?2",
+        ).bind(now, rotation.id),
+      );
+      if (!rotation.aircraft_id) continue;
+      statements.push(
+        this.env.DB.prepare(
+          `UPDATE aircraft SET operational_state = 'AVAILABLE',
+                  operational_state_changed_at = CASE
+                    WHEN operational_state <> 'AVAILABLE' THEN ?1
+                    ELSE operational_state_changed_at END,
+                  version = version + 1, updated_at = ?1 WHERE id = ?2`,
+        ).bind(now, rotation.aircraft_id),
+      );
+    }
+  }
+
+  async handleTicketGroupMutation(
+    command: TicketGroupMutationCommand,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const group = await this.loadTicketGroup(command);
+    if (!group) {
+      return json(
+        { error: { code: "TICKET_GROUP_NOT_FOUND", message: "Ticketgruppe nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    const rotations = await this.loadTicketGroupRotations(group.id);
+    const validationFailure = this.validateRotationMutation(command, current, rotations);
+    if (validationFailure) return validationFailure;
     const targetProductId = group.product_id;
     const targetResourceGroupId = group.resource_group_id;
     const currentProduct = await this.env.DB.prepare(
@@ -198,38 +216,14 @@ export class TicketGroupMutationCommandService {
         event: result.event,
       }),
     ];
-    for (const rotation of rotationRows.results) {
-      if (rotation.rotation_group_count === 1) {
-        statements.push(
-          this.env.DB.prepare(
-            "UPDATE rotations SET status = 'CANCELED', version = version + 1, updated_at = ?1 WHERE id = ?2",
-          ).bind(now, rotation.id),
-        );
-      }
-      if (rotation.rotation_group_count === 1 && rotation.aircraft_id) {
-        statements.push(
-          this.env.DB.prepare(
-            `UPDATE aircraft SET operational_state = 'AVAILABLE',
-                    operational_state_changed_at = CASE
-                      WHEN operational_state <> 'AVAILABLE' THEN ?1
-                      ELSE operational_state_changed_at END,
-                    version = version + 1, updated_at = ?1 WHERE id = ?2`,
-          ).bind(now, rotation.aircraft_id),
-        );
-      }
-    }
+    this.appendReleasedRotationStatements(statements, rotations, now);
 
     if (
       command.type === "CANCEL_TICKET_GROUP" ||
       command.type === "MARK_NO_SHOW" ||
       requiresCashierClarification
     ) {
-      const status =
-        command.type === "CANCEL_TICKET_GROUP"
-          ? "CANCELED"
-          : command.type === "MARK_NO_SHOW"
-            ? "NO_SHOW"
-            : "CLARIFICATION";
+      const status = terminalTicketStatus(command.type);
       statements.push(
         this.env.DB.prepare(
           `UPDATE ticket_groups SET status = ?1, deferral_count = ?2,
