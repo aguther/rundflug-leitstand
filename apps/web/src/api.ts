@@ -106,8 +106,10 @@ export function controlApiPath(eventId: string, suffix: `/${string}`): string {
 function apiGetUrl(input: RequestInfo | URL, init?: RequestInit): string | null {
   const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
   if (method !== "GET") return null;
-  const value =
-    typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+  let value: string;
+  if (typeof input === "string") value = input;
+  else if (input instanceof URL) value = input.toString();
+  else value = input.url;
   if (value.startsWith("/api/")) return value;
   if (typeof window === "undefined") return null;
   const url = new URL(value, window.location.href);
@@ -156,11 +158,11 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<R
     if (fallbackUrl && typeof XMLHttpRequest !== "undefined") {
       try {
         return await xhrApiGet(fallbackUrl, init);
-      } catch (fallbackCause) {
-        if (fallbackCause instanceof DOMException && fallbackCause.name === "AbortError") {
-          throw fallbackCause;
+      } catch (error_) {
+        if (error_ instanceof DOMException && error_.name === "AbortError") {
+          throw error_;
         }
-        throw new Error(SERVER_UNREACHABLE_MESSAGE, { cause: fallbackCause });
+        throw new Error(SERVER_UNREACHABLE_MESSAGE, { cause: error_ });
       }
     }
     throw new Error(SERVER_UNREACHABLE_MESSAGE, { cause });

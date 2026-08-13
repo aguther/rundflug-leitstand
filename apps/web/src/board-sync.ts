@@ -103,11 +103,9 @@ export function createBoardSyncCoordinator(
       }
       requestedMinimumVersion = Math.max(requestedMinimumVersion, minimumVersion);
       forcedRequestPending = forcedRequestPending || forceFollowUp;
-      if (!inFlight) {
-        inFlight = run().finally(() => {
-          inFlight = null;
-        });
-      }
+      inFlight ??= run().finally(() => {
+        inFlight = null;
+      });
       return inFlight;
     },
   };

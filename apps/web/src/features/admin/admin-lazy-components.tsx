@@ -49,9 +49,5 @@ export const EventParametersWorkspace = lazy(() =>
 );
 
 export function AdminWorkspaceLoading() {
-  return (
-    <div className="admin-section" role="status">
-      Administrationsbereich wird geladen …
-    </div>
-  );
+  return <output className="admin-section">Administrationsbereich wird geladen …</output>;
 }

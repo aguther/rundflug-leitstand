@@ -14,11 +14,7 @@ const FeatureRouter = lazy(async () => {
 });
 
 function ApplicationLoading() {
-  return (
-    <div className="app-loading" role="status">
-      Arbeitsbereich wird geladen …
-    </div>
-  );
+  return <output className="app-loading">Arbeitsbereich wird geladen …</output>;
 }
 
 function isPublicRoute(pathname: string): boolean {
@@ -39,12 +35,7 @@ function AuthenticatedApplication() {
         <FeatureRouter />
       </Suspense>
     );
-  if (loading)
-    return (
-      <div className="app-loading" role="status">
-        Anmeldung wird geprüft …
-      </div>
-    );
+  if (loading) return <output className="app-loading">Anmeldung wird geprüft …</output>;
   if (!session) return <LoginPage />;
   return <EventScopedApplication session={session} />;
 }

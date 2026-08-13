@@ -120,7 +120,7 @@ export function createTargetWranglerConfig(baseConfig, profile, databaseId) {
   result.name = profile.workerName;
   result.secrets = { required: [...requiredCloudflareSecrets] };
   result.vars = {
-    ...(result.vars ?? {}),
+    ...result.vars,
     APP_ENV: profile.appEnv,
     DATA_JURISDICTION: "eu",
     SOURCE_REVISION:
@@ -161,11 +161,11 @@ export function createTargetWranglerConfig(baseConfig, profile, databaseId) {
 }
 
 export function cloudflareAccountId(payload, preferredAccountId = null) {
-  const accounts = Array.isArray(payload?.accounts)
-    ? payload.accounts
-    : Array.isArray(payload?.memberships)
-      ? payload.memberships.map((entry) => entry.account ?? entry)
-      : [];
+  let accounts = [];
+  if (Array.isArray(payload?.accounts)) accounts = payload.accounts;
+  else if (Array.isArray(payload?.memberships)) {
+    accounts = payload.memberships.map((entry) => entry.account ?? entry);
+  }
   const accountIds = accounts
     .map((entry) => entry?.id)
     .filter((entry) => typeof entry === "string" && entry.length > 0);

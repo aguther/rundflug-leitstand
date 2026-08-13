@@ -16,7 +16,9 @@ import { registerControlCoordinationRoutes } from "./control-coordination-routes
 import { registerControlSessionMiddleware } from "./control-session-middleware";
 import { registerControlTransportRoutes } from "./control-transport-routes";
 import { registerDeviceRoutes } from "./device-routes";
-import { EventCoordinator } from "./event-coordinator";
+
+export { EventCoordinator } from "./event-coordinator";
+
 import { registerFactoryResetRoutes } from "./factory-reset-routes";
 import { registerFidsControlRoutes } from "./fids-control-routes";
 import { registerHistoryRoutes } from "./history-routes";
@@ -175,8 +177,6 @@ app.onError((error, context) => {
   );
   return context.json({ error: { code: "INTERNAL_ERROR", message: "Interner Fehler." } }, 500);
 });
-
-export { EventCoordinator };
 
 export default {
   fetch: app.fetch,

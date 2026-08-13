@@ -17,10 +17,9 @@ applyInitialInstallMetadata();
 applyInitialTheme();
 
 if (import.meta.env.MODE !== "simulator") {
-  void import("virtual:pwa-register").then(({ registerSW }) => {
-    registerSW({
-      immediate: true,
-    });
+  const { registerSW } = await import("virtual:pwa-register");
+  registerSW({
+    immediate: true,
   });
 }
 
