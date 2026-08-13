@@ -1,5 +1,10 @@
-import { analysisSnapshotCaptureReceiptSchema, type OperatorRole } from "@rundflug/contracts";
+import type { OperatorRole } from "@rundflug/contracts";
 import type { DeviceRole } from "@rundflug/domain";
+import {
+  type AnalysisSnapshotReceiptRow,
+  isAnalysisSnapshotCaptureAuthorized,
+  parseAnalysisSnapshotReceipt,
+} from "./analysis-snapshot-capture-receipt";
 import type {
   ForecastRecalculationRequest,
   ForecastRecalculationResult,
@@ -35,13 +40,6 @@ export type AnalysisSnapshotCaptureResult =
       currentVersion?: number;
     };
 
-interface AnalysisSnapshotReceiptRow {
-  operation_day_id: string;
-  device_id: string;
-  command_type: string;
-  response_json: string;
-}
-
 interface ExistingAnalysisPlanningRun {
   operation_day_id: string;
   operation_day_version: number;
@@ -59,45 +57,49 @@ export class AnalysisSnapshotCaptureService {
   ) {}
 
   async capture(input: AnalysisSnapshotCaptureInput): Promise<AnalysisSnapshotCaptureResult> {
-    if (
-      !["ADMIN", "FLIGHT_DIRECTOR"].includes(input.actorRole) ||
-      !["ADMIN", "FLIGHT_DIRECTOR"].includes(input.deviceRole)
-    ) {
+    if (!isAnalysisSnapshotCaptureAuthorized(input.actorRole, input.deviceRole)) {
       return { ok: false, code: "SESSION_NOT_AUTHORIZED" };
     }
 
+    const receiptResult = await this.restoreReceipt(input);
+    if (receiptResult) return receiptResult;
+
+    const existingRunResult = await this.restorePlanningRun(input);
+    if (existingRunResult) return existingRunResult;
+
+    const event = await this.env.DB.prepare("SELECT version FROM operation_days WHERE id = ?1")
+      .bind(input.eventId)
+      .first<{ version: number }>();
+    if (event?.version !== input.expectedEventVersion) {
+      return this.staleVersionResult(event);
+    }
+
+    return this.capturePlanningRun(input);
+  }
+
+  private async restoreReceipt(
+    input: AnalysisSnapshotCaptureInput,
+  ): Promise<AnalysisSnapshotCaptureResult | null> {
     const receipt = await this.env.DB.prepare(
       `SELECT operation_day_id, device_id, command_type, response_json
          FROM idempotency_receipts WHERE command_id = ?1`,
     )
       .bind(input.requestId)
       .first<AnalysisSnapshotReceiptRow>();
-    if (receipt) {
-      if (
-        receipt.operation_day_id !== input.eventId ||
-        receipt.device_id !== input.deviceId ||
-        receipt.command_type !== ANALYSIS_SNAPSHOT_COMMAND_TYPE
-      ) {
-        return { ok: false, code: "ANALYSIS_SNAPSHOT_IDEMPOTENCY_CONFLICT" };
-      }
-      try {
-        const stored = analysisSnapshotCaptureReceiptSchema.safeParse(
-          JSON.parse(receipt.response_json),
-        );
-        if (!stored.success || stored.data.expectedEventVersion !== input.expectedEventVersion) {
-          return { ok: false, code: "ANALYSIS_SNAPSHOT_IDEMPOTENCY_CONFLICT" };
-        }
-        return {
-          ok: true,
-          planningRunId: stored.data.planningRunId,
-          eventVersion: stored.data.eventVersion,
-          dispatchPlanRevision: stored.data.dispatchPlanRevision,
-        };
-      } catch {
-        return { ok: false, code: "ANALYSIS_SNAPSHOT_IDEMPOTENCY_CONFLICT" };
-      }
+    if (!receipt) return null;
+    if (
+      receipt.operation_day_id !== input.eventId ||
+      receipt.device_id !== input.deviceId ||
+      receipt.command_type !== ANALYSIS_SNAPSHOT_COMMAND_TYPE
+    ) {
+      return { ok: false, code: "ANALYSIS_SNAPSHOT_IDEMPOTENCY_CONFLICT" };
     }
+    return parseAnalysisSnapshotReceipt(input, receipt.response_json);
+  }
 
+  private async restorePlanningRun(
+    input: AnalysisSnapshotCaptureInput,
+  ): Promise<AnalysisSnapshotCaptureResult | null> {
     const existingRun = await this.env.DB.prepare(
       `SELECT operation_day_id, operation_day_version, trigger_event_type,
               dispatch_plan_revision, status
@@ -105,37 +107,37 @@ export class AnalysisSnapshotCaptureService {
     )
       .bind(input.requestId)
       .first<ExistingAnalysisPlanningRun>();
-    if (existingRun) {
-      if (
-        existingRun.operation_day_id !== input.eventId ||
-        existingRun.operation_day_version !== input.expectedEventVersion ||
-        existingRun.trigger_event_type !== "MANUAL_DIAGNOSIS"
-      ) {
-        return { ok: false, code: "ANALYSIS_SNAPSHOT_IDEMPOTENCY_CONFLICT" };
-      }
-      if (existingRun.status !== "SUCCEEDED") {
-        return { ok: false, code: "ANALYSIS_SNAPSHOT_CAPTURE_FAILED" };
-      }
-      const recovered = {
-        planningRunId: input.requestId,
-        eventVersion: existingRun.operation_day_version,
-        dispatchPlanRevision: existingRun.dispatch_plan_revision,
-      };
-      await this.persistAnalysisSnapshotReceipt(input, recovered);
-      return { ok: true, ...recovered };
+    if (!existingRun) return null;
+    if (
+      existingRun.operation_day_id !== input.eventId ||
+      existingRun.operation_day_version !== input.expectedEventVersion ||
+      existingRun.trigger_event_type !== "MANUAL_DIAGNOSIS"
+    ) {
+      return { ok: false, code: "ANALYSIS_SNAPSHOT_IDEMPOTENCY_CONFLICT" };
     }
-
-    const event = await this.env.DB.prepare("SELECT version FROM operation_days WHERE id = ?1")
-      .bind(input.eventId)
-      .first<{ version: number }>();
-    if (event?.version !== input.expectedEventVersion) {
-      return {
-        ok: false,
-        code: "ANALYSIS_SNAPSHOT_STALE_VERSION",
-        ...(event ? { currentVersion: event.version } : {}),
-      };
+    if (existingRun.status !== "SUCCEEDED") {
+      return { ok: false, code: "ANALYSIS_SNAPSHOT_CAPTURE_FAILED" };
     }
+    const recovered = {
+      planningRunId: input.requestId,
+      eventVersion: existingRun.operation_day_version,
+      dispatchPlanRevision: existingRun.dispatch_plan_revision,
+    };
+    await this.persistAnalysisSnapshotReceipt(input, recovered);
+    return { ok: true, ...recovered };
+  }
 
+  private staleVersionResult(event: { version: number } | null): AnalysisSnapshotCaptureResult {
+    return {
+      ok: false,
+      code: "ANALYSIS_SNAPSHOT_STALE_VERSION",
+      ...(event ? { currentVersion: event.version } : {}),
+    };
+  }
+
+  private async capturePlanningRun(
+    input: AnalysisSnapshotCaptureInput,
+  ): Promise<AnalysisSnapshotCaptureResult> {
     try {
       const captured = await this.recalculateForecastTimelines({
         eventId: input.eventId,
@@ -153,11 +155,7 @@ export class AnalysisSnapshotCaptureService {
         )
           .bind(input.eventId)
           .first<{ version: number }>();
-        return {
-          ok: false,
-          code: "ANALYSIS_SNAPSHOT_STALE_VERSION",
-          ...(current ? { currentVersion: current.version } : {}),
-        };
+        return this.staleVersionResult(current);
       }
       console.error(
         JSON.stringify({
