@@ -11,7 +11,7 @@ afterEach(() => cleanup());
 
 describe("admin workspace feedback interactions", () => {
   it("keeps the event label above a centered title and status row", () => {
-    render(
+    const { container } = render(
       <EventContextSummary
         event={
           {
@@ -29,6 +29,8 @@ describe("admin workspace feedback interactions", () => {
     expect(screen.getByText("Veranstaltung").nextElementSibling).toBe(title.parentElement);
     expect(title.parentElement?.classList.contains("event-workspace-title-row")).toBe(true);
     expect(title.parentElement?.contains(screen.getByText("Aktiv"))).toBe(true);
+    expect(container.querySelectorAll(".event-workspace-context-actions")).toHaveLength(1);
+    expect(container.querySelector(".event-workspace-context-actions")?.childElementCount).toBe(0);
   });
 
   it("skips informative help while keeping form controls and actions keyboard reachable", async () => {

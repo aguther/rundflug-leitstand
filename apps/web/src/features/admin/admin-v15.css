@@ -18,81 +18,6 @@
   font-size: 0.78rem;
 }
 
-.admin-shell .setup-progress {
-  min-height: 64px;
-  display: grid;
-  grid-template-columns: repeat(6, minmax(110px, 1fr));
-  gap: 0;
-  margin: 12px 22px;
-  padding: 0 12px;
-  overflow: hidden;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-md);
-  background: var(--ui-surface);
-}
-
-.admin-shell .setup-progress li {
-  position: relative;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-}
-
-.admin-shell .setup-progress li::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: 50%;
-  left: -50%;
-  height: 1px;
-  background: var(--ui-border-strong);
-}
-
-.admin-shell .setup-progress li:first-child::before {
-  display: none;
-}
-
-.admin-shell .setup-progress button {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  min-height: 62px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 6px;
-  border: 0;
-  color: var(--ui-muted);
-  background: transparent;
-  font-size: 0.75rem;
-}
-
-.admin-shell .setup-step-number {
-  width: 24px;
-  height: 24px;
-  display: inline-grid;
-  place-items: center;
-  flex: 0 0 auto;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: 50%;
-  color: var(--ui-muted);
-  background: var(--ui-surface);
-  font-size: 0.72rem;
-}
-
-.admin-shell .setup-progress li.complete .setup-step-number,
-.admin-shell .setup-progress li.current .setup-step-number {
-  border-color: var(--ui-accent);
-  color: #fff;
-  background: var(--ui-accent);
-}
-
-.admin-shell .setup-progress li.complete button,
-.admin-shell .setup-progress li.current button {
-  color: var(--ui-text);
-}
-
 .admin-shell .admin-simulator-launch {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -590,23 +515,12 @@
     scrollbar-width: none;
   }
 
-  .admin-shell .admin-side-nav::-webkit-scrollbar,
-  .admin-shell .setup-progress::-webkit-scrollbar {
+  .admin-shell .admin-side-nav::-webkit-scrollbar {
     display: none;
   }
 
   .admin-shell .admin-side-nav button {
     min-width: max-content;
-  }
-
-  .admin-shell .setup-progress {
-    display: flex;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .admin-shell .setup-progress li {
-    min-width: 150px;
   }
 }
 

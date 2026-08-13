@@ -3,6 +3,7 @@ import { Database } from "lucide-react";
 import type { ReactNode } from "react";
 import { AddButton, SearchField } from "../../../design-system/components";
 import { EventWorkspaceFrame } from "../event-workspace/EventWorkspaceFrame";
+import { EventWorkspaceToolbar } from "../event-workspace/EventWorkspaceToolbar";
 import "./master-data.css";
 
 export function MasterDataWorkspace({
@@ -26,7 +27,7 @@ export function MasterDataWorkspace({
 }>) {
   return (
     <EventWorkspaceFrame event={event} variant="master-data">
-      <div className="master-data-unified-toolbar">
+      <EventWorkspaceToolbar className="master-data-unified-toolbar">
         <SearchField
           label="Stammdaten durchsuchen"
           onChange={(event) => onSearchChange(event.target.value)}
@@ -38,7 +39,7 @@ export function MasterDataWorkspace({
           {resultCount} {resultCount === 1 ? "Eintrag" : "Einträge"}
         </span>
         <AddButton ariaLabel={addAriaLabel} onClick={onNew} />
-      </div>
+      </EventWorkspaceToolbar>
       <div className="master-data-unified-content">{children}</div>
     </EventWorkspaceFrame>
   );

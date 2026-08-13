@@ -20,13 +20,10 @@ describe("unified master-data dialogs and stable event workspace", () => {
       /\.admin-shell \.admin-workspace,[\s\S]*?flex-direction: column;[\s\S]*?overflow: hidden;/,
     );
     expect(adminEventStyles).toMatch(
-      /\.admin-workspace:not\(\.master-data-active\)[\s\S]*?> \.admin-workspace-scroll-region \{[\s\S]*?padding-top: 16px;/,
+      /\.admin-shell \.admin-workspace-scroll-region \{[\s\S]*?padding-top: 16px;/,
     );
     expect(adminEventStyles).toMatch(
-      /\.admin-workspace:not\(\.master-data-active\) > \.setup-progress-navigation \{[\s\S]*?margin-bottom: 0;/,
-    );
-    expect(adminEventStyles).toMatch(
-      /\.admin-shell \.setup-progress-navigation \{[\s\S]*?margin: 16px 16px 12px;/,
+      /\.admin-shell \.setup-progress-navigation \{[\s\S]*?margin: 16px 16px 0;/,
     );
     expect(adminEventStyles).toContain(".setup-progress-navigation.is-overflowing");
     expect(adminEventStyles).toContain(".setup-progress-scroll--forward");

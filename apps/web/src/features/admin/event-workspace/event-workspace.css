@@ -4,7 +4,7 @@
   min-width: 0;
   display: grid;
   align-content: start;
-  margin: 12px auto 24px;
+  margin: 0 auto 24px;
   overflow: hidden;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
@@ -18,7 +18,7 @@
 .admin-shell .event-workspace-context {
   min-height: 108px;
   display: grid;
-  grid-template-columns: minmax(250px, 1fr) minmax(360px, 1.1fr) auto;
+  grid-template-columns: minmax(250px, 1fr) minmax(360px, 1.1fr) minmax(0, 232px);
   align-items: center;
   gap: 20px;
   padding: 16px 20px;
@@ -97,6 +97,26 @@
   gap: 8px;
 }
 
+.admin-shell .event-workspace-context-actions {
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.admin-shell .event-workspace-frame > .ds-tabs {
+  height: 48px;
+  min-height: 48px;
+}
+
+.admin-shell .event-workspace-frame > .ds-tabs > button {
+  height: 48px;
+  min-height: 48px;
+}
+
+.admin-shell .event-workspace-toolbar {
+  height: 72px;
+  min-height: 72px;
+}
+
 .admin-shell .event-workspace-section {
   min-width: 0;
   display: grid;
@@ -140,11 +160,15 @@
     grid-column: 1 / -1;
     justify-content: flex-end;
   }
+
+  .admin-shell .event-workspace-context-actions:empty {
+    display: none;
+  }
 }
 
 @media (max-width: 760px) {
   .admin-shell .event-workspace-frame {
-    margin-block: 8px 16px;
+    margin-block: 0 16px;
     border-inline: 0;
     border-radius: 0;
   }
@@ -167,6 +191,11 @@
   .admin-shell .event-workspace-context-actions {
     grid-column: auto;
     justify-content: stretch;
+  }
+
+  .admin-shell .event-workspace-toolbar {
+    height: auto;
+    min-height: 72px;
   }
 
   .admin-shell .event-workspace-context-actions > * {

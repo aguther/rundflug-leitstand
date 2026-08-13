@@ -41,18 +41,24 @@ describe("V1.5 administration UI", () => {
   });
 
   it("defines stable compact and phone layouts without page-level horizontal overflow", () => {
-    expect(adminStyles).toContain("grid-template-columns: repeat(6, minmax(110px, 1fr))");
+    expect(adminEventStyles).toContain(".setup-progress .setup-progress-item");
     expect(adminStyles).toContain("grid-template-columns: minmax(150px, 1fr) auto 112px");
-    expect(adminStyles).toContain("overflow-x: auto");
-    expect(adminStyles).toContain("scrollbar-width: none");
+    expect(adminEventStyles).toContain("overflow-x: auto");
+    expect(adminEventStyles).toContain("scrollbar-width: none");
     expect(adminStyles).toContain("flex-direction: column");
   });
 
   it("keeps the event workspace dense and gives setup focus a stable footprint", () => {
-    expect(adminEventStyles).toContain(".setup-progress li::before");
-    expect(adminEventStyles).toContain("display: none");
+    expect(adminEventStyles).not.toContain(".setup-progress li");
+    expect(adminStyles).not.toContain(".setup-progress li");
+    expect(adminStyles).not.toContain(".setup-step-number");
     expect(adminEventStyles).toContain(".setup-progress button:focus-visible");
-    expect(adminEventStyles).toContain("min-height: 46px");
+    expect(adminEventStyles).toMatch(
+      /\.setup-progress \.setup-progress-item,[\s\S]*?\.setup-progress button \{[\s\S]*?height: 54px;[\s\S]*?min-height: 54px;/,
+    );
+    expect(adminEventStyles).toMatch(
+      /@media \(max-width: 700px\)[\s\S]*?height: 46px;[\s\S]*?min-height: 46px;/,
+    );
     expect(adminEventStyles).toContain("height: auto");
     expect(adminEventStyles).toContain("width: min(880px, 100%)");
     expect(adminEventStyles).toContain("width: min(1024px, calc(100vw - 32px))");

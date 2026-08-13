@@ -42,7 +42,7 @@ export function EventContextSummary({
           <dd>{event.timeZone}</dd>
         </div>
       </dl>
-      {actions ? <div className="event-workspace-context-actions">{actions}</div> : null}
+      <div className="event-workspace-context-actions">{actions}</div>
     </header>
   );
 }

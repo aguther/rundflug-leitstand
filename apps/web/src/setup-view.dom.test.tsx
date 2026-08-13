@@ -15,8 +15,22 @@ const notifications = vi.hoisted(() => ({
 }));
 
 vi.mock("./api", () => api);
-vi.mock("./app/AppShell", () => ({
-  AppShell: ({ children }: { children: React.ReactNode }) => <main>{children}</main>,
+vi.mock("./features/auth/AccessPageFrame", () => ({
+  AccessPageFrame: ({
+    children,
+    description,
+    title,
+  }: {
+    children: React.ReactNode;
+    description?: React.ReactNode;
+    title: React.ReactNode;
+  }) => (
+    <main>
+      <h1>{title}</h1>
+      {description ? <p>{description}</p> : null}
+      {children}
+    </main>
+  ),
 }));
 vi.mock("./app/PageNotifications", () => ({
   useActionMessageBridge: notifications.useActionMessageBridge,
@@ -138,5 +152,35 @@ describe("setup view", () => {
       (screen.getByRole("button", { name: "System einmalig einrichten" }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
+  });
+
+  it("keeps the setup labels, help text, and form control order stable", async () => {
+    const user = userEvent.setup();
+    api.getSetupStatus.mockResolvedValue({
+      setupRequired: true,
+      setupConfigured: true,
+      resetSetupAuthorized: false,
+      resetSetupExpiresAt: null,
+    });
+
+    render(<SetupView />);
+
+    const eventId = await screen.findByLabelText(/^Technische Veranstaltungs-ID/);
+    expect(screen.getByText("Kleinbuchstaben, Ziffern und Bindestriche")).toBeTruthy();
+    expect(screen.getByText("Aus dem betreiberseitigen Passwortsafe")).toBeTruthy();
+    expect(screen.getByText("6–12 Ziffern; danach Anmeldung als ADMIN-01")).toBeTruthy();
+
+    await user.tab();
+    expect(document.activeElement).toBe(eventId);
+    for (const label of [
+      /^Bezeichnung/,
+      /^Datum: Datum im Format TT\.MM\.JJJJ$/,
+      /^Flugplatz/,
+      /^Installations-Notfallcode/,
+      /^Erste Administrator-PIN/,
+    ]) {
+      await user.tab();
+      expect(document.activeElement).toBe(screen.getByLabelText(label));
+    }
   });
 });

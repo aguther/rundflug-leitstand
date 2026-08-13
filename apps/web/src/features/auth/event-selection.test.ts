@@ -38,11 +38,11 @@ describe("explicit event selection and display binding", () => {
   });
 
   it("keeps long event labels inside the responsive selection panel", () => {
-    expect(loginStyles).toContain("width: min(420px, calc(100% - 32px));");
+    expect(loginStyles).toContain(".access-page-panel {");
+    expect(loginStyles).toContain(".event-selection-page .access-page-panel {");
     expect(loginStyles).toContain("width: min(42rem, calc(100% - 32px));");
     expect(loginStyles).toContain("grid-template-columns: minmax(0, 1fr);");
-    expect(loginStyles).toContain(".event-selection-page .login-submit {\n  min-width: 0;");
-    expect(loginStyles).toContain(".event-selection-page .login-submit {\n  width: 100%;");
+    expect(loginStyles).toContain(".event-selection-page .access-page-submit {");
     expect(loginStyles).toContain("text-overflow: ellipsis;");
   });
 });

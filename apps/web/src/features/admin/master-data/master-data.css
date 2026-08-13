@@ -4,7 +4,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 16px;
+  padding: 13px 16px 14px;
   border-bottom: 1px solid var(--ui-border);
   background: var(--ui-surface-subtle);
 }
@@ -22,6 +22,28 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.admin-shell .master-data-status-filter {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  color: var(--ui-text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admin-shell .master-data-status-filter select {
+  width: 136px;
+  min-width: 136px;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding-inline: 12px 34px;
+  font: inherit;
 }
 
 .admin-shell .master-data-result-count {
@@ -259,6 +281,17 @@
   }
 
   .admin-shell .master-data-unified-filters {
+    min-width: 0;
+  }
+
+  .admin-shell .master-data-status-filter {
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .admin-shell .master-data-status-filter select {
+    width: 100%;
     min-width: 0;
   }
 

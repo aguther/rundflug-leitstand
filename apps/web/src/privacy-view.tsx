@@ -1,11 +1,14 @@
-import { AppShell as Shell } from "./app/AppShell";
+import { AccessPageFrame } from "./features/auth/AccessPageFrame";
 
 export function PrivacyView() {
   return (
-    <Shell title="Datenschutz">
-      <section className="privacy-page">
-        <span className="eyebrow">Datensparsame V1</span>
-        <h1>Privatsphäre ohne Gastkonto</h1>
+    <AccessPageFrame
+      eyebrow="Datensparsame V1"
+      title="Privatsphäre ohne Gastkonto"
+      titleId="privacy-title"
+      variant="reading"
+    >
+      <div className="access-page-reading-content">
         <p>
           Der Rundflug-Leitstand erfasst keine Namen und keine Telefonnummern. Der Ticketstatus ist
           ausschließlich über einen zufälligen Ticketcode erreichbar.
@@ -21,10 +24,10 @@ export function PrivacyView() {
           Veranstaltung festgelegten Frist gelöscht, standardmäßig sieben Tage nach
           Veranstaltungsende. Der operative Ticket- und Auditbestand bleibt davon getrennt.
         </p>
-        <a className="privacy-link" href="/">
+        <a className="access-page-link" href="/">
           Zurück zum Leitstand
         </a>
-      </section>
-    </Shell>
+      </div>
+    </AccessPageFrame>
   );
 }

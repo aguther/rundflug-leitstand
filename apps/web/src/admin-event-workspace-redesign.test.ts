@@ -24,6 +24,15 @@ describe("event-scoped administration redesign", () => {
     expect(frameStyles).toContain("--event-workspace-max-width: 1640px");
     expect(frameStyles).not.toContain("--event-workspace-max-width: 1180px");
     expect(frameStyles).not.toContain("--event-workspace-max-width: 1520px");
+    expect(frameStyles).toContain(
+      "grid-template-columns: minmax(250px, 1fr) minmax(360px, 1.1fr) minmax(0, 232px)",
+    );
+    expect(frameStyles).toMatch(
+      /\.event-workspace-frame > \.ds-tabs \{[\s\S]*?height: 48px;[\s\S]*?min-height: 48px;/,
+    );
+    expect(frameStyles).toMatch(
+      /\.event-workspace-toolbar \{[\s\S]*?height: 72px;[\s\S]*?min-height: 72px;/,
+    );
     expect(adminWorkspaceStyles).toMatch(
       /\.admin-shell \.event-setup-v15\.single-panel \{[\s\S]*?margin: 0;/,
     );

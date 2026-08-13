@@ -157,33 +157,15 @@
   background: var(--ui-surface-subtle);
 }
 
-.admin-shell .setup-progress li {
-  min-height: 46px;
-  border-left: 1px solid var(--ui-border);
-}
-
-.admin-shell .setup-progress li:first-child {
-  border-left: 0;
-}
-
-.admin-shell .setup-progress li::before {
-  display: none;
-}
-
 .admin-shell .setup-progress button:focus-visible {
   outline: 0;
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ui-accent) 75%, transparent);
 }
 
-.admin-shell .setup-progress li.current button:focus-visible {
+.admin-shell .setup-progress .setup-progress-item.current button:focus-visible {
   box-shadow:
     inset 0 -2px var(--ui-accent),
     inset 0 0 0 2px color-mix(in srgb, var(--ui-accent) 75%, transparent);
-}
-
-.admin-shell .setup-step-number {
-  width: 22px;
-  height: 22px;
 }
 
 .admin-shell button.field-info,
@@ -843,9 +825,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-}
-
-.admin-shell .admin-workspace:not(.master-data-active) > .admin-workspace-scroll-region {
   padding-top: 16px;
 }
 
@@ -886,7 +865,7 @@
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  margin: 16px 16px 12px;
+  margin: 16px 16px 0;
   overflow: hidden;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
@@ -915,10 +894,6 @@
   background: transparent;
   scroll-behavior: smooth;
   scrollbar-width: none;
-}
-
-.admin-shell .admin-workspace:not(.master-data-active) > .setup-progress-navigation {
-  margin-bottom: 0;
 }
 
 .admin-shell .setup-progress-scroll {
@@ -966,6 +941,7 @@
 .admin-shell .setup-progress .setup-progress-item,
 .admin-shell .setup-progress button {
   height: 54px;
+  min-height: 54px;
 }
 
 .admin-shell .setup-progress .setup-progress-item {
@@ -1338,6 +1314,7 @@
 @media (max-width: 700px) {
   .admin-shell .setup-progress-navigation {
     width: calc(100% - 24px);
+    flex-basis: 48px;
     height: 48px;
     min-height: 48px;
     margin-inline: 12px;

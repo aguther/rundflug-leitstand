@@ -15,4 +15,14 @@ describe("master data layout", () => {
       /@media \(max-width: 760px\)[\s\S]*?\.master-data-unified-toolbar > \.ds-search-control \{[\s\S]*?width: 100%;/,
     );
   });
+
+  it("keeps the shared toolbar and resource status filter on stable control geometry", () => {
+    expect(styles).toMatch(/\.master-data-unified-toolbar \{[\s\S]*?padding: 13px 16px 14px;/);
+    expect(styles).toMatch(
+      /\.master-data-status-filter \{[\s\S]*?display: inline-flex;[\s\S]*?gap: 12px;/,
+    );
+    expect(styles).toMatch(
+      /\.master-data-status-filter select \{[\s\S]*?height: 44px;[\s\S]*?min-height: 44px;/,
+    );
+  });
 });

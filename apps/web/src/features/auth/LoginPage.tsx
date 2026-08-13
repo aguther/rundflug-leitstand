@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { BrandLockup, BrandMark } from "../../design-system/BrandMark";
 import { Button } from "../../design-system/components";
-import { ThemeToggle } from "../../design-system/ThemeToggle";
+import { AccessPageFrame } from "./AccessPageFrame";
 import { useAuth } from "./AuthContext";
 import {
   type LoginAccount,
@@ -10,7 +9,6 @@ import {
   loginRoleOrder,
   roleLabels,
 } from "./api";
-import "./login.css";
 
 export function LoginPage() {
   const { setSession, unavailable, refresh } = useAuth();
@@ -62,88 +60,77 @@ export function LoginPage() {
   }
 
   return (
-    <main className="login-page">
-      <header className="login-topbar">
-        <a className="app-brand" href="/">
-          <BrandLockup />
-        </a>
-        <ThemeToggle />
-      </header>
-      <section className="login-panel" aria-labelledby="login-title">
-        <div className="login-heading">
-          <BrandMark />
-          <div>
-            <h1 id="login-title">Anmelden</h1>
-            <p>Konto auswählen und persönliche PIN eingeben.</p>
-          </div>
-        </div>
-        {unavailable ? (
-          <div className="login-message login-message-error" role="alert">
-            <span>Server nicht erreichbar.</span>
-            <Button
-              busy={refreshBusy}
-              type="button"
-              onClick={() => void retryConnection()}
-              variant="secondary"
-            >
-              Erneut prüfen
-            </Button>
-          </div>
-        ) : null}
-        <form onSubmit={(event) => void submit(event)}>
-          <label htmlFor="login-account">Konto</label>
-          <select
-            ref={accountRef}
-            id="login-account"
-            value={accountId}
-            onChange={(event) => setAccountId(event.target.value)}
-          >
-            <option value="">Konto auswählen</option>
-            {loginRoleOrder.map((role) => {
-              const roleAccounts = accounts.filter((account) => account.role === role);
-              if (roleAccounts.length === 0) return null;
-              return (
-                <optgroup key={role} label={roleLabels[role]}>
-                  {roleAccounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.loginCode}
-                    </option>
-                  ))}
-                </optgroup>
-              );
-            })}
-          </select>
-          <label htmlFor="login-pin">PIN</label>
-          <input
-            ref={pinRef}
-            id="login-pin"
-            type="password"
-            inputMode="numeric"
-            autoComplete="current-password"
-            pattern="[0-9]{6,12}"
-            minLength={6}
-            maxLength={12}
-            value={pin}
-            onChange={(event) => setPin(event.target.value.replace(/\D/g, ""))}
-            placeholder="6–12 Ziffern"
-          />
-          {error ? (
-            <p className="login-error" role="alert">
-              {error}
-            </p>
-          ) : null}
+    <AccessPageFrame
+      description="Konto auswählen und persönliche PIN eingeben."
+      title="Anmelden"
+      titleId="login-title"
+    >
+      {unavailable ? (
+        <div className="login-message login-message-error" role="alert">
+          <span>Server nicht erreichbar.</span>
           <Button
-            busy={busy}
-            className="login-submit"
-            type="submit"
-            disabled={!accountId || pin.length < 6}
-            variant="primary"
+            busy={refreshBusy}
+            type="button"
+            onClick={() => void retryConnection()}
+            variant="secondary"
           >
-            Anmelden
+            Erneut prüfen
           </Button>
-        </form>
-        <p className="login-privacy">Keine Namen · keine personenbezogenen Profile</p>
-      </section>
-    </main>
+        </div>
+      ) : null}
+      <form onSubmit={(event) => void submit(event)}>
+        <label htmlFor="login-account">Konto</label>
+        <select
+          ref={accountRef}
+          id="login-account"
+          value={accountId}
+          onChange={(event) => setAccountId(event.target.value)}
+        >
+          <option value="">Konto auswählen</option>
+          {loginRoleOrder.map((role) => {
+            const roleAccounts = accounts.filter((account) => account.role === role);
+            if (roleAccounts.length === 0) return null;
+            return (
+              <optgroup key={role} label={roleLabels[role]}>
+                {roleAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.loginCode}
+                  </option>
+                ))}
+              </optgroup>
+            );
+          })}
+        </select>
+        <label htmlFor="login-pin">PIN</label>
+        <input
+          ref={pinRef}
+          id="login-pin"
+          type="password"
+          inputMode="numeric"
+          autoComplete="current-password"
+          pattern="[0-9]{6,12}"
+          minLength={6}
+          maxLength={12}
+          value={pin}
+          onChange={(event) => setPin(event.target.value.replace(/\D/g, ""))}
+          placeholder="6–12 Ziffern"
+        />
+        {error ? (
+          <p className="login-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <Button
+          busy={busy}
+          className="access-page-submit"
+          type="submit"
+          disabled={!accountId || pin.length < 6}
+          variant="primary"
+        >
+          Anmelden
+        </Button>
+      </form>
+      <p className="access-page-privacy">Keine Namen · keine personenbezogenen Profile</p>
+    </AccessPageFrame>
   );
 }
