@@ -197,6 +197,7 @@ export function FidsSettingsDialog({
             />
             <label className="fids-shared-flight-setting">
               <input
+                aria-label="Gruppen desselben Flugs zusammenfassen"
                 checked={draft.groupSharedFlights}
                 disabled={saving}
                 onChange={(event) =>
@@ -392,10 +393,10 @@ export function FidsSettingsDialog({
           </section>
 
           {unavailableIds.length > 0 ? (
-            <p className="fids-settings-warning" role="status">
+            <output className="fids-settings-warning">
               {unavailableIds.length} nicht mehr verfügbare Auswahl(en) werden beim Speichern
               entfernt.
-            </p>
+            </output>
           ) : null}
           {error ? (
             <p className="fids-settings-error" role="alert">

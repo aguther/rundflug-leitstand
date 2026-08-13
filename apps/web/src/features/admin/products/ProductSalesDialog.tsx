@@ -13,6 +13,12 @@ import "./product-sales-dialog.css";
 type Product = OperationBoard["products"][number];
 type EventStatus = OperationBoard["event"]["status"];
 
+function liveSalesDescription(eventStatus: EventStatus, readOnly: boolean): string {
+  if (eventStatus === "PREPARATION") return "Ab Betriebsfreigabe verfügbar";
+  if (readOnly) return "Nach Betriebsende nur lesend";
+  return "Die Umschaltung wird separat bestätigt und protokolliert.";
+}
+
 export function ProductSalesDialog({
   product,
   eventStatus,
@@ -131,13 +137,7 @@ export function ProductSalesDialog({
         <section className="product-sales-control" aria-labelledby="product-live-sales-heading">
           <div>
             <h3 id="product-live-sales-heading">Live-Verkauf</h3>
-            <p>
-              {eventStatus === "PREPARATION"
-                ? "Ab Betriebsfreigabe verfügbar"
-                : readOnly
-                  ? "Nach Betriebsende nur lesend"
-                  : "Die Umschaltung wird separat bestätigt und protokolliert."}
-            </p>
+            <p>{liveSalesDescription(eventStatus, readOnly)}</p>
           </div>
           <Button
             busy={busyAction === "toggle"}

@@ -37,6 +37,12 @@ import type { useAdminFactoryReset } from "./useAdminFactoryReset";
 
 type RunBusyAction = (key: string, action: () => Promise<void>) => Promise<void>;
 
+function productSalesBusyAction(productId: string | null, busyActionKey: string | null) {
+  if (!productId || !busyActionKey) return null;
+  if (busyActionKey === `product-${productId}-closing`) return "closing";
+  return busyActionKey === `product-${productId}-sales` ? "toggle" : null;
+}
+
 interface AdminShellDialogsProps {
   administrator: boolean;
   assignmentContext: AircraftResourceGroupAssignmentContext | null;
@@ -132,13 +138,7 @@ export function AdminShellDialogs({
       ) : null}
       {board ? (
         <ProductSalesDialog
-          busyAction={
-            salesProductId && busyActionKey === `product-${salesProductId}-closing`
-              ? "closing"
-              : salesProductId && busyActionKey === `product-${salesProductId}-sales`
-                ? "toggle"
-                : null
-          }
+          busyAction={productSalesBusyAction(salesProductId, busyActionKey)}
           closingValue={saleClosesAt}
           eventStatus={board.event.status}
           key={salesProductId ?? "closed"}

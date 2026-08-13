@@ -48,6 +48,14 @@ function formatTimestamp(value: string | null): string {
     : "–";
 }
 
+function archiveAvailabilityMessage(
+  eventStatus: OperationBoard["event"]["status"],
+  loading: boolean,
+): string {
+  if (!["CLOSED", "ARCHIVED"].includes(eventStatus)) return "Der aktuelle Tag ist noch geöffnet.";
+  return loading ? "Archive werden geladen …" : "";
+}
+
 export function AnalysisWorkspace({
   board,
   backendConfirmed,
@@ -310,12 +318,7 @@ export function AnalysisWorkspace({
                 </div>
               </div>
               <div aria-live="polite" className="analysis-archives-message">
-                {archiveError ||
-                  (!["CLOSED", "ARCHIVED"].includes(board.event.status)
-                    ? "Der aktuelle Tag ist noch geöffnet."
-                    : archivesLoading
-                      ? "Archive werden geladen …"
-                      : "")}
+                {archiveError || archiveAvailabilityMessage(board.event.status, archivesLoading)}
               </div>
               <section
                 aria-label="Liste der Tagesanalysepakete"
