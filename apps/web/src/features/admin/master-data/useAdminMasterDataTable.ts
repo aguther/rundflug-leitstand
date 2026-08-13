@@ -3,6 +3,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MasterDataCategory } from "../../../admin-ux";
 
 type SortDirection = "asc" | "desc" | null;
+type Gate = OperationBoard["gates"][number];
+type ResourceGroup = OperationBoard["resourceGroups"][number];
+type Aircraft = OperationBoard["aircraft"][number];
+type Pilot = OperationBoard["pilots"][number];
+type Product = OperationBoard["products"][number];
+
+interface CategoryCount {
+  filtered: number;
+  total: number;
+}
 
 export interface AdminMasterDataSort {
   category: MasterDataCategory;
@@ -38,6 +48,102 @@ function sortRows<T extends { id: string }>(
   });
 }
 
+function nextSortDirection(direction: SortDirection): SortDirection {
+  switch (direction) {
+    case "asc":
+      return "desc";
+    case "desc":
+      return null;
+    default:
+      return "asc";
+  }
+}
+
+function gateSortValue(gate: Gate, key: string): string | number {
+  switch (key) {
+    case "status":
+      return Number(gate.active);
+    case "sortOrder":
+      return gate.sortOrder;
+    case "type":
+      return gate.gateType;
+    default:
+      return gate.label;
+  }
+}
+
+function resourceGroupSortValue(group: ResourceGroup, key: string): string | number {
+  switch (key) {
+    case "status":
+      return group.status;
+    case "gate":
+      return group.gateLabel;
+    case "capacity":
+      return group.referenceCapacity;
+    case "aircraft":
+      return group.activeAircraftIds.length;
+    default:
+      return group.name;
+  }
+}
+
+function aircraftSortValue(aircraft: Aircraft, key: string): string | number {
+  switch (key) {
+    case "type":
+      return aircraft.aircraftType;
+    case "seats":
+      return aircraft.passengerSeats;
+    case "group":
+      return aircraft.resourceGroupName;
+    case "pilot":
+      return aircraft.currentPilotOperationalCode ?? "";
+    case "status":
+      return aircraft.operationalState;
+    default:
+      return aircraft.registration;
+  }
+}
+
+function pilotSortValue(pilot: Pilot, key: string): string | number {
+  switch (key) {
+    case "note":
+      return pilot.operationalNote;
+    case "status":
+      return Number(pilot.active) + Number(pilot.paused);
+    case "rotation":
+      return pilot.currentCommunicationNumber ?? 0;
+    default:
+      return pilot.operationalCode;
+  }
+}
+
+function productSortValue(product: Product, key: string): string | number {
+  switch (key) {
+    case "name":
+      return product.name;
+    case "group":
+      return product.resourceGroupName;
+    case "gate":
+      return product.gateLabel;
+    case "price":
+      return product.priceCents;
+    case "duration":
+      return product.referenceDurationMinutes;
+    case "status":
+      return Number(product.saleEnabled);
+    default:
+      return product.code;
+  }
+}
+
+function countForCategory(
+  category: MasterDataCategory,
+  counts: Readonly<Partial<Record<MasterDataCategory, CategoryCount>>>,
+  fallback: CategoryCount,
+): CategoryCount {
+  return counts[category] ?? fallback;
+}
+
 export function useAdminMasterDataTable({ board, category }: UseAdminMasterDataTableOptions) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<AdminMasterDataSort>({
@@ -56,15 +162,12 @@ export function useAdminMasterDataTable({ board, category }: UseAdminMasterDataT
 
   const toggleSort = useCallback(
     (key: string) => {
-      setSort((current) =>
-        current.category === category && current.key === key
-          ? {
-              ...current,
-              direction:
-                current.direction === "asc" ? "desc" : current.direction === "desc" ? null : "asc",
-            }
-          : { category, key, direction: "asc" },
-      );
+      setSort((current) => {
+        if (current.category !== category || current.key !== key) {
+          return { category, key, direction: "asc" };
+        }
+        return { ...current, direction: nextSortDirection(current.direction) };
+      });
     },
     [category],
   );
@@ -83,14 +186,7 @@ export function useAdminMasterDataTable({ board, category }: UseAdminMasterDataT
         `${gate.label} ${gate.gateType}`.toLocaleLowerCase("de-DE").includes(normalizedSearch),
       ),
       sort,
-      (gate, key) =>
-        key === "status"
-          ? Number(gate.active)
-          : key === "sortOrder"
-            ? gate.sortOrder
-            : key === "type"
-              ? gate.gateType
-              : gate.label,
+      gateSortValue,
     );
     const visibleResourceGroups = sortRows(
       "resource-groups",
@@ -102,16 +198,7 @@ export function useAdminMasterDataTable({ board, category }: UseAdminMasterDataT
             .includes(normalizedSearch),
       ),
       sort,
-      (group, key) =>
-        key === "status"
-          ? group.status
-          : key === "gate"
-            ? group.gateLabel
-            : key === "capacity"
-              ? group.referenceCapacity
-              : key === "aircraft"
-                ? group.activeAircraftIds.length
-                : group.name,
+      resourceGroupSortValue,
     );
     const visibleAircraft = sortRows(
       "aircraft",
@@ -121,18 +208,7 @@ export function useAdminMasterDataTable({ board, category }: UseAdminMasterDataT
           .includes(normalizedSearch),
       ),
       sort,
-      (aircraft, key) =>
-        key === "type"
-          ? aircraft.aircraftType
-          : key === "seats"
-            ? aircraft.passengerSeats
-            : key === "group"
-              ? aircraft.resourceGroupName
-              : key === "pilot"
-                ? (aircraft.currentPilotOperationalCode ?? "")
-                : key === "status"
-                  ? aircraft.operationalState
-                  : aircraft.registration,
+      aircraftSortValue,
     );
     const visiblePilots = sortRows(
       "pilots",
@@ -142,14 +218,7 @@ export function useAdminMasterDataTable({ board, category }: UseAdminMasterDataT
           .includes(normalizedSearch),
       ),
       sort,
-      (pilot, key) =>
-        key === "note"
-          ? pilot.operationalNote
-          : key === "status"
-            ? Number(pilot.active) + Number(pilot.paused)
-            : key === "rotation"
-              ? (pilot.currentCommunicationNumber ?? 0)
-              : pilot.operationalCode,
+      pilotSortValue,
     );
     const visibleProducts = sortRows(
       "products",
@@ -159,41 +228,29 @@ export function useAdminMasterDataTable({ board, category }: UseAdminMasterDataT
           .includes(normalizedSearch),
       ),
       sort,
-      (product, key) =>
-        key === "name"
-          ? product.name
-          : key === "group"
-            ? product.resourceGroupName
-            : key === "gate"
-              ? product.gateLabel
-              : key === "price"
-                ? product.priceCents
-                : key === "duration"
-                  ? product.referenceDurationMinutes
-                  : key === "status"
-                    ? Number(product.saleEnabled)
-                    : product.code,
+      productSortValue,
     );
-    const filteredCount =
-      category === "gates"
-        ? visibleGates.length
-        : category === "resource-groups"
-          ? visibleResourceGroups.length
-          : category === "aircraft"
-            ? visibleAircraft.length
-            : category === "pilots"
-              ? visiblePilots.length
-              : visibleProducts.length;
-    const totalCount =
-      category === "gates"
-        ? (board?.gates.length ?? 0)
-        : category === "resource-groups"
-          ? resourceGroups.length
-          : category === "aircraft"
-            ? (board?.aircraft.length ?? 0)
-            : category === "pilots"
-              ? (board?.pilots.length ?? 0)
-              : (board?.products.length ?? 0);
+    const productCounts = {
+      filtered: visibleProducts.length,
+      total: board?.products.length ?? 0,
+    };
+    const { filtered: filteredCount, total: totalCount } = countForCategory(
+      category,
+      {
+        aircraft: {
+          filtered: visibleAircraft.length,
+          total: board?.aircraft.length ?? 0,
+        },
+        gates: { filtered: visibleGates.length, total: board?.gates.length ?? 0 },
+        pilots: { filtered: visiblePilots.length, total: board?.pilots.length ?? 0 },
+        products: productCounts,
+        "resource-groups": {
+          filtered: visibleResourceGroups.length,
+          total: resourceGroups.length,
+        },
+      },
+      productCounts,
+    );
     const pageCount = Math.max(1, Math.ceil(filteredCount / pageSize));
     const clampedPage = Math.min(page, pageCount - 1);
     const pageStart = clampedPage * pageSize;
