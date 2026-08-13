@@ -175,14 +175,9 @@ export function incidentToBlock(
   incident: ManualIncident,
   source: PendingBlock["source"],
 ): PendingBlock {
-  const state: PendingBlock["state"] =
-    incident.type === "REFUELING"
-      ? "REFUELING"
-      : incident.type === "UNPLANNED_PAUSE"
-        ? "UNPLANNED_PAUSE"
-        : incident.dayOutage
-          ? "DAY_OUT"
-          : "TECHNICAL_DEFECT";
+  let state: PendingBlock["state"] = incident.dayOutage ? "DAY_OUT" : "TECHNICAL_DEFECT";
+  if (incident.type === "REFUELING") state = "REFUELING";
+  else if (incident.type === "UNPLANNED_PAUSE") state = "UNPLANNED_PAUSE";
   return {
     key: incident.id,
     state,
