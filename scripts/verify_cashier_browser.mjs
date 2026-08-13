@@ -336,6 +336,143 @@ function assertContained(inner, outer, label, tolerance = 1) {
   }
 }
 
+function assertBaseViewportGeometry(geometry, scenario) {
+  if (
+    geometry.document.scrollWidth > geometry.document.clientWidth + 1 ||
+    geometry.document.bodyScrollWidth > geometry.viewport.width + 1
+  ) {
+    throw new Error(`Horizontal document overflow: ${JSON.stringify(geometry.document)}`);
+  }
+  if (geometry.toolbar.box.bottom > geometry.ticketTable.box.top + 1) {
+    throw new Error(
+      `Cashier toolbar overlaps the ticket list: ${JSON.stringify({ toolbar: geometry.toolbar.box, ticketTable: geometry.ticketTable.box })}`,
+    );
+  }
+  if (
+    scenario.expectSingleScreen &&
+    (geometry.document.scrollHeight > geometry.document.clientHeight + 1 ||
+      geometry.document.bodyScrollHeight > geometry.viewport.height + 1)
+  ) {
+    throw new Error(
+      `Vertical document scroll in single-screen mode: ${JSON.stringify(geometry.document)}`,
+    );
+  }
+  if (geometry.media.tabletLandscape !== scenario.expectTabletLayout) {
+    throw new Error(
+      `Unexpected tablet media-query state: ${JSON.stringify({ scenario, media: geometry.media })}`,
+    );
+  }
+}
+
+function assertTabletHeaderGeometry(geometry) {
+  if (!geometry.media.pointerCoarse || !geometry.media.anyPointerCoarse) {
+    throw new Error(
+      `Tablet context does not expose a coarse pointer: ${JSON.stringify(geometry.media)}`,
+    );
+  }
+  assertContained(geometry.salePanel, geometry.viewport, "Cashier sale panel");
+  assertContained(geometry.ticketPanel, geometry.viewport, "Cashier ticket panel");
+  if (
+    geometry.heading.scrollWidth > geometry.heading.clientWidth + 1 ||
+    geometry.heading.scrollHeight > geometry.heading.clientHeight + 1 ||
+    geometry.heading.box.height > geometry.heading.lineHeight * 1.5
+  ) {
+    throw new Error(`Cashier heading wraps or clips: ${JSON.stringify(geometry.heading)}`);
+  }
+  for (const [index, button] of geometry.tabs.buttons.entries()) {
+    assertContained(button, geometry.tabs.box, `Cashier tab ${index + 1}`);
+  }
+  if (
+    geometry.tabs.scrollTop !== 0 ||
+    geometry.tabs.scrollHeight > geometry.tabs.clientHeight + 1
+  ) {
+    throw new Error(`Cashier tabs scroll vertically: ${JSON.stringify(geometry.tabs)}`);
+  }
+  if (
+    geometry.tabs.box.bottom > geometry.toolbar.box.top + 1 ||
+    geometry.tabs.activeBorderWidth < 2 ||
+    geometry.tabs.activeBorderColor === "rgba(0, 0, 0, 0)"
+  ) {
+    throw new Error(
+      `Cashier tabs overlap the toolbar or hide the active underline: ${JSON.stringify({ tabs: geometry.tabs, toolbar: geometry.toolbar })}`,
+    );
+  }
+}
+
+function assertTabletControlsGeometry(geometry) {
+  for (const control of geometry.toolbar.controls) {
+    assertContained(
+      control.box,
+      geometry.toolbar.box,
+      `Cashier toolbar control ${control.selector}`,
+    );
+  }
+  if (
+    geometry.refreshButton.box.width < 44 ||
+    geometry.refreshButton.box.height < 44 ||
+    geometry.refreshButton.display === "none" ||
+    geometry.refreshButton.visibility !== "visible" ||
+    geometry.refreshButton.opacity === 0
+  ) {
+    throw new Error(
+      `Cashier refresh control is not a visible 44px target: ${JSON.stringify(geometry.refreshButton)}`,
+    );
+  }
+  for (const [index, button] of geometry.stepperButtons.entries()) {
+    if (button.width < 44 || button.height < 44) {
+      throw new Error(
+        `Cashier stepper target ${index + 1} is below 44px: ${JSON.stringify(button)}`,
+      );
+    }
+  }
+}
+
+function assertTabletContentGeometry(geometry) {
+  if (
+    geometry.ticketTable.clientHeight < 120 ||
+    !["auto", "scroll"].includes(geometry.ticketTable.overflowY) ||
+    geometry.ticketTable.scrollHeight <= geometry.ticketTable.clientHeight
+  ) {
+    throw new Error(
+      `Cashier ticket list is not a usable scroll region: ${JSON.stringify(geometry.ticketTable)}`,
+    );
+  }
+  assertContained(geometry.ticketTable.box, geometry.ticketPanel, "Cashier ticket list");
+  assertContained(geometry.ticketDetail, geometry.ticketPanel, "Cashier ticket detail");
+  if (geometry.ticketTable.box.bottom > geometry.ticketDetail.top + 1) {
+    throw new Error(
+      `Cashier ticket list overlaps the detail: ${JSON.stringify({ ticketTable: geometry.ticketTable.box, ticketDetail: geometry.ticketDetail })}`,
+    );
+  }
+  assertContained(
+    geometry.ticketDetailGrid.box,
+    geometry.ticketDetail,
+    "Cashier ticket detail grid",
+  );
+  for (const [index, child] of geometry.ticketDetailGrid.children.entries()) {
+    assertContained(
+      child,
+      geometry.ticketDetailGrid.box,
+      `Cashier ticket detail area ${index + 1}`,
+    );
+  }
+  if (!["auto", "scroll"].includes(geometry.flightGroups.overflowY)) {
+    throw new Error(
+      `Cashier flight groups are not a bounded scroll region: ${JSON.stringify(geometry.flightGroups)}`,
+    );
+  }
+  assertContained(geometry.ticketActions, geometry.ticketDetail, "Cashier ticket actions");
+  const actionLabels = new Set(geometry.actionButtons.map((button) => button.label));
+  for (const requiredLabel of ["Stornieren", "Ticket drucken"]) {
+    if (!actionLabels.has(requiredLabel)) {
+      throw new Error(`Missing visible cashier ticket action: ${requiredLabel}`);
+    }
+  }
+  for (const [index, button] of geometry.actionButtons.entries()) {
+    assertContained(button.box, geometry.viewport, `Cashier ticket action ${index + 1}`);
+  }
+}
+
 async function assertViewportGeometry(page, scenario) {
   const geometry = await page.evaluate((query) => {
     const element = (selector) => {
@@ -455,134 +592,11 @@ async function assertViewportGeometry(page, scenario) {
     };
   }, tabletLandscapeMediaQuery);
 
-  if (
-    geometry.document.scrollWidth > geometry.document.clientWidth + 1 ||
-    geometry.document.bodyScrollWidth > geometry.viewport.width + 1
-  ) {
-    throw new Error(`Horizontal document overflow: ${JSON.stringify(geometry.document)}`);
-  }
-  if (geometry.toolbar.box.bottom > geometry.ticketTable.box.top + 1) {
-    throw new Error(
-      `Cashier toolbar overlaps the ticket list: ${JSON.stringify({ toolbar: geometry.toolbar.box, ticketTable: geometry.ticketTable.box })}`,
-    );
-  }
-  if (
-    scenario.expectSingleScreen &&
-    (geometry.document.scrollHeight > geometry.document.clientHeight + 1 ||
-      geometry.document.bodyScrollHeight > geometry.viewport.height + 1)
-  ) {
-    throw new Error(
-      `Vertical document scroll in single-screen mode: ${JSON.stringify(geometry.document)}`,
-    );
-  }
-  if (geometry.media.tabletLandscape !== scenario.expectTabletLayout) {
-    throw new Error(
-      `Unexpected tablet media-query state: ${JSON.stringify({ scenario, media: geometry.media })}`,
-    );
-  }
-
+  assertBaseViewportGeometry(geometry, scenario);
   if (!scenario.expectTabletLayout) return geometry;
-
-  if (!geometry.media.pointerCoarse || !geometry.media.anyPointerCoarse) {
-    throw new Error(
-      `Tablet context does not expose a coarse pointer: ${JSON.stringify(geometry.media)}`,
-    );
-  }
-  assertContained(geometry.salePanel, geometry.viewport, "Cashier sale panel");
-  assertContained(geometry.ticketPanel, geometry.viewport, "Cashier ticket panel");
-  if (
-    geometry.heading.scrollWidth > geometry.heading.clientWidth + 1 ||
-    geometry.heading.scrollHeight > geometry.heading.clientHeight + 1 ||
-    geometry.heading.box.height > geometry.heading.lineHeight * 1.5
-  ) {
-    throw new Error(`Cashier heading wraps or clips: ${JSON.stringify(geometry.heading)}`);
-  }
-  for (const [index, button] of geometry.tabs.buttons.entries()) {
-    assertContained(button, geometry.tabs.box, `Cashier tab ${index + 1}`);
-  }
-  if (
-    geometry.tabs.scrollTop !== 0 ||
-    geometry.tabs.scrollHeight > geometry.tabs.clientHeight + 1
-  ) {
-    throw new Error(`Cashier tabs scroll vertically: ${JSON.stringify(geometry.tabs)}`);
-  }
-  if (
-    geometry.tabs.box.bottom > geometry.toolbar.box.top + 1 ||
-    geometry.tabs.activeBorderWidth < 2 ||
-    geometry.tabs.activeBorderColor === "rgba(0, 0, 0, 0)"
-  ) {
-    throw new Error(
-      `Cashier tabs overlap the toolbar or hide the active underline: ${JSON.stringify({ tabs: geometry.tabs, toolbar: geometry.toolbar })}`,
-    );
-  }
-  for (const control of geometry.toolbar.controls) {
-    assertContained(
-      control.box,
-      geometry.toolbar.box,
-      `Cashier toolbar control ${control.selector}`,
-    );
-  }
-  if (
-    geometry.refreshButton.box.width < 44 ||
-    geometry.refreshButton.box.height < 44 ||
-    geometry.refreshButton.display === "none" ||
-    geometry.refreshButton.visibility !== "visible" ||
-    geometry.refreshButton.opacity === 0
-  ) {
-    throw new Error(
-      `Cashier refresh control is not a visible 44px target: ${JSON.stringify(geometry.refreshButton)}`,
-    );
-  }
-  for (const [index, button] of geometry.stepperButtons.entries()) {
-    if (button.width < 44 || button.height < 44) {
-      throw new Error(
-        `Cashier stepper target ${index + 1} is below 44px: ${JSON.stringify(button)}`,
-      );
-    }
-  }
-  if (
-    geometry.ticketTable.clientHeight < 120 ||
-    !["auto", "scroll"].includes(geometry.ticketTable.overflowY) ||
-    geometry.ticketTable.scrollHeight <= geometry.ticketTable.clientHeight
-  ) {
-    throw new Error(
-      `Cashier ticket list is not a usable scroll region: ${JSON.stringify(geometry.ticketTable)}`,
-    );
-  }
-  assertContained(geometry.ticketTable.box, geometry.ticketPanel, "Cashier ticket list");
-  assertContained(geometry.ticketDetail, geometry.ticketPanel, "Cashier ticket detail");
-  if (geometry.ticketTable.box.bottom > geometry.ticketDetail.top + 1) {
-    throw new Error(
-      `Cashier ticket list overlaps the detail: ${JSON.stringify({ ticketTable: geometry.ticketTable.box, ticketDetail: geometry.ticketDetail })}`,
-    );
-  }
-  assertContained(
-    geometry.ticketDetailGrid.box,
-    geometry.ticketDetail,
-    "Cashier ticket detail grid",
-  );
-  for (const [index, child] of geometry.ticketDetailGrid.children.entries()) {
-    assertContained(
-      child,
-      geometry.ticketDetailGrid.box,
-      `Cashier ticket detail area ${index + 1}`,
-    );
-  }
-  if (!["auto", "scroll"].includes(geometry.flightGroups.overflowY)) {
-    throw new Error(
-      `Cashier flight groups are not a bounded scroll region: ${JSON.stringify(geometry.flightGroups)}`,
-    );
-  }
-  assertContained(geometry.ticketActions, geometry.ticketDetail, "Cashier ticket actions");
-  const actionLabels = geometry.actionButtons.map((button) => button.label);
-  for (const requiredLabel of ["Stornieren", "Ticket drucken"]) {
-    if (!actionLabels.includes(requiredLabel)) {
-      throw new Error(`Missing visible cashier ticket action: ${requiredLabel}`);
-    }
-  }
-  for (const [index, button] of geometry.actionButtons.entries()) {
-    assertContained(button.box, geometry.viewport, `Cashier ticket action ${index + 1}`);
-  }
+  assertTabletHeaderGeometry(geometry);
+  assertTabletControlsGeometry(geometry);
+  assertTabletContentGeometry(geometry);
   return geometry;
 }
 
