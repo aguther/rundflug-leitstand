@@ -38,6 +38,17 @@ function visibleText(node: ReactNode): string {
   return parts.join(" ").replace(/\s+/g, " ").trim();
 }
 
+function effectiveBusyLabel(
+  busyLabel: string | undefined,
+  ariaLabel: string | undefined,
+  children: ReactNode,
+) {
+  if (busyLabel) return busyLabel;
+  if (ariaLabel) return `${ariaLabel} wird ausgeführt`;
+  const contentLabel = visibleText(children);
+  return contentLabel ? `${contentLabel} wird ausgeführt` : "Aktion wird ausgeführt";
+}
+
 export function Button({
   variant = "secondary",
   size = "default",
@@ -53,14 +64,7 @@ export function Button({
 }: Readonly<ButtonProps>) {
   const [internalBusy, setInternalBusy] = useState(false);
   const effectiveBusy = busy || internalBusy;
-  const contentLabel = visibleText(children);
-  const actionLabel =
-    busyLabel ??
-    (ariaLabel
-      ? `${ariaLabel} wird ausgeführt`
-      : contentLabel
-        ? `${contentLabel} wird ausgeführt`
-        : "Aktion wird ausgeführt");
+  const actionLabel = effectiveBusyLabel(busyLabel, ariaLabel, children);
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
     const result = (
       onClick as ((clickEvent: MouseEvent<HTMLButtonElement>) => unknown) | undefined

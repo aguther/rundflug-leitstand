@@ -14,6 +14,21 @@ export interface TabsProps<T extends string> {
   idPrefix?: string;
 }
 
+function keyboardTabIndex(key: string, index: number, tabCount: number): number | null {
+  switch (key) {
+    case "Home":
+      return 0;
+    case "End":
+      return tabCount - 1;
+    case "ArrowRight":
+      return (index + 1) % tabCount;
+    case "ArrowLeft":
+      return (index - 1 + tabCount) % tabCount;
+    default:
+      return null;
+  }
+}
+
 export function Tabs<T extends string>({
   items,
   value,
@@ -43,16 +58,9 @@ export function Tabs<T extends string>({
           key={item.value}
           onClick={() => onChange(item.value)}
           onKeyDown={(event) => {
-            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+            const nextIndex = keyboardTabIndex(event.key, index, items.length);
+            if (nextIndex === null) return;
             event.preventDefault();
-            const nextIndex =
-              event.key === "Home"
-                ? 0
-                : event.key === "End"
-                  ? items.length - 1
-                  : event.key === "ArrowRight"
-                    ? (index + 1) % items.length
-                    : (index - 1 + items.length) % items.length;
             moveFocus(nextIndex);
           }}
           ref={(element) => {

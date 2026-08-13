@@ -23,6 +23,12 @@ function systemTheme(): ResolvedTheme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+function nextThemePreference(current: ThemePreference): ThemePreference {
+  if (current === "system") return "light";
+  if (current === "light") return "dark";
+  return "system";
+}
+
 function applyTheme(preference: ThemePreference, resolved: ResolvedTheme): void {
   document.documentElement.dataset.theme = resolved;
   document.documentElement.dataset.themePreference = preference;
@@ -60,10 +66,7 @@ export function ThemeProvider({ children }: Readonly<{ children: React.ReactNode
       resolved,
       system,
       setPreference,
-      cycle: () =>
-        setPreference((current) =>
-          current === "system" ? "light" : current === "light" ? "dark" : "system",
-        ),
+      cycle: () => setPreference(nextThemePreference),
     }),
     [preference, resolved, system],
   );
