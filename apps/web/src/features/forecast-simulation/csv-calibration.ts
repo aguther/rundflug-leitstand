@@ -56,8 +56,7 @@ export class CalibrationCsvError extends Error {
 function delimiterScore(line: string, delimiter: "," | ";"): number {
   let quoted = false;
   let score = 0;
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index];
+  for (const character of line) {
     if (character === '"') quoted = !quoted;
     else if (!quoted && character === delimiter) score += 1;
   }
@@ -80,31 +79,46 @@ function detectDelimiter(text: string): "," | ";" {
   return semicolon >= comma ? ";" : ",";
 }
 
+function csvCharacterKind(
+  character: string,
+  delimiter: "," | ";",
+  quoted: boolean,
+): "QUOTE" | "DELIMITER" | "NEWLINE" | "CONTENT" {
+  if (character === '"') return "QUOTE";
+  if (!quoted && character === delimiter) return "DELIMITER";
+  if (!quoted && (character === "\n" || character === "\r")) return "NEWLINE";
+  return "CONTENT";
+}
+
 function parseCsv(text: string, delimiter: "," | ";"): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
   let quoted = false;
   for (let index = 0; index < text.length; index += 1) {
-    const character = text[index];
-    if (character === '"') {
-      if (quoted && text[index + 1] === '"') {
-        cell += '"';
-        index += 1;
-      } else {
-        quoted = !quoted;
-      }
-    } else if (character === delimiter && !quoted) {
-      row.push(cell.trim());
-      cell = "";
-    } else if ((character === "\n" || character === "\r") && !quoted) {
-      if (character === "\r" && text[index + 1] === "\n") index += 1;
-      row.push(cell.trim());
-      rows.push(row);
-      row = [];
-      cell = "";
-    } else {
-      cell += character;
+    const character = text[index] ?? "";
+    switch (csvCharacterKind(character, delimiter, quoted)) {
+      case "QUOTE":
+        if (quoted && text[index + 1] === '"') {
+          cell += '"';
+          index += 1;
+        } else {
+          quoted = !quoted;
+        }
+        break;
+      case "DELIMITER":
+        row.push(cell.trim());
+        cell = "";
+        break;
+      case "NEWLINE":
+        if (character === "\r" && text[index + 1] === "\n") index += 1;
+        row.push(cell.trim());
+        rows.push(row);
+        row = [];
+        cell = "";
+        break;
+      default:
+        cell += character;
     }
   }
   if (quoted)
@@ -189,6 +203,100 @@ function distribution(values: readonly number[]): TriangularDistribution {
   };
 }
 
+function calibrationHeaders(parsed: string[][]): {
+  format: CalibrationResult["format"];
+  headerIndex: number;
+  headers: string[];
+} {
+  const firstContentRow = parsed.findIndex((row) => row.some((cell) => cell.trim().length > 0));
+  if (firstContentRow < 0) throw new CalibrationCsvError("CSV_EMPTY", "Die CSV-Datei ist leer.");
+  const flightsMarker = parsed.findIndex(
+    (row) => row.length === 1 && cleanHeader(row[0] ?? "").toUpperCase() === "FLÜGE",
+  );
+  const format: CalibrationResult["format"] = flightsMarker >= 0 ? "DAILY_REPORT" : "REDUCED";
+  const headerIndex = flightsMarker >= 0 ? flightsMarker + 1 : firstContentRow;
+  const headers = (parsed[headerIndex] ?? []).map(cleanHeader);
+  if (headers.length === 0) {
+    throw new CalibrationCsvError("HEADER_MISSING", "Die CSV-Datei enthält keine Kopfzeile.");
+  }
+  if (format === "REDUCED") {
+    const normalized = headers.map((header) => header.toLowerCase());
+    assertAllowedColumns(normalized, REDUCED_COLUMNS);
+    assertRequiredColumns(normalized, REDUCED_COLUMNS.slice(0, 4));
+    return { format, headerIndex, headers: normalized };
+  }
+  assertAllowedColumns(headers, DAILY_REPORT_COLUMNS);
+  assertRequiredColumns(headers, ["Aufruf", "Start", "Landung", "Abschluss"]);
+  return { format, headerIndex, headers };
+}
+
+function assertRequiredColumns(
+  headers: readonly string[],
+  requiredColumns: readonly string[],
+): void {
+  for (const required of requiredColumns) {
+    if (!headers.includes(required)) {
+      throw new CalibrationCsvError("COLUMN_MISSING", `Pflichtspalte ${required} fehlt.`);
+    }
+  }
+}
+
+type CalibrationRowOutcome =
+  | { kind: "STOP" | "SKIP" | "EXCLUDED" }
+  | { kind: "ROW"; row: CalibrationRow };
+
+function calibrationRowOutcome(
+  values: readonly string[],
+  headers: readonly string[],
+  format: CalibrationResult["format"],
+  hasRows: boolean,
+): CalibrationRowOutcome {
+  if (values.every((value) => value.trim().length === 0)) {
+    return format === "DAILY_REPORT" && hasRows ? { kind: "STOP" } : { kind: "SKIP" };
+  }
+  if (format === "DAILY_REPORT" && values.length === 1 && /^[A-ZÄÖÜ -]+$/.test(values[0] ?? "")) {
+    return { kind: "STOP" };
+  }
+  const record = rowObject(headers, values);
+  if (format === "REDUCED" && interrupted(record.interrupted ?? "")) {
+    return { kind: "EXCLUDED" };
+  }
+  const reduced = format === "REDUCED";
+  const calledAt = parseTimestamp(record[reduced ? "called_at" : "Aufruf"] ?? "");
+  const departedAt = parseTimestamp(record[reduced ? "departed_at" : "Start"] ?? "");
+  const landedAt = parseTimestamp(record[reduced ? "landed_at" : "Landung"] ?? "");
+  const completedAt = parseTimestamp(record[reduced ? "completed_at" : "Abschluss"] ?? "");
+  if (
+    ![calledAt, departedAt, landedAt, completedAt].every(Number.isFinite) ||
+    calledAt >= departedAt ||
+    departedAt >= landedAt ||
+    landedAt >= completedAt
+  ) {
+    return { kind: "EXCLUDED" };
+  }
+  return { kind: "ROW", row: { calledAt, departedAt, landedAt, completedAt } };
+}
+
+function parseCalibrationRows(
+  parsed: string[][],
+  headerIndex: number,
+  headers: readonly string[],
+  format: CalibrationResult["format"],
+): { rows: CalibrationRow[]; excludedRows: number } {
+  const rows: CalibrationRow[] = [];
+  let excludedRows = 0;
+  for (const values of parsed.slice(headerIndex + 1)) {
+    const outcome = calibrationRowOutcome(values, headers, format, rows.length > 0);
+    if (outcome.kind === "STOP") break;
+    if (outcome.kind === "EXCLUDED") {
+      excludedRows += 1;
+      continue;
+    }
+    if (outcome.kind === "ROW") rows.push(outcome.row);
+  }
+  return { rows, excludedRows };
+}
+
 export function calibrateFromCsv(
   input: string,
   currentBuffer: TriangularDistribution,
@@ -202,69 +310,8 @@ export function calibrateFromCsv(
   }
   const delimiter = detectDelimiter(input);
   const parsed = parseCsv(input, delimiter);
-  const firstContentRow = parsed.findIndex((row) => row.some((cell) => cell.trim().length > 0));
-  if (firstContentRow < 0) throw new CalibrationCsvError("CSV_EMPTY", "Die CSV-Datei ist leer.");
-  const flightsMarker = parsed.findIndex(
-    (row) => row.length === 1 && cleanHeader(row[0] ?? "").toUpperCase() === "FLÜGE",
-  );
-  const format: CalibrationResult["format"] = flightsMarker >= 0 ? "DAILY_REPORT" : "REDUCED";
-  const headerIndex = flightsMarker >= 0 ? flightsMarker + 1 : firstContentRow;
-  const headers = (parsed[headerIndex] ?? []).map(cleanHeader);
-  if (headers.length === 0) {
-    throw new CalibrationCsvError("HEADER_MISSING", "Die CSV-Datei enthält keine Kopfzeile.");
-  }
-
-  if (format === "REDUCED") {
-    const normalized = headers.map((header) => header.toLowerCase());
-    assertAllowedColumns(normalized, REDUCED_COLUMNS);
-    for (const required of REDUCED_COLUMNS.slice(0, 4)) {
-      if (!normalized.includes(required)) {
-        throw new CalibrationCsvError("COLUMN_MISSING", `Pflichtspalte ${required} fehlt.`);
-      }
-    }
-    headers.splice(0, headers.length, ...normalized);
-  } else {
-    assertAllowedColumns(headers, DAILY_REPORT_COLUMNS);
-    for (const required of ["Aufruf", "Start", "Landung", "Abschluss"]) {
-      if (!headers.includes(required)) {
-        throw new CalibrationCsvError("COLUMN_MISSING", `Pflichtspalte ${required} fehlt.`);
-      }
-    }
-  }
-
-  const rows: CalibrationRow[] = [];
-  let excludedRows = 0;
-  for (let index = headerIndex + 1; index < parsed.length; index += 1) {
-    const values = parsed[index] ?? [];
-    if (values.every((value) => value.trim().length === 0)) {
-      if (format === "DAILY_REPORT" && rows.length > 0) break;
-      continue;
-    }
-    if (format === "DAILY_REPORT" && values.length === 1 && /^[A-ZÄÖÜ -]+$/.test(values[0] ?? "")) {
-      break;
-    }
-    const record = rowObject(headers, values);
-    if (format === "REDUCED" && interrupted(record.interrupted ?? "")) {
-      excludedRows += 1;
-      continue;
-    }
-    const calledAt = parseTimestamp(record[format === "REDUCED" ? "called_at" : "Aufruf"] ?? "");
-    const departedAt = parseTimestamp(record[format === "REDUCED" ? "departed_at" : "Start"] ?? "");
-    const landedAt = parseTimestamp(record[format === "REDUCED" ? "landed_at" : "Landung"] ?? "");
-    const completedAt = parseTimestamp(
-      record[format === "REDUCED" ? "completed_at" : "Abschluss"] ?? "",
-    );
-    if (
-      ![calledAt, departedAt, landedAt, completedAt].every(Number.isFinite) ||
-      calledAt >= departedAt ||
-      departedAt >= landedAt ||
-      landedAt >= completedAt
-    ) {
-      excludedRows += 1;
-      continue;
-    }
-    rows.push({ calledAt, departedAt, landedAt, completedAt });
-  }
+  const { format, headerIndex, headers } = calibrationHeaders(parsed);
+  const { rows, excludedRows } = parseCalibrationRows(parsed, headerIndex, headers, format);
   if (rows.length < 5) {
     throw new CalibrationCsvError(
       "SAMPLE_TOO_SMALL",
