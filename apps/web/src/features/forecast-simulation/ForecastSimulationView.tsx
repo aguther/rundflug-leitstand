@@ -19,10 +19,9 @@ import {
   Upload,
   Wrench,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button, ModalDialog } from "../../design-system/components";
 import { ThemeToggle } from "../../design-system/ThemeToggle";
-import type { BatchComparisonResult } from "./comparison";
 import { CalibrationCsvError, calibrateFromCsv } from "./csv-calibration";
 import { calculateSimulationMetrics, runSimulation } from "./engine";
 import { ForecastTimeline } from "./ForecastTimeline";
@@ -38,6 +37,7 @@ import {
   validateSimulationConfig,
 } from "./model";
 import { ScenarioEditor } from "./ScenarioEditor";
+import { SimulationComparisonDialog } from "./SimulationComparisonDialog";
 import { SimulationFidsPopout, type SimulationFidsPopoutHandle } from "./SimulationFidsPopout";
 import {
   nextSimulationVariantName,
@@ -49,6 +49,8 @@ import {
   createSimulationScenarioTemplate,
   simulationScenarioTemplateFileName,
 } from "./simulation-scenario-template";
+import { useSimulationComparison } from "./useSimulationComparison";
+import { useSimulationPlayback } from "./useSimulationPlayback";
 import "./forecast-simulation.css";
 
 const MINUTE_MS = 60_000;
@@ -61,12 +63,6 @@ interface SimulationVariant {
   name: string;
   config: SimulationConfig;
   manualIncidents: ManualIncident[];
-}
-
-function createComparisonWorker(): Worker {
-  return new Worker(new URL("./comparison-worker.ts", import.meta.url), {
-    type: "module",
-  });
 }
 
 const timeFormatter = new Intl.DateTimeFormat("de-DE", {
@@ -83,6 +79,60 @@ function formatTime(value: number | string): string {
 function metric(value: number | null, unit = ""): string {
   if (value === null) return "–";
   return `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(value)}${unit}`;
+}
+
+function forecastQualityLabel(quality: SimulationForecastSnapshot["quality"]): string {
+  switch (quality) {
+    case "STABLE":
+      return "Stabil";
+    case "CHANGING":
+      return "Veränderlich";
+    default:
+      return "Unsicher";
+  }
+}
+
+interface CalibrationImportOptions {
+  config: SimulationConfig;
+  file: File | undefined;
+  fileInput: HTMLInputElement | null;
+  onRestart: (config: SimulationConfig) => void;
+  setImporting: (importing: boolean) => void;
+  setMessage: (message: string) => void;
+}
+
+async function importCalibrationCsv({
+  config,
+  file,
+  fileInput,
+  onRestart,
+  setImporting,
+  setMessage,
+}: CalibrationImportOptions): Promise<void> {
+  if (!file) return;
+  setImporting(true);
+  try {
+    const calibration = calibrateFromCsv(await file.text(), config.realityModel.phases.buffer);
+    onRestart({
+      ...config,
+      realityModel: {
+        ...config.realityModel,
+        phases: calibration.suggestedPhases,
+      },
+    });
+    setMessage(
+      `${calibration.validRows} Umläufe kalibriert, ${calibration.excludedRows} ausgeschlossen. Puffer blieb unverändert.`,
+    );
+  } catch (error) {
+    setMessage(
+      error instanceof CalibrationCsvError
+        ? error.message
+        : "Die Datei konnte nicht gelesen werden.",
+    );
+  } finally {
+    setImporting(false);
+    if (fileInput) fileInput.value = "";
+  }
 }
 
 function milestoneVisible(value: string | null, nowMs: number): string | null {
@@ -238,10 +288,9 @@ function ErrorChart({
         </text>
       </svg>
       {activePoint ? (
-        <div
+        <output
           className="sim-chart-tooltip"
           data-align={activePoint.x > width * 0.68 ? "right" : "center"}
-          role="status"
           style={{ left: `${(activePoint.x / width) * 100}%` }}
         >
           <strong>Fluggruppe {activePoint.communicationNumber}</strong>
@@ -266,7 +315,7 @@ function ErrorChart({
               </dd>
             </div>
           </dl>
-        </div>
+        </output>
       ) : null}
     </div>
   );
@@ -317,45 +366,23 @@ export function ForecastSimulationView() {
   );
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [comparisonOpen, setComparisonOpen] = useState(false);
   const [foundationOpen, setFoundationOpen] = useState(false);
-  const [comparisonResult, setComparisonResult] = useState<BatchComparisonResult | null>(null);
-  const [comparisonProgress, setComparisonProgress] = useState({ completed: 0, total: 0 });
-  const [comparisonError, setComparisonError] = useState<string | null>(null);
-  const [comparisonRunning, setComparisonRunning] = useState(false);
+  const comparison = useSimulationComparison();
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importingCsv, setImportingCsv] = useState(false);
   const [fidsWindowError, setFidsWindowError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const comparisonWorkerRef = useRef<Worker | null>(null);
   const fidsPopoutRef = useRef<SimulationFidsPopoutHandle>(null);
   const editorErrors = validateSimulationConfig(editorConfig);
   const simulationEnd = Date.parse(result.runWindow.endAt);
 
-  useEffect(() => {
-    if (!running) return;
-    let previous = performance.now();
-    const timer = window.setInterval(() => {
-      const now = performance.now();
-      const elapsed = now - previous;
-      previous = now;
-      setCurrentMs((value) => {
-        const next = Math.min(simulationEnd, value + elapsed * speed);
-        if (next >= simulationEnd) setRunning(false);
-        return next;
-      });
-    }, 100);
-    return () => window.clearInterval(timer);
-  }, [running, simulationEnd, speed]);
-
-  useEffect(() => {
-    const worker = createComparisonWorker();
-    comparisonWorkerRef.current = worker;
-    return () => {
-      worker.terminate();
-      if (comparisonWorkerRef.current === worker) comparisonWorkerRef.current = null;
-    };
-  }, []);
+  useSimulationPlayback({
+    endAt: simulationEnd,
+    running,
+    setCurrentMs,
+    setRunning,
+    speed,
+  });
 
   const loadSimulation = (
     nextConfig: SimulationConfig,
@@ -449,33 +476,15 @@ export function ForecastSimulationView() {
     );
   };
 
-  const handleCsv = async (file: File | undefined) => {
-    if (!file) return;
-    setImportingCsv(true);
-    try {
-      const calibration = calibrateFromCsv(await file.text(), config.realityModel.phases.buffer);
-      const nextConfig = {
-        ...config,
-        realityModel: {
-          ...config.realityModel,
-          phases: calibration.suggestedPhases,
-        },
-      };
-      restart(nextConfig);
-      setImportMessage(
-        `${calibration.validRows} Umläufe kalibriert, ${calibration.excludedRows} ausgeschlossen. Puffer blieb unverändert.`,
-      );
-    } catch (error) {
-      setImportMessage(
-        error instanceof CalibrationCsvError
-          ? error.message
-          : "Die Datei konnte nicht gelesen werden.",
-      );
-    } finally {
-      setImportingCsv(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
+  const handleCsv = (file: File | undefined) =>
+    importCalibrationCsv({
+      config,
+      file,
+      fileInput: fileInputRef.current,
+      onRestart: restart,
+      setImporting: setImportingCsv,
+      setMessage: setImportMessage,
+    });
 
   const activateVariant = (variant: SimulationVariant) => {
     setSelectedVariantId(variant.id);
@@ -555,7 +564,7 @@ export function ForecastSimulationView() {
 
   const exportResult = () => {
     const blob = new Blob(
-      [JSON.stringify(createSimulationExport(result, manualIncidents, comparisonResult), null, 2)],
+      [JSON.stringify(createSimulationExport(result, manualIncidents, comparison.result), null, 2)],
       {
         type: "application/json;charset=utf-8",
       },
@@ -568,54 +577,10 @@ export function ForecastSimulationView() {
     URL.revokeObjectURL(url);
   };
 
-  const cancelComparison = () => {
-    comparisonWorkerRef.current?.terminate();
-    comparisonWorkerRef.current = null;
-    setComparisonRunning(false);
-  };
-
-  const startComparison = () => {
-    if (comparisonRunning) cancelComparison();
-    setComparisonOpen(true);
-    setComparisonResult(null);
-    setComparisonError(null);
-    setComparisonProgress({ completed: 0, total: config.forecastTuning.comparisonRuns });
-    setComparisonRunning(true);
-    const worker = comparisonWorkerRef.current ?? createComparisonWorker();
-    comparisonWorkerRef.current = worker;
-    worker.onmessage = (
-      event: MessageEvent<
-        | { type: "progress"; completedRuns: number; totalRuns: number }
-        | { type: "result"; result: BatchComparisonResult }
-        | { type: "error"; message: string }
-      >,
-    ) => {
-      if (event.data.type === "progress") {
-        setComparisonProgress({
-          completed: event.data.completedRuns,
-          total: event.data.totalRuns,
-        });
-        return;
-      }
-      if (event.data.type === "result") {
-        setComparisonResult(event.data.result);
-      } else {
-        setComparisonError(event.data.message);
-        worker.terminate();
-        comparisonWorkerRef.current = null;
-      }
-      setComparisonRunning(false);
-    };
-    worker.onerror = () => {
-      setComparisonError("Der lokale A/B-Vergleich ist fehlgeschlagen.");
-      worker.terminate();
-      comparisonWorkerRef.current = null;
-      setComparisonRunning(false);
-    };
-    worker.postMessage({
-      config: structuredClone(config),
-      manualIncidents: structuredClone(manualIncidents),
-    });
+  const startComparison = () => comparison.start(config, manualIncidents);
+  const closeComparison = () => {
+    comparison.cancel();
+    comparison.setOpen(false);
   };
 
   return (
@@ -805,11 +770,7 @@ export function ForecastSimulationView() {
           <Button className="sim-full-button" onClick={() => restart(config)} variant="primary">
             <RotateCcw aria-hidden="true" /> Neu starten
           </Button>
-          {importMessage ? (
-            <p className="sim-import-message" role="status">
-              {importMessage}
-            </p>
-          ) : null}
+          {importMessage ? <output className="sim-import-message">{importMessage}</output> : null}
           <p className="sim-sidebar-note">
             Stammdaten dürfen aus dem Betrieb stammen. Nachfrage, Umläufe, Ereignisse und Ergebnisse
             bleiben synthetisch und lokal.
@@ -1063,11 +1024,7 @@ export function ForecastSimulationView() {
                 <p>{formatTime(selectedSnapshot.capturedAt)} · nur interne Diagnose</p>
               </div>
               <strong data-quality={selectedSnapshot.quality}>
-                {selectedSnapshot.quality === "STABLE"
-                  ? "Stabil"
-                  : selectedSnapshot.quality === "CHANGING"
-                    ? "Veränderlich"
-                    : "Unsicher"}
+                {forecastQualityLabel(selectedSnapshot.quality)}
               </strong>
             </header>
             <dl>
@@ -1198,95 +1155,16 @@ export function ForecastSimulationView() {
         </div>
       </ModalDialog>
 
-      <ModalDialog
-        description="Produktions-Baseline und lokaler Kandidat verwenden dieselben Seeds und Szenarien."
-        footer={
-          <>
-            {comparisonRunning ? (
-              <Button onClick={cancelComparison}>Vergleich abbrechen</Button>
-            ) : (
-              <Button onClick={startComparison}>Erneut ausführen</Button>
-            )}
-            <Button
-              onClick={() => {
-                cancelComparison();
-                setComparisonOpen(false);
-              }}
-              variant="primary"
-            >
-              Schließen
-            </Button>
-          </>
-        }
-        onClose={() => {
-          cancelComparison();
-          setComparisonOpen(false);
-        }}
-        open={comparisonOpen}
-        size="wide"
-        title="A/B-Prognosevergleich"
-      >
-        {comparisonRunning ? (
-          <section className="sim-comparison-progress" aria-live="polite">
-            <strong>
-              Seed-Lauf {comparisonProgress.completed} von {comparisonProgress.total}
-            </strong>
-            <progress
-              max={Math.max(1, comparisonProgress.total)}
-              value={comparisonProgress.completed}
-            />
-            <p>Die Berechnung läuft ausschließlich lokal in einem Browser-Worker.</p>
-          </section>
-        ) : null}
-        {comparisonError ? (
-          <p className="sim-editor-errors" role="alert">
-            {comparisonError}
-          </p>
-        ) : null}
-        {comparisonResult ? (
-          <>
-            <p className="sim-comparison-summary">
-              Median je Kennzahl über {comparisonResult.runCount} Läufe ab Seed{" "}
-              {comparisonResult.seedStart}. Ein positives Delta bedeutet Kandidat minus Baseline.
-            </p>
-            <div className="sim-comparison-table-wrap">
-              <table className="sim-comparison-table">
-                <thead>
-                  <tr>
-                    <th>Kategorie</th>
-                    <th>Kennzahl</th>
-                    <th>Baseline</th>
-                    <th>Kandidat</th>
-                    <th>Delta</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparisonResult.rows.map((row) => (
-                    <tr key={row.id}>
-                      <td>{row.category}</td>
-                      <th scope="row">{row.label}</th>
-                      <td>{metric(row.baseline, row.unit ? ` ${row.unit}` : "")}</td>
-                      <td>{metric(row.candidate, row.unit ? ` ${row.unit}` : "")}</td>
-                      <td>
-                        {row.delta === null
-                          ? "–"
-                          : `${row.delta > 0 ? "+" : ""}${metric(
-                              row.delta,
-                              row.unit ? ` ${row.unit}` : "",
-                            )}`}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="sim-editor-hint">
-              Die Tabelle spricht keine automatische Empfehlung aus: Fehler, Fensterbreite, Qualität
-              und Gate-Wartezeit sind getrennte Zielgrößen.
-            </p>
-          </>
-        ) : null}
-      </ModalDialog>
+      <SimulationComparisonDialog
+        error={comparison.error}
+        onCancel={comparison.cancel}
+        onClose={closeComparison}
+        onRestart={startComparison}
+        open={comparison.open}
+        progress={comparison.progress}
+        result={comparison.result}
+        running={comparison.running}
+      />
     </div>
   );
 }

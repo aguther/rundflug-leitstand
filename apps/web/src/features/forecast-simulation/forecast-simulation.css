@@ -348,6 +348,7 @@
 }
 
 .sim-import-message {
+  display: block;
   margin: -3px 0 0;
   color: var(--ui-muted);
   font-size: 11px;

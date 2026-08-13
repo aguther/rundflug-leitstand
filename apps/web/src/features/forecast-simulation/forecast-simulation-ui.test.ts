@@ -19,6 +19,10 @@ const eventParametersFormSource = readFileSync(
 );
 const adminParameterSource = `${adminSource}\n${eventParametersSource}\n${eventParametersFormSource}`;
 const viewSource = readFileSync(new URL("./ForecastSimulationView.tsx", import.meta.url), "utf8");
+const comparisonSource = readFileSync(
+  new URL("./useSimulationComparison.ts", import.meta.url),
+  "utf8",
+);
 const editorSource = readFileSync(new URL("./ScenarioEditor.tsx", import.meta.url), "utf8");
 const planEditorSource = readFileSync(
   new URL("./SimulationPlanEditor.tsx", import.meta.url),
@@ -153,7 +157,7 @@ describe("local and hosted forecast simulation surface", () => {
       expect(editorSource).toContain(label);
     }
     expect(viewSource).toContain(
-      "createSimulationExport(result, manualIncidents, comparisonResult)",
+      "createSimulationExport(result, manualIncidents, comparison.result)",
     );
     expect(viewSource).toContain("SIMULATION_DEMAND_PROFILE_LABELS");
     expect(viewSource).not.toContain('id="sim-demand"');
@@ -171,10 +175,10 @@ describe("local and hosted forecast simulation surface", () => {
     expect(editorSource).toContain("Admin-Planwert");
     expect(editorSource).toContain("Prognose-Labor");
     expect(viewSource).toContain("Baseline und Kandidat vergleichen");
-    expect(viewSource).toContain("comparison-worker.ts");
-    expect(viewSource).toContain("const worker = createComparisonWorker()");
-    expect(viewSource).toContain(
-      "const worker = comparisonWorkerRef.current ?? createComparisonWorker()",
+    expect(comparisonSource).toContain("comparison-worker.ts");
+    expect(comparisonSource).toContain("const worker = createComparisonWorker()");
+    expect(comparisonSource).toContain(
+      "const worker = workerRef.current ?? createComparisonWorker()",
     );
     expect(viewSource).toContain("SimulationHistoryDialog");
     expect(historySource).toContain("Alle Prognose-Snapshots");
