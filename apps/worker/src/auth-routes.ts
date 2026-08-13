@@ -31,6 +31,36 @@ const defaultDependencies = {
 
 type AuthRouteDependencies = typeof defaultDependencies;
 
+interface LoginAccount {
+  id: string;
+  login_code: string;
+  role: OperatorRole;
+  pin_hash: string;
+  active: number;
+  failed_attempts: number;
+  locked_until: string | null;
+  session_version: number;
+}
+
+async function recordFailedLogin(
+  env: Env,
+  account: LoginAccount | null,
+  locked: boolean,
+  now: Date,
+) {
+  if (!account || locked) return;
+  const failedAttempts = account.failed_attempts + 1;
+  const lockedUntil =
+    failedAttempts >= 5 ? new Date(now.getTime() + 15 * 60_000).toISOString() : null;
+  await env.DB.prepare(
+    `UPDATE operator_accounts
+        SET failed_attempts = ?1, locked_until = ?2, updated_at = ?3
+      WHERE id = ?4`,
+  )
+    .bind(failedAttempts >= 5 ? 0 : failedAttempts, lockedUntil, now.toISOString(), account.id)
+    .run();
+}
+
 export function registerAuthRoutes(
   app: WorkerApp,
   dependencies: AuthRouteDependencies = defaultDependencies,
@@ -73,39 +103,14 @@ export function registerAuthRoutes(
          FROM operator_accounts WHERE id = ?1 AND deleted_at IS NULL`,
     )
       .bind(accountId)
-      .first<{
-        id: string;
-        login_code: string;
-        role: OperatorRole;
-        pin_hash: string;
-        active: number;
-        failed_attempts: number;
-        locked_until: string | null;
-        session_version: number;
-      }>();
+      .first<LoginAccount>();
     const locked = account?.locked_until && Date.parse(account.locked_until) > now.getTime();
     const valid =
       Boolean(account?.active) &&
       !locked &&
       Boolean(account && (await dependencies.verifyPin(pin, account.pin_hash)));
     if (!account || !valid) {
-      if (account && !locked) {
-        const failedAttempts = account.failed_attempts + 1;
-        const lockedUntil =
-          failedAttempts >= 5 ? new Date(now.getTime() + 15 * 60_000).toISOString() : null;
-        await context.env.DB.prepare(
-          `UPDATE operator_accounts
-              SET failed_attempts = ?1, locked_until = ?2, updated_at = ?3
-            WHERE id = ?4`,
-        )
-          .bind(
-            failedAttempts >= 5 ? 0 : failedAttempts,
-            lockedUntil,
-            now.toISOString(),
-            account.id,
-          )
-          .run();
-      }
+      await recordFailedLogin(context.env, account, Boolean(locked), now);
       return context.json(LOGIN_ERROR, 401);
     }
 

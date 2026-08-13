@@ -22,6 +22,7 @@ import { AttendanceCommandService } from "./attendance-command-service";
 import { dispatchRegisteredCommand } from "./command-handler-registry";
 import { loadCommandPreflightReads } from "./command-preflight";
 import { CommandPreflightService } from "./command-preflight-service";
+import type { CommandPreflightReads } from "./command-preflight-types";
 import { CoordinatorRealtimeService } from "./coordinator-realtime-service";
 import { verifyCredential } from "./crypto";
 import { DispatchRecommendationLeaseService } from "./dispatch-recommendation-lease-service";
@@ -423,7 +424,103 @@ export class EventCoordinator extends DurableObject<Env> {
     this.realtime.handleError(socket);
   }
 
-  private async handleCommand(request: Request): Promise<Response> {
+  private trustedOperatorRole(request: Request, command: CommandEnvelope): DeviceRole | null {
+    const operatorRole = request.headers.get("x-operator-role") as DeviceRole | null;
+    const operatorDeviceId = request.headers.get("x-operator-device-id");
+    return operatorRole && operatorDeviceId === command.deviceId ? operatorRole : null;
+  }
+
+  private async duplicateReceipt(command: CommandEnvelope): Promise<Response | null> {
+    const prior = await this.env.DB.prepare(
+      "SELECT response_json FROM idempotency_receipts WHERE command_id = ?1",
+    )
+      .bind(command.commandId)
+      .first<{ response_json: string }>();
+    if (!prior) return null;
+    const stored = commandResultSchema.parse(JSON.parse(prior.response_json));
+    return json({ ...stored, duplicate: true });
+  }
+
+  private async authorizeCommandDevice(
+    request: Request,
+    command: CommandEnvelope,
+    trustedOperatorRole: DeviceRole | null,
+  ): Promise<{ role: DeviceRole; credential_hash: string | null } | Response> {
+    if (trustedOperatorRole) return { role: trustedOperatorRole, credential_hash: null };
+    const device = await this.env.DB.prepare(
+      `SELECT role, credential_hash
+         FROM paired_devices
+        WHERE id = ?1 AND operation_day_id = ?2 AND active = 1`,
+    )
+      .bind(command.deviceId, command.eventId)
+      .first<{ role: DeviceRole; credential_hash: string | null }>();
+    if (
+      !device ||
+      !(await verifyCredential(request.headers.get("x-device-token"), device.credential_hash))
+    ) {
+      return json(
+        { error: { code: "DEVICE_NOT_PAIRED", message: "Sitzung ist nicht berechtigt." } },
+        { status: 401 },
+      );
+    }
+    await this.env.DB.prepare("UPDATE paired_devices SET last_seen_at = ?1 WHERE id = ?2")
+      .bind(new Date().toISOString(), command.deviceId)
+      .run();
+    return device;
+  }
+
+  private validateCommandRole(deviceRole: DeviceRole, command: CommandEnvelope): Response | null {
+    try {
+      assertRoleMayExecute(deviceRole, command.type as OperationalCommandType);
+      if (command.type === "STAGE_OUTAGE_RECOVERY") {
+        for (const entry of command.payload.entries) {
+          assertMayStageOutageRecoveryEntry(deviceRole, entry.type);
+        }
+      }
+      return null;
+    } catch (reason: unknown) {
+      if (reason instanceof DomainRuleError) {
+        return json({ error: { code: reason.code, message: reason.message } }, { status: 403 });
+      }
+      throw reason;
+    }
+  }
+
+  private validateActiveOperatorClaim(
+    deviceRole: DeviceRole,
+    operatorAccountId: string | null,
+    claim: { aircraft_id: string } | null,
+    command: CommandEnvelope,
+    fallbackAircraftId: string | null,
+  ): Response | null {
+    if (deviceRole !== "FLIGHT_LINE" || !operatorAccountId) return null;
+    if (!claim) {
+      return json(
+        {
+          error: {
+            code: "AIRCRAFT_ASSIST_CLAIM_REQUIRED",
+            message: "Die Flugzeugübernahme ist abgelaufen oder wurde extern übernommen.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const payload = command.payload as Record<string, unknown>;
+    const targetAircraftId =
+      typeof payload.aircraftId === "string" ? payload.aircraftId : fallbackAircraftId;
+    if (!targetAircraftId || targetAircraftId === claim.aircraft_id) return null;
+    return json(
+      {
+        error: {
+          code: "AIRCRAFT_ASSIST_CLAIM_MISMATCH",
+          message: "Dieses Flugzeug wird nicht mehr von diesem Login betreut.",
+        },
+      },
+      { status: 409 },
+    );
+  }
+
+  private async parseCommand(request: Request): Promise<CommandEnvelope | Response> {
     let command: CommandEnvelope;
     try {
       command = commandEnvelopeSchema.parse(await request.json());
@@ -433,60 +530,48 @@ export class EventCoordinator extends DurableObject<Env> {
         { status: 400 },
       );
     }
-
     const eventIdFromPath = new URL(request.url).pathname.split("/").at(-2);
-    if (eventIdFromPath !== command.eventId) {
-      return json(
-        {
-          error: {
-            code: "EVENT_MISMATCH",
-            message: "Event-ID in URL und Kommando stimmen nicht überein.",
-          },
+    if (eventIdFromPath === command.eventId) return command;
+    return json(
+      {
+        error: {
+          code: "EVENT_MISMATCH",
+          message: "Event-ID in URL und Kommando stimmen nicht überein.",
         },
-        { status: 400 },
+      },
+      { status: 400 },
+    );
+  }
+
+  private validatePreflight(
+    command: CommandEnvelope,
+    preflight: CommandPreflightReads,
+  ): StoredEventRow | Response {
+    if (!preflight.current) {
+      return json(
+        { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+        { status: 404 },
       );
     }
+    const conflict =
+      validateCommandVersion(command, preflight.current, preflight.aggregateVersion) ??
+      validatePlannedOperationLink(command, preflight.plannedOperation);
+    return conflict ?? preflight.current;
+  }
+
+  private async handleCommand(request: Request): Promise<Response> {
+    const parsedCommand = await this.parseCommand(request);
+    if (parsedCommand instanceof Response) return parsedCommand;
+    const command = parsedCommand;
 
     try {
-      const operatorRole = request.headers.get("x-operator-role") as DeviceRole | null;
-      const operatorDeviceId = request.headers.get("x-operator-device-id");
-      const trustedOperatorRole =
-        operatorRole && operatorDeviceId === command.deviceId ? operatorRole : null;
+      const trustedOperatorRole = this.trustedOperatorRole(request, command);
       if (!trustedOperatorRole) {
-        const prior = await this.env.DB.prepare(
-          "SELECT response_json FROM idempotency_receipts WHERE command_id = ?1",
-        )
-          .bind(command.commandId)
-          .first<{ response_json: string }>();
-        if (prior) {
-          const stored = commandResultSchema.parse(JSON.parse(prior.response_json));
-          return json({ ...stored, duplicate: true });
-        }
+        const duplicate = await this.duplicateReceipt(command);
+        if (duplicate) return duplicate;
       }
-      let device: { role: DeviceRole; credential_hash: string | null } | null = null;
-      if (trustedOperatorRole) {
-        device = { role: trustedOperatorRole, credential_hash: null };
-      } else {
-        device = await this.env.DB.prepare(
-          `SELECT role, credential_hash
-             FROM paired_devices
-            WHERE id = ?1 AND operation_day_id = ?2 AND active = 1`,
-        )
-          .bind(command.deviceId, command.eventId)
-          .first<{ role: DeviceRole; credential_hash: string | null }>();
-        if (
-          !device ||
-          !(await verifyCredential(request.headers.get("x-device-token"), device.credential_hash))
-        ) {
-          return json(
-            { error: { code: "DEVICE_NOT_PAIRED", message: "Sitzung ist nicht berechtigt." } },
-            { status: 401 },
-          );
-        }
-        await this.env.DB.prepare("UPDATE paired_devices SET last_seen_at = ?1 WHERE id = ?2")
-          .bind(new Date().toISOString(), command.deviceId)
-          .run();
-      }
+      const device = await this.authorizeCommandDevice(request, command, trustedOperatorRole);
+      if (device instanceof Response) return device;
       const operatorAccountId = request.headers.get("x-operator-account-id");
       const commandNow = new Date();
       const trustedPreflight = trustedOperatorRole
@@ -500,19 +585,8 @@ export class EventCoordinator extends DurableObject<Env> {
       if (trustedPreflight?.duplicateResult) {
         return json({ ...trustedPreflight.duplicateResult, duplicate: true });
       }
-      try {
-        assertRoleMayExecute(device.role, command.type as OperationalCommandType);
-        if (command.type === "STAGE_OUTAGE_RECOVERY") {
-          for (const entry of command.payload.entries) {
-            assertMayStageOutageRecoveryEntry(device.role, entry.type);
-          }
-        }
-      } catch (reason: unknown) {
-        if (reason instanceof DomainRuleError) {
-          return json({ error: { code: reason.code, message: reason.message } }, { status: 403 });
-        }
-        throw reason;
-      }
+      const roleError = this.validateCommandRole(device.role, command);
+      if (roleError) return roleError;
 
       const preflight =
         trustedPreflight?.reads ??
@@ -524,54 +598,22 @@ export class EventCoordinator extends DurableObject<Env> {
           nowIso: commandNow.toISOString(),
         }));
       let trustedPreflightD1CallCount = trustedPreflight?.d1CallCount ?? 0;
-      const current = preflight.current;
-      if (!current) {
-        return json(
-          { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
-          { status: 404 },
-        );
-      }
-      const versionConflict = validateCommandVersion(command, current, preflight.aggregateVersion);
-      if (versionConflict) return versionConflict;
-      const plannedOperationConflict = validatePlannedOperationLink(
-        command,
-        preflight.plannedOperation,
-      );
-      if (plannedOperationConflict) return plannedOperationConflict;
+      const preflightResult = this.validatePreflight(command, preflight);
+      if (preflightResult instanceof Response) return preflightResult;
+      const current = preflightResult;
 
       const activeOperatorClaim = preflight.activeOperatorClaim;
       // Production commands always carry a session actor. The actor-less branch is retained only
       // for the development integration scaffold, which is already blocked by the public route in
       // every non-development environment.
-      if (device.role === "FLIGHT_LINE" && operatorAccountId) {
-        if (!activeOperatorClaim) {
-          return json(
-            {
-              error: {
-                code: "AIRCRAFT_ASSIST_CLAIM_REQUIRED",
-                message: "Die Flugzeugübernahme ist abgelaufen oder wurde extern übernommen.",
-              },
-            },
-            { status: 409 },
-          );
-        }
-        const payload = command.payload as Record<string, unknown>;
-        const targetAircraftId =
-          typeof payload.aircraftId === "string"
-            ? payload.aircraftId
-            : preflight.targetRotationAircraftId;
-        if (targetAircraftId && targetAircraftId !== activeOperatorClaim.aircraft_id) {
-          return json(
-            {
-              error: {
-                code: "AIRCRAFT_ASSIST_CLAIM_MISMATCH",
-                message: "Dieses Flugzeug wird nicht mehr von diesem Login betreut.",
-              },
-            },
-            { status: 409 },
-          );
-        }
-      }
+      const claimError = this.validateActiveOperatorClaim(
+        device.role,
+        operatorAccountId,
+        activeOperatorClaim,
+        command,
+        preflight.targetRotationAircraftId,
+      );
+      if (claimError) return claimError;
       if (operatorAccountId && activeOperatorClaim) {
         const renewal = await this.commandPreflight.renewActiveClaim({
           command,
@@ -620,7 +662,7 @@ export class EventCoordinator extends DurableObject<Env> {
   }
 
   private ensureForecastRecalculationQueue(): Promise<void> {
-    if (this.forecastWork) return this.forecastWork;
+    if (this.forecastWork !== null) return this.forecastWork;
     const work = this.runForecastRecalculationQueue();
     this.forecastWork = work;
     return work;
