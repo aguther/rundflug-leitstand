@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, CircleAlert, Info, X } from "lucide-react"
 import {
   createContext,
   type Dispatch,
+  type FocusEvent,
   type SetStateAction,
   useCallback,
   useContext,
@@ -146,17 +147,17 @@ export function PageNotice({
   if (dismissedKey === noticeKey) return null;
 
   const ToneIcon = toneIcon[tone];
-  return (
-    <section
-      className={`page-notification page-notification-${tone}`}
-      onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false);
-      }}
-      onFocusCapture={() => setPaused(true)}
-      onPointerEnter={() => setPaused(true)}
-      onPointerLeave={() => setPaused(false)}
-      role={tone === "danger" ? "alert" : "status"}
-    >
+  const notificationProps = {
+    className: `page-notification page-notification-${tone}`,
+    onBlurCapture: (event: FocusEvent<HTMLElement>) => {
+      if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false);
+    },
+    onFocusCapture: () => setPaused(true),
+    onPointerEnter: () => setPaused(true),
+    onPointerLeave: () => setPaused(false),
+  };
+  const content = (
+    <>
       <ToneIcon aria-hidden="true" className="page-notification-icon" size={20} />
       <div className="page-notification-content">{children}</div>
       <button
@@ -167,6 +168,14 @@ export function PageNotice({
       >
         <X aria-hidden="true" size={18} />
       </button>
-    </section>
+    </>
   );
+  if (tone === "danger") {
+    return (
+      <section {...notificationProps} role="alert">
+        {content}
+      </section>
+    );
+  }
+  return <output {...notificationProps}>{content}</output>;
 }

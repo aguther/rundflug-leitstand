@@ -12,6 +12,21 @@ interface AdminOverviewPanelProps {
   pushConfigurationStatus: PushConfigurationStatus;
 }
 
+function pushSubscriptionCount(
+  status: PushConfigurationStatus,
+  activeSubscriptions: number,
+): number | string {
+  if (status === "configured") return activeSubscriptions;
+  return status === "loading" ? "…" : "–";
+}
+
+function pushStatusLabel(status: PushConfigurationStatus): string {
+  if (status === "configured") return "Web-Push aktiv";
+  if (status === "missing") return "Web-Push fehlt";
+  if (status === "loading") return "Web-Push wird geprüft";
+  return "Web-Push nicht geprüft";
+}
+
 export function AdminOverviewPanel({
   board,
   eventFlow,
@@ -78,21 +93,9 @@ export function AdminOverviewPanel({
         </div>
         <div>
           <strong>
-            {pushConfigurationStatus === "configured"
-              ? board.metrics.activePushSubscriptions
-              : pushConfigurationStatus === "loading"
-                ? "…"
-                : "–"}
+            {pushSubscriptionCount(pushConfigurationStatus, board.metrics.activePushSubscriptions)}
           </strong>
-          <span>
-            {pushConfigurationStatus === "configured"
-              ? "Web-Push aktiv"
-              : pushConfigurationStatus === "missing"
-                ? "Web-Push fehlt"
-                : pushConfigurationStatus === "loading"
-                  ? "Web-Push wird geprüft"
-                  : "Web-Push nicht geprüft"}
-          </span>
+          <span>{pushStatusLabel(pushConfigurationStatus)}</span>
         </div>
       </section>
       {pushConfigurationStatus === "missing" ? (

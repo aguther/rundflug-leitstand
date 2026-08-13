@@ -33,13 +33,7 @@ export function FeatureBoundary({
 }: Readonly<{ children: ReactNode; routeKey: string }>) {
   return (
     <AppErrorBoundary scope="route" resetKey={routeKey}>
-      <Suspense
-        fallback={
-          <div className="app-loading" role="status">
-            Arbeitsbereich wird geladen …
-          </div>
-        }
-      >
+      <Suspense fallback={<output className="app-loading">Arbeitsbereich wird geladen …</output>}>
         {children}
       </Suspense>
     </AppErrorBoundary>
