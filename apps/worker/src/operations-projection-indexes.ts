@@ -125,13 +125,14 @@ export function createOperationsProjectionIndexes(
           : undefined;
         const rotationInResourceGroup =
           activeRotation?.resource_group_id === resourceGroupId ? activeRotation : undefined;
-        const availableAt = rotationInResourceGroup?.predicted_completion_at
-          ? Date.parse(rotationInResourceGroup.predicted_completion_at)
-          : pilot.paused === 1
-            ? pilot.pause_expected_review_at
-              ? Date.parse(pilot.pause_expected_review_at)
-              : Number.NaN
-            : forecastReferenceMs;
+        let availableAt = forecastReferenceMs;
+        if (rotationInResourceGroup?.predicted_completion_at) {
+          availableAt = Date.parse(rotationInResourceGroup.predicted_completion_at);
+        } else if (pilot.paused === 1) {
+          availableAt = pilot.pause_expected_review_at
+            ? Date.parse(pilot.pause_expected_review_at)
+            : Number.NaN;
+        }
         if (!Number.isFinite(availableAt)) return [];
         return [
           {

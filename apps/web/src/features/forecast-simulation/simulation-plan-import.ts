@@ -343,14 +343,14 @@ export function parseSimulationPlanImport(
   }
   const rawFormat =
     typeof raw === "object" && raw !== null && "format" in raw ? raw.format : undefined;
-  const firstIssue =
-    rawFormat === "rundflug-simulation-scenario"
-      ? scenario.error.issues[0]?.message
-      : rawFormat === "rundflug-simulation-plan"
-        ? simulationPlan.error.issues[0]?.message
-        : rawFormat === "rundflug-master-data-template"
-          ? masterData.error.issues[0]?.message
-          : "Unbekanntes Dateiformat.";
+  let firstIssue = "Unbekanntes Dateiformat.";
+  if (rawFormat === "rundflug-simulation-scenario") {
+    firstIssue = scenario.error.issues[0]?.message ?? firstIssue;
+  } else if (rawFormat === "rundflug-simulation-plan") {
+    firstIssue = simulationPlan.error.issues[0]?.message ?? firstIssue;
+  } else if (rawFormat === "rundflug-master-data-template") {
+    firstIssue = masterData.error.issues[0]?.message ?? firstIssue;
+  }
   throw new SimulationPlanImportError(
     `Die Datei ist weder eine Szenario-Vorlage noch ein Simulationsplan oder gültiges Stammdaten-Template: ${firstIssue ?? "Ungültiger Dateiinhalt."}`,
   );

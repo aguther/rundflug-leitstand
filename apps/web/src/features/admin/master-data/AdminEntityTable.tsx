@@ -7,7 +7,20 @@ import {
 
 export interface AdminEntityTableColumn<Row> extends Omit<DataTableColumn<Row>, "header"> {
   label: string;
-  sortKey?: string | undefined;
+  sortKey?: string;
+}
+
+function ariaSortFor(
+  active: boolean,
+  direction: "asc" | "desc" | null | undefined,
+): "ascending" | "descending" | "none" {
+  if (!active || !direction) return "none";
+  return direction === "asc" ? "ascending" : "descending";
+}
+
+function sortIndicator(active: boolean, direction: "asc" | "desc" | null | undefined): string {
+  if (!active || !direction) return "↕";
+  return direction === "asc" ? "↑" : "↓";
 }
 
 export function AdminEntityTable<Row>({
@@ -18,34 +31,23 @@ export function AdminEntityTable<Row>({
   ...tableProps
 }: Omit<DataTableProps<Row>, "columns"> & {
   columns: AdminEntityTableColumn<Row>[];
-  sortKey?: string | undefined;
-  sortDirection?: "asc" | "desc" | null | undefined;
-  onSort?: ((key: string) => void) | undefined;
+  sortKey?: string;
+  sortDirection?: "asc" | "desc" | null;
+  onSort?: (key: string) => void;
 }) {
   const tableColumns: DataTableColumn<Row>[] = columns.map(
     ({ label, sortKey: columnSort, ...column }) => ({
       ...column,
       ...(columnSort
         ? {
-            ariaSort:
-              sortKey === columnSort && sortDirection
-                ? sortDirection === "asc"
-                  ? ("ascending" as const)
-                  : ("descending" as const)
-                : ("none" as const),
+            ariaSort: ariaSortFor(sortKey === columnSort, sortDirection),
           }
         : {}),
       header:
         columnSort && onSort ? (
           <button className="admin-sort-button" onClick={() => onSort(columnSort)} type="button">
             {label}
-            <span aria-hidden="true">
-              {sortKey === columnSort && sortDirection
-                ? sortDirection === "asc"
-                  ? "↑"
-                  : "↓"
-                : "↕"}
-            </span>
+            <span aria-hidden="true">{sortIndicator(sortKey === columnSort, sortDirection)}</span>
           </button>
         ) : (
           (label as ReactNode)

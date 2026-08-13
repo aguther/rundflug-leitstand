@@ -134,8 +134,8 @@ export function ProductsWorkspace({
       )}
       rowKey={(product) => product.id}
       rows={rows}
-      sortDirection={sortDirection}
-      sortKey={sortKey}
+      sortDirection={sortDirection ?? null}
+      sortKey={sortKey ?? ""}
     />
   );
 }

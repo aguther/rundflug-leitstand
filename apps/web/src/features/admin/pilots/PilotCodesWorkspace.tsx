@@ -94,8 +94,8 @@ export function PilotCodesWorkspace({
       )}
       rowKey={(pilot) => pilot.id}
       rows={rows}
-      sortDirection={sortDirection}
-      sortKey={sortKey}
+      sortDirection={sortDirection ?? null}
+      sortKey={sortKey ?? ""}
     />
   );
 }

@@ -134,8 +134,8 @@ export function GatesWorkspace({
       )}
       rowKey={(gate) => gate.id}
       rows={rows}
-      sortDirection={sortDirection}
-      sortKey={sortKey}
+      sortDirection={sortDirection ?? null}
+      sortKey={sortKey ?? ""}
     />
   );
 }

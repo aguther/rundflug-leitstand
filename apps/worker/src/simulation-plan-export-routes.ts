@@ -113,14 +113,13 @@ export function registerSimulationPlanExportRoutes(
     }
 
     const plannedOperations = plans.results.map((plan, index) => {
-      const scopeKey =
-        plan.scope_type === "EVENT"
-          ? "event"
-          : plan.scope_type === "RESOURCE_GROUP"
-            ? projection.keys.resourceGroups.get(plan.scope_id)
-            : plan.scope_type === "AIRCRAFT"
-              ? projection.keys.aircraft.get(plan.scope_id)
-              : projection.keys.pilots.get(plan.scope_id);
+      let scopeKey = projection.keys.pilots.get(plan.scope_id);
+      if (plan.scope_type === "EVENT") scopeKey = "event";
+      else if (plan.scope_type === "RESOURCE_GROUP") {
+        scopeKey = projection.keys.resourceGroups.get(plan.scope_id);
+      } else if (plan.scope_type === "AIRCRAFT") {
+        scopeKey = projection.keys.aircraft.get(plan.scope_id);
+      }
       if (!scopeKey) {
         throw new Error(`Simulationsexport: Ziel für Planeintrag ${plan.id} fehlt.`);
       }

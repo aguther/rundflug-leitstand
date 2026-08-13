@@ -147,8 +147,8 @@ export function AircraftWorkspace({
         )}
         rowKey={(aircraft) => aircraft.id}
         rows={rows}
-        sortDirection={sortDirection}
-        sortKey={sortKey}
+        sortDirection={sortDirection ?? null}
+        sortKey={sortKey ?? ""}
       />
     </>
   );
