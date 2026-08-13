@@ -51,6 +51,52 @@ function hasAdminAccess(
   return Boolean(actor && device && actor.role === "ADMIN" && device.role === "ADMIN");
 }
 
+function snapshotCaptureFailure(code: string): {
+  status: 403 | 409 | 412 | 500;
+  message: string;
+} {
+  if (code === "SESSION_NOT_AUTHORIZED") {
+    return { status: 403, message: "Für die Diagnose ist eine berechtigte Sitzung erforderlich." };
+  }
+  if (code === "ANALYSIS_SNAPSHOT_STALE_VERSION") {
+    return { status: 412, message: "Die Betriebsdaten wurden inzwischen aktualisiert." };
+  }
+  if (code === "ANALYSIS_SNAPSHOT_CAPTURE_FAILED") {
+    return { status: 500, message: "Der aktuelle Planungslauf konnte nicht erstellt werden." };
+  }
+  if (code === "ANALYSIS_SNAPSHOT_IDEMPOTENCY_CONFLICT") {
+    return {
+      status: 409,
+      message: "Die Diagnoseanforderung wurde bereits mit anderen Daten verwendet.",
+    };
+  }
+  return { status: 409, message: "Der aktuelle Planungslauf konnte nicht erstellt werden." };
+}
+
+function safeSnapshotBuildError(error: unknown): {
+  code: string;
+  message: string;
+} {
+  const code = error instanceof Error ? error.message : "ANALYSIS_SNAPSHOT_DATA_INCOMPLETE";
+  if (code === "ANALYSIS_SNAPSHOT_NOT_READY") {
+    return { code, message: "Der aktuelle Planungslauf ist noch nicht verfügbar." };
+  }
+  if (["ANALYSIS_SNAPSHOT_CHANGED", "ANALYSIS_SNAPSHOT_DATA_INCOMPLETE"].includes(code)) {
+    return { code, message: "Die Diagnose konnte nicht konsistent aufgebaut werden." };
+  }
+  return {
+    code: "ANALYSIS_SNAPSHOT_DATA_INCOMPLETE",
+    message: "Die Diagnose konnte nicht konsistent aufgebaut werden.",
+  };
+}
+
+function archiveConflictMessage(code: string): string {
+  if (code === "ANALYSIS_ARCHIVE_EVENT_OPEN") {
+    return "Das Tagesarchiv kann erst nach dem Schließen erstellt werden.";
+  }
+  return "Die Veranstaltungsversion wurde inzwischen geändert.";
+}
+
 export function registerAnalysisControlRoutes(
   app: WorkerApp,
   eventCoordinatorNamespace: EventCoordinatorNamespaceResolver,
@@ -128,30 +174,16 @@ export function registerAnalysisControlRoutes(
         deviceRole: device.role,
       });
     if (!capture.ok) {
-      const status =
-        capture.code === "SESSION_NOT_AUTHORIZED"
-          ? 403
-          : capture.code === "ANALYSIS_SNAPSHOT_STALE_VERSION"
-            ? 412
-            : capture.code === "ANALYSIS_SNAPSHOT_CAPTURE_FAILED"
-              ? 500
-              : 409;
+      const failure = snapshotCaptureFailure(capture.code);
       return context.json(
         {
           error: {
             code: capture.code,
-            message:
-              capture.code === "SESSION_NOT_AUTHORIZED"
-                ? "Für die Diagnose ist eine berechtigte Sitzung erforderlich."
-                : capture.code === "ANALYSIS_SNAPSHOT_STALE_VERSION"
-                  ? "Die Betriebsdaten wurden inzwischen aktualisiert."
-                  : capture.code === "ANALYSIS_SNAPSHOT_IDEMPOTENCY_CONFLICT"
-                    ? "Die Diagnoseanforderung wurde bereits mit anderen Daten verwendet."
-                    : "Der aktuelle Planungslauf konnte nicht erstellt werden.",
+            message: failure.message,
             currentVersion: capture.currentVersion,
           },
         },
-        status,
+        failure.status,
       );
     }
 
@@ -215,22 +247,12 @@ export function registerAnalysisControlRoutes(
         operationBoard: operationBoard.data as OperationBoard,
       });
     } catch (error) {
-      const code = error instanceof Error ? error.message : "ANALYSIS_SNAPSHOT_DATA_INCOMPLETE";
-      const safeCode = [
-        "ANALYSIS_SNAPSHOT_NOT_READY",
-        "ANALYSIS_SNAPSHOT_CHANGED",
-        "ANALYSIS_SNAPSHOT_DATA_INCOMPLETE",
-      ].includes(code)
-        ? code
-        : "ANALYSIS_SNAPSHOT_DATA_INCOMPLETE";
+      const failure = safeSnapshotBuildError(error);
       return context.json(
         {
           error: {
-            code: safeCode,
-            message:
-              safeCode === "ANALYSIS_SNAPSHOT_NOT_READY"
-                ? "Der aktuelle Planungslauf ist noch nicht verfügbar."
-                : "Die Diagnose konnte nicht konsistent aufgebaut werden.",
+            code: failure.code,
+            message: failure.message,
             currentVersion: (await readVersion()) ?? undefined,
           },
         },
@@ -332,10 +354,7 @@ export function registerAnalysisControlRoutes(
           {
             error: {
               code,
-              message:
-                code === "ANALYSIS_ARCHIVE_EVENT_OPEN"
-                  ? "Das Tagesarchiv kann erst nach dem Schließen erstellt werden."
-                  : "Die Veranstaltungsversion wurde inzwischen geändert.",
+              message: archiveConflictMessage(code),
             },
           },
           409,
