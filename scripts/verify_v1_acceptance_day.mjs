@@ -190,12 +190,8 @@ try {
 
   for (let index = 0; index < soldRotations.length; index += 1) {
     const rotation = soldRotations[index];
-    const aircraftId =
-      rotation.resourceGroupId === "acceptance-rg-b"
-        ? "acceptance-aircraft-b1"
-        : index % 2 === 0
-          ? "acceptance-aircraft-a1"
-          : "acceptance-aircraft-a2";
+    let aircraftId = index % 2 === 0 ? "acceptance-aircraft-a1" : "acceptance-aircraft-a2";
+    if (rotation.resourceGroupId === "acceptance-rg-b") aircraftId = "acceptance-aircraft-b1";
     const pilotId = `acceptance-pilot-0${(index % 3) + 1}`;
     const pilotAssigned = await post(
       envelope("acceptance-admin", version, "ASSIGN_AIRCRAFT_PILOT", {

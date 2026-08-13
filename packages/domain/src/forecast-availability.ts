@@ -227,19 +227,13 @@ function constraintWindow(
   constraint: QueueAvailabilityConstraint,
   scenario: "lower" | "expected" | "upper",
 ): { start: number; end: number } {
-  const start =
-    scenario === "lower"
-      ? constraint.latestStartMinutes
-      : scenario === "expected"
-        ? constraint.expectedStartMinutes
-        : constraint.earliestStartMinutes;
+  let start = constraint.earliestStartMinutes;
+  if (scenario === "lower") start = constraint.latestStartMinutes;
+  else if (scenario === "expected") start = constraint.expectedStartMinutes;
   if (constraint.active) return { start, end: Number.POSITIVE_INFINITY };
-  const duration =
-    scenario === "lower"
-      ? constraint.minimumDurationMinutes
-      : scenario === "expected"
-        ? constraint.typicalDurationMinutes
-        : constraint.maximumDurationMinutes;
+  let duration = constraint.maximumDurationMinutes;
+  if (scenario === "lower") duration = constraint.minimumDurationMinutes;
+  else if (scenario === "expected") duration = constraint.typicalDurationMinutes;
   return { start, end: start + duration };
 }
 
@@ -435,8 +429,9 @@ export function reserveNextQueueWindow(
         }
       : lane;
   });
-  const minimumWindowMargin =
-    effectiveDuration.quality === "UNCERTAIN" ? 0 : effectiveDuration.quality === "STABLE" ? 3 : 5;
+  let minimumWindowMargin = 5;
+  if (effectiveDuration.quality === "UNCERTAIN") minimumWindowMargin = 0;
+  else if (effectiveDuration.quality === "STABLE") minimumWindowMargin = 3;
   const windowLower = Math.max(
     0,
     Math.min(selected.lowerMinutes, selected.expectedMinutes - minimumWindowMargin),

@@ -96,11 +96,8 @@ async function publicStatusInstallTitle(
           )
           .bind(codeHash)
           .first<{ product_code: string; communication_number: number }>();
-  return row
-    ? formatBookingGroupLabel(row.product_code, row.communication_number)
-    : target === "group"
-      ? "Gruppenstatus"
-      : "Ticketstatus";
+  if (row) return formatBookingGroupLabel(row.product_code, row.communication_number);
+  return target === "group" ? "Gruppenstatus" : "Ticketstatus";
 }
 
 async function installableAppShellResponse(

@@ -15,6 +15,12 @@ export interface CapacityAssessment {
   saleRecommended: boolean;
 }
 
+function predictionQualityFactor(quality: PredictionQuality): number {
+  if (quality === "STABLE") return 1;
+  if (quality === "CHANGING") return 0.85;
+  return 0.6;
+}
+
 function capacityStatus(input: {
   remainingSellableSeats: number;
   predictionQuality: PredictionQuality;
@@ -50,8 +56,7 @@ export function assessRemainingCapacity(input: {
     input.activeAircraftSeats
       .filter((seats) => Number.isInteger(seats) && seats > 0)
       .reduce((sum, seats) => sum + seats, 0);
-  const qualityFactor =
-    input.predictionQuality === "STABLE" ? 1 : input.predictionQuality === "CHANGING" ? 0.85 : 0.6;
+  const qualityFactor = predictionQualityFactor(input.predictionQuality);
   const projectedSeats = Math.max(
     0,
     Math.floor(rawProjectedSeats * qualityFactor) - Math.max(0, input.reservedSeats ?? 0),

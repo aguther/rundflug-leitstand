@@ -18,6 +18,12 @@ const eventCatalogCollator = new Intl.Collator("de-DE", {
   sensitivity: "base",
 });
 
+function nextSortDirection(direction: EventSortState["direction"]): EventSortState["direction"] {
+  if (direction === "asc") return "desc";
+  if (direction === "desc") return null;
+  return "asc";
+}
+
 export function useAdminEventCatalog({
   administrator,
   board,
@@ -141,8 +147,7 @@ export function useAdminEventCatalog({
       current.key === key
         ? {
             key,
-            direction:
-              current.direction === "asc" ? "desc" : current.direction === "desc" ? null : "asc",
+            direction: nextSortDirection(current.direction),
           }
         : { key, direction: "asc" },
     );

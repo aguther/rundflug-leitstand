@@ -89,13 +89,13 @@ export function createRealtimeRefreshScheduler(
     }
     generation += 1;
     const pendingEventVersion = pendingRefresh?.eventVersion ?? null;
+    let nextEventVersion = pendingEventVersion;
+    if (eventVersion !== null) {
+      nextEventVersion =
+        pendingEventVersion === null ? eventVersion : Math.max(eventVersion, pendingEventVersion);
+    }
     pendingRefresh = {
-      eventVersion:
-        eventVersion === null
-          ? pendingEventVersion
-          : pendingEventVersion === null
-            ? eventVersion
-            : Math.max(eventVersion, pendingEventVersion),
+      eventVersion: nextEventVersion,
       forceFollowUp: forceFollowUp || (pendingRefresh?.forceFollowUp ?? false),
       generation,
     };
@@ -123,7 +123,7 @@ export function createRealtimeRefreshScheduler(
   };
 
   const startDrain = (): Promise<void> => {
-    if (drainPromise) return drainPromise;
+    if (drainPromise !== null) return drainPromise;
     const currentDrain = drain();
     drainPromise = currentDrain;
     void currentDrain.finally(() => {

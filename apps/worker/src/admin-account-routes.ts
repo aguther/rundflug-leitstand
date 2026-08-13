@@ -100,6 +100,8 @@ export function registerAdminAccountRoutes(
     }
     const pinHash = parsed.data.pin ? await dependencies.hashPin(parsed.data.pin) : null;
     const now = new Date().toISOString();
+    let active: number | null = null;
+    if (parsed.data.active !== undefined) active = parsed.data.active ? 1 : 0;
     const result = await context.env.DB.prepare(
       `UPDATE operator_accounts
           SET active = COALESCE(?1, active), pin_hash = COALESCE(?2, pin_hash),
@@ -110,13 +112,7 @@ export function registerAdminAccountRoutes(
               failed_attempts = 0, locked_until = NULL, updated_at = ?3
         WHERE id = ?4 AND deleted_at IS NULL`,
     )
-      .bind(
-        parsed.data.active === undefined ? null : parsed.data.active ? 1 : 0,
-        pinHash,
-        now,
-        accountId,
-        parsed.data.revokeSessions ? 1 : 0,
-      )
+      .bind(active, pinHash, now, accountId, parsed.data.revokeSessions ? 1 : 0)
       .run();
     if (!result.meta.changes) {
       return context.json(

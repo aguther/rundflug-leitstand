@@ -19,6 +19,19 @@ import {
   SIMULATION_MINUTE_MS as MINUTE_MS,
 } from "./simulation-primitives";
 
+function expectedAircraftAvailability(
+  aircraft: RuntimeAircraft,
+  activeRotation: RuntimeRotation | null,
+  nowMs: number,
+  referenceTotalMinutes: number,
+): number {
+  if (typeof aircraft.blockedUntilMs === "number") return aircraft.blockedUntilMs;
+  if (activeRotation?.predictedCompletionAt)
+    return Date.parse(activeRotation.predictedCompletionAt);
+  if (aircraft.state === "ACTIVE") return addMinutes(nowMs, referenceTotalMinutes);
+  return nowMs;
+}
+
 export function calculateLegacySimulationProjections(input: {
   config: SimulationConfig;
   nowMs: number;
@@ -91,13 +104,12 @@ export function calculateLegacySimulationProjections(input: {
       const activeRotation = entry.activeRotationId
         ? rotations.find((rotation) => rotation.id === entry.activeRotationId)
         : null;
-      const resourceExpectedAt =
-        entry.blockedUntilMs ??
-        (activeRotation?.predictedCompletionAt
-          ? Date.parse(activeRotation.predictedCompletionAt)
-          : entry.state === "ACTIVE"
-            ? addMinutes(nowMs, referenceTotalMinutes)
-            : nowMs);
+      const resourceExpectedAt = expectedAircraftAvailability(
+        entry,
+        activeRotation ?? null,
+        nowMs,
+        referenceTotalMinutes,
+      );
       const expectedAt = Math.max(nowMs, resourceExpectedAt, activeInterruptionEndMs ?? 0);
       const futureUncertainty = expectedAt > nowMs ? 5 * MINUTE_MS : 0;
       const constraints = [];
