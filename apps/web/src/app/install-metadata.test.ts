@@ -1,7 +1,20 @@
-import { describe, expect, it } from "vitest";
-import { installMetadataForPath, publicStatusInstallMetadata } from "./install-metadata";
+// @vitest-environment jsdom
+
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  applyInitialInstallMetadata,
+  applyInstallMetadata,
+  installMetadataForPath,
+  publicStatusInstallMetadata,
+} from "./install-metadata";
 
 describe("ansichtsspezifische Installationsmetadaten", () => {
+  afterEach(() => {
+    document.head.replaceChildren();
+    document.title = "";
+    window.history.replaceState({}, "", "/");
+  });
+
   it.each([
     [
       "/kasse",
@@ -72,5 +85,53 @@ describe("ansichtsspezifische Installationsmetadaten", () => {
       appleTitle: "G-PAN20-0133",
       documentTitle: "G-PAN20-0133 · Rundflug",
     });
+  });
+
+  it("erzeugt fehlende Dokumentmetadaten und aktualisiert vorhandene Knoten", () => {
+    const existingManifest = document.createElement("link");
+    existingManifest.rel = "manifest";
+    document.head.append(existingManifest);
+    const existingAppleTitle = document.createElement("meta");
+    existingAppleTitle.name = "apple-mobile-web-app-title";
+    document.head.append(existingAppleTitle);
+
+    applyInstallMetadata(publicStatusInstallMetadata("group", "ABCDE2345678"));
+
+    expect(document.querySelectorAll('link[rel="manifest"]')).toHaveLength(1);
+    expect(document.querySelector<HTMLLinkElement>('link[rel="manifest"]')?.href).toContain(
+      "/api/public/pwa-manifest/group/ABCDE2345678",
+    );
+    expect(document.querySelector<HTMLLinkElement>('link[rel="icon"]')?.type).toBe("image/svg+xml");
+    expect(document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]')?.href).toContain(
+      "/icons/pwa/ticket/apple-touch-icon-180.png",
+    );
+    expect(existingAppleTitle.content).toBe("Gruppenstatus");
+    expect(
+      document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-capable"]')?.content,
+    ).toBe("yes");
+    expect(document.title).toBe("Gruppenstatus · Rundflug");
+  });
+
+  it("wendet initiale Metadaten nur für installierbare Pfade an", () => {
+    window.history.replaceState({}, "", "/admin");
+    applyInitialInstallMetadata();
+    expect(document.title).toBe("Admin · Rundflug-Leitstand");
+
+    document.head.replaceChildren();
+    document.title = "Unverändert";
+    window.history.replaceState({}, "", "/unbekannt");
+    applyInitialInstallMetadata();
+    expect(document.title).toBe("Unverändert");
+    expect(document.head.querySelectorAll("link, meta")).toHaveLength(0);
+  });
+
+  it("weist öffentliche Standardtitel und ungültige Codes eindeutig zu", () => {
+    expect(publicStatusInstallMetadata("ticket", "abc/def")).toMatchObject({
+      appleTitle: "Ticketstatus",
+      documentTitle: "Ticketstatus · Rundflug",
+      manifestHref: "/api/public/pwa-manifest/ticket/abc%2Fdef",
+    });
+    expect(installMetadataForPath("/ticket/INVALID-0000")).toBeNull();
+    expect(installMetadataForPath("/gruppe/short")).toBeNull();
   });
 });
