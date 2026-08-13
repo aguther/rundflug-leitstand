@@ -154,6 +154,19 @@ function publicStatus(
   return lifecycle;
 }
 
+function sharedFlightKey(input: {
+  activeGroupPlan: boolean;
+  lifecycle: RotationLifecycle;
+  rotation: SimulationRotation;
+  snapshot: SimulationForecastSnapshot | undefined;
+  visibleAt: number;
+}): string | null {
+  if (input.activeGroupPlan) return null;
+  if (input.lifecycle !== "DRAFT") return `rotation:${input.rotation.id}`;
+  if (!visibleMilestone(input.rotation.precalledAt, input.visibleAt)) return null;
+  return input.snapshot?.dispatchBatchId ? `dispatch:${input.snapshot.dispatchBatchId}` : null;
+}
+
 function statusPriority(
   rotation: SimulationRotation,
   lifecycle: RotationLifecycle,
@@ -350,16 +363,13 @@ export function createSimulationFidsBoard(input: {
         status: activeGroupPlan
           ? "SERVICE_PAUSED"
           : publicStatus(rotation, lifecycle, input.visibleAt),
-        sharedFlightKey:
-          activeGroupPlan !== undefined
-            ? null
-            : lifecycle === "DRAFT" && visibleMilestone(rotation.precalledAt, input.visibleAt)
-              ? snapshot?.dispatchBatchId
-                ? `dispatch:${snapshot.dispatchBatchId}`
-                : null
-              : lifecycle !== "DRAFT"
-                ? `rotation:${rotation.id}`
-                : null,
+        sharedFlightKey: sharedFlightKey({
+          activeGroupPlan: activeGroupPlan !== undefined,
+          lifecycle,
+          rotation,
+          snapshot,
+          visibleAt: input.visibleAt,
+        }),
         waitLowerMinutes: window.lowerMinutes,
         waitUpperMinutes: window.upperMinutes,
         boardingWindowLowerAt: window.lowerAt,
