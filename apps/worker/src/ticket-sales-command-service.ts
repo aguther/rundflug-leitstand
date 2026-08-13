@@ -10,11 +10,128 @@ import { rowToSnapshot } from "./snapshot";
 import type { Env, StoredEventRow } from "./types";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
+type SaleProduct = {
+  id: string;
+  code: string;
+  name: string;
+  resource_group_id: string;
+  gate_id: string;
+  gate_label: string;
+  price_cents: number;
+  sale_enabled: number;
+  sale_closes_at: string | null;
+  weight_classes_json: string;
+  resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+  effective_group_capacity: number;
+};
 
 function json(data: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set("content-type", JSON_HEADERS["content-type"]);
   return new Response(JSON.stringify(data), { ...init, headers });
+}
+
+function salePrerequisiteError(product: SaleProduct, current: StoredEventRow): Response | null {
+  if (!product.gate_id) {
+    return json(
+      {
+        error: {
+          code: "PRODUCT_GATE_REQUIRED",
+          message: "Für das Produkt muss vor dem Verkauf ein Gate konfiguriert sein.",
+        },
+      },
+      { status: 409 },
+    );
+  }
+  if (current.sale_opens_at && Date.parse(current.sale_opens_at) > Date.now()) {
+    return json(
+      {
+        error: {
+          code: "SALE_NOT_OPEN",
+          message: "Der konfigurierte Verkaufsbeginn ist noch nicht erreicht.",
+        },
+      },
+      { status: 409 },
+    );
+  }
+  if (!current.operations_end_at) {
+    return json(
+      {
+        error: {
+          code: "OPERATING_END_REQUIRED",
+          message: "Betriebsende muss vor dem Verkauf konfiguriert sein.",
+        },
+      },
+      { status: 409 },
+    );
+  }
+  if (product.effective_group_capacity === 0) {
+    return json(
+      {
+        error: {
+          code: "SALE_BLOCKED_NO_AIRCRAFT",
+          message: "Der Ressourcengruppe ist kein aktives Flugzeug zugeordnet.",
+        },
+      },
+      { status: 409 },
+    );
+  }
+  return null;
+}
+
+function invalidTicketDetails(
+  ticketDetails: ReadonlyArray<{
+    weightClass: "NOT_CAPTURED" | "CHILD" | "NORMAL" | "HEAVY" | "INDIVIDUAL";
+    individualWeightKg: number | null;
+  }>,
+  allowedWeightClasses: ReadonlyArray<string>,
+): boolean {
+  return ticketDetails.some(
+    (detail) =>
+      !allowedWeightClasses.includes(detail.weightClass) ||
+      (detail.weightClass === "INDIVIDUAL" && detail.individualWeightKg === null) ||
+      (detail.weightClass !== "INDIVIDUAL" && detail.individualWeightKg !== null),
+  );
+}
+
+function saleRuleError(product: SaleProduct, current: StoredEventRow): Response | null {
+  try {
+    assertSaleAllowed({
+      eventStatus: current.status,
+      productSaleEnabled: product.sale_enabled === 1,
+      resourceGroupStatus: product.resource_group_status,
+      emergencyMode: current.emergency_mode === 1,
+      eventInterrupted: current.operational_interrupted === 1,
+      saleClosingReached:
+        product.sale_closes_at !== null && Date.parse(product.sale_closes_at) <= Date.now(),
+    });
+    return null;
+  } catch (reason: unknown) {
+    if (reason instanceof DomainRuleError) {
+      return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
+    }
+    throw reason;
+  }
+}
+
+function bookingSplitResult(input: {
+  groupSize: number;
+  referenceCapacity: number;
+  splitAcknowledged: boolean;
+}):
+  | { plan: ReturnType<typeof planBookingGroupSplit>; error: null }
+  | { plan: null; error: Response } {
+  try {
+    return { plan: planBookingGroupSplit(input), error: null };
+  } catch (reason: unknown) {
+    if (reason instanceof DomainRuleError) {
+      return {
+        plan: null,
+        error: json({ error: { code: reason.code, message: reason.message } }, { status: 409 }),
+      };
+    }
+    throw reason;
+  }
 }
 
 export class TicketSalesCommandService {
@@ -45,100 +162,25 @@ export class TicketSalesCommandService {
     WHERE p.id = ?1 AND p.operation_day_id = ?2`,
     )
       .bind(command.payload.productId, command.eventId)
-      .first<{
-        id: string;
-        code: string;
-        name: string;
-        resource_group_id: string;
-        gate_id: string;
-        gate_label: string;
-        price_cents: number;
-        sale_enabled: number;
-        sale_closes_at: string | null;
-        weight_classes_json: string;
-        resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
-        effective_group_capacity: number;
-      }>();
+      .first<SaleProduct>();
     if (!product) {
       return json(
         { error: { code: "PRODUCT_NOT_FOUND", message: "Produkt nicht gefunden." } },
         { status: 404 },
       );
     }
-    if (!product.gate_id) {
-      return json(
-        {
-          error: {
-            code: "PRODUCT_GATE_REQUIRED",
-            message: "Für das Produkt muss vor dem Verkauf ein Gate konfiguriert sein.",
-          },
-        },
-        { status: 409 },
-      );
-    }
-    if (current.sale_opens_at && Date.parse(current.sale_opens_at) > Date.now()) {
-      return json(
-        {
-          error: {
-            code: "SALE_NOT_OPEN",
-            message: "Der konfigurierte Verkaufsbeginn ist noch nicht erreicht.",
-          },
-        },
-        { status: 409 },
-      );
-    }
-    try {
-      assertSaleAllowed({
-        eventStatus: current.status,
-        productSaleEnabled: product.sale_enabled === 1,
-        resourceGroupStatus: product.resource_group_status,
-        emergencyMode: current.emergency_mode === 1,
-        eventInterrupted: current.operational_interrupted === 1,
-        saleClosingReached:
-          product.sale_closes_at !== null && Date.parse(product.sale_closes_at) <= Date.now(),
-      });
-    } catch (reason: unknown) {
-      if (reason instanceof DomainRuleError) {
-        return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
-      }
-      throw reason;
-    }
-    if (!current.operations_end_at) {
-      return json(
-        {
-          error: {
-            code: "OPERATING_END_REQUIRED",
-            message: "Betriebsende muss vor dem Verkauf konfiguriert sein.",
-          },
-        },
-        { status: 409 },
-      );
-    }
+    const prerequisiteError = salePrerequisiteError(product, current);
+    if (prerequisiteError) return prerequisiteError;
+    const ruleError = saleRuleError(product, current);
+    if (ruleError) return ruleError;
     const effectiveGroupCapacity = product.effective_group_capacity;
-    if (effectiveGroupCapacity === 0) {
-      return json(
-        {
-          error: {
-            code: "SALE_BLOCKED_NO_AIRCRAFT",
-            message: "Der Ressourcengruppe ist kein aktives Flugzeug zugeordnet.",
-          },
-        },
-        { status: 409 },
-      );
-    }
-    let splitPlan: ReturnType<typeof planBookingGroupSplit>;
-    try {
-      splitPlan = planBookingGroupSplit({
-        groupSize: command.payload.ticketCount,
-        referenceCapacity: effectiveGroupCapacity,
-        splitAcknowledged: command.payload.oversizeSplitAcknowledged,
-      });
-    } catch (reason: unknown) {
-      if (reason instanceof DomainRuleError) {
-        return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
-      }
-      throw reason;
-    }
+    const split = bookingSplitResult({
+      groupSize: command.payload.ticketCount,
+      referenceCapacity: effectiveGroupCapacity,
+      splitAcknowledged: command.payload.oversizeSplitAcknowledged,
+    });
+    if (split.error) return split.error;
+    const splitPlan = split.plan;
     const requiredFlightGroupCount = splitPlan.slotSizes.length;
 
     const allowedWeightClasses = JSON.parse(product.weight_classes_json) as Array<
@@ -162,15 +204,7 @@ export class TicketSalesCommandService {
         { status: 409 },
       );
     }
-    if (
-      ticketDetailsProvided &&
-      ticketDetails.some(
-        (detail) =>
-          !allowedWeightClasses.includes(detail.weightClass) ||
-          (detail.weightClass === "INDIVIDUAL" && detail.individualWeightKg === null) ||
-          (detail.weightClass !== "INDIVIDUAL" && detail.individualWeightKg !== null),
-      )
-    ) {
+    if (ticketDetailsProvided && invalidTicketDetails(ticketDetails, allowedWeightClasses)) {
       return json(
         {
           error: {
