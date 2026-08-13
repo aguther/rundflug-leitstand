@@ -139,6 +139,50 @@ function recurringRuleDueLabel(rule: RecurringOperationalRule): string {
   return `in ${remaining} ${unit}`;
 }
 
+function canSavePlannedOperation({
+  afterRotationId,
+  durationMultiplierPercent,
+  earliestStartAt,
+  effectMode,
+  eligibleRotations,
+  latestStartAt,
+  maximumDurationMinutes,
+  minimumDurationMinutes,
+  scopeId,
+  scopeType,
+  startMode,
+  typicalDurationMinutes,
+}: Readonly<{
+  afterRotationId: string;
+  durationMultiplierPercent: number;
+  earliestStartAt: string | null;
+  effectMode: PlannedOperation["effectMode"];
+  eligibleRotations: readonly OperationBoard["rotations"][number][];
+  latestStartAt: string | null;
+  maximumDurationMinutes: number;
+  minimumDurationMinutes: number;
+  scopeId: string;
+  scopeType: PlanScopeType;
+  startMode: PlannedOperation["startMode"];
+  typicalDurationMinutes: number;
+}>): boolean {
+  const validDurations =
+    minimumDurationMinutes >= 1 &&
+    minimumDurationMinutes <= typicalDurationMinutes &&
+    typicalDurationMinutes <= maximumDurationMinutes;
+  const validEffect =
+    effectMode === "BLOCKING" ||
+    (durationMultiplierPercent >= 110 && durationMultiplierPercent <= 300);
+  const validScope = scopeType === "EVENT" || scopeId.length > 0;
+  if (!validDurations || !validEffect || !validScope) return false;
+  if (startMode === "AFTER_CURRENT_ROTATION") {
+    return eligibleRotations.some((rotation) => rotation.id === afterRotationId);
+  }
+  return Boolean(
+    earliestStartAt && latestStartAt && Date.parse(earliestStartAt) <= Date.parse(latestStartAt),
+  );
+}
+
 function eligibleRotationsForPlan(
   rotations: OperationBoard["rotations"],
   scopeType: PlanScopeType,
@@ -792,8 +836,8 @@ export function OperationalPlanPanel({
   onUpsert,
   onUpsertRecurringRule,
 }: Readonly<OperationalPlanPanelProps>) {
-  const showPlans = content === "combined" || content === "plans";
-  const showRules = content === "combined" || content === "rules";
+  const showPlans = content !== "rules";
+  const showRules = content !== "plans";
   const [editorOpen, setEditorOpen] = useState(false);
   const [planEditorId, setPlanEditorId] = useState<string | null>(null);
   const [planExpectedVersion, setPlanExpectedVersion] = useState<number | null>(null);
@@ -939,16 +983,20 @@ export function OperationalPlanPanel({
     planStartMode === "TIME_WINDOW" && planLatestStart
       ? eventLocalDateTimeToIso(planLatestStart, eventTimeZone)
       : null;
-  const canSavePlan =
-    planMinimumDuration >= 1 &&
-    planMinimumDuration <= planTypicalDuration &&
-    planTypicalDuration <= planMaximumDuration &&
-    (planEffectMode === "BLOCKING" ||
-      (planDurationMultiplierPercent >= 110 && planDurationMultiplierPercent <= 300)) &&
-    (planScopeType === "EVENT" || planScopeId.length > 0) &&
-    (planStartMode === "TIME_WINDOW"
-      ? Boolean(earliestIso && latestIso && Date.parse(earliestIso) <= Date.parse(latestIso))
-      : eligiblePlanRotations.some((rotation) => rotation.id === planAfterRotationId));
+  const canSavePlan = canSavePlannedOperation({
+    afterRotationId: planAfterRotationId,
+    durationMultiplierPercent: planDurationMultiplierPercent,
+    earliestStartAt: earliestIso,
+    effectMode: planEffectMode,
+    eligibleRotations: eligiblePlanRotations,
+    latestStartAt: latestIso,
+    maximumDurationMinutes: planMaximumDuration,
+    minimumDurationMinutes: planMinimumDuration,
+    scopeId: planScopeId,
+    scopeType: planScopeType,
+    startMode: planStartMode,
+    typicalDurationMinutes: planTypicalDuration,
+  });
 
   async function savePlannedOperation() {
     await onUpsert({

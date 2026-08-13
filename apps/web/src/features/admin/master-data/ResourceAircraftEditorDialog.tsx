@@ -35,6 +35,11 @@ export function ResourceAircraftEditorDialog({
   submitAttempted,
 }: Readonly<ResourceAircraftEditorDialogProps>) {
   const resourceGroupSelected = category === "resource-groups";
+  const resourceAction = resourceEditor.editorId === "new" ? "anlegen" : "bearbeiten";
+  const aircraftAction = aircraftEditor.editorId === "new" ? "anlegen" : "bearbeiten";
+  const title = resourceGroupSelected
+    ? `Ressourcengruppe ${resourceAction}`
+    : `Flugzeug ${aircraftAction}`;
   return (
     <ModalDialog
       bodyClassName="master-data-editor-body"
@@ -45,15 +50,7 @@ export function ResourceAircraftEditorDialog({
       onClose={onClose}
       open={open}
       size={resourceGroupSelected ? "wide" : "default"}
-      title={
-        resourceGroupSelected
-          ? resourceEditor.editorId === "new"
-            ? "Ressourcengruppe anlegen"
-            : "Ressourcengruppe bearbeiten"
-          : aircraftEditor.editorId === "new"
-            ? "Flugzeug anlegen"
-            : "Flugzeug bearbeiten"
-      }
+      title={title}
     >
       <div className="resource-master-grid">
         <fieldset hidden={!resourceGroupSelected}>

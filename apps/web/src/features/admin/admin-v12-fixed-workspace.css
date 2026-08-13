@@ -875,6 +875,12 @@
   height: 100dvh;
   border: 0;
   border-radius: 0;
+  inset: auto;
+  margin: 0;
+}
+
+.factory-reset-form {
+  display: contents;
 }
 .factory-reset-dialog .dialog-actions {
   position: sticky;

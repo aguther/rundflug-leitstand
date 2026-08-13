@@ -14,6 +14,43 @@ const completionTabs = [
   { value: "corrections", label: "Administrative Korrekturen" },
 ] satisfies Array<{ value: CompletionTab; label: string }>;
 
+function CorrectionGate({ onStart }: Readonly<{ onStart: () => void }>) {
+  return (
+    <div className="completion-correction-gate">
+      <span className="admin-only-badge">Nur Administration</span>
+      <h2>Dokumentierte Besetzung korrigieren</h2>
+      <p>
+        Dieser Sonderweg berichtigt ausschließlich die Dokumentation. Er besitzt keine
+        flugbetriebliche oder sicherheitsbezogene Freigabewirkung.
+      </p>
+      <Button onClick={onStart} type="button" variant="primary">
+        Korrektur beginnen
+      </Button>
+    </div>
+  );
+}
+
+function CompletionPanelContent({
+  activeTab,
+  correctionStarted,
+  corrections,
+  onStartCorrection,
+  panels,
+  tab,
+}: Readonly<{
+  activeTab: CompletionTab;
+  correctionStarted: boolean;
+  corrections: ReactNode;
+  onStartCorrection: () => void;
+  panels: Record<Exclude<CompletionTab, "corrections">, ReactNode>;
+  tab: CompletionTab;
+}>) {
+  if (activeTab !== tab) return null;
+  if (tab !== "corrections") return panels[tab];
+  if (correctionStarted) return corrections;
+  return <CorrectionGate onStart={onStartCorrection} />;
+}
+
 export function CompletionWorkspace({
   board,
   summary,
@@ -61,25 +98,14 @@ export function CompletionWorkspace({
           key={tab.value}
           role="tabpanel"
         >
-          {activeTab !== tab.value ? null : tab.value === "corrections" ? (
-            correctionStarted ? (
-              corrections
-            ) : (
-              <div className="completion-correction-gate">
-                <span className="admin-only-badge">Nur Administration</span>
-                <h2>Dokumentierte Besetzung korrigieren</h2>
-                <p>
-                  Dieser Sonderweg berichtigt ausschließlich die Dokumentation. Er besitzt keine
-                  flugbetriebliche oder sicherheitsbezogene Freigabewirkung.
-                </p>
-                <Button onClick={() => setCorrectionStarted(true)} type="button" variant="primary">
-                  Korrektur beginnen
-                </Button>
-              </div>
-            )
-          ) : (
-            panels[tab.value]
-          )}
+          <CompletionPanelContent
+            activeTab={activeTab}
+            correctionStarted={correctionStarted}
+            corrections={corrections}
+            onStartCorrection={() => setCorrectionStarted(true)}
+            panels={panels}
+            tab={tab.value}
+          />
         </section>
       ))}
     </EventWorkspaceFrame>

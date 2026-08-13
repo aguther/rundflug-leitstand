@@ -27,7 +27,7 @@ function FlowTooltip({
   timeZone,
 }: Readonly<{
   active?: boolean;
-  label?: number | undefined;
+  label?: number;
   payload?: ReadonlyArray<{ dataKey?: unknown; value?: unknown }>;
   timeZone: string;
 }>) {
@@ -157,14 +157,7 @@ export function AdminEventFlowChart({
             />
             <YAxis allowDecimals={false} domain={[0, "dataMax + 1"]} width={38} />
             <Tooltip
-              content={(props) => (
-                <FlowTooltip
-                  active={props.active}
-                  label={typeof props.label === "number" ? props.label : undefined}
-                  payload={props.payload}
-                  timeZone={timeZone}
-                />
-              )}
+              content={<FlowTooltip timeZone={timeZone} />}
               cursor={{ stroke: "var(--ui-border-strong)", strokeDasharray: "3 4" }}
             />
             <Area
