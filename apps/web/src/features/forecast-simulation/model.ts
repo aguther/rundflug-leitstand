@@ -691,8 +691,7 @@ function localDate(value: string, timeZone: string): string {
   }).format(new Date(value));
 }
 
-export function validateSimulationConfig(config: SimulationConfig): string[] {
-  const errors: string[] = [];
+function validateBasicSimulationConfig(config: SimulationConfig, errors: string[]): void {
   for (const [label, distribution, allowZero] of [
     ["Boarding", config.realityModel.phases.boarding, false],
     ["Flug", config.realityModel.phases.flight, false],
@@ -744,6 +743,9 @@ export function validateSimulationConfig(config: SimulationConfig): string[] {
   }
   if (!Number.isInteger(config.seed) || config.seed < 1 || config.seed > 4_294_967_295)
     errors.push("Der Seed muss eine positive 32-Bit-Ganzzahl sein.");
+}
+
+function validateSimulationSchedule(config: SimulationConfig, errors: string[]): void {
   const scheduleValues = [
     config.schedule.salesStartAt,
     config.schedule.salesEndAt,
@@ -775,6 +777,9 @@ export function validateSimulationConfig(config: SimulationConfig): string[] {
       errors.push("Der Verkauf darf nicht nach dem Flugbetrieb enden.");
     }
   }
+}
+
+function validateDemandConfiguration(config: SimulationConfig, errors: string[]): void {
   const demandDuration = salesDurationMinutes(config.schedule);
   if (!config.operationalModel) {
     const demandWindows = [...config.realityModel.demand.windows].sort(
@@ -803,162 +808,231 @@ export function validateSimulationConfig(config: SimulationConfig): string[] {
       }
     }
   }
+}
+
+type OperationalModel = NonNullable<SimulationConfig["operationalModel"]>;
+
+interface OperationalIdentifiers {
+  aircraft: Set<string>;
+  gates: Set<string>;
+  pilots: Set<string>;
+  products: Set<string>;
+  resourceGroups: Set<string>;
+}
+
+function operationalIdentifiers(model: OperationalModel): OperationalIdentifiers {
+  return {
+    aircraft: new Set(model.aircraft.map((entry) => entry.id)),
+    gates: new Set(model.gates.map((entry) => entry.id)),
+    pilots: new Set(model.pilots.map((entry) => entry.id)),
+    products: new Set(model.products.map((entry) => entry.id)),
+    resourceGroups: new Set(model.resourceGroups.map((entry) => entry.id)),
+  };
+}
+
+function validateOperationalCollections(model: OperationalModel, errors: string[]): void {
+  for (const [label, ids] of [
+    ["Gate", model.gates.map((entry) => entry.id)],
+    ["Ressourcengruppe", model.resourceGroups.map((entry) => entry.id)],
+    ["Flugzeug", model.aircraft.map((entry) => entry.id)],
+    ["Pilot", model.pilots.map((entry) => entry.id)],
+    ["Produkt", model.products.map((entry) => entry.id)],
+  ] as const) {
+    if (new Set(ids).size !== ids.length) {
+      errors.push(`${label}-Kennungen müssen eindeutig sein.`);
+    }
+  }
+  if (model.gates.length === 0) errors.push("Der Import enthält kein Gate.");
+  if (model.resourceGroups.length === 0) errors.push("Der Import enthält keine Ressourcengruppe.");
+  if (model.aircraft.length === 0) errors.push("Der Import enthält kein Flugzeug.");
+  if (model.products.length === 0) errors.push("Der Import enthält kein Produkt.");
+}
+
+function validateOperationalReferences(
+  config: SimulationConfig,
+  model: OperationalModel,
+  ids: OperationalIdentifiers,
+  errors: string[],
+): void {
+  validateOperationalCollections(model, errors);
+  for (const group of model.resourceGroups) {
+    if (!ids.gates.has(group.gateId)) {
+      errors.push(`Ressourcengruppe ${group.shortCode} verweist auf ein unbekanntes Gate.`);
+    }
+  }
+  for (const entry of model.aircraft) {
+    if (!entry.resourceGroupId || !ids.resourceGroups.has(entry.resourceGroupId)) {
+      errors.push(`Flugzeug ${entry.registration} besitzt keine gültige Ressourcengruppe.`);
+    }
+  }
+  for (const product of model.products) {
+    if (!ids.resourceGroups.has(product.resourceGroupId) || !ids.gates.has(product.gateId)) {
+      errors.push(`Produkt ${product.code} besitzt ungültige Gruppen- oder Gate-Verweise.`);
+    }
+  }
+  for (const productId of Object.keys(config.demandByProduct ?? {})) {
+    if (!ids.products.has(productId)) {
+      errors.push(`Die Nachfrage verweist auf ein unbekanntes Produkt (${productId}).`);
+    }
+  }
+}
+
+function validateProductDemand(
+  config: SimulationConfig,
+  model: OperationalModel,
+  errors: string[],
+): void {
+  const demandDuration = salesDurationMinutes(config.schedule);
+  for (const product of model.products) {
+    const demand = config.demandByProduct?.[product.id];
+    if (!demand) {
+      errors.push(`Für Produkt ${product.code} fehlt ein Nachfragemodell.`);
+      continue;
+    }
+    const windows = [...demand.windows].sort(
+      (left, right) =>
+        left.startOffsetMinutes - right.startOffsetMinutes ||
+        left.endOffsetMinutes - right.endOffsetMinutes,
+    );
+    for (const [index, window] of windows.entries()) {
+      if (
+        !Number.isInteger(window.startOffsetMinutes) ||
+        !Number.isInteger(window.endOffsetMinutes) ||
+        window.startOffsetMinutes < 0 ||
+        window.endOffsetMinutes <= window.startOffsetMinutes ||
+        window.endOffsetMinutes > demandDuration ||
+        !Number.isFinite(window.personsPerHour) ||
+        window.personsPerHour < 0
+      ) {
+        errors.push(`Nachfragefenster ${index + 1} für Produkt ${product.code} ist ungültig.`);
+      }
+      if (index > 0 && (windows[index - 1]?.endOffsetMinutes ?? 0) > window.startOffsetMinutes) {
+        errors.push(`Nachfragefenster für Produkt ${product.code} überlappen sich.`);
+      }
+    }
+  }
+}
+
+function plannedOperationTargetIsValid(
+  operation: SimulationConfig["plannedOperations"][number],
+  ids: OperationalIdentifiers,
+): boolean {
+  if (operation.scopeType === "EVENT") return operation.scopeId === "event";
+  if (operation.scopeType === "RESOURCE_GROUP") return ids.resourceGroups.has(operation.scopeId);
+  if (operation.scopeType === "AIRCRAFT") return ids.aircraft.has(operation.scopeId);
+  return ids.pilots.has(operation.scopeId);
+}
+
+function validatePlannedOperations(
+  config: SimulationConfig,
+  ids: OperationalIdentifiers,
+  errors: string[],
+): void {
+  const operationIds = new Set<string>();
+  for (const operation of config.plannedOperations) {
+    if (operationIds.has(operation.key)) {
+      errors.push(`Planeintrag ${operation.key} ist doppelt vorhanden.`);
+    }
+    operationIds.add(operation.key);
+    validatePlannedOperation(operation, ids, errors);
+  }
+}
+
+function validatePlannedOperation(
+  operation: SimulationConfig["plannedOperations"][number],
+  ids: OperationalIdentifiers,
+  errors: string[],
+): void {
+  if (operation.unresolvedAfterCurrentRotation) {
+    errors.push(
+      `Planeintrag ${operation.key} beginnt „nach aktuellem Umlauf“ und muss vor dem Lauf umgewandelt oder ausgeschlossen werden.`,
+    );
+  }
+  if (!plannedOperationTargetIsValid(operation, ids)) {
+    errors.push(`Planeintrag ${operation.key} verweist auf ein unbekanntes Ziel.`);
+  }
+  if (
+    operation.minimumDurationMinutes < 1 ||
+    operation.minimumDurationMinutes > operation.typicalDurationMinutes ||
+    operation.typicalDurationMinutes > operation.maximumDurationMinutes
+  ) {
+    errors.push(`Planeintrag ${operation.key} besitzt eine ungültige Dauer.`);
+  }
+  if (
+    (operation.effectMode === "BLOCKING" &&
+      operation.durationMultiplierPercent !== null &&
+      operation.durationMultiplierPercent !== undefined) ||
+    (operation.effectMode === "SLOWDOWN" &&
+      (!Number.isInteger(operation.durationMultiplierPercent) ||
+        (operation.durationMultiplierPercent ?? 0) < 110 ||
+        (operation.durationMultiplierPercent ?? 0) > 300))
+  ) {
+    errors.push(`Planeintrag ${operation.key} besitzt einen ungültigen Verzögerungsfaktor.`);
+  }
+  if (
+    operation.startMode === "TIME_WINDOW" &&
+    (!operation.earliestStartAt ||
+      !operation.latestStartAt ||
+      Number.isNaN(Date.parse(operation.earliestStartAt)) ||
+      Number.isNaN(Date.parse(operation.latestStartAt)) ||
+      Date.parse(operation.earliestStartAt) > Date.parse(operation.latestStartAt))
+  ) {
+    errors.push(`Planeintrag ${operation.key} besitzt ein ungültiges Startzeitfenster.`);
+  }
+  if (operation.startMode === "AFTER_CURRENT_ROTATION" && !operation.afterRotationId) {
+    errors.push(`Planeintrag ${operation.key} benötigt einen simulierten Bezugsumlauf.`);
+  }
+}
+
+function validateRecurringRules(
+  config: SimulationConfig,
+  ids: OperationalIdentifiers,
+  errors: string[],
+): void {
+  const activeRuleTargets = new Set<string>();
+  for (const rule of config.recurringRules ?? []) {
+    const identity = `${rule.scopeType}:${rule.scopeId}:${rule.kind}`;
+    if (activeRuleTargets.has(identity)) {
+      errors.push(`Für ${rule.scopeId} ist die Regelart ${rule.kind} doppelt vorhanden.`);
+    }
+    activeRuleTargets.add(identity);
+    const targetValid =
+      rule.scopeType === "AIRCRAFT" ? ids.aircraft.has(rule.scopeId) : ids.pilots.has(rule.scopeId);
+    if (!targetValid) {
+      errors.push(`Regel ${rule.key} verweist auf ein unbekanntes Ziel.`);
+    }
+    if (rule.kind === "REFUELING" && rule.scopeType !== "AIRCRAFT") {
+      errors.push(`Regel ${rule.key}: Tanken ist nur für Flugzeuge zulässig.`);
+    }
+    if (!Number.isInteger(rule.intervalValue) || rule.intervalValue < 1) {
+      errors.push(`Regel ${rule.key} besitzt ein ungültiges Intervall.`);
+    }
+    if (
+      rule.minimumDurationMinutes < 1 ||
+      rule.minimumDurationMinutes > rule.typicalDurationMinutes ||
+      rule.typicalDurationMinutes > rule.maximumDurationMinutes
+    ) {
+      errors.push(`Regel ${rule.key} besitzt eine ungültige Dauer.`);
+    }
+  }
+}
+
+function validateOperationalConfiguration(config: SimulationConfig, errors: string[]): void {
   if (config.operationalModel) {
     const model = config.operationalModel;
-    const gateIds = new Set(model.gates.map((entry) => entry.id));
-    const resourceGroupIds = new Set(model.resourceGroups.map((entry) => entry.id));
-    const aircraftIds = new Set(model.aircraft.map((entry) => entry.id));
-    const pilotIds = new Set(model.pilots.map((entry) => entry.id));
-    const productIds = new Set(model.products.map((entry) => entry.id));
-    for (const [label, ids] of [
-      ["Gate", model.gates.map((entry) => entry.id)],
-      ["Ressourcengruppe", model.resourceGroups.map((entry) => entry.id)],
-      ["Flugzeug", model.aircraft.map((entry) => entry.id)],
-      ["Pilot", model.pilots.map((entry) => entry.id)],
-      ["Produkt", model.products.map((entry) => entry.id)],
-    ] as const) {
-      if (new Set(ids).size !== ids.length) {
-        errors.push(`${label}-Kennungen müssen eindeutig sein.`);
-      }
-    }
-    if (model.gates.length === 0) errors.push("Der Import enthält kein Gate.");
-    if (model.resourceGroups.length === 0)
-      errors.push("Der Import enthält keine Ressourcengruppe.");
-    if (model.aircraft.length === 0) errors.push("Der Import enthält kein Flugzeug.");
-    if (model.products.length === 0) errors.push("Der Import enthält kein Produkt.");
-    for (const group of model.resourceGroups) {
-      if (!gateIds.has(group.gateId)) {
-        errors.push(`Ressourcengruppe ${group.shortCode} verweist auf ein unbekanntes Gate.`);
-      }
-    }
-    for (const entry of model.aircraft) {
-      if (!entry.resourceGroupId || !resourceGroupIds.has(entry.resourceGroupId)) {
-        errors.push(`Flugzeug ${entry.registration} besitzt keine gültige Ressourcengruppe.`);
-      }
-    }
-    for (const product of model.products) {
-      if (!resourceGroupIds.has(product.resourceGroupId) || !gateIds.has(product.gateId)) {
-        errors.push(`Produkt ${product.code} besitzt ungültige Gruppen- oder Gate-Verweise.`);
-      }
-    }
-    for (const productId of Object.keys(config.demandByProduct ?? {})) {
-      if (!productIds.has(productId)) {
-        errors.push(`Die Nachfrage verweist auf ein unbekanntes Produkt (${productId}).`);
-      }
-    }
-    for (const product of model.products) {
-      const demand = config.demandByProduct?.[product.id];
-      if (!demand) {
-        errors.push(`Für Produkt ${product.code} fehlt ein Nachfragemodell.`);
-        continue;
-      }
-      const windows = [...demand.windows].sort(
-        (left, right) =>
-          left.startOffsetMinutes - right.startOffsetMinutes ||
-          left.endOffsetMinutes - right.endOffsetMinutes,
-      );
-      for (const [index, window] of windows.entries()) {
-        if (
-          !Number.isInteger(window.startOffsetMinutes) ||
-          !Number.isInteger(window.endOffsetMinutes) ||
-          window.startOffsetMinutes < 0 ||
-          window.endOffsetMinutes <= window.startOffsetMinutes ||
-          window.endOffsetMinutes > demandDuration ||
-          !Number.isFinite(window.personsPerHour) ||
-          window.personsPerHour < 0
-        ) {
-          errors.push(`Nachfragefenster ${index + 1} für Produkt ${product.code} ist ungültig.`);
-        }
-        if (index > 0 && (windows[index - 1]?.endOffsetMinutes ?? 0) > window.startOffsetMinutes) {
-          errors.push(`Nachfragefenster für Produkt ${product.code} überlappen sich.`);
-        }
-      }
-    }
-    const operationIds = new Set<string>();
-    for (const operation of config.plannedOperations) {
-      if (operationIds.has(operation.key)) {
-        errors.push(`Planeintrag ${operation.key} ist doppelt vorhanden.`);
-      }
-      operationIds.add(operation.key);
-      if (operation.unresolvedAfterCurrentRotation) {
-        errors.push(
-          `Planeintrag ${operation.key} beginnt „nach aktuellem Umlauf“ und muss vor dem Lauf umgewandelt oder ausgeschlossen werden.`,
-        );
-      }
-      const targetValid =
-        operation.scopeType === "EVENT"
-          ? operation.scopeId === "event"
-          : operation.scopeType === "RESOURCE_GROUP"
-            ? resourceGroupIds.has(operation.scopeId)
-            : operation.scopeType === "AIRCRAFT"
-              ? aircraftIds.has(operation.scopeId)
-              : pilotIds.has(operation.scopeId);
-      if (!targetValid) {
-        errors.push(`Planeintrag ${operation.key} verweist auf ein unbekanntes Ziel.`);
-      }
-      if (
-        operation.minimumDurationMinutes < 1 ||
-        operation.minimumDurationMinutes > operation.typicalDurationMinutes ||
-        operation.typicalDurationMinutes > operation.maximumDurationMinutes
-      ) {
-        errors.push(`Planeintrag ${operation.key} besitzt eine ungültige Dauer.`);
-      }
-      if (
-        (operation.effectMode === "BLOCKING" &&
-          operation.durationMultiplierPercent !== null &&
-          operation.durationMultiplierPercent !== undefined) ||
-        (operation.effectMode === "SLOWDOWN" &&
-          (!Number.isInteger(operation.durationMultiplierPercent) ||
-            (operation.durationMultiplierPercent ?? 0) < 110 ||
-            (operation.durationMultiplierPercent ?? 0) > 300))
-      ) {
-        errors.push(`Planeintrag ${operation.key} besitzt einen ungültigen Verzögerungsfaktor.`);
-      }
-      if (
-        operation.startMode === "TIME_WINDOW" &&
-        (!operation.earliestStartAt ||
-          !operation.latestStartAt ||
-          Number.isNaN(Date.parse(operation.earliestStartAt)) ||
-          Number.isNaN(Date.parse(operation.latestStartAt)) ||
-          Date.parse(operation.earliestStartAt) > Date.parse(operation.latestStartAt))
-      ) {
-        errors.push(`Planeintrag ${operation.key} besitzt ein ungültiges Startzeitfenster.`);
-      }
-      if (operation.startMode === "AFTER_CURRENT_ROTATION" && !operation.afterRotationId) {
-        errors.push(`Planeintrag ${operation.key} benötigt einen simulierten Bezugsumlauf.`);
-      }
-    }
-    const activeRuleTargets = new Set<string>();
-    for (const rule of config.recurringRules ?? []) {
-      const identity = `${rule.scopeType}:${rule.scopeId}:${rule.kind}`;
-      if (activeRuleTargets.has(identity)) {
-        errors.push(`Für ${rule.scopeId} ist die Regelart ${rule.kind} doppelt vorhanden.`);
-      }
-      activeRuleTargets.add(identity);
-      const targetValid =
-        rule.scopeType === "AIRCRAFT" ? aircraftIds.has(rule.scopeId) : pilotIds.has(rule.scopeId);
-      if (!targetValid) {
-        errors.push(`Regel ${rule.key} verweist auf ein unbekanntes Ziel.`);
-      }
-      if (rule.kind === "REFUELING" && rule.scopeType !== "AIRCRAFT") {
-        errors.push(`Regel ${rule.key}: Tanken ist nur für Flugzeuge zulässig.`);
-      }
-      if (!Number.isInteger(rule.intervalValue) || rule.intervalValue < 1) {
-        errors.push(`Regel ${rule.key} besitzt ein ungültiges Intervall.`);
-      }
-      if (
-        rule.minimumDurationMinutes < 1 ||
-        rule.minimumDurationMinutes > rule.typicalDurationMinutes ||
-        rule.typicalDurationMinutes > rule.maximumDurationMinutes
-      ) {
-        errors.push(`Regel ${rule.key} besitzt eine ungültige Dauer.`);
-      }
-    }
+    const ids = operationalIdentifiers(model);
+    validateOperationalReferences(config, model, ids, errors);
+    validateProductDemand(config, model, errors);
+    validatePlannedOperations(config, ids, errors);
+    validateRecurringRules(config, ids, errors);
   } else if (config.plannedOperations.length > 0) {
     errors.push("Geplante Unterbrechungen benötigen importierte operative Stammdaten.");
   } else if ((config.recurringRules ?? []).length > 0) {
     errors.push("Wiederkehrende Regeln benötigen importierte operative Stammdaten.");
   }
+}
+
+function validateIncidentConfiguration(config: SimulationConfig, errors: string[]): void {
   if (
     config.realityModel.incidents.refueling.enabled &&
     config.realityModel.incidents.refueling.everyRotations < 1
@@ -979,6 +1053,9 @@ export function validateSimulationConfig(config: SimulationConfig): string[] {
     config.realityModel.incidents.technicalDefect.dayOutageProbability > 1
   )
     errors.push("Die Tagesausfallwahrscheinlichkeit muss zwischen 0 und 100 Prozent liegen.");
+}
+
+function validateForecastConfiguration(config: SimulationConfig, errors: string[]): void {
   const forecast = config.forecastTuning.forecast;
   if (
     !Number.isInteger(forecast.maximumSamples) ||
@@ -1030,5 +1107,15 @@ export function validateSimulationConfig(config: SimulationConfig): string[] {
     config.forecastTuning.comparisonRuns > 100
   )
     errors.push("Der A/B-Vergleich muss zwischen 5 und 100 Läufe verwenden.");
+}
+
+export function validateSimulationConfig(config: SimulationConfig): string[] {
+  const errors: string[] = [];
+  validateBasicSimulationConfig(config, errors);
+  validateSimulationSchedule(config, errors);
+  validateDemandConfiguration(config, errors);
+  validateOperationalConfiguration(config, errors);
+  validateIncidentConfiguration(config, errors);
+  validateForecastConfiguration(config, errors);
   return errors;
 }
