@@ -33,6 +33,10 @@ const percentile95 = (values) => {
 };
 const timestamp = (tick) =>
   new Date(Date.parse("2026-08-02T08:00:00.000Z") + tick * 30_000).toISOString();
+const anchorReason = (anchor, tick) => {
+  if (!anchor) return null;
+  return tick === 0 ? "INITIAL_RUN" : "PERIODIC_ANCHOR";
+};
 
 const workDirectory = mkdtempSync(join(tmpdir(), "rundflug-analysis-scale-"));
 const databasePath = join(workDirectory, "scale.sqlite");
@@ -136,30 +140,32 @@ try {
     ),
   });
   for (let offset = 0; offset < ROTATIONS; offset += 50) {
-    contextEntries.push({
-      kind: "ROTATIONS_QUEUE",
-      partitionKey: `resource-1:${offset / 50}`,
-      chunkId: persistChunk(
-        "ROTATIONS_QUEUE",
-        rotationInputs.slice(offset, offset + 50),
-        timestamp(0),
-      ),
-    });
-    contextEntries.push({
-      kind: "OPERATIONAL_CONSTRAINTS",
-      partitionKey: `resource-1:${offset / 50}`,
-      chunkId: persistChunk(
-        "OPERATIONAL_CONSTRAINTS",
-        rotationInputs.slice(offset, offset + 50).map((rotation) => ({
-          id: `rotation:${rotation.id}`,
-          resourceGroupId: "resource-1",
-          constraints: [],
-          turnaroundProfiles: [],
-          confirmedTurnaroundProfile: null,
-        })),
-        timestamp(0),
-      ),
-    });
+    contextEntries.push(
+      {
+        kind: "ROTATIONS_QUEUE",
+        partitionKey: `resource-1:${offset / 50}`,
+        chunkId: persistChunk(
+          "ROTATIONS_QUEUE",
+          rotationInputs.slice(offset, offset + 50),
+          timestamp(0),
+        ),
+      },
+      {
+        kind: "OPERATIONAL_CONSTRAINTS",
+        partitionKey: `resource-1:${offset / 50}`,
+        chunkId: persistChunk(
+          "OPERATIONAL_CONSTRAINTS",
+          rotationInputs.slice(offset, offset + 50).map((rotation) => ({
+            id: `rotation:${rotation.id}`,
+            resourceGroupId: "resource-1",
+            constraints: [],
+            turnaroundProfiles: [],
+            confirmedTurnaroundProfile: null,
+          })),
+          timestamp(0),
+        ),
+      },
+    );
   }
   contextEntries.sort(
     (left, right) =>
@@ -302,7 +308,7 @@ try {
       calculationNow,
       calculationNow,
       anchor ? "ANCHOR" : "REFERENCE",
-      anchor ? (tick === 0 ? "INITIAL_RUN" : "PERIODIC_ANCHOR") : null,
+      anchorReason(anchor, tick),
       sha256(`${calculationNow}:dispatch`),
       forecastDigest,
       semanticDigest,
