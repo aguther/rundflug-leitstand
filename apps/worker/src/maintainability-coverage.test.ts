@@ -69,7 +69,7 @@ describe("V1 maintainability and portability boundaries", () => {
       jsdom: "^30.0.1",
       mermaid: "11.16.1",
       typescript: "7.0.2",
-      wrangler: "4.112.0",
+      wrangler: "4.122.0",
     });
     expect(webManifest.dependencies).toMatchObject({ "lucide-react": "^1.28.0" });
     expect(webManifest.devDependencies).toMatchObject({
@@ -83,13 +83,14 @@ describe("V1 maintainability and portability boundaries", () => {
       "esbuild@0.28.1": true,
       "workerd@1.20260714.1": true,
       "workerd@1.20260801.1": true,
+      "workerd@1.20260811.1": true,
       sharp: false,
     });
     expect(packageLock.packages?.["node_modules/wrangler"]).toMatchObject({
-      version: "4.112.0",
+      version: "4.122.0",
       dependencies: {
-        miniflare: "4.20260714.0",
-        workerd: "1.20260714.1",
+        miniflare: "5.20260811.0-alpha",
+        workerd: "1.20260811.1",
       },
     });
     expect(
