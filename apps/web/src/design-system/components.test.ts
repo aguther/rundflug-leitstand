@@ -103,7 +103,8 @@ describe("shared design-system component library", () => {
   });
 
   it("SidePanel adapts to a bottom sheet on narrow viewports and exposes dialog semantics", () => {
-    expect(sidePanelSource).toContain('role="dialog"');
+    expect(sidePanelSource).toContain("<dialog");
+    expect(sidePanelSource).toContain("open={open}");
     expect(sidePanelSource).toContain("<IconButton");
     expect(sidePanelSource).toContain('closeLabel = "Dialog schließen"');
     expect(sidePanelSource).toContain("<X");

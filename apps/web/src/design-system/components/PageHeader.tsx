@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Children, type ReactNode } from "react";
 
 export interface PageHeaderProps {
   title: ReactNode;
@@ -21,9 +21,8 @@ export function PageHeader({
       <div>
         {breadcrumb && breadcrumb.length > 0 ? (
           <div className="ds-page-header-eyebrow">
-            {breadcrumb.map((crumb, index) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: breadcrumb order is static per render
-              <span key={index} aria-current={index === breadcrumb.length - 1 ? "page" : undefined}>
+            {Children.map(breadcrumb, (crumb, index) => (
+              <span aria-current={index === breadcrumb.length - 1 ? "page" : undefined}>
                 {crumb}
                 {index < breadcrumb.length - 1 ? " › " : null}
               </span>

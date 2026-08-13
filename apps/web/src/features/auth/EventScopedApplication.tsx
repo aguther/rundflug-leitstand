@@ -12,11 +12,7 @@ const FeatureRouter = lazy(async () => {
 });
 
 function Loading({ children = "Arbeitsbereich wird geladen …" }: Readonly<{ children?: string }>) {
-  return (
-    <div className="app-loading" role="status">
-      {children}
-    </div>
-  );
+  return <output className="app-loading">{children}</output>;
 }
 
 export function EventScopedApplication({ session }: Readonly<{ session: OperatorSession }>) {

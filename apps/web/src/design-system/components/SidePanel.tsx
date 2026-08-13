@@ -27,12 +27,12 @@ export function SidePanel({
         onClick={onClose}
         aria-hidden="true"
       />
-      <aside
+      <dialog
+        aria-label={typeof title === "string" ? title : undefined}
+        aria-modal="true"
         className="ds-sidepanel"
         data-open={open}
-        role="dialog"
-        aria-modal="true"
-        aria-label={typeof title === "string" ? title : undefined}
+        open={open}
       >
         <div className="ds-sidepanel-header">
           <h2>{title}</h2>
@@ -42,7 +42,7 @@ export function SidePanel({
         </div>
         <div className="ds-sidepanel-body">{children}</div>
         {footer ? <div className="ds-sidepanel-footer">{footer}</div> : null}
-      </aside>
+      </dialog>
     </>
   );
 }

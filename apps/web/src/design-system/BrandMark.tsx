@@ -13,15 +13,14 @@ export function BrandSymbol({
   return (
     <svg
       aria-hidden={labelled ? undefined : "true"}
-      aria-label={labelled ? "Rundflug Leitstand" : undefined}
       className={className}
       fill="none"
-      role={labelled ? "img" : undefined}
       stroke="currentColor"
       strokeLinecap="round"
       strokeLinejoin="round"
       viewBox="0 0 48 48"
     >
+      <title>Rundflug Leitstand</title>
       <path className="brand-symbol-route" d="M32.54 4.82A21 21 0 1 0 43.18 15.46" />
       <g className="brand-symbol-aircraft" transform="translate(9.6 9.6) scale(1.2)">
         <path d="M3 22h18" />

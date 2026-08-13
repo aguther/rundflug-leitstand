@@ -32,6 +32,12 @@ describe("Rundflug-Leitstand branding fallback", () => {
     expect(markup).toContain('aria-hidden="true"');
   });
 
+  it("labels standalone symbols through native SVG title semantics", () => {
+    const markup = renderToStaticMarkup(createElement(BrandSymbol, { labelled: true }));
+    expect(markup).toContain("<title>Rundflug Leitstand</title>");
+    expect(markup).not.toContain('role="img"');
+  });
+
   it("uses local font assets and theme-safe ink and amber tokens", () => {
     expect(mainSource).toContain("@fontsource/barlow-condensed/latin-200.css");
     expect(mainSource).toContain("@fontsource/barlow-condensed/latin-400.css");

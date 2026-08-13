@@ -62,6 +62,14 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("F-ADM-080 event-scoped application initialization", () => {
+  it("announces the initial loading state through native status semantics", () => {
+    loadSelectableEventsMock.mockReturnValue(new Promise(() => undefined));
+
+    render(<EventScopedApplication session={session} />);
+
+    expect(screen.getByRole("status").textContent).toContain("Arbeitsbereich wird geladen");
+  });
+
   it("activates a valid deep link before mounting the feature router and canonicalizes the URL", async () => {
     window.history.replaceState(
       null,
