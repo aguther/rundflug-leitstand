@@ -4,8 +4,7 @@ import type { Env } from "./types";
 
 const mocks = vi.hoisted(() => ({
   load: vi.fn(),
-  project: vi.fn(),
-  calculate: vi.fn(),
+  calculateForecast: vi.fn(),
   evaluatePrecalls: vi.fn(),
   prepareStatements: vi.fn(),
   persist: vi.fn(),
@@ -14,10 +13,6 @@ const mocks = vi.hoisted(() => ({
   prepareCapture: vi.fn(),
   completeCapture: vi.fn(),
   failCapture: vi.fn(),
-}));
-
-vi.mock("@rundflug/domain", () => ({
-  calculateForecastTimelineResult: mocks.calculate,
 }));
 
 vi.mock("./forecast-precall-evaluator", () => ({
@@ -30,8 +25,8 @@ vi.mock("./forecast-timeline-loader", () => ({
   },
 }));
 
-vi.mock("./forecast-timeline-projector", () => ({
-  projectForecastTimelineInput: mocks.project,
+vi.mock("./forecast-timeline-calculation", () => ({
+  calculateConvergedForecastTimeline: mocks.calculateForecast,
 }));
 
 vi.mock("./forecast-timeline-repository", () => ({
@@ -86,13 +81,14 @@ describe("forecast timeline service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.load.mockResolvedValue(loaded);
-    mocks.project.mockReturnValue({
+    mocks.calculateForecast.mockReturnValue({
       forecastInput,
       adaptiveLeadMinutes: 12,
       now: new Date("2026-08-12T08:00:00.000Z"),
       nowIso: "2026-08-12T08:00:00.000Z",
+      calculationResult,
+      calculationDurationMs: 3,
     });
-    mocks.calculate.mockReturnValue(calculationResult);
     mocks.evaluatePrecalls.mockReturnValue(precallEvaluation);
     mocks.prepareStatements.mockReturnValue(["statement-1"]);
     mocks.prepareCapture.mockResolvedValue(preparedCapture);
@@ -117,8 +113,7 @@ describe("forecast timeline service", () => {
       },
       expect.any(String),
     );
-    expect(mocks.project).toHaveBeenCalledWith(loaded, "synthetic-event");
-    expect(mocks.calculate).toHaveBeenCalledWith(forecastInput);
+    expect(mocks.calculateForecast).toHaveBeenCalledWith(loaded, "synthetic-event");
     expect(mocks.evaluatePrecalls).toHaveBeenCalledWith({
       event,
       rotations: rotationRows.results,

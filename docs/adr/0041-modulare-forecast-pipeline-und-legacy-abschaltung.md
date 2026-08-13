@@ -27,6 +27,12 @@ Abschaltkriterium dokumentiert.
   Event-Version vor jeder Berechnung mit `ANALYSIS_SNAPSHOT_STALE_VERSION` zurück.
 - Der Projector normalisiert geladene Zeilen ohne Cloudflare-Zugriff in `ForecastTimelinesInput`.
   Fachliche Projektion und Voraufrufauswahl bleiben deterministisch und übergeben Zeit explizit.
+- Ändert der erste Rechenschritt Completion-Projektionen bereits aktiver Umläufe, überträgt der
+  Projector diese Werte speicherintern auf die zugehörigen Flugzeug- und Pilotenbahnen. Der Service
+  berechnet den Dispatch danach höchstens einmal mit demselben geladenen Zustand und Zeitpunkt neu.
+  Dadurch bleibt die Empfehlung auch dann konsistent, wenn der EventCoordinator mehrere schnelle
+  Commands vor dem ersten Forecast-Lauf zusammenfasst; D1-Persistenz, Analyseerfassung und
+  Veröffentlichung erfolgen weiterhin genau einmal für den konvergierten Endstand.
 - Das Repository bündelt Forecast-Updates, Snapshots, Voraufrufentscheidung, Audit und Outbox. Push
   und WebSocket-Veröffentlichung erfolgen weiterhin ausschließlich nach erfolgreicher Persistenz.
 - Die Domain ist nach `forecast-types`, `forecast-sampling`, `forecast-availability`,

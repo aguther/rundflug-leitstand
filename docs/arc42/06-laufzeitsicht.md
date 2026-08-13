@@ -75,7 +75,11 @@ sequenceDiagram
 
     DO->>F: Neuberechnung nach erfolgreicher Fachtransaktion
     F->>D: offene Umläufe, Ist-Zeiten, bis zu 12 Vergleichsumläufe,<br/>Pausen, weiche Pläne, wiederkehrende Regeln
-    F->>F: Verfügbarkeitsbahnen, Dispatch-Fenster,<br/>Gewichtung, Ausreißerfilter, Qualitätsstufe
+    F->>F: aktive Timelines und Verfügbarkeitsbahnen berechnen
+    opt aktive Completion-Projektion hat sich geändert
+        F->>F: Dispatch mit denselben Eingaben und demselben Zeitpunkt<br/>einmal konsistent nachberechnen
+    end
+    F->>F: Dispatch-Fenster, Gewichtung,<br/>Ausreißerfilter, Qualitätsstufe
     F->>D: Prognosefelder aktualisieren + unveränderlichen Snapshot je Umlauf anhängen
     F->>F: Voraufrufbedingungen prüfen
     opt Voraufruf ausgelöst
@@ -90,6 +94,12 @@ sequenceDiagram
 Der Prognoselauf verändert keine bestätigten Ist-Ereignisse. Zusätzlich taktet der
 Durable-Object-Alarm die Neuberechnung alle 30 Sekunden und beendet fällige Gruppennachrufe über
 dieselbe serielle Kommandogrenze.
+
+Die einmalige interne Nachberechnung verhindert, dass ein durch Debouncing zusammengefasster
+Commandlauf einen Dispatch-Vorschlag noch aus den zuvor gespeicherten Completion-Zeiten aktiver
+Flugzeuge oder Piloten ableitet. Beide Rechenschritte verwenden denselben geladenen Zustand und
+denselben Berechnungszeitpunkt; nur der konvergierte Endstand wird persistiert, als Analysepaket
+erfasst und veröffentlicht.
 
 ## 6.4 Verbindungsverlust und Wiederaufnahme
 

@@ -3,6 +3,7 @@ import {
   type DispatchLockedBatchInput,
   type DispatchPlan,
   deriveAdaptivePrecallLeadMinutes,
+  type ForecastTimelineProjection,
   type ForecastTimelinesInput,
   normalizePrecallObservation,
   compareTechnicalStrings as order,
@@ -18,7 +19,82 @@ import {
   stringArray,
 } from "./forecast-timeline-projector-support";
 
-type ForecastTimelineData = Awaited<ReturnType<ForecastTimelineLoader["load"]>>;
+export type ForecastTimelineData = Awaited<ReturnType<ForecastTimelineLoader["load"]>>;
+const ACTIVE_ROTATION_STATUSES = new Set(["CALLED", "IN_FLIGHT", "LANDED"]);
+
+export function applyActiveForecastProjections(
+  data: ForecastTimelineData,
+  projections: readonly ForecastTimelineProjection[],
+): ForecastTimelineData | null {
+  const projectionByRotationId = new Map(
+    projections.map((projection) => [projection.rotationId, projection]),
+  );
+  const activeRotations = data.rotationRows.results.filter((rotation) =>
+    ACTIVE_ROTATION_STATUSES.has(rotation.status),
+  );
+  const activeTimelineChanged = activeRotations.some((rotation) => {
+    const projection = projectionByRotationId.get(rotation.id);
+    return (
+      projection !== undefined &&
+      (projection.predictedBoardingAt !== rotation.predicted_boarding_at ||
+        projection.predictedDepartureAt !== rotation.predicted_departure_at ||
+        projection.predictedLandingAt !== rotation.predicted_landing_at ||
+        projection.predictedCompletionAt !== rotation.predicted_completion_at)
+    );
+  });
+  if (!activeTimelineChanged) return null;
+
+  const projectedCompletionByAircraftId = new Map<string, string | null>();
+  const projectedCompletionByPilotId = new Map<string, string | null>();
+  for (const rotation of activeRotations) {
+    const projection = projectionByRotationId.get(rotation.id);
+    if (!projection) continue;
+    if (rotation.aircraft_id) {
+      projectedCompletionByAircraftId.set(rotation.aircraft_id, projection.predictedCompletionAt);
+    }
+    if (rotation.pilot_id) {
+      projectedCompletionByPilotId.set(rotation.pilot_id, projection.predictedCompletionAt);
+    }
+  }
+
+  return {
+    ...data,
+    rotationRows: {
+      ...data.rotationRows,
+      results: data.rotationRows.results.map((rotation) => {
+        const projection = projectionByRotationId.get(rotation.id);
+        return projection && ACTIVE_ROTATION_STATUSES.has(rotation.status)
+          ? {
+              ...rotation,
+              predicted_boarding_at: projection.predictedBoardingAt,
+              predicted_departure_at: projection.predictedDepartureAt,
+              predicted_landing_at: projection.predictedLandingAt,
+              predicted_completion_at: projection.predictedCompletionAt,
+            }
+          : rotation;
+      }),
+    },
+    capacityRows: {
+      ...data.capacityRows,
+      results: data.capacityRows.results.map((aircraft) => ({
+        ...aircraft,
+        predicted_completion_at: projectedCompletionByAircraftId.has(aircraft.aircraft_id)
+          ? (projectedCompletionByAircraftId.get(aircraft.aircraft_id) ?? null)
+          : aircraft.predicted_completion_at,
+      })),
+    },
+    pilotRows: {
+      ...data.pilotRows,
+      results: data.pilotRows.results.map((pilot) => ({
+        ...pilot,
+        predicted_completion_at: projectedCompletionByPilotId.has(pilot.id)
+          ? (projectedCompletionByPilotId.get(pilot.id) ?? null)
+          : pilot.predicted_completion_at,
+      })),
+    },
+  };
+}
+
 export function projectForecastTimelineInput(
   data: ForecastTimelineData,
   eventId: string,

@@ -1,8 +1,7 @@
-import { calculateForecastTimelineResult } from "@rundflug/domain";
 import { evaluateAutomaticPrecalls } from "./forecast-precall-evaluator";
 import { ForecastPublicationService } from "./forecast-publication-service";
+import { calculateConvergedForecastTimeline } from "./forecast-timeline-calculation";
 import { ForecastTimelineLoader } from "./forecast-timeline-loader";
-import { projectForecastTimelineInput } from "./forecast-timeline-projector";
 import { ForecastTimelineRepository } from "./forecast-timeline-repository";
 import type {
   ForecastRecalculationRequest,
@@ -43,13 +42,14 @@ export class ForecastTimelineService {
     const queryNowIso = new Date().toISOString();
     const loaded = await this.loader.load(request, queryNowIso);
     const { event, rotationRows } = loaded;
-    const { forecastInput, adaptiveLeadMinutes, now, nowIso } = projectForecastTimelineInput(
-      loaded,
-      eventId,
-    );
-    const calculationStartedAtMs = performance.now();
-    const calculationResult = calculateForecastTimelineResult(forecastInput);
-    const calculationDurationMs = Math.max(0, performance.now() - calculationStartedAtMs);
+    const {
+      forecastInput,
+      adaptiveLeadMinutes,
+      now,
+      nowIso,
+      calculationResult,
+      calculationDurationMs,
+    } = calculateConvergedForecastTimeline(loaded, eventId);
     const projections = calculationResult.projections;
     const planningRunId = request.planningRunId ?? crypto.randomUUID();
     const {
