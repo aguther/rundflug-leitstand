@@ -107,6 +107,35 @@ describe("event catalog dialog", () => {
     expect(props.onDelete).toHaveBeenCalledWith(events[1]);
   });
 
+  it("projects every event phase and exposes stable sort semantics", () => {
+    const phaseEvents = [
+      ...events,
+      { ...events[0], eventId: "demo-closed", name: "Closed flight day", status: "CLOSED" },
+      { ...events[0], eventId: "demo-archived", name: "Archived flight day", status: "ARCHIVED" },
+    ] as EventCatalogEntry[];
+    const props = properties({
+      events: phaseEvents,
+      sort: { key: "status", direction: "desc" },
+    });
+    const rendered = render(<EventCatalogDialog {...props} />);
+
+    expect(screen.getByText("Vorbereitung")).toBeTruthy();
+    expect(screen.getByText("Aktiv")).toBeTruthy();
+    expect(screen.getByText("Geschlossen")).toBeTruthy();
+    expect(screen.getByText("Archiviert")).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: /Phase/ }).getAttribute("aria-sort")).toBe(
+      "descending",
+    );
+
+    rendered.rerender(
+      <EventCatalogDialog {...props} events={[]} sort={{ key: "status", direction: null }} />,
+    );
+    expect(screen.getByText("Keine passende Veranstaltung gefunden.")).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: /Phase/ }).getAttribute("aria-sort")).toBe(
+      "none",
+    );
+  });
+
   it("keeps creation validation and normalized identifiers at the boundary", () => {
     const props = properties({ view: "create" });
     render(<EventCatalogDialog {...props} />);
@@ -142,5 +171,11 @@ describe("event catalog dialog", () => {
     expect(
       (screen.getByRole("button", { name: "Veranstaltung anlegen" }) as HTMLButtonElement).disabled,
     ).toBe(true);
+  });
+
+  it("does not expose dialog content while closed", () => {
+    render(<EventCatalogDialog {...properties({ view: "closed" })} />);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
