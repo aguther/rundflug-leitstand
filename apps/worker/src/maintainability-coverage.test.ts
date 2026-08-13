@@ -60,25 +60,26 @@ describe("V1 maintainability and portability boundaries", () => {
     });
     expect(rootManifest.packageManager).toBe("npm@12.0.2");
     expect(rootManifest.devDependencies).toMatchObject({
-      "@biomejs/biome": "^2.5.6",
-      "@cloudflare/vitest-pool-workers": "^0.20.3",
+      "@biomejs/biome": "^2.5.8",
+      "@cloudflare/vitest-pool-workers": "^0.21.3",
       "@cloudflare/workers-types": "^5.20260801.1",
       "@playwright/test": "^1.62.1",
       "@sonar/scan": "^5.0.0",
+      "@testing-library/user-event": "^14.6.4",
       "@vitest/coverage-v8": "^4.1.10",
       jsdom: "^30.0.1",
       mermaid: "11.16.1",
       typescript: "7.0.2",
-      wrangler: "4.122.0",
+      wrangler: "4.123.0",
     });
-    expect(webManifest.dependencies).toMatchObject({ "lucide-react": "^1.28.0" });
+    expect(webManifest.dependencies).toMatchObject({ "lucide-react": "^1.31.0" });
     expect(webManifest.devDependencies).toMatchObject({
       "@types/react": "19.2.18",
       "@types/react-dom": "19.2.4",
       "@vitejs/plugin-react": "^6.0.5",
       vite: "^8.2.1",
     });
-    expect(workerManifest.dependencies).toMatchObject({ hono: "^4.12.34" });
+    expect(workerManifest.dependencies).toMatchObject({ hono: "^4.13.2" });
     expect(rootManifest.allowScripts).toEqual({
       "esbuild@0.28.1": true,
       "workerd@1.20260714.1": true,
@@ -87,15 +88,22 @@ describe("V1 maintainability and portability boundaries", () => {
       sharp: false,
     });
     expect(packageLock.packages?.["node_modules/wrangler"]).toMatchObject({
-      version: "4.122.0",
+      version: "4.123.0",
       dependencies: {
-        miniflare: "5.20260811.0-alpha",
+        miniflare: "5.20260811.1-alpha",
         workerd: "1.20260811.1",
+      },
+    });
+    expect(packageLock.packages?.["node_modules/@cloudflare/vitest-pool-workers"]).toMatchObject({
+      version: "0.21.3",
+      dependencies: {
+        miniflare: "5.20260811.1-alpha",
+        wrangler: "4.123.0",
       },
     });
     expect(
       packageLock.packages?.["node_modules/@cloudflare/vitest-pool-workers/node_modules/wrangler"],
-    ).toMatchObject({ version: "4.120.0" });
+    ).toBeUndefined();
     const defaultNodeVersion = nodeVersion.trim();
     expect(defaultNodeVersion).toBe("24.18.0");
     expect(rootManifest.scripts?.["check:ci"]).toBe(

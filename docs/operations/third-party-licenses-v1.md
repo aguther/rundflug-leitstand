@@ -19,8 +19,8 @@ RFC 8188, RFC 8291 und RFC 8292.
 | --- | --- | --- |
 | `@fontsource/barlow-condensed` | 5.3.0 | OFL-1.1 |
 | `fflate` | 0.8.3 | MIT |
-| `hono` | 4.12.34 | MIT |
-| `lucide-react` | 1.28.0 | ISC |
+| `hono` | 4.13.2 | MIT |
+| `lucide-react` | 1.31.0 | ISC |
 | `qrcode` | 1.5.4 | MIT |
 | `react` | 19.2.8 | MIT |
 | `react-dom` | 19.2.8 | MIT |

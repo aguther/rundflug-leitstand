@@ -61,7 +61,7 @@ Zeilen.
 ### Entwicklungsabhängigkeiten
 
 Der Lockfile wurde mit npm 12.0.2 erneuert. Die direkten Werkzeuge verwenden unter anderem Vite
-8.2.1, `@cloudflare/vitest-pool-workers` 0.20.3, Wrangler 4.122.0 und `vite-plugin-pwa` 1.3.0.
+8.2.1, `@cloudflare/vitest-pool-workers` 0.21.3, Wrangler 4.123.0 und `vite-plugin-pwa` 1.3.0.
 Der eng begrenzte `fast-uri`-Override steht auf 3.1.5; ein erzwungenes Audit-Major-Upgrade wurde
 nicht eingesetzt.
 

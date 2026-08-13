@@ -94,20 +94,20 @@
     "docs:arc42:pdf": "playwright install chromium && node scripts/build_arc42_pdf.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.6",
-    "@cloudflare/vitest-pool-workers": "^0.20.3",
+    "@biomejs/biome": "^2.5.8",
+    "@cloudflare/vitest-pool-workers": "^0.21.3",
     "@cloudflare/workers-types": "^5.20260801.1",
     "@playwright/test": "^1.62.1",
     "@sonar/scan": "^5.0.0",
     "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
+    "@testing-library/user-event": "^14.6.4",
     "@vitest/coverage-v8": "^4.1.10",
     "concurrently": "^10.0.4",
     "jsdom": "^30.0.1",
     "mermaid": "11.16.1",
     "typescript": "7.0.2",
     "vitest": "4.1.10",
-    "wrangler": "4.122.0"
+    "wrangler": "4.123.0"
   },
   "overrides": {
     "fast-uri": "3.1.5",
