@@ -1,5 +1,20 @@
 import { z } from "zod";
 
+function plannedTargetExists(
+  scopeType: "EVENT" | "RESOURCE_GROUP" | "AIRCRAFT" | "PILOT",
+  scopeId: string,
+  targets: Readonly<{
+    resourceGroups: ReadonlySet<string>;
+    aircraft: ReadonlySet<string>;
+    pilots: ReadonlySet<string>;
+  }>,
+): boolean {
+  if (scopeType === "EVENT") return scopeId === "event";
+  if (scopeType === "RESOURCE_GROUP") return targets.resourceGroups.has(scopeId);
+  if (scopeType === "AIRCRAFT") return targets.aircraft.has(scopeId);
+  return targets.pilots.has(scopeId);
+}
+
 import { masterDataTemplateSchema } from "./master-data";
 
 import {
@@ -672,14 +687,11 @@ const simulationScenarioVersionTwoConfigSchema = simulationScenarioVersionOneCon
     });
 
     config.plannedOperations.forEach((operation, index) => {
-      const targetExists =
-        operation.scopeType === "EVENT"
-          ? operation.scopeId === "event"
-          : operation.scopeType === "RESOURCE_GROUP"
-            ? resourceGroupIds.has(operation.scopeId)
-            : operation.scopeType === "AIRCRAFT"
-              ? aircraftIds.has(operation.scopeId)
-              : pilotIds.has(operation.scopeId);
+      const targetExists = plannedTargetExists(operation.scopeType, operation.scopeId, {
+        resourceGroups: resourceGroupIds,
+        aircraft: aircraftIds,
+        pilots: pilotIds,
+      });
       if (!targetExists) {
         context.addIssue({
           code: "custom",
@@ -737,14 +749,11 @@ export const simulationPlanExportSchema = z
     const aircraftKeys = new Set(exported.masterData.aircraft.map((entry) => entry.key));
     const pilotKeys = new Set(exported.masterData.pilots.map((entry) => entry.key));
     exported.plannedOperations.forEach((operation, index) => {
-      const targetExists =
-        operation.scopeType === "EVENT"
-          ? operation.scopeKey === "event"
-          : operation.scopeType === "RESOURCE_GROUP"
-            ? resourceGroupKeys.has(operation.scopeKey)
-            : operation.scopeType === "AIRCRAFT"
-              ? aircraftKeys.has(operation.scopeKey)
-              : pilotKeys.has(operation.scopeKey);
+      const targetExists = plannedTargetExists(operation.scopeType, operation.scopeKey, {
+        resourceGroups: resourceGroupKeys,
+        aircraft: aircraftKeys,
+        pilots: pilotKeys,
+      });
       if (!targetExists) {
         context.addIssue({
           code: "custom",
