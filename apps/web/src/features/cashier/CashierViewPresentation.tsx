@@ -87,13 +87,13 @@ export function CashierNotifications({
   pendingDraftCount,
   serverConfirmed,
   board,
-}: {
+}: Readonly<{
   error: string | null;
   lastConfirmedAt: string | null;
   pendingDraftCount: number;
   serverConfirmed: boolean;
   board: OperationBoard | null;
-}) {
+}>) {
   let draftNotice: ReactNode = null;
   if (pendingDraftCount > 0) {
     draftNotice = (
@@ -118,7 +118,9 @@ export function CashierNotifications({
   );
 }
 
-export function CashierTicketGroupHeader({ group }: { group: TicketSearchResult | undefined }) {
+export function CashierTicketGroupHeader({
+  group,
+}: Readonly<{ group: TicketSearchResult | undefined }>) {
   if (!group) {
     return (
       <header>
@@ -154,10 +156,10 @@ export function CashierTicketGroupHeader({ group }: { group: TicketSearchResult 
 export function CashierTicketPaperPreview({
   receipt,
   onEnlarge,
-}: {
+}: Readonly<{
   receipt: TicketReceipt | null;
   onEnlarge: () => void;
-}) {
+}>) {
   if (!receipt) return <span>Ticketzettel wird nach Auswahl angezeigt.</span>;
   return (
     <>

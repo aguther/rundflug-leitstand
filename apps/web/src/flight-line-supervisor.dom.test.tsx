@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { OperationBoard } from "@rundflug/contracts";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -470,10 +470,8 @@ describe("Flight Director operational coordination", () => {
     await user.type(search, "unbekannt");
     expect(screen.getByText("Noch keine verkauften Tickets.")).toBeTruthy();
     await user.clear(search);
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: /Tagesauswertung für G-PN-0017 anzeigen/ }),
-      ).toBeTruthy(),
-    );
+    expect(
+      await screen.findByRole("button", { name: /Tagesauswertung für G-PN-0017 anzeigen/ }),
+    ).toBeTruthy();
   });
 });
