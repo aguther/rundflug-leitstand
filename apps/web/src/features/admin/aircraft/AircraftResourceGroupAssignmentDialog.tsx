@@ -7,6 +7,40 @@ export type AircraftResourceGroupAssignmentContext =
   | { mode: "aircraft"; aircraftId: string }
   | { mode: "resource-group"; resourceGroupId: string };
 
+type BoardAircraft = OperationBoard["aircraft"][number];
+type BoardResourceGroup = OperationBoard["resourceGroups"][number];
+
+interface AssignmentValidationInput {
+  activeRotation: boolean;
+  aircraft: BoardAircraft | undefined;
+  compatible: boolean;
+  targetGroup: BoardResourceGroup | undefined;
+}
+
+function assignmentValidationMessage({
+  activeRotation,
+  aircraft,
+  compatible,
+  targetGroup,
+}: Readonly<AssignmentValidationInput>) {
+  if (!aircraft || !targetGroup) {
+    return "Flugzeug und Zielgruppe müssen vollständig ausgewählt sein.";
+  }
+  if (aircraft.resourceGroupId === targetGroup.id) {
+    return "Das Flugzeug ist bereits dieser Ressourcengruppe zugeordnet.";
+  }
+  if (activeRotation) {
+    return "Ein aktiver Umlauf sperrt die Zuordnung nach dem aktuell geladenen Stand.";
+  }
+  if (!compatible) {
+    return "Der Flugzeugtyp ist für die Zielgruppe nicht als kompatibel hinterlegt.";
+  }
+  if (targetGroup.status === "ENDED") {
+    return "Eine beendete Ressourcengruppe kann kein Zuordnungsziel sein.";
+  }
+  return "Die Kombination ist nach dem aktuell geladenen Stand zuordenbar.";
+}
+
 export function AircraftResourceGroupAssignmentDialog({
   board,
   context,
@@ -33,7 +67,7 @@ export function AircraftResourceGroupAssignmentDialog({
   if (!context) return null;
   const aircraft = board.aircraft.find((entry) => entry.id === aircraftId);
   const targetGroup = board.resourceGroups.find((entry) => entry.id === resourceGroupId);
-  const activeRotation = board.rotations.find(
+  const activeRotation = board.rotations.some(
     (rotation) =>
       rotation.aircraftId === aircraftId &&
       ["CALLED", "IN_FLIGHT", "LANDED"].includes(rotation.status),
@@ -53,18 +87,12 @@ export function AircraftResourceGroupAssignmentDialog({
       !activeRotation &&
       !busy,
   );
-  const validationMessage =
-    !aircraft || !targetGroup
-      ? "Flugzeug und Zielgruppe müssen vollständig ausgewählt sein."
-      : aircraft.resourceGroupId === targetGroup.id
-        ? "Das Flugzeug ist bereits dieser Ressourcengruppe zugeordnet."
-        : activeRotation
-          ? "Ein aktiver Umlauf sperrt die Zuordnung nach dem aktuell geladenen Stand."
-          : !compatible
-            ? "Der Flugzeugtyp ist für die Zielgruppe nicht als kompatibel hinterlegt."
-            : targetGroup.status === "ENDED"
-              ? "Eine beendete Ressourcengruppe kann kein Zuordnungsziel sein."
-              : "Die Kombination ist nach dem aktuell geladenen Stand zuordenbar.";
+  const validationMessage = assignmentValidationMessage({
+    activeRotation,
+    aircraft,
+    compatible,
+    targetGroup,
+  });
 
   function requestClose() {
     if (!busy) onClose();

@@ -149,6 +149,48 @@ describe("shared aircraft relationship dialogs", () => {
     expect(onConfirm).toHaveBeenCalledWith("aircraft-a", "group-b");
   });
 
+  it("explains active-rotation and ended-group assignment blockers", () => {
+    const activeRotationBoard = {
+      ...board,
+      rotations: [{ aircraftId: "aircraft-a", status: "CALLED" }],
+    } as unknown as OperationBoard;
+    const rendered = render(
+      <AircraftResourceGroupAssignmentDialog
+        board={activeRotationBoard}
+        busy={false}
+        context={{ mode: "resource-group", resourceGroupId: "group-b" }}
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Flugzeug"), {
+      target: { value: "aircraft-a" },
+    });
+    expect(screen.getByText(/Ein aktiver Umlauf sperrt die Zuordnung/)).toBeTruthy();
+
+    const endedGroupBoard = {
+      ...board,
+      resourceGroups: [
+        ...board.resourceGroups,
+        { id: "group-ended", name: "Beendet", status: "ENDED", compatibleAircraftTypes: [] },
+      ],
+    } as unknown as OperationBoard;
+    rendered.rerender(
+      <AircraftResourceGroupAssignmentDialog
+        board={endedGroupBoard}
+        busy={false}
+        context={{ mode: "resource-group", resourceGroupId: "group-ended" }}
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Flugzeug"), {
+      target: { value: "aircraft-a" },
+    });
+    expect(screen.getByText(/Eine beendete Ressourcengruppe/)).toBeTruthy();
+  });
+
   it("keeps an explicit zero distinct from inherited turnaround values", () => {
     const onSave = vi.fn();
     render(
