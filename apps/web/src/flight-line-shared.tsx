@@ -1,4 +1,4 @@
-import type { OperationBoard } from "@rundflug/contracts";
+import type { DispatchRecommendationLease, OperationBoard } from "@rundflug/contracts";
 import {
   aircraftOperationalStateLabels,
   formatBookingGroupLabel,
@@ -223,6 +223,38 @@ const historyColumns: Array<{ label: string; Icon: LucideIcon }> = [
   { label: "Abschluss", Icon: CircleCheck },
 ];
 
+function currentFlightProgressStep(
+  status: string,
+  unavailable: boolean,
+): FlightProgressStepKey | null {
+  if (unavailable) return "unavailable";
+  switch (status) {
+    case "BOARDING":
+      return "boarding";
+    case "IN_FLIGHT":
+      return "offblock";
+    case "LANDED":
+      return "onblock";
+    case "AVAILABLE":
+      return "available";
+    default:
+      return null;
+  }
+}
+
+function unavailableProgressLabel(status: string): string {
+  if (status === "REFUELING") return "Tanken";
+  if (status === "PAUSED") return "Pause";
+  return "Nicht verfügbar";
+}
+
+function flightProgressStepAriaLabel(step: FlightProgressStep, timeZone: string): string {
+  if (step.time) return `${step.label}: ${formatFlightLineTime(step.time, timeZone)}`;
+  if (step.current) return `${step.label}: aktuell`;
+  if (step.reached) return `${step.label}: erreicht`;
+  return `${step.label}: ausstehend`;
+}
+
 export function CurrentAircraftStateMarker({
   aircraft,
   rotation,
@@ -265,17 +297,7 @@ export function flightProgressSteps(
   const status = visibleAircraftState(aircraft, rotation);
   const timeline = rotation?.timeline.actual;
   const unavailable = ["REFUELING", "PAUSED", "INTERRUPTED", "INACTIVE"].includes(status);
-  const current: FlightProgressStepKey | null = unavailable
-    ? "unavailable"
-    : status === "BOARDING"
-      ? "boarding"
-      : status === "IN_FLIGHT"
-        ? "offblock"
-        : status === "LANDED"
-          ? "onblock"
-          : status === "AVAILABLE"
-            ? "available"
-            : null;
+  const current = currentFlightProgressStep(status, unavailable);
   const availableReached =
     status === "AVAILABLE" &&
     (!rotation || rotation.status === "DRAFT" || rotation.status === "COMPLETED");
@@ -302,7 +324,7 @@ export function flightProgressSteps(
     { key: "onblock", label: "On-Block", time: timeline?.landingAt, reached: reached.onblock },
     {
       key: "unavailable",
-      label: status === "REFUELING" ? "Tanken" : status === "PAUSED" ? "Pause" : "Nicht verfügbar",
+      label: unavailableProgressLabel(status),
       time: unavailable ? aircraft.operationalStateChangedAt : null,
       reached: reached.unavailable,
     },
@@ -344,7 +366,7 @@ export function FlightProgress({
         return (
           <li
             aria-current={step.current ? "step" : undefined}
-            aria-label={`${step.label}: ${step.time ? formatFlightLineTime(step.time, timeZone) : step.current ? "aktuell" : step.reached ? "erreicht" : "ausstehend"}`}
+            aria-label={flightProgressStepAriaLabel(step, timeZone)}
             className={`${step.reached ? "reached" : ""} ${step.current ? "current" : ""} ${step.connectorReached ? "connector-reached" : ""}`.trim()}
             data-icon={step.icon}
             data-step={step.key}
@@ -363,6 +385,19 @@ export function FlightProgress({
 
 function queuedSegmentTicketCount(group: FlightLineQueueGroup): number {
   return group.nextSegmentTicketCount ?? group.ticketCount;
+}
+
+function AssignmentQueueIdentityStatus({
+  group,
+  isPresent,
+}: Readonly<{ group: FlightLineQueueGroup; isPresent: boolean }>) {
+  if (group.dispatchReservation === "OTHER") {
+    return <small className="flight-director-reservation-note">Anderweitig reserviert</small>;
+  }
+  if (isPresent) {
+    return <small className="flight-director-present-note">Anwesend</small>;
+  }
+  return null;
 }
 
 export function TicketGroupRecallButton({
@@ -425,7 +460,7 @@ function AssignmentQueueRow({
   onToggle: (ticketGroupId: string, selected: boolean) => void;
   onRecall: (ticketGroupId: string) => void | Promise<void>;
   onRecallClear: (ticketGroupId: string, recallId: string) => void | Promise<void>;
-  onDefer?: ((ticketGroupId: string) => void | Promise<void>) | undefined;
+  onDefer?: (ticketGroupId: string) => void | Promise<void>;
   productMismatch: boolean;
   disabled: boolean;
   timeZone: string;
@@ -450,11 +485,7 @@ function AssignmentQueueRow({
         />
         <span className="flight-director-queue-identity">
           <strong>{communicationLabel}</strong>
-          {group.dispatchReservation === "OTHER" ? (
-            <small className="flight-director-reservation-note">Anderweitig reserviert</small>
-          ) : isPresent ? (
-            <small className="flight-director-present-note">Anwesend</small>
-          ) : null}
+          <AssignmentQueueIdentityStatus group={group} isPresent={isPresent} />
         </span>
       </label>
       <div className="flight-director-queue-persons">
@@ -507,6 +538,198 @@ function AssignmentQueueRow({
       </div>
     </div>
   );
+}
+
+function dispatchRecommendationReason(
+  recommendation: DispatchRecommendationLease | null,
+  containsGateCall: boolean,
+): string {
+  if (recommendation?.decisionReasons.includes("HARD_COMMITMENT") || containsGateCall) {
+    return "Bereits aufgerufene Gruppen haben Vorrang.";
+  }
+  const protectsMaximumWait =
+    recommendation?.decisionReasons.includes("MUST_SERVE_MAX_WAIT") ?? false;
+  const protectsConfirmedOvertakes =
+    recommendation?.decisionReasons.includes("MUST_SERVE_MAX_OVERTAKES") ?? false;
+  if (protectsMaximumWait && protectsConfirmedOvertakes) {
+    return "Maximale Wartezeit und Überholschutz haben Vorrang.";
+  }
+  if (protectsMaximumWait) return "Lange Wartezeit hat Vorrang.";
+  if (protectsConfirmedOvertakes) return "Diese Gruppe darf nicht weiter überholt werden.";
+  if (recommendation?.decisionReasons.includes("PRODUCT_FAIRNESS")) {
+    return "Faire Verteilung zwischen den Produkten hat Vorrang.";
+  }
+  if (recommendation?.decisionReasons.includes("CAPACITY_OPTIMIZED")) {
+    return "Faire Queue-Reihenfolge mit bestmöglicher Sitzplatzauslastung.";
+  }
+  return "Queue-Reihenfolge und verfügbare Kapazität bestimmen diese Belegung.";
+}
+
+function AssignmentGuidance({
+  aircraft,
+  capacityExceeded,
+  queueDeviationReason,
+  queueDeviationReasonRequired,
+  recommendationMatchesSelection,
+  setQueueDeviationReason,
+}: Readonly<{
+  aircraft: FlightLineAircraft | undefined;
+  capacityExceeded: boolean;
+  queueDeviationReason: string;
+  queueDeviationReasonRequired: boolean;
+  recommendationMatchesSelection: boolean;
+  setQueueDeviationReason: (reason: string) => void;
+}>) {
+  if (queueDeviationReasonRequired) {
+    return (
+      <label className="flight-director-deviation-reason">
+        <span>Grund für manuelle Abweichung</span>
+        <input
+          maxLength={240}
+          onChange={(event) => setQueueDeviationReason(event.target.value)}
+          placeholder="Mindestens 3 Zeichen"
+          value={queueDeviationReason}
+        />
+      </label>
+    );
+  }
+  if (capacityExceeded) {
+    return <small className="is-warning">Die Auswahl überschreitet die Kapazität.</small>;
+  }
+  if (!aircraft?.currentPilotId) {
+    return <small className="is-warning">Vor dem Boarding einen Piloten zuweisen.</small>;
+  }
+  if (recommendationMatchesSelection) return <small>Aktuelle Empfehlung ausgewählt.</small>;
+  return <small>Eine manuelle Belegung ist mit Abweichungsgrund jederzeit möglich.</small>;
+}
+
+function DispatchRecommendationStatus({
+  dispatchLease,
+  leaseRemainingSeconds,
+  recommendationContainsGateCall,
+  recommendationIsCurrent,
+  skippedEarlierProductGroupCount,
+}: Readonly<{
+  dispatchLease: DispatchRecommendationLeaseController;
+  leaseRemainingSeconds: number;
+  recommendationContainsGateCall: boolean;
+  recommendationIsCurrent: boolean;
+  skippedEarlierProductGroupCount: number;
+}>) {
+  if (["EXPIRED", "INVALIDATED", "ERROR"].includes(dispatchLease.mode)) {
+    const message =
+      dispatchLease.mode === "EXPIRED"
+        ? "Die Vorschlagsreservierung ist abgelaufen."
+        : dispatchLease.error;
+    return (
+      <div className="flight-director-dispatch-reservation is-expired" role="alert">
+        <span>{message}</span>
+      </div>
+    );
+  }
+  if (dispatchLease.mode === "MANUAL") {
+    return (
+      <output className="flight-director-dispatch-reservation is-manual">
+        Manuelle Belegung – nicht reserviert
+      </output>
+    );
+  }
+  const recommendation = dispatchLease.lease;
+  if (!recommendation) {
+    return (
+      <output className="flight-director-dispatch-reservation is-loading">
+        <Clock3 aria-hidden="true" />
+        <span>Vorschlag wird geladen …</span>
+      </output>
+    );
+  }
+  const reason = dispatchRecommendationReason(recommendation, recommendationContainsGateCall);
+  return (
+    <div
+      className={`flight-director-dispatch-recommendation${dispatchLease.mode === "REFRESHING" ? " is-refreshing" : ""}`}
+    >
+      <div className="flight-director-dispatch-summary">
+        <span>Empfehlung · Umlauf {recommendation.dispatchOrder}</span>
+      </div>
+      <div className="flight-director-dispatch-countdown">
+        <Clock3 aria-hidden="true" />
+        {recommendationIsCurrent ? (
+          <strong>
+            <span className={leaseRemainingSeconds <= 30 ? "is-expiring" : undefined}>
+              Reserviert {formatDispatchLeaseCountdown(leaseRemainingSeconds)}
+            </span>
+          </strong>
+        ) : (
+          <strong aria-live="polite">Vorschlag wird geladen …</strong>
+        )}
+      </div>
+      <div className="flight-director-dispatch-occupancy">
+        <strong>
+          {recommendation.occupiedSeats} von{" "}
+          {recommendation.occupiedSeats + recommendation.availableSeats} Plätzen
+        </strong>
+      </div>
+      <div className="flight-director-dispatch-reason">
+        <span>{reason}</span>
+        {skippedEarlierProductGroupCount > 0 ? (
+          <small>
+            {skippedEarlierProductGroupCount} frühere Gruppe
+            {skippedEarlierProductGroupCount === 1 ? " wird" : "n werden"} fair eingeordnet.
+          </small>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function AssignmentQueueRows({
+  capacity,
+  disabled,
+  groups,
+  onDefer,
+  onRecall,
+  onRecallClear,
+  onToggle,
+  selectedProductId,
+  selectedQueueGroupIds,
+  selectedSeats,
+  timeZone,
+}: Readonly<{
+  capacity: number;
+  disabled: boolean;
+  groups: FlightLineQueueGroup[];
+  onDefer?: (ticketGroupId: string) => void | Promise<void>;
+  onRecall: (ticketGroupId: string) => void | Promise<void>;
+  onRecallClear: (ticketGroupId: string, recallId: string) => void | Promise<void>;
+  onToggle: (ticketGroupId: string, selected: boolean) => void | Promise<void>;
+  selectedProductId: string | null;
+  selectedQueueGroupIds: string[];
+  selectedSeats: number;
+  timeZone: string;
+}>) {
+  if (groups.length === 0) return <p>Keine passende Buchungsgruppe in der Warteschlange.</p>;
+  return groups.map((group) => {
+    const selected = selectedQueueGroupIds.includes(group.id);
+    const deferGroup = onDefer ? () => onDefer(group.id) : undefined;
+    return (
+      <AssignmentQueueRow
+        capacity={capacity}
+        disabled={disabled}
+        group={group}
+        key={group.id}
+        {...(deferGroup ? { onDefer: deferGroup } : {})}
+        onRecall={onRecall}
+        onRecallClear={onRecallClear}
+        onToggle={onToggle}
+        productMismatch={
+          !selected && selectedProductId !== null && group.productId !== selectedProductId
+        }
+        selected={selected}
+        selectedSeats={selectedSeats}
+        timeZone={timeZone}
+      />
+    );
+  });
 }
 
 export function BookingGroupAssignmentDialog({
@@ -591,25 +814,9 @@ export function BookingGroupAssignmentDialog({
       (groupId) => groups.find((group) => group.id === groupId)?.precalledAt,
     ),
   );
-  const protectsMaximumWait =
-    dispatchRecommendation?.decisionReasons.includes("MUST_SERVE_MAX_WAIT") ?? false;
-  const protectsConfirmedOvertakes =
-    dispatchRecommendation?.decisionReasons.includes("MUST_SERVE_MAX_OVERTAKES") ?? false;
-  const recommendationReason =
-    dispatchRecommendation?.decisionReasons.includes("HARD_COMMITMENT") ||
-    recommendationContainsGateCall
-      ? "Bereits aufgerufene Gruppen haben Vorrang."
-      : protectsMaximumWait && protectsConfirmedOvertakes
-        ? "Maximale Wartezeit und Überholschutz haben Vorrang."
-        : protectsMaximumWait
-          ? "Lange Wartezeit hat Vorrang."
-          : protectsConfirmedOvertakes
-            ? "Diese Gruppe darf nicht weiter überholt werden."
-            : dispatchRecommendation?.decisionReasons.includes("PRODUCT_FAIRNESS")
-              ? "Faire Verteilung zwischen den Produkten hat Vorrang."
-              : dispatchRecommendation?.decisionReasons.includes("CAPACITY_OPTIMIZED")
-                ? "Faire Queue-Reihenfolge mit bestmöglicher Sitzplatzauslastung."
-                : "Queue-Reihenfolge und verfügbare Kapazität bestimmen diese Belegung.";
+  const selectedGroupLabels = selectedGroups
+    .map((group) => formatBookingGroupLabel(group.productCode, group.communicationNumber))
+    .join(", ");
   useEffect(() => {
     if (!open || !queueDeviationReasonRequired) setQueueDeviationReason("");
   }, [open, queueDeviationReasonRequired]);
@@ -667,6 +874,32 @@ export function BookingGroupAssignmentDialog({
       setRecommendationReloadPending(false);
     }
   }
+
+  function toggleQueueGroup(ticketGroupId: string, selected: boolean) {
+    return runQueueMutation(async () => {
+      if (
+        ["IDLE", "RESERVED", "ACQUIRING", "REFRESHING", "EXPIRED", "ERROR"].includes(
+          dispatchLease.mode,
+        )
+      ) {
+        await dispatchLease.switchToManual();
+      }
+      await onToggle(ticketGroupId, selected);
+    });
+  }
+
+  function recallQueueGroup(ticketGroupId: string) {
+    return runQueueMutation(() => onRecall(ticketGroupId));
+  }
+
+  function clearQueueGroupRecall(ticketGroupId: string, recallId: string) {
+    return runQueueMutation(() => onRecallClear(ticketGroupId, recallId));
+  }
+
+  function deferQueueGroup(ticketGroupId: string) {
+    return runQueueMutation(() => onDefer?.(ticketGroupId));
+  }
+
   return (
     <ModalDialog
       description={
@@ -681,36 +914,17 @@ export function BookingGroupAssignmentDialog({
             <strong>
               {selectedSeats} von {capacity} Plätzen ausgewählt
             </strong>
-            <small>
-              {selectedGroups.length > 0
-                ? selectedGroups
-                    .map((group) =>
-                      formatBookingGroupLabel(group.productCode, group.communicationNumber),
-                    )
-                    .join(", ")
-                : "Noch keine Gruppe gewählt"}
-            </small>
+            <small>{selectedGroupLabels || "Noch keine Gruppe gewählt"}</small>
           </div>
           <div className="flight-director-assignment-guidance">
-            {queueDeviationReasonRequired ? (
-              <label className="flight-director-deviation-reason">
-                <span>Grund für manuelle Abweichung</span>
-                <input
-                  maxLength={240}
-                  onChange={(event) => setQueueDeviationReason(event.target.value)}
-                  placeholder="Mindestens 3 Zeichen"
-                  value={queueDeviationReason}
-                />
-              </label>
-            ) : capacityExceeded ? (
-              <small className="is-warning">Die Auswahl überschreitet die Kapazität.</small>
-            ) : !aircraft?.currentPilotId ? (
-              <small className="is-warning">Vor dem Boarding einen Piloten zuweisen.</small>
-            ) : recommendationMatchesSelection ? (
-              <small>Aktuelle Empfehlung ausgewählt.</small>
-            ) : (
-              <small>Eine manuelle Belegung ist mit Abweichungsgrund jederzeit möglich.</small>
-            )}
+            <AssignmentGuidance
+              aircraft={aircraft}
+              capacityExceeded={capacityExceeded}
+              queueDeviationReason={queueDeviationReason}
+              queueDeviationReasonRequired={queueDeviationReasonRequired}
+              recommendationMatchesSelection={recommendationMatchesSelection}
+              setQueueDeviationReason={setQueueDeviationReason}
+            />
           </div>
           <div className="flight-director-assignment-footer-actions">
             <Button
@@ -753,61 +967,13 @@ export function BookingGroupAssignmentDialog({
         <section className="flight-director-queue">
           <div className="flight-director-dispatch-slot">
             <div className="flight-director-dispatch-content">
-              {["EXPIRED", "INVALIDATED", "ERROR"].includes(dispatchLease.mode) ? (
-                <div className="flight-director-dispatch-reservation is-expired" role="alert">
-                  <span>
-                    {dispatchLease.mode === "EXPIRED"
-                      ? "Die Vorschlagsreservierung ist abgelaufen."
-                      : dispatchLease.error}
-                  </span>
-                </div>
-              ) : dispatchLease.mode === "MANUAL" ? (
-                <div className="flight-director-dispatch-reservation is-manual" role="status">
-                  Manuelle Belegung – nicht reserviert
-                </div>
-              ) : dispatchRecommendation ? (
-                <div
-                  className={`flight-director-dispatch-recommendation${dispatchLease.mode === "REFRESHING" ? " is-refreshing" : ""}`}
-                >
-                  <div className="flight-director-dispatch-summary">
-                    <span>Empfehlung · Umlauf {dispatchRecommendation.dispatchOrder}</span>
-                  </div>
-                  <div className="flight-director-dispatch-countdown">
-                    <Clock3 aria-hidden="true" />
-                    {recommendationIsCurrent ? (
-                      <strong>
-                        <span className={leaseRemainingSeconds <= 30 ? "is-expiring" : undefined}>
-                          Reserviert {formatDispatchLeaseCountdown(leaseRemainingSeconds)}
-                        </span>
-                      </strong>
-                    ) : (
-                      <strong aria-live="polite">Vorschlag wird geladen …</strong>
-                    )}
-                  </div>
-                  <div className="flight-director-dispatch-occupancy">
-                    <strong>
-                      {dispatchRecommendation.occupiedSeats} von{" "}
-                      {dispatchRecommendation.occupiedSeats + dispatchRecommendation.availableSeats}{" "}
-                      Plätzen
-                    </strong>
-                  </div>
-                  <div className="flight-director-dispatch-reason">
-                    <span>{recommendationReason}</span>
-                    {skippedEarlierProductGroups.length > 0 ? (
-                      <small>
-                        {skippedEarlierProductGroups.length} frühere Gruppe
-                        {skippedEarlierProductGroups.length === 1 ? " wird" : "n werden"} fair
-                        eingeordnet.
-                      </small>
-                    ) : null}
-                  </div>
-                </div>
-              ) : (
-                <div className="flight-director-dispatch-reservation is-loading" role="status">
-                  <Clock3 aria-hidden="true" />
-                  <span>Vorschlag wird geladen …</span>
-                </div>
-              )}
+              <DispatchRecommendationStatus
+                dispatchLease={dispatchLease}
+                leaseRemainingSeconds={leaseRemainingSeconds}
+                recommendationContainsGateCall={recommendationContainsGateCall}
+                recommendationIsCurrent={recommendationIsCurrent}
+                skippedEarlierProductGroupCount={skippedEarlierProductGroups.length}
+              />
             </div>
             <div className="flight-director-dispatch-action">
               <IconButton
@@ -830,52 +996,19 @@ export function BookingGroupAssignmentDialog({
             <span>Aktionen</span>
           </div>
           <div className="flight-director-queue-scroll" aria-busy={queueInteractionPending}>
-            {groups.length > 0 ? (
-              groups.map((group) => (
-                <AssignmentQueueRow
-                  capacity={capacity}
-                  disabled={queueInteractionPending}
-                  group={group}
-                  key={group.id}
-                  onDefer={
-                    onDefer
-                      ? (ticketGroupId) => runQueueMutation(() => onDefer(ticketGroupId))
-                      : undefined
-                  }
-                  onRecall={(ticketGroupId) => runQueueMutation(() => onRecall(ticketGroupId))}
-                  onRecallClear={(ticketGroupId, recallId) =>
-                    runQueueMutation(() => onRecallClear(ticketGroupId, recallId))
-                  }
-                  onToggle={(ticketGroupId, selected) =>
-                    runQueueMutation(async () => {
-                      if (
-                        [
-                          "IDLE",
-                          "RESERVED",
-                          "ACQUIRING",
-                          "REFRESHING",
-                          "EXPIRED",
-                          "ERROR",
-                        ].includes(dispatchLease.mode)
-                      ) {
-                        await dispatchLease.switchToManual();
-                      }
-                      await onToggle(ticketGroupId, selected);
-                    })
-                  }
-                  productMismatch={
-                    !selectedQueueGroupIds.includes(group.id) &&
-                    selectedProductId !== null &&
-                    group.productId !== selectedProductId
-                  }
-                  selected={selectedQueueGroupIds.includes(group.id)}
-                  selectedSeats={selectedSeats}
-                  timeZone={timeZone}
-                />
-              ))
-            ) : (
-              <p>Keine passende Buchungsgruppe in der Warteschlange.</p>
-            )}
+            <AssignmentQueueRows
+              capacity={capacity}
+              disabled={queueInteractionPending}
+              groups={groups}
+              {...(onDefer ? { onDefer: deferQueueGroup } : {})}
+              onRecall={recallQueueGroup}
+              onRecallClear={clearQueueGroupRecall}
+              onToggle={toggleQueueGroup}
+              selectedProductId={selectedProductId}
+              selectedQueueGroupIds={selectedQueueGroupIds}
+              selectedSeats={selectedSeats}
+              timeZone={timeZone}
+            />
           </div>
         </section>
       </div>
@@ -1042,6 +1175,18 @@ function HistoryCellIcon({ Icon, label }: Readonly<{ Icon: LucideIcon; label: st
   );
 }
 
+function pilotAvailabilityLabel(
+  pilot: OperationBoard["pilots"][number],
+  blockedByRotation: boolean,
+  assignedAircraft: FlightLineAircraft | undefined,
+): string {
+  if (!pilot.active) return "Inaktiv";
+  if (pilot.paused) return "Pausiert";
+  if (blockedByRotation) return "Im aktiven Umlauf";
+  if (assignedAircraft) return `Zugewiesen: ${assignedAircraft.registration}`;
+  return "Verfügbar";
+}
+
 export function PilotAssignmentDialogs({
   aircraft,
   board,
@@ -1139,15 +1284,7 @@ export function PilotAssignmentDialogs({
                 <span>
                   <strong>{pilot.operationalCode}</strong>
                   <small>
-                    {!pilot.active
-                      ? "Inaktiv"
-                      : pilot.paused
-                        ? "Pausiert"
-                        : blockedByRotation
-                          ? "Im aktiven Umlauf"
-                          : assignedAircraft
-                            ? `Zugewiesen: ${assignedAircraft.registration}`
-                            : "Verfügbar"}
+                    {pilotAvailabilityLabel(pilot, blockedByRotation, assignedAircraft)}
                   </small>
                 </span>
               </label>
