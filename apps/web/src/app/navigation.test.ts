@@ -124,6 +124,8 @@ describe("V1.2 app navigation", () => {
     expect(ticketStatusSource).toContain("<Shell");
     expect(ticketStatusSource).toContain("publicView");
     expect(shellSource).toContain("publicView={publicView}");
-    expect(headerSource).toContain("!kiosk && !publicView && session");
+    expect(headerSource).toContain(
+      "const internalOperationalView = Boolean(session && !kiosk && !publicView && !fidsView);",
+    );
   });
 });

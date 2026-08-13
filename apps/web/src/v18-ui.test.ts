@@ -90,7 +90,7 @@ describe("V1.8 approved UI deltas", () => {
       expect(next, column).toBeGreaterThan(position);
       position = next;
     }
-    expect(flightLine).toContain("phaseIcon(rotation)");
+    expect(flightLine).toContain("<RotationPhaseIcon rotation={rotation} />");
     expect(flightLine).toContain("formatAbsoluteTimeWindow");
   });
 
