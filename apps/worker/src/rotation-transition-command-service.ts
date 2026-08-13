@@ -11,6 +11,10 @@ import {
 } from "@rundflug/domain";
 import { dispatchSegmentOrderSql } from "./dispatch-ordering-sql";
 import type { StoredDispatchRecommendationLease } from "./dispatch-recommendation-lease-service";
+import {
+  dispatchQueueDeviationReason,
+  rotationTransitionJson as json,
+} from "./rotation-transition-presentation";
 import { rowToSnapshot } from "./snapshot";
 import type {
   StoredTicketGroupRecall,
@@ -18,13 +22,6 @@ import type {
 } from "./ticket-group-recall-persistence-service";
 import type { Env, StoredEventRow } from "./types";
 import { sendRotationPushNotifications } from "./web-push";
-
-const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
-function json(data: unknown, init: ResponseInit = {}): Response {
-  const headers = new Headers(init.headers);
-  headers.set("content-type", JSON_HEADERS["content-type"]);
-  return new Response(JSON.stringify(data), { ...init, headers });
-}
 
 export type RotationTransitionCommand = Extract<
   CommandEnvelope,
@@ -864,6 +861,10 @@ export class RotationTransitionCommandService {
         ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(overridePayload), now),
       ];
     });
+    const queueDeviationReason = dispatchQueueDeviationReason(
+      command,
+      acceptedDispatchRecommendation,
+    );
     await this.env.DB.batch([
       this.env.DB.prepare(
         "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
@@ -1032,11 +1033,7 @@ export class RotationTransitionCommandService {
           to: nextState,
           aircraftId: selectedAircraftId,
           pilotId: selectedPilotId,
-          queueDeviationReason:
-            command.type === "CALL_NEXT"
-              ? (command.payload.queueDeviationReason ??
-                (acceptedDispatchRecommendation ? "CAPACITY_OPTIMIZED_DISPATCH" : null))
-              : null,
+          queueDeviationReason,
           dispatchRecommendation:
             command.type === "CALL_NEXT" && acceptedDispatchRecommendation
               ? command.payload.dispatchRecommendation
