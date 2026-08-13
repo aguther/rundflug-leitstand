@@ -323,4 +323,33 @@ describe("completion history panel", () => {
       true,
     );
   });
+
+  it("keeps visible filters, disclosures, and actions in DOM keyboard order", () => {
+    renderPanel("OPERATIONS");
+
+    expect(document.querySelectorAll(".history-filter-disclosures")).toHaveLength(1);
+    const orderedControls = [
+      screen.getByLabelText("Von"),
+      screen.getByLabelText("Bis"),
+      screen.getByLabelText("Fluggruppennummer"),
+      screen.getByText("Fachliche Filter"),
+      screen.getByLabelText("Flugzeug"),
+      screen.getByLabelText("Pilotencode"),
+      screen.getByLabelText("Produkt"),
+      screen.getByLabelText("Ressourcengruppe"),
+      screen.getByLabelText("Ticketstatus"),
+      screen.getByText("Technische Filter"),
+      screen.getByRole("button", { name: "Anwenden" }),
+      screen.getByRole("button", { name: "Zurücksetzen" }),
+    ];
+
+    for (let index = 0; index < orderedControls.length - 1; index += 1) {
+      const currentControl = orderedControls[index];
+      const nextControl = orderedControls[index + 1];
+      if (!currentControl || !nextControl) throw new Error("Incomplete keyboard order fixture.");
+      expect(
+        currentControl.compareDocumentPosition(nextControl) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).not.toBe(0);
+    }
+  });
 });

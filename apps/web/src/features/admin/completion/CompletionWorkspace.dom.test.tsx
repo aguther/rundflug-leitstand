@@ -38,7 +38,14 @@ describe("CompletionWorkspace", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Administrative Korrekturen" }));
     expect(screen.queryByText("Korrekturformular")).toBeNull();
+    const correctionPanel = screen.getByRole("tabpanel", {
+      name: "Administrative Korrekturen",
+    });
+    expect(correctionPanel.classList.contains("completion-correction-panel")).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Korrektur beginnen" }));
     expect(screen.getByText("Korrekturformular")).not.toBeNull();
+    expect(screen.getByRole("tabpanel", { name: "Administrative Korrekturen" })).toBe(
+      correctionPanel,
+    );
   });
 });

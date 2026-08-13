@@ -274,14 +274,16 @@ export function AnalysisWorkspace({
                   <Download aria-hidden="true" /> Aktuelle Momentaufnahme exportieren
                 </Button>
               </div>
-              <div aria-live="polite" className={`analysis-snapshot-status tone-${status.tone}`}>
-                <span>{status.text}</span>
-                {status.stale ? (
-                  <Button onClick={() => void onRefresh()} size="compact" type="button">
-                    Aktualisieren
-                  </Button>
-                ) : null}
-              </div>
+              {status.text ? (
+                <div aria-live="polite" className={`analysis-snapshot-status tone-${status.tone}`}>
+                  <span>{status.text}</span>
+                  {status.stale ? (
+                    <Button onClick={() => void onRefresh()} size="compact" type="button">
+                      Aktualisieren
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
             </section>
             <section className="analysis-archives">
               <div className="analysis-archives-header">

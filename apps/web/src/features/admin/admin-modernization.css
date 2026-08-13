@@ -602,10 +602,6 @@
     min-width: 100px;
   }
 
-  .admin-shell .history-filters {
-    overflow: hidden;
-  }
-
   .admin-shell .section-heading,
   .admin-shell .report-actions {
     align-items: stretch;

@@ -245,7 +245,6 @@ footer {
 .pair-device-page,
 .setup-page,
 .reset-level-row,
-.history-filters,
 .payment-information,
 .event-catalog a,
 .pairing-qr {
@@ -259,7 +258,6 @@ footer {
 .payment-information,
 .rotation-timeline,
 .attendance-panel,
-.history-filters,
 .ticket-receipt code {
   background: var(--ui-surface-subtle);
 }
@@ -320,8 +318,6 @@ footer {
 .flight-workspace input,
 .flight-workspace select,
 .flight-workspace textarea,
-.history-filters input,
-.history-filters select,
 .event-lifecycle input,
 .device-pairing-form input,
 .device-pairing-form select,
@@ -336,7 +332,6 @@ footer {
 .cashier-workspace input::placeholder,
 .cashier-workspace textarea::placeholder,
 .flight-workspace input::placeholder,
-.history-filters input::placeholder,
 .admin-workspace input::placeholder,
 .admin-workspace textarea::placeholder {
   color: var(--ui-disabled-text);
@@ -363,7 +358,6 @@ footer {
 }
 .interrupt-action,
 .device-pairing-form button,
-.history-filters button,
 .dialog-actions > button:not(.danger-action) {
   color: var(--ui-accent);
   border-color: color-mix(in srgb, var(--ui-accent) 62%, var(--ui-border));
@@ -392,7 +386,6 @@ footer {
   background: var(--ui-control-hover);
 }
 .device-pairing-form button:hover:not(:disabled),
-.history-filters button:hover:not(:disabled),
 .dialog-actions > button:not(.danger-action):hover:not(:disabled) {
   background: var(--ui-control-hover);
 }
@@ -414,7 +407,6 @@ footer {
   opacity: 1;
 }
 .device-pairing-form button:disabled,
-.history-filters button:disabled,
 .dialog-actions > button:disabled,
 .interrupt-action:disabled {
   color: var(--ui-disabled-text);
@@ -2987,7 +2979,6 @@ p {
   }
   .device-pairing-form,
   .device-list > div,
-  .history-filters,
   .parameter-grid,
   .fleet-row,
   .pilot-list > div,

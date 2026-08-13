@@ -137,10 +137,12 @@ describe("analysis workspace archive lifecycle", () => {
     );
     const action = screen.getByRole("button", { name: "Aktuelle Momentaufnahme exportieren" });
     const actionSlot = action.closest(".analysis-snapshot-action-slot");
+    expect(document.querySelector(".analysis-snapshot-status")).toBeNull();
 
     await user.click(action);
 
     expect(await screen.findByText("Momentaufnahme wurde heruntergeladen.")).toBeTruthy();
+    expect(document.querySelectorAll(".analysis-snapshot-status")).toHaveLength(1);
     expect(api.downloadAnalysisSnapshot).toHaveBeenCalledOnce();
     expect(action.closest(".analysis-snapshot-action-slot")).toBe(actionSlot);
   });

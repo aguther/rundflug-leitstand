@@ -642,17 +642,6 @@
   white-space: nowrap;
 }
 
-.admin-shell .history-filters {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 8px;
-  margin: 8px 0;
-  padding: 10px;
-}
-
-.admin-shell .history-filters > .localized-input-field {
-  grid-column: span 2;
-}
-
 .admin-shell .history-table-wrap {
   min-height: 220px;
   max-height: 320px;
@@ -706,25 +695,9 @@
   margin: 0;
 }
 
-@media (max-width: 1400px) {
-  .admin-shell .history-filters {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 1200px) {
   .admin-shell .metrics-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 900px) {
-  .admin-shell .history-filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .admin-shell .history-filters > .localized-input-field {
-    grid-column: span 2;
   }
 }
 
@@ -787,14 +760,6 @@
     grid-column: 1;
   }
 
-  .admin-shell .history-filters {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-shell .history-filters > .localized-input-field {
-    grid-column: 1;
-  }
-
   .admin-shell .history-table-wrap {
     min-height: 240px;
     max-height: 360px;
@@ -826,6 +791,33 @@
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   padding-top: 16px;
+}
+
+.admin-shell .admin-workspace--events > .admin-workspace-scroll-region {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ui-border-strong) 82%, transparent) transparent;
+}
+
+.admin-shell .admin-workspace--events > .admin-workspace-scroll-region::-webkit-scrollbar {
+  width: 10px;
+}
+
+.admin-shell .admin-workspace--events > .admin-workspace-scroll-region::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-shell .admin-workspace--events > .admin-workspace-scroll-region::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ui-border-strong) 82%, transparent);
+  background-clip: padding-box;
+}
+
+.admin-shell
+  .admin-workspace--events
+  > .admin-workspace-scroll-region::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ui-muted) 78%, transparent);
+  background-clip: padding-box;
 }
 
 .admin-shell .admin-workspace > .ds-page-header,

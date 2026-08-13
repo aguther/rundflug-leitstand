@@ -8,6 +8,7 @@
 }
 
 .completion-correction-panel {
+  margin: 16px;
   border: 1px solid var(--ui-purple-text);
   border-radius: var(--radius-lg);
   background: var(--ui-purple-soft);
@@ -75,9 +76,31 @@
   font-weight: 650;
 }
 
-.completion-history-panel .history-filters {
+.admin-shell .completion-history-panel .history-filters {
+  min-inline-size: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
   gap: 12px;
+  margin: 0;
+  padding: 14px;
+  overflow: visible;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  color: var(--ui-text);
+  background: var(--ui-surface-subtle);
+}
+
+.admin-shell .completion-history-panel .history-filters legend {
+  max-width: calc(100% - 20px);
+  padding: 0 6px;
+  overflow: hidden;
+  color: var(--ui-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .history-visible-filters,
@@ -85,6 +108,18 @@
 .history-technical-filters > div {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.history-visible-filters {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+}
+
+.history-filter-disclosures {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  align-items: start;
   gap: 12px;
 }
 
@@ -115,6 +150,27 @@
   gap: 8px;
 }
 
+.history-filter-chips:empty {
+  display: none;
+}
+
+.history-filter-actions {
+  justify-content: flex-end;
+}
+
+.admin-shell .completion-history-panel .history-filters :is(input, select) {
+  min-width: 0;
+  min-height: 44px;
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+  background: var(--ui-control);
+}
+
+.admin-shell .completion-history-panel .history-filters input::placeholder {
+  color: var(--ui-disabled-text);
+  opacity: 1;
+}
+
 .history-filter-chips button {
   min-height: 44px;
   padding: 6px 10px;
@@ -143,7 +199,26 @@
 }
 
 @media (max-width: 760px) {
+  .completion-correction-panel {
+    margin: 12px;
+  }
+
   .completion-summary-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-shell .completion-history-panel .history-filters {
+    padding: 12px;
+  }
+
+  .history-visible-filters,
+  .history-filter-disclosures,
+  .history-advanced-filters > div,
+  .history-technical-filters > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .history-filter-actions > * {
+    flex: 1 1 0;
   }
 }

@@ -378,13 +378,15 @@ export function CompletionHistoryFilters({
     <fieldset className="history-filters">
       <legend>{filterLegend(view)}</legend>
       <VisibleHistoryFilters board={board} filters={filters} onChange={onChange} view={view} />
-      {view === "OPERATIONS" && (
-        <OperationalHistoryFilters board={board} filters={filters} onChange={onChange} />
-      )}
-      {view === "FORECASTS" && (
-        <ForecastHistoryFilters board={board} filters={filters} onChange={onChange} />
-      )}
-      {view === "AUDIT" && <AuditHistoryFilters filters={filters} onChange={onChange} />}
+      <div className="history-filter-disclosures">
+        {view === "OPERATIONS" && (
+          <OperationalHistoryFilters board={board} filters={filters} onChange={onChange} />
+        )}
+        {view === "FORECASTS" && (
+          <ForecastHistoryFilters board={board} filters={filters} onChange={onChange} />
+        )}
+        {view === "AUDIT" && <AuditHistoryFilters filters={filters} onChange={onChange} />}
+      </div>
       <ActiveFilterChips filters={filters} onChange={onChange} />
       <div className="history-filter-actions">
         <Button onClick={onApply} type="button" variant="primary">

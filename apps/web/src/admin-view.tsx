@@ -514,7 +514,9 @@ export function AdminView() {
     >
       <section className="admin-layout">
         <AdminNavigation activeArea={adminArea} onChange={changeAdminArea} />
-        <div className={`admin-workspace ${masterDataStepActive ? "master-data-active" : ""}`}>
+        <div
+          className={`admin-workspace admin-workspace--${adminArea} ${masterDataStepActive ? "master-data-active" : ""}`.trim()}
+        >
           <PageHeader
             actions={
               <div className="admin-page-header-actions">
