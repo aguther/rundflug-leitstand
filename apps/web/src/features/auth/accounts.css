@@ -5,10 +5,6 @@
   padding: 0 0 20px 16px;
 }
 
-.account-security-actions p {
-  margin: 0;
-}
-
 .account-table-card {
   min-width: 0;
   overflow: hidden;
@@ -166,7 +162,7 @@
 }
 
 .account-security-actions p {
-  margin-top: 3px;
+  margin: 3px 0 0;
   color: var(--ui-muted);
   font-size: 0.76rem;
 }

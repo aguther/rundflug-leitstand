@@ -332,11 +332,6 @@
 }
 
 .assist-claim,
-.assist-finish {
-  border-radius: var(--radius-sm);
-}
-
-.assist-claim,
 .assist-finish,
 .assist-more,
 .assist-actions button {
@@ -346,6 +341,7 @@
 
 .assist-claim,
 .assist-finish {
+  border-radius: var(--radius-sm);
   display: grid;
   grid-template-columns: 24px auto;
   justify-content: center;

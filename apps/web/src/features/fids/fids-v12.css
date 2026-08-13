@@ -873,16 +873,6 @@
   background: transparent;
 }
 
-.standard-fids .ds-modal-body {
-  padding: 10px clamp(20px, 3.2vw, 40px) clamp(18px, 2.8vw, 30px);
-  overflow-y: auto;
-}
-
-.fids-settings-form {
-  display: grid;
-  gap: 0;
-}
-
 .fids-settings-row-count,
 .fids-settings-fieldset {
   padding: clamp(14px, 2dvh, 22px) 0;
@@ -1007,14 +997,6 @@
   border-radius: 7px;
   color: var(--fids-orange);
   font-weight: 700;
-}
-
-.fids-settings-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding-top: clamp(14px, 2.3dvh, 22px);
 }
 
 .fids-settings-actions > div {
@@ -1276,11 +1258,13 @@
 
 .standard-fids .ds-modal-body {
   min-height: 0;
+  padding: 10px clamp(20px, 3.2vw, 40px) clamp(18px, 2.8vw, 30px);
   overflow: hidden;
 }
 
 .fids-settings-form {
   display: grid;
+  gap: 0;
   height: 100%;
   max-height: none;
   min-height: 0;
@@ -1432,6 +1416,11 @@
 }
 
 .fids-settings-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: clamp(14px, 2.3dvh, 22px);
   border-top: 1px solid var(--fids-border);
   background: var(--fids-bg);
 }
