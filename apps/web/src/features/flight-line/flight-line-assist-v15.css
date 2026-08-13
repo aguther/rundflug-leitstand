@@ -358,7 +358,10 @@
 
 .flight-assist-v15 .assist-v15-pilot-code {
   min-height: var(--control-compact);
+  min-width: 0;
+  max-width: 220px;
   display: inline-flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
   padding-inline: 9px;
@@ -403,12 +406,13 @@
 .flight-assist-v15 .assist-v15-action-bar {
   min-width: 0;
   display: grid;
-  grid-template-columns: 240px auto;
-  justify-content: space-between;
+  grid-template-columns: repeat(4, 56px);
+  justify-content: start;
   gap: 8px;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--ui-border);
+  min-height: 56px;
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 
 .flight-assist-v15 .assist-v15-primary-action {
@@ -418,10 +422,11 @@
 
 .flight-assist-v15 .assist-v15-secondary-actions {
   min-width: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, 56px);
   flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 4px;
+  justify-content: start;
+  gap: 5px;
   margin: 0;
   padding: 0;
   border: 0;
@@ -484,6 +489,7 @@
 .flight-assist-v15 .flight-director-current-content {
   width: 100%;
   height: auto;
+  min-height: 145px;
   min-width: 0;
   overflow: visible;
 }
@@ -518,7 +524,9 @@
 }
 
 .flight-assist-v15 .flight-director-current-timeline {
+  display: block;
   grid-template-columns: repeat(4, minmax(70px, 1fr));
+  padding: 14px 18px;
 }
 
 .flight-assist-v15 .flight-director-compact-table.history {
@@ -946,14 +954,6 @@
     margin-top: 8px;
   }
 
-  .flight-assist-v15 .assist-v15-action-bar {
-    grid-template-columns: 1fr;
-  }
-
-  .flight-assist-v15 .assist-v15-secondary-actions {
-    justify-content: flex-start;
-  }
-
   .flight-assist-v15 .assist-v15-group-select {
     grid-template-columns: 30px 20px minmax(42px, 1fr);
   }
@@ -968,17 +968,6 @@
   }
 }
 
-/* Stable Assist controls and current/history viewport. */
-.flight-assist-v15 .assist-v15-active-tools {
-  flex-wrap: nowrap;
-}
-
-.flight-assist-v15 .assist-v15-pilot-code {
-  min-width: 0;
-  max-width: 220px;
-  flex-wrap: nowrap;
-}
-
 .flight-assist-v15 .assist-v15-pilot-code strong {
   min-width: 0;
   overflow: hidden;
@@ -990,38 +979,11 @@
   flex: 0 0 auto;
 }
 
-.flight-assist-v15 .assist-v15-action-bar {
-  grid-template-columns: repeat(4, 56px);
-  justify-content: start;
-  min-height: 56px;
-  margin-bottom: 0;
-  padding-bottom: 0;
-  border-bottom: 0;
-}
-
 .flight-assist-v15 .assist-v15-primary-action,
 .flight-assist-v15 .assist-v15-secondary-actions .ds-icon-button {
   width: 56px;
   min-width: 56px;
   height: 56px;
-}
-
-.flight-assist-v15 .assist-v15-secondary-actions {
-  display: grid;
-  grid-template-columns: repeat(3, 56px);
-  justify-content: start;
-  gap: 5px;
-}
-
-.flight-assist-v15 .flight-director-current-content {
-  height: auto;
-  min-height: 145px;
-  overflow: visible;
-}
-
-.flight-assist-v15 .flight-director-current-timeline {
-  display: block;
-  padding: 14px 18px;
 }
 
 .flight-assist-v15 .flight-director-current-timeline .flight-director-progress {

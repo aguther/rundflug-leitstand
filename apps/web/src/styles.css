@@ -253,11 +253,6 @@ footer {
   border-color: var(--ui-border);
   background: var(--ui-surface);
 }
-.emergency-control {
-  color: var(--ui-danger);
-  border-color: color-mix(in srgb, var(--ui-danger) 72%, var(--ui-border));
-  background: var(--ui-danger-soft);
-}
 .emergency-control label {
   color: var(--ui-danger);
 }
@@ -1300,6 +1295,7 @@ input:focus-visible {
   border: 2px solid #a61b1b;
   border-radius: 6px;
   background: #fff5f5;
+  color: var(--ui-danger);
 }
 .emergency-control label {
   display: grid;
@@ -2258,8 +2254,8 @@ p {
 }
 .admin-workspace .primary-action:disabled {
   border-color: #a7b5c5;
-  color: #65758a;
-  background: #e4e9ef;
+  color: #4f5f73;
+  background: #f1f4f7;
   cursor: not-allowed;
 }
 .master-data-table-scroll {
@@ -2392,7 +2388,7 @@ p {
 }
 .setup-checklist li.complete > span {
   color: #fff;
-  background: #229c57;
+  background: #187a42;
 }
 .setup-checklist li.missing > span {
   color: #8a4b00;
@@ -3036,6 +3032,7 @@ p {
   border: 1px solid color-mix(in srgb, var(--ui-danger) 55%, var(--ui-border));
   border-radius: 6px;
   background: var(--ui-surface);
+  color: var(--ui-danger);
 }
 .emergency-control summary {
   min-height: 44px;
@@ -3776,7 +3773,7 @@ p {
 .matrix-recommendation .console-confirm {
   color: #fff;
   border-color: #1d75d7;
-  background: #1976df;
+  background: #1265be;
 }
 .console-bottom-grid {
   display: grid;
@@ -4111,7 +4108,7 @@ p {
   border: 1px solid #2a6caf;
   border-radius: 4px;
   color: #55a6ff;
-  background: rgba(30, 101, 176, 0.1);
+  background: #10243a;
   font-size: 0.8rem;
 }
 .assist-state.state-paused {
@@ -4145,7 +4142,7 @@ p {
   align-self: end;
   color: #fff;
   border-color: #277de1;
-  background: #2684ff;
+  background: #1265be;
 }
 .assist-more {
   width: 100%;
@@ -4207,7 +4204,7 @@ p {
   min-height: 54px;
   color: #fff;
   border-color: #277de1;
-  background: #2684ff;
+  background: #1265be;
 }
 .assist-empty {
   color: var(--assist-muted);
