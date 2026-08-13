@@ -128,7 +128,7 @@ export function AdminView() {
     activeArea: adminArea,
     activeEventStep: eventStep,
     onError: setMessage,
-    timeZone: board?.event.timeZone,
+    timeZone: board?.event.timeZone ?? "Europe/Berlin",
   });
   const refreshHistory = adminHistory.refreshAuditHistory;
   const pilotEditor = usePilotEditorState(board?.pilots);
