@@ -45,7 +45,7 @@ def verify_release_version() -> str:
     release_yaml = versioned_paths[1].read_text(encoding="utf-8")
     if not release_yaml.startswith(f"version: {version}\n"):
         fail(f"requirements-v{version}.yaml does not declare version {version}")
-    release_ids = re.findall(r"^  - id: ([A-Z0-9-]+)$", release_yaml, re.MULTILINE)
+    release_ids = re.findall(r"^ {2}- id: ([A-Z0-9-]+)$", release_yaml, re.MULTILINE)
     if len(release_ids) != EXPECTED_CURRENT_REQUIREMENTS or len(release_ids) != len(set(release_ids)):
         fail(
             f"release {version} must contain exactly "
@@ -82,9 +82,7 @@ def fail(message: str) -> None:
     raise SystemExit(1)
 
 
-def main() -> None:
-    release_version = verify_release_version()
-    requirements = load_json_compatible_yaml(YAML_PATH)
+def verify_baseline_requirements(requirements):
     if len(requirements) != 207:
         fail(f"expected 207 requirements, found {len(requirements)}")
 
@@ -105,6 +103,10 @@ def main() -> None:
     if invalid_stages:
         fail(f"invalid stages: {invalid_stages}")
 
+    return ids
+
+
+def verify_traceability(requirements, ids):
     with CSV_PATH.open(newline="", encoding="utf-8-sig") as handle:
         rows = list(csv.DictReader(handle))
     csv_ids = [row["ID"] for row in rows]
@@ -152,6 +154,14 @@ def main() -> None:
     if len(v1_must) != 166:
         fail(f"expected 166 V1 MUSS requirements, found {len(v1_must)}")
 
+    return v1_rows, v1_must
+
+
+def main() -> None:
+    release_version = verify_release_version()
+    requirements = load_json_compatible_yaml(YAML_PATH)
+    ids = verify_baseline_requirements(requirements)
+    v1_rows, v1_must = verify_traceability(requirements, ids)
     print(
         f"OK: release {release_version}, {EXPECTED_CURRENT_REQUIREMENTS} current requirements, "
         f"{len(ids)} baseline requirements, "

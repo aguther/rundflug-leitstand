@@ -21,16 +21,17 @@ const board = async (deviceId, token) => {
   if (!response.ok) throw new Error(`Board-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
-const command = async (
-  deviceId,
-  token,
-  expectedVersion,
-  type,
-  payload,
-  expectedStatus = 200,
-  commandId = randomUUID(),
-  consistency = {},
-) => {
+const command = async (...args) => {
+  const [
+    deviceId,
+    token,
+    expectedVersion,
+    type,
+    payload,
+    expectedStatus = 200,
+    commandId = randomUUID(),
+    consistency = {},
+  ] = args;
   const response = await fetch(`${base}/api/control/demo-2026/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": token },
