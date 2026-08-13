@@ -4,12 +4,12 @@ import {
   type MasterDataCategory,
   SetupProgress,
   type SetupStep,
-  ValidationHint,
 } from "./admin-ux";
 import { AppShell as Shell } from "./app/AppShell";
 import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
 import { Button, PageHeader, StatusPill } from "./design-system/components";
 import { formatEventLocalDateTime } from "./event-time";
+import { AdminFactoryResetPanel } from "./features/admin/AdminFactoryResetPanel";
 import { AdminShellDialogs } from "./features/admin/AdminShellDialogs";
 import * as LazyAdmin from "./features/admin/admin-lazy-components";
 import {
@@ -18,6 +18,7 @@ import {
   createAdminSetupSteps,
   summarizeAdminSetup,
 } from "./features/admin/admin-shell-model";
+import { getAdminStatusPresentation } from "./features/admin/admin-status-presentation";
 import type { TurnaroundOverrideContext } from "./features/admin/aircraft/AircraftProductTurnaroundOverrideDialog";
 import type { AircraftResourceGroupAssignmentContext } from "./features/admin/aircraft/AircraftResourceGroupAssignmentDialog";
 import { useAircraftEditorState } from "./features/admin/aircraft/useAircraftEditorState";
@@ -331,6 +332,167 @@ export function AdminView() {
       onDelete={(action) => requestMasterDelete(action.entityType, action.entityId, action.label)}
     />
   );
+  const renderEventWorkspace = () => {
+    if (!board) return null;
+
+    switch (eventStep) {
+      case "event":
+        return (
+          <div
+            aria-labelledby="admin-event-step-event-tab"
+            className="event-setup-v15 single-panel"
+            id="admin-event-step-event-panel"
+            role="tabpanel"
+          >
+            <LazyAdmin.EventParametersWorkspace
+              administrator={isAdministrator}
+              busyActionKey={busyActionKey}
+              event={board.event}
+              key={`${board.event.eventId}-${eventParametersResetKey}`}
+              onDirtyChange={setEventParametersDirty}
+              onRemoveLogo={requestClearEventLogo}
+              onSave={requestSaveEventParameters}
+              onUploadLogo={requestSaveEventLogo}
+            />
+          </div>
+        );
+      case "gates":
+      case "resource-groups":
+      case "aircraft":
+      case "pilots":
+      case "products":
+        return (
+          <LazyAdmin.AdminMasterDataWorkspacePanel
+            board={board}
+            category={masterDataCategory}
+            emptyState={masterDataEmptyState}
+            eventStep={eventStep}
+            onDelete={requestMasterDelete}
+            onEdit={{
+              aircraft: selectAircraftForEditing,
+              gates: selectGateForEditing,
+              pilots: selectPilotForEditing,
+              products: selectProductForEditing,
+              resourceGroups: selectResourceForEditing,
+            }}
+            onNew={startNewMasterDataEntry}
+            onOpenAssignment={setAssignmentDialogContext}
+            onOpenSales={(productId) => {
+              const product = board.products.find((entry) => entry.id === productId);
+              if (!product) return;
+              setSalesProductId(product.id);
+              setSaleClosesAt(
+                product.saleClosesAt
+                  ? formatEventLocalDateTime(product.saleClosesAt, board.event.timeZone)
+                  : "",
+              );
+            }}
+            onOpenTurnaround={setTurnaroundDialogContext}
+            presentation={masterEditorPresentation}
+            table={masterDataTable}
+          />
+        );
+      case "operational-plan":
+        return (
+          <LazyAdmin.AdminOperationalPlanPanel
+            board={board}
+            busy={busyActionKey !== null}
+            onMessage={setMessage}
+            onRefresh={refresh}
+            onRefreshHistory={refreshHistory}
+            onRunBusyAction={runBusyAction}
+            readOnly={!isAdministrator || !adminModeUnlocked}
+          />
+        );
+      case "operations":
+        return (
+          <LazyAdmin.AdminOperationsPanel
+            administrator={isAdministrator}
+            board={board}
+            busyActionKey={busyActionKey}
+            completedSetupSteps={completedSetupSteps}
+            onEmergency={(action, emergencyReason) => {
+              let succeeded = false;
+              return runBusyAction(
+                action === "CLEAR_EMERGENCY" ? "emergency-clear" : "emergency-trigger",
+                async () => {
+                  succeeded = await emergency(action, emergencyReason);
+                },
+              ).then(() => succeeded);
+            }}
+            onOpenSetupStep={openSetupStep}
+            onRequestAdminAction={requestAdminAction}
+            onSetEventLifecycle={setEventLifecycle}
+            setupComplete={setupComplete}
+            setupSteps={setupSteps}
+          />
+        );
+      case "completion":
+        return (
+          <LazyAdmin.AdminCompletionWorkspacePanel
+            administrator={isAdministrator}
+            board={board}
+            busyActionKey={busyActionKey}
+            history={adminHistory}
+            manifestCorrectionResetKey={manifestCorrectionResetKey}
+            onMessage={setMessage}
+            onRequestManifestCorrection={requestManifestCorrection}
+            onRunBusyAction={runBusyAction}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+  const renderAreaWorkspace = () => {
+    switch (adminArea) {
+      case "overview":
+        return board ? (
+          <AdminOverviewPanel
+            board={board}
+            eventFlow={eventFlow.flow}
+            eventFlowError={eventFlow.error}
+            eventFlowLoading={eventFlow.loading}
+            pushConfigurationStatus={pushConfigurationStatus}
+          />
+        ) : null;
+      case "users":
+        return (
+          <LazyAdmin.AccountManagement
+            createOpen={accountCreateOpen}
+            onCreateOpenChange={setAccountCreateOpen}
+          />
+        );
+      case "backup":
+        return (
+          <AdminFactoryResetPanel
+            administrator={isAdministrator}
+            onOpen={factoryResetState.openDialog}
+          />
+        );
+      case "evaluation":
+        return (
+          <LazyAdmin.AnalysisWorkspace
+            backendConfirmed={backendConfirmed}
+            board={board}
+            onRefresh={refresh}
+            simulator={
+              <AdminSimulationLauncher
+                available={Boolean(board)}
+                busyActionKey={busyActionKey}
+                onMessage={setMessage}
+                onRunBusyAction={runBusyAction}
+              />
+            }
+          />
+        );
+      case "events":
+        return renderEventWorkspace();
+      default:
+        return null;
+    }
+  };
+  const statusPresentation = getAdminStatusPresentation(board?.event.status, error);
   return (
     <Shell
       className="admin-shell"
@@ -361,27 +523,7 @@ export function AdminView() {
                     Veranstaltungen verwalten
                   </Button>
                 ) : null}
-                <StatusPill
-                  tone={
-                    board?.event.status === "ACTIVE"
-                      ? "success"
-                      : board?.event.status === "PREPARATION"
-                        ? "warning"
-                        : error
-                          ? "danger"
-                          : "neutral"
-                  }
-                >
-                  {board?.event.status === "ACTIVE"
-                    ? "Betrieb aktiv"
-                    : board?.event.status === "PREPARATION"
-                      ? "Betrieb noch nicht freigegeben"
-                      : board?.event.status === "CLOSED"
-                        ? "Betrieb geschlossen"
-                        : error
-                          ? "Stand nicht verfügbar"
-                          : "Stand wird geladen"}
-                </StatusPill>
+                <StatusPill tone={statusPresentation.tone}>{statusPresentation.label}</StatusPill>
               </div>
             }
             description={
@@ -444,15 +586,6 @@ export function AdminView() {
             {board?.currentDeviceRole === "FLIGHT_DIRECTOR" ? (
               <div className="readonly-banner">Flight-Director-Ansicht · primär lesend</div>
             ) : null}
-            {board && adminArea === "overview" ? (
-              <AdminOverviewPanel
-                board={board}
-                eventFlow={eventFlow.flow}
-                eventFlowError={eventFlow.error}
-                eventFlowLoading={eventFlow.loading}
-                pushConfigurationStatus={pushConfigurationStatus}
-              />
-            ) : null}
             <AdminAccessStatusBar
               adminModeUnlocked={adminModeUnlocked}
               administrator={isAdministrator}
@@ -467,90 +600,7 @@ export function AdminView() {
               onRequestAdminModeUnlock={requestAdminModeUnlock}
               refreshing={refreshing}
             />
-          {adminArea === "users" ? (
-            <LazyAdmin.AccountManagement
-              createOpen={accountCreateOpen}
-              onCreateOpenChange={setAccountCreateOpen}
-            />
-          ) : null}
-          <section className="reset-levels" hidden={adminArea !== "backup"}>
-            {!isAdministrator ? (
-              <ValidationHint tone="error">
-                Reset ist sichtbar, bleibt aber gesperrt, bis eine gültige Administrationssitzung
-                bestätigt wurde.
-              </ValidationHint>
-            ) : null}
-            <div className="reset-level-row factory-reset-row" hidden={adminArea !== "backup"}>
-              <div>
-                <h2>Werkszustand herstellen</h2>
-                <p>
-                  Alle Anwendungsdaten, Stammdaten, Historien, Sitzungen und die Ersteinrichtung
-                  werden gelöscht. Danach startet das System wieder bei /setup.
-                </p>
-              </div>
-              <button
-                className="danger-action"
-                disabled={!isAdministrator}
-                onClick={factoryResetState.openDialog}
-                type="button"
-              >
-                <span>Werkszustand vorbereiten</span>
-              </button>
-            </div>
-          </section>
-          <div
-            aria-labelledby="admin-event-step-event-tab"
-            className="event-setup-v15 single-panel"
-            hidden={adminArea !== "events" || eventStep !== "event"}
-            id="admin-event-step-event-panel"
-            role="tabpanel"
-          >
-            {eventStep === "event" && board ? (
-              <LazyAdmin.EventParametersWorkspace
-                administrator={isAdministrator}
-                busyActionKey={busyActionKey}
-                event={board.event}
-                key={`${board.event.eventId}-${eventParametersResetKey}`}
-                onDirtyChange={setEventParametersDirty}
-                onRemoveLogo={requestClearEventLogo}
-                onSave={requestSaveEventParameters}
-                onUploadLogo={requestSaveEventLogo}
-              />
-            ) : null}
-
-          </div>
-
-          {masterDataStepActive && board ? (
-            <LazyAdmin.AdminMasterDataWorkspacePanel
-              board={board}
-              category={masterDataCategory}
-              emptyState={masterDataEmptyState}
-              eventStep={eventStep}
-              onDelete={requestMasterDelete}
-              onEdit={{
-                aircraft: selectAircraftForEditing,
-                gates: selectGateForEditing,
-                pilots: selectPilotForEditing,
-                products: selectProductForEditing,
-                resourceGroups: selectResourceForEditing,
-              }}
-              onNew={startNewMasterDataEntry}
-              onOpenAssignment={setAssignmentDialogContext}
-              onOpenSales={(productId) => {
-                const product = board.products.find((entry) => entry.id === productId);
-                if (!product) return;
-                setSalesProductId(product.id);
-                setSaleClosesAt(
-                  product.saleClosesAt
-                    ? formatEventLocalDateTime(product.saleClosesAt, board.event.timeZone)
-                    : "",
-                );
-              }}
-              onOpenTurnaround={setTurnaroundDialogContext}
-              presentation={masterEditorPresentation}
-              table={masterDataTable}
-            />
-          ) : null}
+            {renderAreaWorkspace()}
           <AdminShellDialogs
             administrator={isAdministrator}
             assignmentContext={assignmentDialogContext}
@@ -589,66 +639,6 @@ export function AdminView() {
             templateImport={templateImport}
             turnaroundContext={turnaroundDialogContext}
           />
-          {adminArea === "evaluation" ? (
-            <LazyAdmin.AnalysisWorkspace
-              backendConfirmed={backendConfirmed}
-              board={board}
-              onRefresh={refresh}
-              simulator={
-                <AdminSimulationLauncher
-                  available={Boolean(board)}
-                  busyActionKey={busyActionKey}
-                  onMessage={setMessage}
-                  onRunBusyAction={runBusyAction}
-                />
-              }
-            />
-          ) : null}
-          {adminArea === "events" && eventStep === "operational-plan" && board ? (
-            <LazyAdmin.AdminOperationalPlanPanel
-              board={board}
-              busy={busyActionKey !== null}
-              onMessage={setMessage}
-              onRefresh={refresh}
-              onRefreshHistory={refreshHistory}
-              onRunBusyAction={runBusyAction}
-              readOnly={!isAdministrator || !adminModeUnlocked}
-            />
-          ) : null}
-          {adminArea === "events" && eventStep === "operations" && board ? (
-            <LazyAdmin.AdminOperationsPanel
-              administrator={isAdministrator}
-              board={board}
-              busyActionKey={busyActionKey}
-              completedSetupSteps={completedSetupSteps}
-              onEmergency={(action, emergencyReason) => {
-                let succeeded = false;
-                return runBusyAction(
-                  action === "CLEAR_EMERGENCY" ? "emergency-clear" : "emergency-trigger",
-                  async () => {
-                    succeeded = await emergency(action, emergencyReason);
-                  },
-                ).then(() => succeeded);
-              }}
-              onOpenSetupStep={openSetupStep}
-              onRequestAdminAction={requestAdminAction}
-              onSetEventLifecycle={setEventLifecycle}
-              setupComplete={setupComplete}
-              setupSteps={setupSteps}
-              />
-          ) : null}
-          {adminArea === "events" && eventStep === "completion" && board ? (
-            <LazyAdmin.AdminCompletionWorkspacePanel
-              administrator={isAdministrator}
-              board={board}
-              busyActionKey={busyActionKey}
-              history={adminHistory}
-              manifestCorrectionResetKey={manifestCorrectionResetKey}
-              onMessage={setMessage}
-              onRequestManifestCorrection={requestManifestCorrection}
-              onRunBusyAction={runBusyAction}
-            />
-          ) : null}
             </Suspense>
           </div>
         </div>

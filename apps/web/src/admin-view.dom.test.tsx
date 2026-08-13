@@ -485,6 +485,26 @@ describe("admin view orchestration", () => {
     expect(actions.changeArea).toHaveBeenCalledWith("users");
   });
 
+  it.each([
+    ["PREPARATION", "Betrieb noch nicht freigegeben"],
+    ["CLOSED", "Betrieb geschlossen"],
+  ])("presents the %s event status", (status, label) => {
+    const board = createBoard();
+    workspace.board = { ...board, event: { ...board.event, status } };
+
+    render(<AdminView />);
+
+    expect(screen.getByText(label)).toBeTruthy();
+  });
+
+  it("presents a loading status before the board is available", () => {
+    workspace.board = null;
+
+    render(<AdminView />);
+
+    expect(screen.getByText("Stand wird geladen")).toBeTruthy();
+  });
+
   it("surfaces setup and connection states when no board is available", () => {
     workspace.board = null;
     workspace.error = "Backend nicht erreichbar";
