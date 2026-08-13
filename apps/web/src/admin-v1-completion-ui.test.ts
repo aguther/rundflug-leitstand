@@ -9,6 +9,7 @@ import factoryResetDialogSource from "./features/admin/FactoryResetDialog.tsx?ra
 import masterDataWorkspaceSource from "./features/admin/master-data/MasterDataWorkspace.tsx?raw";
 import operationsWorkspaceSource from "./features/admin/operations/OperationsWorkspace.tsx?raw";
 import sharedSource from "./operation-workspace.tsx?raw";
+import { readCssSource } from "./test-css-source";
 
 const fieldPrimitivesSource = readFileSync(
   new URL("./features/operations/operation-field-primitives.tsx", import.meta.url),
@@ -19,7 +20,7 @@ const appSource = `${sharedSource}\n${fieldPrimitivesSource}\n${factoryResetDial
 
 const stylesSource = [
   readFileSync(new URL("./styles.css", import.meta.url), "utf8"),
-  readFileSync(new URL("./features/admin/admin-v12.css", import.meta.url), "utf8"),
+  readCssSource(new URL("./features/admin/admin-v12.css", import.meta.url)),
   readFileSync(new URL("./features/admin/admin-v15.css", import.meta.url), "utf8"),
   readFileSync(
     new URL("./features/admin/event-parameters/event-parameters.css", import.meta.url),

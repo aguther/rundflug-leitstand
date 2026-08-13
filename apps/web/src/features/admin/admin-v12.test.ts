@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import featureRouterSource from "../../FeatureRouter.tsx?raw";
+import { readCssSource } from "../../test-css-source";
 
-const stylesSource = readFileSync(new URL("./admin-v12.css", import.meta.url), "utf8");
+const stylesSource = readCssSource(new URL("./admin-v12.css", import.meta.url));
 const modernizationStylesSource = readFileSync(
   new URL("./admin-modernization.css", import.meta.url),
   "utf8",

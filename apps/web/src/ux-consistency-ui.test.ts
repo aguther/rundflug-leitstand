@@ -4,6 +4,7 @@ import cashierSource from "./cashier-view.tsx?raw";
 import productSalesDialogSource from "./features/admin/products/ProductSalesDialog.tsx?raw";
 import flightLineSource from "./flight-line-view.tsx?raw";
 import sharedSource from "./operation-workspace.tsx?raw";
+import { readCssSource } from "./test-css-source";
 
 const operationLabelsSource = readFileSync(
   new URL("./features/operations/operation-labels.ts", import.meta.url),
@@ -14,7 +15,7 @@ const appSource = `${sharedSource}\n${operationLabelsSource}\n${productSalesDial
 
 const stylesSource = [
   readFileSync(new URL("./styles.css", import.meta.url), "utf8"),
-  readFileSync(new URL("./features/admin/admin-v12.css", import.meta.url), "utf8"),
+  readCssSource(new URL("./features/admin/admin-v12.css", import.meta.url)),
 ].join("\n");
 const productSalesStyles = readFileSync(
   new URL("./features/admin/products/product-sales-dialog.css", import.meta.url),

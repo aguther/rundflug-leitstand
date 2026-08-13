@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { readCssSource } from "../test-css-source";
 
 const gradientPattern = /(?:linear|radial)-gradient\(/;
 
@@ -14,7 +15,7 @@ describe("quiet surfaces stay gradient-free", () => {
   it.each(quietSurfaceStylesheets)(
     "%s has no gradients (Admin/Kasse/Supervisor/FIDS are calm, table-dense surfaces per the multi-surface concept)",
     (relativePath) => {
-      const source = readFileSync(new URL(relativePath, import.meta.url), "utf8");
+      const source = readCssSource(new URL(relativePath, import.meta.url));
       expect(source).not.toMatch(gradientPattern);
     },
   );

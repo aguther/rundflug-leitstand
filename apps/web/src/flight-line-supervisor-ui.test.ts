@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import analyticsViewportSource from "./features/flight-line/analytics-diagram-viewport.ts?raw";
 import analyticsContentSource from "./features/flight-line/FlightDirectorAnalyticsContent.tsx?raw";
@@ -9,11 +8,11 @@ import { expectedReviewAtFromPause } from "./flight-line-pause";
 import sharedSource from "./flight-line-shared.tsx?raw";
 import supervisorSource from "./flight-line-supervisor.tsx?raw";
 import appSource from "./flight-line-view.tsx?raw";
+import { readCssSource } from "./test-css-source";
 
 const flightLineSource = `${supervisorSource}\n${sharedSource}\n${operationsDialogSource}\n${operationalPlanSource}\n${analyticsDialogSource}\n${analyticsContentSource}`;
-const flightLineStyles = readFileSync(
+const flightLineStyles = readCssSource(
   new URL("./features/flight-line/flight-line-v12.css", import.meta.url),
-  "utf8",
 );
 
 describe("Flight Director", () => {
@@ -74,7 +73,7 @@ describe("Flight Director", () => {
     expect(flightLineSource).toContain("Nicht verfügbar");
     expect(flightLineSource).toContain("PilotChangeIcon");
     expect(flightLineSource).toContain("primaryAircraftActionPresentation");
-    expect(supervisorSource).toContain("phaseIcon(rotation)");
+    expect(supervisorSource).toContain("<RotationPhaseIcon rotation={rotation} />");
     expect(supervisorSource).not.toContain("Nächster Schritt");
     expect(supervisorSource).not.toContain("<span>Status</span>");
     expect(supervisorSource).not.toContain("<dd>{rotation.status}</dd>");

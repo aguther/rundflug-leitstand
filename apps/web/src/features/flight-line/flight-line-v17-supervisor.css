@@ -1,0 +1,933 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: migrated UI layers retain their approved cascade. */
+/* V1.7.0 supervisor: one compact table, no expanding aircraft rows. */
+.flight-director-v15 {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ds-panel.flight-director-aircraft {
+  height: clamp(260px, 43vh, 470px);
+  min-height: 230px;
+  flex: 1 1 360px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.flight-director-aircraft-table {
+  min-width: 1300px;
+}
+
+.flight-director-aircraft-head,
+.flight-director-aircraft-row {
+  min-width: 1300px;
+  grid-template-columns: 120px 110px 122px 72px 150px 130px 140px minmax(390px, 1fr);
+  gap: 10px;
+  padding: 7px 10px;
+}
+
+.flight-director-aircraft-head {
+  min-height: 38px;
+}
+
+.flight-director-aircraft-row {
+  min-height: 64px;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  cursor: default;
+}
+
+.flight-director-aircraft-row:last-child {
+  border-bottom: 0;
+}
+
+.flight-director-aircraft-resource,
+.flight-director-aircraft-status {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.flight-director-aircraft-resource small,
+.flight-director-aircraft-status small {
+  overflow: hidden;
+  color: var(--ui-muted);
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flight-director-aircraft-status .ds-status-pill {
+  width: max-content;
+  max-width: 100%;
+  color: inherit;
+}
+
+.flight-director-aircraft-status .ds-status-pill--success {
+  color: var(--ui-success-text, var(--ui-success));
+}
+
+.flight-director-aircraft-status .ds-status-pill--warning {
+  color: var(--ui-warning-text, var(--ui-warning));
+}
+
+.flight-director-aircraft-status .ds-status-pill--danger {
+  color: var(--ui-danger);
+}
+
+.flight-director-aircraft-status .ds-status-pill--info {
+  color: var(--ui-accent);
+}
+
+.flight-director-pilot-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--ui-text);
+  text-align: center;
+}
+
+.flight-director-pilot-code > svg {
+  width: 15px;
+  height: 15px;
+  color: var(--ui-muted);
+}
+
+.flight-director-timeline,
+.flight-director-next-step,
+.flight-director-aircraft-details :is(strong, small),
+.flight-director-compact-table.tickets > div:not(.flight-director-compact-head) > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flight-director-row-actions {
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.flight-director-row-actions > .ds-button {
+  width: 152px;
+  min-width: 152px;
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+  background: var(--ui-control);
+  box-shadow: none;
+}
+
+.flight-director-row-actions > .ds-button:hover:not(:disabled) {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.flight-director-row-actions .ds-icon-button svg {
+  transform: none;
+}
+
+.flight-director-row-actions .ds-icon-button:first-of-type svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.flight-director-bottom-grid {
+  min-height: 190px;
+  flex: 0 1 270px;
+}
+
+.flight-director-current-rotation {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 8px;
+}
+
+.flight-director-current-rotation > div {
+  padding: 8px;
+}
+
+.flight-director-current-content {
+  height: calc(100% - 39px);
+  min-width: 620px;
+  overflow: auto;
+}
+
+.flight-director-current-timeline {
+  padding: 4px 18px 12px;
+}
+
+.flight-director-current-timeline .flight-director-progress {
+  width: 100%;
+}
+
+.flight-director-compact-table.history .flight-director-compact-head,
+.flight-director-compact-table.history > div:not(.flight-director-compact-head) {
+  min-width: 760px;
+  grid-template-columns: minmax(190px, 1.5fr) 0.65fr repeat(4, 0.7fr);
+}
+
+.flight-director-assignment-dialog {
+  height: 100%;
+  min-height: 0;
+}
+
+.flight-director-assignment-modal {
+  width: min(1080px, 100%);
+  height: min(800px, calc(100vh - 32px));
+}
+
+html:has(.flight-director-assignment-modal) {
+  overflow: hidden;
+}
+
+@supports (height: 100dvh) {
+  .flight-director-assignment-modal {
+    height: min(800px, calc(100dvh - 32px));
+  }
+}
+
+.flight-director-assignment-modal .ds-modal-header {
+  min-height: 82px;
+  align-items: center;
+}
+
+.flight-director-assignment-modal-body {
+  overflow: hidden;
+  padding: 16px 18px;
+}
+
+.flight-director-assignment-dialog .flight-director-queue {
+  height: 100%;
+  display: grid;
+  grid-template-rows: 86px 32px minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+}
+
+.flight-director-dispatch-slot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 66px;
+  min-height: 86px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+
+.flight-director-dispatch-content {
+  min-width: 0;
+}
+
+.flight-director-dispatch-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-left: 1px solid var(--ui-border);
+}
+
+.flight-director-dispatch-action .ds-icon-button {
+  width: var(--control-touch);
+  min-width: var(--control-touch);
+  height: var(--control-touch);
+}
+
+.flight-director-queue-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.flight-director-queue-head,
+.flight-director-assignment-dialog .flight-director-queue-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.35fr) minmax(100px, 0.55fr) minmax(140px, 0.7fr) 150px;
+  align-items: center;
+  column-gap: 14px;
+}
+
+.flight-director-queue-head {
+  padding: 0 16px;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.flight-director-dispatch-recommendation {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(165px, 0.9fr) minmax(130px, 0.75fr) minmax(
+      220px,
+      1.4fr
+    );
+  align-items: stretch;
+  height: 100%;
+  background: var(--ui-surface-subtle);
+}
+
+.flight-director-dispatch-recommendation.is-refreshing {
+  opacity: 0.78;
+}
+
+.flight-director-dispatch-recommendation > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border-right: 1px solid var(--ui-border);
+}
+
+.flight-director-dispatch-recommendation > div:last-child {
+  border-right: 0;
+}
+
+.flight-director-dispatch-recommendation span,
+.flight-director-dispatch-recommendation small {
+  color: var(--ui-muted);
+  font-size: 0.76rem;
+}
+
+.flight-director-dispatch-summary > span,
+.flight-director-dispatch-occupancy > strong {
+  color: var(--ui-text);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.flight-director-dispatch-countdown > strong,
+.flight-director-dispatch-countdown > strong > span {
+  color: var(--ui-accent);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.flight-director-dispatch-countdown > strong > span.is-expiring {
+  color: var(--ui-warning-text, var(--ui-warning));
+}
+
+.flight-director-dispatch-countdown > svg {
+  width: 18px;
+  height: 18px;
+  color: var(--ui-accent);
+}
+
+.flight-director-dispatch-recommendation > .flight-director-dispatch-reason {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+}
+
+.flight-director-dispatch-reason > span {
+  overflow: hidden;
+  color: var(--ui-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flight-director-dispatch-reservation {
+  display: flex;
+  min-height: 86px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  height: 100%;
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+  font-size: 0.82rem;
+}
+
+.flight-director-dispatch-reservation.is-loading {
+  justify-content: flex-start;
+}
+
+.flight-director-dispatch-reservation.is-loading svg {
+  width: 18px;
+  height: 18px;
+  color: var(--ui-accent);
+}
+
+.flight-director-dispatch-reservation.is-manual {
+  color: var(--ui-warning-text, var(--ui-warning));
+  background: var(--ui-warning-soft);
+}
+
+.flight-director-dispatch-reservation.is-expired {
+  color: var(--ui-danger);
+  background: var(--ui-danger-soft);
+}
+
+.flight-director-dispatch-recommendation small {
+  margin: 0;
+}
+
+.flight-director-assignment-dialog .flight-director-queue-row {
+  min-height: 72px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-raised);
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.flight-director-assignment-dialog .flight-director-queue-row:last-child {
+  border-bottom: 0;
+}
+
+.flight-director-assignment-dialog .flight-director-queue-row.selected {
+  background: var(--ui-accent-soft);
+  box-shadow: inset 4px 0 var(--ui-accent);
+}
+
+.flight-director-assignment-dialog .flight-director-queue-row.is-present:not(.selected) {
+  background: color-mix(in srgb, var(--ui-success-soft) 70%, var(--ui-surface-raised));
+}
+
+.flight-director-assignment-dialog .flight-director-queue-row > .flight-director-queue-group {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.flight-director-queue-group > input {
+  width: 21px;
+  height: 21px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--ui-accent);
+}
+
+.flight-director-queue-identity,
+.flight-director-queue-persons,
+.flight-director-queue-call {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.flight-director-assignment-dialog .flight-director-queue-row > .flight-director-queue-persons,
+.flight-director-assignment-dialog .flight-director-queue-row > .flight-director-queue-call {
+  display: grid;
+  justify-content: stretch;
+}
+
+.flight-director-queue-identity strong {
+  overflow: hidden;
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flight-director-queue-identity small,
+.flight-director-queue-persons small,
+.flight-director-queue-call small {
+  color: var(--ui-muted);
+  font-size: 0.68rem;
+}
+
+.flight-director-queue-identity .flight-director-reservation-note {
+  color: var(--ui-muted);
+}
+
+.flight-director-queue-identity .flight-director-present-note {
+  color: var(--ui-success-text, var(--ui-success));
+}
+
+.flight-director-queue-call .is-gate-call {
+  color: var(--ui-accent);
+  font-size: 0.74rem;
+  font-weight: 750;
+  letter-spacing: 0.035em;
+}
+
+.flight-director-queue-call-title {
+  display: none;
+}
+
+.flight-director-assignment-dialog .flight-director-queue-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.flight-director-assignment-dialog .flight-director-queue-actions .ds-icon-button {
+  width: var(--control-touch);
+  min-width: var(--control-touch);
+  height: var(--control-touch);
+}
+
+.flight-director-queue-action {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.flight-director-queue-action > small {
+  display: none;
+  color: var(--ui-muted);
+  font-size: 0.58rem;
+  line-height: 1;
+}
+
+.flight-director-assignment-modal-footer {
+  min-height: 96px;
+  display: block;
+  padding: 12px 18px;
+}
+
+.flight-director-assignment-footer-content {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 300px minmax(220px, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+}
+
+.flight-director-assignment-summary {
+  display: grid;
+  gap: 3px;
+}
+
+.flight-director-assignment-summary > span {
+  color: var(--ui-muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.flight-director-assignment-summary > strong {
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+
+.flight-director-assignment-guidance {
+  min-width: 0;
+  min-height: 54px;
+  display: grid;
+  align-items: center;
+}
+
+.flight-director-assignment-guidance > small {
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+}
+
+.flight-director-assignment-guidance > small.is-warning {
+  color: var(--ui-warning-text, var(--ui-warning));
+}
+
+.flight-director-assignment-guidance .flight-director-deviation-reason {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(130px, auto) minmax(160px, 1fr);
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+}
+
+.flight-director-assignment-guidance .flight-director-deviation-reason input {
+  min-width: 0;
+  height: 40px;
+}
+
+.flight-director-assignment-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flight-director-assignment-footer-actions .ds-button {
+  min-height: var(--control-touch);
+  white-space: nowrap;
+}
+
+.flight-director-dialog-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--ui-warning) 45%, var(--ui-border));
+  border-radius: var(--radius-sm);
+  color: var(--ui-warning-text, var(--ui-warning));
+  background: var(--ui-warning-soft);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.flight-director-pilot-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.flight-director-dialog-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.flight-director-dialog-title svg {
+  width: 25px;
+  height: 25px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.flight-director-pilot-current {
+  margin: 0 0 10px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-muted);
+  font-size: 0.78rem;
+}
+
+.flight-director-pilot-current strong {
+  color: var(--ui-text);
+}
+
+.ds-modal-dialog:has(.flight-director-pilot-options) {
+  width: min(520px, 100%);
+}
+
+.flight-director-pilot-options > label {
+  min-height: 60px;
+  display: grid;
+  grid-template-columns: auto 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-control);
+  cursor: pointer;
+}
+
+.flight-director-pilot-options > label.disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.flight-director-pilot-options input {
+  width: 19px;
+  height: 19px;
+}
+
+.flight-director-pilot-options svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.flight-director-pilot-options span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.flight-director-pilot-options small {
+  overflow: hidden;
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1250px) {
+  .flight-line-shell {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  @supports (height: 100dvh) {
+    .flight-line-shell {
+      height: 100dvh;
+    }
+  }
+
+  .flight-director-v15 {
+    overflow: hidden;
+  }
+
+  .ds-panel.flight-director-aircraft {
+    max-height: none;
+  }
+
+  .flight-director-bottom-grid {
+    min-height: 185px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-height: 820px) and (min-width: 801px) {
+  .flight-line-shell {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  @supports (height: 100dvh) {
+    .flight-line-shell {
+      height: 100dvh;
+    }
+  }
+
+  .flight-director-v15 {
+    overflow: hidden;
+  }
+
+  .ds-panel.flight-director-aircraft {
+    max-height: none;
+  }
+
+  .flight-director-bottom-grid {
+    min-height: 185px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 800px) {
+  .flight-line-shell {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .flight-director-v15 {
+    overflow: visible;
+  }
+
+  .flight-director-bottom-grid {
+    min-height: 440px;
+    grid-template-columns: 1fr;
+  }
+
+  .flight-director-assignment-dialog {
+    height: 100%;
+  }
+
+  .flight-director-assignment-modal {
+    width: 100%;
+    height: calc(100vh - 16px);
+  }
+
+  @supports (height: 100dvh) {
+    .flight-director-assignment-modal {
+      height: calc(100dvh - 16px);
+    }
+  }
+
+  .flight-director-assignment-modal .ds-modal-header {
+    min-height: 86px;
+    padding: 12px 14px;
+  }
+
+  .flight-director-assignment-modal .ds-modal-header h2 {
+    font-size: 1.02rem;
+  }
+
+  .flight-director-assignment-modal .ds-modal-header p {
+    max-width: 260px;
+    font-size: 0.7rem;
+    line-height: 1.35;
+  }
+
+  .flight-director-assignment-modal-body {
+    overflow: hidden;
+    padding: 10px;
+  }
+
+  .flight-director-assignment-dialog .flight-director-queue {
+    grid-template-rows: 104px minmax(0, 1fr);
+  }
+
+  .flight-director-dispatch-slot {
+    grid-template-columns: minmax(0, 1fr) 56px;
+    min-height: 104px;
+  }
+
+  .flight-director-dispatch-recommendation {
+    grid-template-areas:
+      "summary occupancy"
+      "countdown reason";
+    grid-template-columns: 1fr auto;
+    grid-template-rows: 1fr 1fr;
+  }
+
+  .flight-director-dispatch-recommendation > div {
+    gap: 6px;
+    padding: 8px 10px;
+    border-right: 0;
+  }
+
+  .flight-director-dispatch-summary {
+    grid-area: summary;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .flight-director-dispatch-countdown {
+    grid-area: countdown;
+  }
+
+  .flight-director-dispatch-occupancy {
+    grid-area: occupancy;
+    justify-content: flex-end;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .flight-director-dispatch-recommendation > .flight-director-dispatch-reason {
+    grid-area: reason;
+    justify-items: end;
+    padding-left: 4px;
+  }
+
+  .flight-director-dispatch-recommendation span,
+  .flight-director-dispatch-recommendation small,
+  .flight-director-dispatch-countdown > strong,
+  .flight-director-dispatch-countdown > strong > span {
+    font-size: 0.68rem;
+  }
+
+  .flight-director-dispatch-reason > span {
+    max-width: 126px;
+    text-align: right;
+  }
+
+  .flight-director-dispatch-reservation {
+    min-height: 104px;
+  }
+
+  .flight-director-queue-head {
+    display: none;
+  }
+
+  .flight-director-assignment-dialog .flight-director-queue-row {
+    min-height: 94px;
+    grid-template-columns: minmax(105px, 1fr) 72px 116px;
+    grid-template-rows: 1fr 1fr;
+    gap: 4px 8px;
+    padding: 8px 10px;
+  }
+
+  .flight-director-assignment-dialog .flight-director-queue-row > .flight-director-queue-group {
+    grid-column: 1;
+    grid-row: 1;
+    gap: 9px;
+  }
+
+  .flight-director-assignment-dialog .flight-director-queue-row > .flight-director-queue-persons {
+    grid-column: 1;
+    grid-row: 2;
+    padding-left: 30px;
+    font-size: 0.74rem;
+  }
+
+  .flight-director-assignment-dialog .flight-director-queue-row > .flight-director-queue-call {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+
+  .flight-director-queue-call-title {
+    display: block;
+    font-size: 0.65rem;
+  }
+
+  .flight-director-assignment-dialog .flight-director-queue-actions {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-self: center;
+    justify-content: end;
+    flex-wrap: nowrap;
+    gap: 5px;
+  }
+
+  .flight-director-assignment-dialog .flight-director-queue-action {
+    width: 55px;
+  }
+
+  .flight-director-assignment-dialog .flight-director-queue-actions .ds-icon-button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+
+  .flight-director-queue-action > small {
+    display: block;
+  }
+
+  .flight-director-assignment-modal-footer {
+    min-height: 158px;
+    padding: 9px 10px calc(9px + env(safe-area-inset-bottom));
+  }
+
+  .flight-director-assignment-footer-content {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .flight-director-assignment-summary > strong {
+    font-size: 0.82rem;
+    white-space: normal;
+  }
+
+  .flight-director-assignment-summary > span,
+  .flight-director-assignment-summary > small {
+    display: none;
+  }
+
+  .flight-director-assignment-guidance {
+    min-height: 32px;
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .flight-director-assignment-guidance .flight-director-deviation-reason {
+    grid-template-columns: 1fr 1.2fr;
+  }
+
+  .flight-director-assignment-footer-actions {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .flight-director-assignment-cancel {
+    display: none;
+  }
+
+  .flight-director-assignment-footer-actions .ds-button--primary {
+    width: 100%;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 380px) {
+  .flight-director-assignment-dialog .flight-director-queue-row {
+    grid-template-columns: minmax(100px, 1fr) 68px 112px;
+  }
+
+  .flight-director-assignment-dialog .flight-director-queue-action {
+    width: 53px;
+  }
+}

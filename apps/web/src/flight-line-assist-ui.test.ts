@@ -5,14 +5,14 @@ import assistSource from "./flight-line-assist.tsx?raw";
 import sharedFlightLineSource from "./flight-line-shared.tsx?raw";
 import flightLineSource from "./flight-line-view.tsx?raw";
 import sharedSource from "./operation-workspace.tsx?raw";
+import { readCssSource } from "./test-css-source";
 
 const assistStyles = readFileSync(
   new URL("./features/flight-line/flight-line-assist-v15.css", import.meta.url),
   "utf8",
 );
-const sharedFlightLineStyles = readFileSync(
+const sharedFlightLineStyles = readCssSource(
   new URL("./features/flight-line/flight-line-v12.css", import.meta.url),
-  "utf8",
 );
 
 const appSource = `${routerSource}\n${flightLineSource}\n${sharedSource}`;

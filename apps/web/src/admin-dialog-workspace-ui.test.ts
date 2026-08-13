@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { readCssSource } from "./test-css-source";
 
 const adminEventStyles = readFileSync(
   new URL("./features/admin/admin-event-workspace.css", import.meta.url),
@@ -9,10 +10,7 @@ const adminStyles = readFileSync(
   new URL("./features/admin/admin-v15.css", import.meta.url),
   "utf8",
 );
-const legacyAdminStyles = readFileSync(
-  new URL("./features/admin/admin-v12.css", import.meta.url),
-  "utf8",
-);
+const legacyAdminStyles = readCssSource(new URL("./features/admin/admin-v12.css", import.meta.url));
 describe("unified master-data dialogs and stable event workspace", () => {
   it("keeps the event workspace in one stable internal scroll region", () => {
     expect(adminEventStyles).toMatch(

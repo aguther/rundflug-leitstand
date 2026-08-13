@@ -4,6 +4,7 @@ import assistSource from "../../flight-line-assist.tsx?raw";
 import sharedSource from "../../flight-line-shared.tsx?raw";
 import supervisorSource from "../../flight-line-supervisor.tsx?raw";
 import viewSource from "../../flight-line-view.tsx?raw";
+import { readCssSource } from "../../test-css-source";
 import operationalPlanSource from "../operations/OperationalPlanPanel.tsx?raw";
 import analyticsDialogSource from "./FlightDirectorAnalyticsDialog.tsx?raw";
 import operationsDialogSource from "./FlightDirectorOperationsDialog.tsx?raw";
@@ -14,7 +15,11 @@ const stylesSource = [
   "../ui-finish-v12.css",
   "../operations-finish-v12.css",
 ]
-  .map((path) => readFileSync(new URL(path, import.meta.url), "utf8"))
+  .map((path) =>
+    path === "./flight-line-v12.css"
+      ? readCssSource(new URL(path, import.meta.url))
+      : readFileSync(new URL(path, import.meta.url), "utf8"),
+  )
   .join("\n");
 
 describe("V1.9 Flight Director and Flight Line surfaces", () => {
