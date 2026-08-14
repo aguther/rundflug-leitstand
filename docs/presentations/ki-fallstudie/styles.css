@@ -612,157 +612,129 @@ h3 {
   text-align: right;
 }
 
-.architecture {
-  display: grid;
-  grid-template-columns: 0.9fr 1.1fr 0.9fr;
-  align-items: center;
-  gap: 28px;
+.mermaid-frame {
+  height: 362px;
+  padding: 14px 20px;
+  border: 1px solid #cbd7e3;
+  border-radius: 18px;
+  background: #fff;
+  overflow: hidden;
 }
-.arch-stack {
-  display: grid;
-  gap: 12px;
+.mermaid-frame.web-component-flow {
+  height: 408px;
+  padding: 10px 16px;
 }
-.arch-box {
-  min-height: 64px;
-  border-radius: 13px;
+.mermaid-frame.appendix-diagram {
+  height: 392px;
+}
+.mermaid-frame.sequence-diagram {
+  height: 490px;
+  padding: 8px 12px;
+}
+.mermaid-diagram {
+  width: 100%;
+  height: 100%;
   display: grid;
   place-items: center;
-  padding: 12px 18px;
-  border: 1px solid #c9d6e3;
-  background: #fff;
-  text-align: center;
+}
+.mermaid-diagram svg {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+  max-height: 100%;
+}
+.diagram-source {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  text-align: right;
+}
+
+.git-history {
+  height: 350px;
+}
+.git-history svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.git-path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 8;
+}
+.git-path.main {
+  stroke: #9ca8b4;
+}
+.git-path.branch-a {
+  stroke: var(--violet);
+}
+.git-path.branch-b {
+  stroke: var(--blue);
+}
+.git-path.branch-b-old {
+  stroke: #7ab8d5;
+  stroke-dasharray: 12 10;
+  opacity: 0.6;
+}
+.git-rebase,
+.git-rebase-arrow {
+  fill: none;
+  stroke: var(--amber);
+  stroke-dasharray: 8 8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+.git-commit {
+  stroke: var(--paper);
+  stroke-width: 6;
+}
+.git-commit.main {
+  fill: #7f8b97;
+}
+.git-commit.branch-a {
+  fill: var(--violet);
+}
+.git-commit.branch-b {
+  fill: var(--blue);
+}
+.git-commit.branch-b-old {
+  fill: #7ab8d5;
+}
+.git-commit.muted {
+  opacity: 0.66;
+}
+.git-stage-labels {
+  fill: var(--ink);
+  font-family: var(--font);
+  font-size: 15px;
   font-weight: 760;
 }
-.arch-core {
-  min-height: 230px;
-  background: var(--navy);
-  color: #fff;
-  border: 0;
-  padding: 32px;
+.git-branch-tags rect {
+  fill: var(--violet-soft);
 }
-.arch-arrow {
-  height: 3px;
-  background: var(--violet);
-  position: relative;
+.git-branch-tags rect.tag-b {
+  fill: var(--cyan-soft);
 }
-.arch-arrow::after {
-  content: "";
-  position: absolute;
-  right: -2px;
-  top: -6px;
-  border-left: 10px solid var(--violet);
-  border-top: 7px solid transparent;
-  border-bottom: 7px solid transparent;
+.git-branch-tags rect.tag-main {
+  fill: var(--navy);
 }
-
-.sequence {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  position: relative;
-  gap: 14px;
-}
-.sequence .actor {
-  text-align: center;
-  font-size: 12px;
-  font-weight: 800;
-  background: var(--navy);
-  color: #fff;
-  border-radius: 7px;
-  padding: 8px 5px;
-}
-.sequence-lanes {
-  position: absolute;
-  top: 36px;
-  left: 10%;
-  right: 10%;
-  height: 258px;
-  background: repeating-linear-gradient(
-    90deg,
-    transparent 0 calc(20% - 1px),
-    #d8e1ea calc(20% - 1px) 20%
-  );
-}
-.seq-event {
-  position: absolute;
-  height: 29px;
-  display: flex;
-  align-items: center;
-  padding: 0 9px;
-  font-size: 11px;
-  font-weight: 720;
-  background: #e6efff;
-  border: 1px solid #91baf9;
-  border-radius: 7px;
-}
-.seq-event.green {
-  background: var(--green-soft);
-  border-color: #7bd0ab;
-}
-.seq-event.amber {
-  background: var(--amber-soft);
-  border-color: #f0c45d;
-}
-
-.git-graph {
-  position: relative;
-  height: 370px;
-}
-.git-lane {
-  position: absolute;
-  left: 110px;
-  right: 40px;
-  height: 4px;
-  border-radius: 5px;
-}
-.git-lane.main {
-  top: 179px;
-  background: var(--navy);
-}
-.git-lane.a {
-  top: 80px;
-  background: var(--violet);
-}
-.git-lane.b {
-  top: 278px;
-  background: var(--cyan);
-}
-.git-node {
-  position: absolute;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 6px solid var(--paper);
-  transform: translate(-50%, -50%);
-}
-.git-node.a {
-  background: var(--violet);
-}
-.git-node.b {
-  background: var(--blue);
-}
-.git-node.main {
-  background: var(--navy);
-}
-.git-join {
-  position: absolute;
-  width: 4px;
-}
-.git-join.a {
-  left: 62%;
-  top: 80px;
-  height: 101px;
-  background: var(--violet);
-}
-.git-join.b {
-  left: 86%;
-  top: 179px;
-  height: 101px;
-  background: var(--blue);
-}
-.git-label {
-  position: absolute;
+.git-branch-tags text {
+  fill: var(--violet);
+  font-family: var(--font);
   font-size: 14px;
-  font-weight: 780;
+  font-weight: 820;
+}
+.git-branch-tags .tag-b + text {
+  fill: #168ab8;
+}
+.git-branch-tags .tag-main + text {
+  fill: #fff;
 }
 
 .matrix {

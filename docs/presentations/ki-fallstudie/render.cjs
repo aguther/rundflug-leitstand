@@ -4,8 +4,78 @@ const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { chromium } = require("playwright");
 
+const canonicalDiagrams = [
+  {
+    id: "technical-context",
+    file: "docs/arc42/03-kontextabgrenzung.md",
+    heading: "## 3.2 Technischer Kontext",
+  },
+  {
+    id: "workspace-overview",
+    file: "docs/arc42/05-bausteinsicht.md",
+    heading: "## 5.1 Ebene 1 – Gesamtsystem",
+  },
+  {
+    id: "web-component-flow",
+    file: "docs/arc42/05-bausteinsicht.md",
+    heading: "### Web-interne Bausteingrenzen",
+  },
+  {
+    id: "sell-ticket-sequence",
+    file: "docs/arc42/06-laufzeitsicht.md",
+    heading: "## 6.1 Schreibkommando: Verkauf an der Kasse",
+  },
+];
+
+function extractMermaidSource(markdown, heading, file) {
+  const headingOffset = markdown.indexOf(heading);
+  if (headingOffset < 0) throw new Error(`Heading not found in ${file}: ${heading}`);
+
+  const blockOffset = markdown.indexOf("```mermaid", headingOffset + heading.length);
+  if (blockOffset < 0) throw new Error(`Mermaid block not found after ${heading} in ${file}`);
+
+  const sourceOffset = blockOffset + "```mermaid".length;
+  const blockEnd = markdown.indexOf("\n```", sourceOffset);
+  if (blockEnd < 0) throw new Error(`Unclosed Mermaid block after ${heading} in ${file}`);
+
+  return markdown.slice(sourceOffset, blockEnd).trim();
+}
+
+async function renderCanonicalDiagrams(page, repositoryRoot) {
+  const definitions = canonicalDiagrams.map((diagram) => {
+    const absolutePath = path.join(repositoryRoot, diagram.file);
+    const markdown = fs.readFileSync(absolutePath, "utf8");
+    return {
+      id: diagram.id,
+      source: extractMermaidSource(markdown, diagram.heading, diagram.file),
+    };
+  });
+
+  const mermaidBundle = path.join(path.dirname(require.resolve("mermaid")), "mermaid.min.js");
+  await page.addScriptTag({
+    path: mermaidBundle,
+  });
+  await page.evaluate(async (diagrams) => {
+    window.mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      theme: "neutral",
+      flowchart: { htmlLabels: true, useMaxWidth: false },
+      sequence: { useMaxWidth: false },
+    });
+
+    for (const diagram of diagrams) {
+      const host = document.querySelector(`[data-mermaid-diagram="${diagram.id}"]`);
+      if (!host) throw new Error(`Presentation placeholder missing: ${diagram.id}`);
+      const { svg } = await window.mermaid.render(`arc42-${diagram.id}`, diagram.source);
+      host.innerHTML = svg;
+    }
+  }, definitions);
+}
+
 async function main() {
   const deckDirectory = __dirname;
+  const repositoryRoot = path.resolve(deckDirectory, "../../..");
   const outputPath = path.resolve(
     process.argv[2] || path.join(deckDirectory, "rundflug-leitstand-ki-fallstudie.pdf"),
   );
@@ -36,6 +106,8 @@ async function main() {
     waitUntil: "domcontentloaded",
     timeout: 30_000,
   });
+  reportStatus("Rendering canonical arc42 Mermaid diagrams…");
+  await renderCanonicalDiagrams(page, repositoryRoot);
   reportStatus("Waiting for fonts and images…");
   await page.evaluate(async () => {
     await Promise.race([
@@ -72,7 +144,7 @@ async function main() {
 
   const slides = page.locator(".slide");
   const slideCount = await slides.count();
-  if (slideCount !== 41) throw new Error(`Expected 41 slides, found ${slideCount}`);
+  if (slideCount !== 40) throw new Error(`Expected 40 slides, found ${slideCount}`);
 
   if (previewDirectory) {
     for (let index = 0; index < slideCount; index += 1) {

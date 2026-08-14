@@ -219,43 +219,63 @@
 <section class="slide white">
   <div class="title-accent violet"></div><div class="eyebrow violet">Engineering · Parallelität</div><div class="slide-number">18</div>
   <div class="title-wrap compact"><h2>Parallele Änderungen bleiben isoliert – und integrieren linear nach main</h2></div>
-  <div class="git-graph" style="margin-top:24px">
-    <div class="git-lane a"></div><div class="git-lane main"></div><div class="git-lane b"></div>
-    <div class="git-join a"></div><div class="git-join b"></div>
-    <div class="git-label" style="left:0;top:70px;color:var(--violet)">STREAM A</div><div class="git-label" style="left:0;top:169px">origin/main</div><div class="git-label" style="left:0;top:268px;color:#299aca">STREAM B</div>
-    <div class="git-node a" style="left:25%;top:80px"></div><div class="git-node a" style="left:42%;top:80px"></div><div class="git-node a" style="left:62%;top:80px"></div><div class="git-node main" style="left:62%;top:179px"></div>
-    <div class="git-node b" style="left:25%;top:278px"></div><div class="git-node b" style="left:42%;top:278px"></div><div class="git-node b" style="left:70%;top:278px"></div><div class="git-node b" style="left:86%;top:278px"></div><div class="git-node main" style="left:86%;top:179px"></div>
-    <div class="git-label" style="left:20%;top:22px">Worktree</div><div class="git-label" style="left:38%;top:22px">Tests + Review</div><div class="git-label" style="left:57%;top:22px">A integriert · t1</div>
-    <div class="git-label" style="left:20%;top:318px">Worktree</div><div class="git-label" style="left:55%;top:318px">Fetch + Rebase</div><div class="git-label" style="left:80%;top:318px">B integriert · t2</div>
+  <div class="git-history" style="margin-top:20px" aria-label="Horizontaler Git-Verlauf mit zwei parallelen Arbeitszweigen">
+    <svg viewBox="0 0 1140 350" role="img">
+      <title>Zwei parallele Worktrees integrieren nacheinander linear nach main</title>
+      <path class="git-path main" d="M72 175 H1068" />
+      <path class="git-path branch-a" d="M72 175 C105 175 115 72 172 72 H480 C540 72 550 175 612 175" />
+      <path class="git-path branch-b-old" d="M72 175 C112 175 120 278 178 278 H455" />
+      <path class="git-path branch-b" d="M612 175 C660 175 662 278 720 278 H920 C980 278 985 175 1040 175" />
+      <path class="git-rebase" d="M455 278 C505 278 540 238 590 199" />
+      <path class="git-rebase-arrow" d="M580 201 L594 197 L588 211" />
+
+      <circle class="git-commit main" cx="72" cy="175" r="13" />
+      <circle class="git-commit branch-a" cx="210" cy="72" r="13" />
+      <circle class="git-commit branch-a" cx="350" cy="72" r="13" />
+      <circle class="git-commit branch-a" cx="480" cy="72" r="13" />
+      <circle class="git-commit main" cx="612" cy="175" r="15" />
+      <circle class="git-commit branch-b-old muted" cx="220" cy="278" r="11" />
+      <circle class="git-commit branch-b-old muted" cx="365" cy="278" r="11" />
+      <circle class="git-commit branch-b" cx="748" cy="278" r="13" />
+      <circle class="git-commit branch-b" cx="865" cy="278" r="13" />
+      <circle class="git-commit main" cx="1040" cy="175" r="15" />
+
+      <g class="git-stage-labels">
+        <text x="72" y="151" text-anchor="middle">Basis</text>
+        <text x="210" y="42" text-anchor="middle">Worktree A</text>
+        <text x="350" y="42" text-anchor="middle">Umsetzen</text>
+        <text x="480" y="42" text-anchor="middle">Tests + Review</text>
+        <text x="612" y="151" text-anchor="middle">A integriert · t1</text>
+        <text x="292" y="326" text-anchor="middle">B vor Rebase</text>
+        <text x="748" y="326" text-anchor="middle">Rebase + Tests</text>
+        <text x="865" y="326" text-anchor="middle">Freigabe</text>
+        <text x="1040" y="151" text-anchor="middle">B integriert · t2</text>
+      </g>
+
+      <g class="git-branch-tags">
+        <rect x="92" y="54" width="72" height="34" rx="17" /><text x="128" y="77" text-anchor="middle">A</text>
+        <rect class="tag-b" x="92" y="260" width="72" height="34" rx="17" /><text x="128" y="283" text-anchor="middle">B</text>
+        <rect class="tag-main" x="78" y="158" width="108" height="34" rx="17" /><text x="132" y="181" text-anchor="middle">main</text>
+      </g>
+    </svg>
   </div>
   <div class="takeaway violet">A integriert zuerst. B rebasiert auf den neuen main-Stand, testet erneut und folgt danach.</div>
 </section>
 
 <section class="slide">
   <div class="title-accent violet"></div><div class="eyebrow violet">Architektur</div><div class="slide-number">19</div>
-  <div class="title-wrap"><h2>Der Stack trennt Bedienung, Koordination und dauerhaften Zustand</h2></div>
-  <div class="architecture" style="margin-top:42px">
-    <div class="panel soft-violet"><div class="eyebrow violet">React · TypeScript · Vite PWA</div><div class="arch-stack" style="margin-top:24px"><div class="arch-box">Kasse</div><div class="arch-box">Flight Line</div><div class="arch-box">Flight Director</div><div class="arch-box">FIDS & QR-Status</div></div></div>
-    <div style="display:grid;grid-template-columns:25px 1fr 25px;align-items:center;gap:18px"><div class="arch-arrow"></div><div class="arch-box arch-core"><div><div class="eyebrow">Cloudflare Worker</div><h3 style="font-size:30px;margin-top:33px">API · Auth<br>Commands · Queries<br>Outbox · Realtime</h3></div></div><div class="arch-arrow"></div></div>
-    <div class="arch-stack"><div class="arch-box"><div><h3>D1</h3><p class="small">relationale Source of Truth</p></div></div><div class="arch-box"><div><h3>Durable Object</h3><p class="small">serialisierte Kommandos & WebSockets</p></div></div><div class="arch-box"><div><h3>R2</h3><p class="small">Backups · Logos · Analysepakete</p></div></div></div>
-  </div>
-  <div class="takeaway violet">Reine Fachlogik im Domain-Paket · Realtime erst nach Persistenz</div>
+  <div class="title-wrap compact"><h2>Technischer Kontext verbindet Endgeräte, Worker und dauerhaften Zustand</h2></div>
+  <div class="mermaid-frame" style="margin-top:24px"><div class="mermaid-diagram" data-mermaid-diagram="technical-context"></div></div>
+  <div class="diagram-source">Original aus arc42, Kapitel 3.2 „Technischer Kontext“</div>
+  <div class="takeaway violet">D1 bleibt Source of Truth · Durable Object serialisiert · Realtime signalisiert bestätigte Versionen</div>
 </section>
 
 <section class="slide white">
-  <div class="title-accent violet"></div><div class="eyebrow violet">arc42 · Laufzeitsicht</div><div class="slide-number">20</div>
-  <div class="title-wrap compact"><h2>Ein Kommando wird serialisiert, geprüft, atomar persistiert – dann veröffentlicht</h2></div>
-  <div class="step-line" style="grid-template-columns:repeat(7,1fr);margin-top:70px">
-    <div class="step"><div class="step-dot" style="background:var(--violet)">1</div><h3>PWA</h3><p>Command + Version</p></div>
-    <div class="step"><div class="step-dot" style="background:var(--violet)">2</div><h3>Worker</h3><p>Vertrag & Rolle</p></div>
-    <div class="step"><div class="step-dot" style="background:var(--violet)">3</div><h3>DO</h3><p>Serialisieren</p></div>
-    <div class="step"><div class="step-dot amber">4</div><h3>Version</h3><p>409 bei stale</p></div>
-    <div class="step"><div class="step-dot" style="background:var(--violet)">5</div><h3>Domain</h3><p>Invarianten</p></div>
-    <div class="step"><div class="step-dot green">6</div><h3>D1-Batch</h3><p>State + Audit + Outbox</p></div>
-    <div class="step"><div class="step-dot navy">7</div><h3>Live</h3><p>Versionssignal</p></div>
-  </div>
-  <div class="grid-3" style="margin-top:60px"><div class="panel soft-amber"><strong>409</strong><p class="small">stale write wird ohne Änderung abgelehnt</p></div><div class="panel soft-green"><strong>200</strong><p class="small">Antwort erst nach bestätigtem D1-Commit</p></div><div class="panel soft-blue"><strong>LIVE</strong><p class="small">danach Signal an weitere Clients</p></div></div>
-  <div class="source-note">arc42: Baustein- und Laufzeitsicht · Details im Anhang</div>
+  <div class="title-accent violet"></div><div class="eyebrow violet">arc42 · Bausteinsicht</div><div class="slide-number">20</div>
+  <div class="title-wrap compact"><h2>Der Datenfluss bleibt vom Veranstaltungskontext bis zur Rollenansicht explizit</h2></div>
+  <div class="mermaid-frame web-component-flow" style="margin-top:24px"><div class="mermaid-diagram" data-mermaid-diagram="web-component-flow"></div></div>
+  <div class="diagram-source">Original aus arc42, Kapitel 5.1 „Web-interne Bausteingrenzen“</div>
+  <div class="takeaway violet">Identität, Live-Lage und rollenbezogene Bedienung bleiben getrennte Verantwortungen</div>
 </section>
 
 <section class="slide">
@@ -319,19 +339,8 @@
   <div class="source-note">Schätzung, kein Angebot · Methodik und Annahmen im Anhang</div>
 </section>
 
-<section class="slide white">
-  <div class="title-accent"></div><div class="eyebrow">Gestalterische Konsequenz</div><div class="slide-number">26</div>
-  <div class="title-wrap compact"><h2>Klare Bühne vorn – vollständige Evidenz im Anhang</h2><p class="subtitle">Die Präsentation reduziert nicht den Inhalt, sondern ordnet seine Detailtiefe nach dem Bedarf des Publikums.</p></div>
-  <div class="grid-3" style="margin-top:40px">
-    <div class="panel dark" style="min-height:318px"><div class="eyebrow">Hauptteil</div><h3 style="font-size:30px;margin-top:34px">Eine Aussage pro Folie</h3><p class="subtitle" style="font-size:18px">Große reale Belege, klare Hierarchie und genug Weißraum für einen verständlichen Vortrag.</p></div>
-    <div class="panel soft-blue" style="min-height:318px"><div class="eyebrow">Bildsprache</div><h3 style="font-size:30px;margin-top:34px">Echt bleibt echt</h3><p class="subtitle" style="font-size:18px">Live-Screenshots dominieren. Historische Renderings werden als Konzept- und Freigabeschritte gekennzeichnet.</p></div>
-    <div class="panel soft-violet" style="min-height:318px"><div class="eyebrow violet">Anhang</div><h3 style="font-size:30px;margin-top:34px">Mehr Tiefe, nicht weniger</h3><p class="subtitle" style="font-size:18px">Metriken, Invarianten, Sequenzen, ADRs, Testinventar und Schätzmethodik werden teilweise ausführlicher als bisher dokumentiert.</p></div>
-  </div>
-  <div class="takeaway">Der Hauptteil erzählt. Der Anhang macht jede wesentliche Aussage prüfbar.</div>
-</section>
-
 <section class="slide dark">
-  <div class="eyebrow">Fazit</div><div class="slide-number">27</div><div class="route-dots"></div>
+  <div class="eyebrow">Fazit</div><div class="slide-number">26</div><div class="route-dots"></div>
   <div class="title-wrap" style="margin-top:100px"><div class="statement">KI beschleunigt Software.<br><em>Verantwortung bleibt menschlich.</em></div></div>
   <div class="grid-3" style="position:absolute;left:66px;right:66px;bottom:95px">
     <div style="border-top:2px solid #43627f;padding-top:20px"><div class="eyebrow" style="color:#90a5ba">Machbar</div><h3 style="margin-top:22px">Vollständige Full-Stack-Produkte in Wochen</h3></div>
@@ -409,28 +418,16 @@
 <section class="slide appendix white">
   <div class="appendix-tab"></div><div class="title-accent"></div><div class="eyebrow">Anhang · Bausteinsicht</div><div class="slide-number">A7</div>
   <div class="title-wrap compact"><h2>Architekturgrenzen schützen Fachlogik und Änderbarkeit</h2></div>
-  <div class="architecture" style="margin-top:46px">
-    <div class="arch-stack"><div class="arch-box" style="background:var(--violet-soft)"><div><strong>apps/web</strong><p class="small">React-PWA · Rollenansichten · Offline-Snapshot</p></div></div><div class="arch-box" style="background:var(--violet-soft)"><div><strong>packages/contracts</strong><p class="small">Zod-DTOs · Commands · Exporte</p></div></div></div>
-    <div class="arch-box arch-core"><div><div class="eyebrow">apps/worker</div><h3 style="font-size:27px;margin-top:24px">Routes → Preflight → EventCoordinator → Handler-Registry</h3><p class="small" style="margin-top:30px">D1 · R2 · Push · Cron als Adapter</p></div></div>
-    <div class="arch-stack"><div class="arch-box" style="background:var(--green-soft)"><div><strong>packages/domain</strong><p class="small">Zustandsautomaten · Queue · Prognose · Invarianten</p></div></div><div class="arch-box" style="background:var(--cyan-soft)"><div><strong>Persistenz</strong><p class="small">D1 Source of Truth · R2 Archive · DO Koordination</p></div></div></div>
-  </div>
+  <div class="mermaid-frame appendix-diagram" style="margin-top:26px"><div class="mermaid-diagram" data-mermaid-diagram="workspace-overview"></div></div>
+  <div class="diagram-source">Original aus arc42, Kapitel 5.1 „Ebene 1 – Gesamtsystem“</div>
   <div class="takeaway violet">UI führt keine Zustandsübergänge aus · Worker dupliziert keine Domänenregeln.</div>
 </section>
 
 <section class="slide appendix">
   <div class="appendix-tab"></div><div class="title-accent"></div><div class="eyebrow">Anhang · Kommandolauf</div><div class="slide-number">A8</div>
   <div class="title-wrap compact"><h2>SELL_TICKET_GROUP: positive und negative Pfade</h2></div>
-  <div class="sequence" style="margin-top:30px;height:330px">
-    <div class="actor">Kasse PWA</div><div class="actor">Worker</div><div class="actor">EventCoordinator</div><div class="actor">D1</div><div class="actor">weitere Clients</div>
-    <div class="sequence-lanes"></div>
-    <div class="seq-event" style="left:5%;top:58px;width:28%">POST command + commandId + expectedVersion</div>
-    <div class="seq-event" style="left:24%;top:102px;width:30%">Rolle, Schema, Idempotenz prüfen</div>
-    <div class="seq-event amber" style="left:44%;top:146px;width:25%">alt: Version veraltet → 409 STALE_VERSION</div>
-    <div class="seq-event green" style="left:43%;top:190px;width:34%">State + Audit + Receipt + Outbox in D1-Batch</div>
-    <div class="seq-event green" style="left:15%;top:234px;width:58%">200 + neue Version + bestätigter Beleg</div>
-    <div class="seq-event" style="left:65%;top:278px;width:29%">Versionssignal → Snapshot nachladen</div>
-  </div>
-  <div class="grid-3" style="margin-top:0"><div class="panel soft-amber"><strong>409</strong><p class="small">keine Änderung</p></div><div class="panel soft-green"><strong>200</strong><p class="small">bestätigte Persistenz</p></div><div class="panel soft-blue"><strong>LIVE</strong><p class="small">Signal, nicht Datenquelle</p></div></div>
+  <div class="mermaid-frame sequence-diagram" style="margin-top:22px"><div class="mermaid-diagram" data-mermaid-diagram="sell-ticket-sequence"></div></div>
+  <div class="diagram-source">Original aus arc42, Kapitel 6.1 „Schreibkommando: Verkauf an der Kasse“</div>
 </section>
 
 <section class="slide appendix white">
