@@ -1,14 +1,5 @@
 import type { ForecastHistory, OperationBoard, ResourceDayHistory } from "@rundflug/contracts";
-import {
-  ArrowLeft,
-  ArrowRight,
-  ChartNoAxesCombined,
-  Maximize2,
-  Plane,
-  UserRound,
-  ZoomIn,
-  ZoomOut,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, ChartNoAxesCombined, Plane, UserRound } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   CartesianGrid,
@@ -22,10 +13,12 @@ import {
 } from "recharts";
 import { Button, IconButton } from "../../design-system/components";
 import { rotationGroupLabelList } from "../../flight-line-shared";
+import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
 import {
-  analyticsZoomLevelsForSpan,
-  useAnalyticsDiagramViewport,
-} from "./analytics-diagram-viewport";
+  clipTimeInterval,
+  timeToPercent,
+  useTimeDiagramViewport,
+} from "../../shared/time-diagram-viewport";
 import type { AnalyticsTab } from "./FlightDirectorAnalyticsDialog";
 import {
   type AnalyticsTicketGroup,
@@ -151,55 +144,6 @@ function AnalyticsLoading() {
   );
 }
 
-function DiagramZoomControls({
-  onChange,
-  onReset,
-  value,
-  zoomLevels,
-}: Readonly<{
-  onChange: (zoom: number) => void;
-  onReset: () => void;
-  value: number;
-  zoomLevels: readonly number[];
-}>) {
-  const index = zoomLevels.indexOf(value);
-  return (
-    <fieldset className="flight-director-diagram-zoom">
-      <legend className="visually-hidden">Diagramm-Zoom</legend>
-      <small>Mausrad: Zoom · Ziehen: Verschieben</small>
-      <Button
-        aria-label="Diagramm verkleinern"
-        disabled={index <= 0}
-        onClick={() => onChange(zoomLevels[Math.max(0, index - 1)] ?? 1)}
-        type="button"
-        variant="secondary"
-      >
-        <ZoomOut aria-hidden="true" />
-      </Button>
-      <span aria-live="polite">{Math.round(value * 100)} %</span>
-      <Button
-        aria-label="Diagramm vergrößern"
-        disabled={index < 0 || index >= zoomLevels.length - 1}
-        onClick={() => onChange(zoomLevels[Math.min(zoomLevels.length - 1, index + 1)] ?? value)}
-        type="button"
-        variant="secondary"
-      >
-        <ZoomIn aria-hidden="true" />
-      </Button>
-      <Button
-        aria-label="Gesamten Veranstaltungsverlauf anzeigen"
-        disabled={value === 1}
-        onClick={onReset}
-        type="button"
-        variant="secondary"
-      >
-        <Maximize2 aria-hidden="true" />
-        Gesamt
-      </Button>
-    </fieldset>
-  );
-}
-
 function ForecastTooltip({
   active,
   label,
@@ -320,10 +264,6 @@ function ForecastDiagram({
   timeZone: string;
 }>) {
   const domain = useMemo(() => capturedDomain(chartData), [chartData]);
-  const zoomLevels = useMemo(
-    () => analyticsZoomLevelsForSpan((domain[1] ?? 1) - (domain[0] ?? 0)),
-    [domain],
-  );
   const {
     changeZoom,
     dragging,
@@ -335,29 +275,34 @@ function ForecastDiagram({
     reset,
     setViewportRef,
     viewportWidth,
+    visibleDomain,
     zoom,
-  } = useAnalyticsDiagramViewport(resetKey, zoomLevels);
+    zoomLevels,
+  } = useTimeDiagramViewport({
+    domain: { from: domain[0] ?? 0, until: domain[1] ?? 1 },
+    insets: { left: 64, right: 28 },
+    resetKey,
+  });
   const actual = rotation?.timeline.actual;
   const [minimum, maximum] = forecastValueDomain(chartData, actual);
-  const chartPixelWidth =
-    Math.max(320, viewportWidth || 720) * zoom - FORECAST_CHART_HORIZONTAL_INSET_PX;
+  const chartPixelWidth = Math.max(320, viewportWidth || 720) - FORECAST_CHART_HORIZONTAL_INSET_PX;
   const timeAxisTicks = calculateTimeAxisTicks({
-    from: domain[0] ?? 0,
+    from: visibleDomain.from,
     minimumLabelSpacing: MINIMUM_TIME_LABEL_SPACING_PX,
     pixelWidth: chartPixelWidth,
     timeZone,
-    until: domain[1] ?? 1,
+    until: visibleDomain.until,
   });
   return (
     <>
-      <DiagramZoomControls
+      <TimeDiagramZoomControls
         onChange={changeZoom}
         onReset={reset}
         value={zoom}
         zoomLevels={zoomLevels}
       />
       <div
-        className={`flight-director-chart-viewport${zoom > 1 ? " is-pannable" : ""}${dragging ? " is-dragging" : ""}`}
+        className={`flight-director-chart-viewport time-diagram-viewport${zoom > 1 ? " is-pannable" : ""}${dragging ? " is-dragging" : ""}`}
         onClickCapture={onClickCapture}
         onPointerCancel={onPointerCancel}
         onPointerDown={onPointerDown}
@@ -369,7 +314,6 @@ function ForecastDiagram({
           aria-label="Prognosediagramm; mit dem Mausrad zoomen und durch Ziehen verschieben"
           className="flight-director-forecast-chart"
           role="img"
-          style={{ width: `${zoom * 100}%` }}
         >
           <ResponsiveContainer height="100%" width="100%">
             <LineChart
@@ -379,8 +323,9 @@ function ForecastDiagram({
             >
               <CartesianGrid stroke="var(--ui-border)" strokeDasharray="2 4" />
               <XAxis
+                allowDataOverflow
                 dataKey="capturedAt"
-                domain={domain}
+                domain={[visibleDomain.from, visibleDomain.until]}
                 interval={0}
                 scale="time"
                 tickFormatter={(value: number) => formatTime(value, timeZone)}
@@ -462,7 +407,9 @@ function ForecastDiagram({
                   y={Date.parse(actual.completionAt)}
                 />
               ) : null}
-              {rotation?.precalledAt ? (
+              {rotation?.precalledAt &&
+              Date.parse(rotation.precalledAt) >= visibleDomain.from &&
+              Date.parse(rotation.precalledAt) <= visibleDomain.until ? (
                 <ReferenceLine
                   label={{ value: "GO TO GATE", fill: "var(--ui-muted)", fontSize: 10 }}
                   stroke="var(--ui-warning)"
@@ -847,7 +794,6 @@ function ResourcePanel({
   const timelineFrom = history ? Date.parse(history.from) : 0;
   const timelineUntil = history ? Date.parse(history.until) : 1;
   const timelineSpan = Math.max(1, timelineUntil - timelineFrom);
-  const zoomLevels = useMemo(() => analyticsZoomLevelsForSpan(timelineSpan), [timelineSpan]);
   const {
     changeZoom,
     dragging,
@@ -859,8 +805,14 @@ function ResourcePanel({
     reset,
     setViewportRef,
     viewportWidth,
+    visibleDomain,
     zoom,
-  } = useAnalyticsDiagramViewport(`${scopeType}:${scopeId}`, zoomLevels);
+    zoomLevels,
+  } = useTimeDiagramViewport({
+    domain: { from: timelineFrom, until: timelineUntil },
+    insets: { left: 0, right: 0 },
+    resetKey: `${scopeType}:${scopeId}`,
+  });
   const timeZone = board.event.timeZone;
   const resources = resourceOptions(board, scopeType);
   const selected = resources.find((resource) => resource.id === scopeId);
@@ -870,17 +822,23 @@ function ResourcePanel({
   );
   const blocks = history?.blocks ?? [];
   const observedUntil = history?.observedUntil ?? new Date(timelineUntil).toISOString();
-  const timelinePercent = (value: string) =>
-    Math.min(100, Math.max(0, ((Date.parse(value) - timelineFrom) / timelineSpan) * 100));
+  const timelinePercent = (value: string | number) =>
+    Math.min(
+      100,
+      Math.max(
+        0,
+        timeToPercent(typeof value === "number" ? value : Date.parse(value), visibleDomain),
+      ),
+    );
   const timelineTicks = calculateTimeAxisTicks({
-    from: timelineFrom,
+    from: visibleDomain.from,
     minimumLabelSpacing: MINIMUM_TIME_LABEL_SPACING_PX,
-    pixelWidth: Math.max(320, viewportWidth || 720) * zoom - RESOURCE_CHART_HORIZONTAL_INSET_PX,
+    pixelWidth: Math.max(320, viewportWidth || 720) - RESOURCE_CHART_HORIZONTAL_INSET_PX,
     timeZone,
-    until: timelineUntil,
+    until: visibleDomain.until,
   }).map((tick) => ({
     ...tick,
-    percent: ((tick.value - timelineFrom) / timelineSpan) * 100,
+    percent: timeToPercent(tick.value, visibleDomain),
   }));
   const ticketGroupsByRotationId = useMemo(() => {
     return new Map(
@@ -938,14 +896,14 @@ function ResourcePanel({
           hasHistory={history !== null && timelineRotations.length > 0}
           loading={loading}
         >
-          <DiagramZoomControls
+          <TimeDiagramZoomControls
             onChange={changeZoom}
             onReset={reset}
             value={zoom}
             zoomLevels={zoomLevels}
           />
           <div
-            className={`flight-director-chart-viewport${zoom > 1 ? " is-pannable" : ""}${dragging ? " is-dragging" : ""}`}
+            className={`flight-director-chart-viewport time-diagram-viewport${zoom > 1 ? " is-pannable" : ""}${dragging ? " is-dragging" : ""}`}
             onClickCapture={onClickCapture}
             onPointerCancel={onPointerCancel}
             onPointerDown={onPointerDown}
@@ -956,7 +914,6 @@ function ResourcePanel({
             <section
               aria-label={`Tagesverlauf ${selected?.primary ?? ""}: ${timelineRotations.length} Umläufe hintereinander`}
               className="flight-director-resource-chart"
-              style={{ width: `${zoom * 100}%` }}
             >
               <div aria-hidden="true" className="resource-timeline-grid">
                 {timelineTicks.map((tick) => (
@@ -978,8 +935,14 @@ function ResourcePanel({
               </div>
               <div className="resource-timeline-lane">
                 {blocks.map((block) => {
-                  const start = timelinePercent(block.startedAt);
-                  const end = timelinePercent(block.endedAt ?? observedUntil);
+                  const clipped = clipTimeInterval(
+                    Date.parse(block.startedAt),
+                    Date.parse(block.endedAt ?? observedUntil),
+                    visibleDomain,
+                  );
+                  if (!clipped) return null;
+                  const start = timelinePercent(clipped.from);
+                  const end = timelinePercent(clipped.until);
                   return (
                     <span
                       aria-hidden="true"
@@ -992,32 +955,47 @@ function ResourcePanel({
                     />
                   );
                 })}
-                <span
-                  aria-hidden="true"
-                  className="resource-timeline-observed"
-                  style={{ left: `${timelinePercent(observedUntil)}%` }}
-                />
+                {Date.parse(observedUntil) >= visibleDomain.from &&
+                  Date.parse(observedUntil) <= visibleDomain.until && (
+                    <span
+                      aria-hidden="true"
+                      className="resource-timeline-observed"
+                      style={{ left: `${timelinePercent(observedUntil)}%` }}
+                    />
+                  )}
                 {timelineRotations.map((item) => {
-                  const width = Math.max(0.15, item.endPercent - item.startPercent);
+                  const itemStart = Date.parse(item.rotation.actual.boardingAt ?? "");
+                  const itemEnd = Date.parse(item.rotation.actual.completionAt ?? observedUntil);
+                  const clippedItem = clipTimeInterval(itemStart, itemEnd, visibleDomain);
+                  if (!clippedItem) return null;
+                  const itemLeft = timelinePercent(clippedItem.from);
+                  const itemRight = timelinePercent(clippedItem.until);
+                  const width = Math.max(0.15, itemRight - itemLeft);
                   const ticketGroupLabels = ticketGroupsByRotationId.get(item.id) ?? [];
                   const title = resourceTimelineTitle(item, ticketGroupLabels, timeZone);
                   return (
                     <div
                       className="resource-timeline-rotation"
                       key={item.id}
-                      style={{ left: `${item.startPercent}%`, width: `${width}%` }}
+                      style={{ left: `${itemLeft}%`, width: `${width}%` }}
                     >
-                      {item.phases.map((phase) => (
-                        <span
-                          aria-hidden="true"
-                          className={`resource-timeline-phase resource-timeline-phase--${phase.type.toLowerCase()}`}
-                          key={phase.type}
-                          style={{
-                            left: `${((phase.startPercent - item.startPercent) / width) * 100}%`,
-                            width: `${Math.max(1, ((phase.endPercent - phase.startPercent) / width) * 100)}%`,
-                          }}
-                        />
-                      ))}
+                      {item.phases.map((phase) => {
+                        const phaseStart = timelineFrom + (phase.startPercent / 100) * timelineSpan;
+                        const phaseEnd = timelineFrom + (phase.endPercent / 100) * timelineSpan;
+                        const clippedPhase = clipTimeInterval(phaseStart, phaseEnd, clippedItem);
+                        if (!clippedPhase) return null;
+                        return (
+                          <span
+                            aria-hidden="true"
+                            className={`resource-timeline-phase resource-timeline-phase--${phase.type.toLowerCase()}`}
+                            key={phase.type}
+                            style={{
+                              left: `${((timelinePercent(clippedPhase.from) - itemLeft) / width) * 100}%`,
+                              width: `${Math.max(1, ((timelinePercent(clippedPhase.until) - timelinePercent(clippedPhase.from)) / width) * 100)}%`,
+                            }}
+                          />
+                        );
+                      })}
                       <button
                         aria-label={`${title} · Prognose öffnen`}
                         onClick={() => onOpenRotation(item.id)}

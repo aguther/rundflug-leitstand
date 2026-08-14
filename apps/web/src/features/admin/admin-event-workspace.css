@@ -74,7 +74,11 @@
   width: 100%;
   min-height: 0;
   margin-top: 2px;
-  overflow: visible;
+  overflow: hidden;
+}
+
+.admin-flow-panel > .time-diagram-zoom {
+  margin-top: 6px;
 }
 
 .admin-flow-chart .recharts-cartesian-axis-tick-value {

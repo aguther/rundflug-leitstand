@@ -1,0 +1,72 @@
+.time-diagram-zoom {
+  display: flex;
+  width: 100%;
+  min-height: 32px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.time-diagram-zoom > small {
+  margin-right: auto;
+  color: var(--ui-muted);
+  font-size: 0.68rem;
+}
+
+.time-diagram-zoom .ds-button {
+  min-height: 30px;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 0.68rem;
+}
+
+.time-diagram-zoom .ds-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.time-diagram-zoom > span {
+  min-width: 52px;
+  color: var(--ui-muted);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.time-diagram-viewport {
+  touch-action: pan-x pan-y;
+}
+
+.time-diagram-viewport.is-pannable {
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.time-diagram-viewport.is-pannable * {
+  user-select: none;
+}
+
+.time-diagram-viewport.is-dragging,
+.time-diagram-viewport.is-dragging * {
+  cursor: grabbing;
+  user-select: none;
+}
+
+@media (max-width: 560px) {
+  .time-diagram-zoom {
+    gap: 3px;
+    justify-content: flex-start;
+  }
+
+  .time-diagram-zoom > small {
+    display: none;
+  }
+
+  .time-diagram-zoom > span {
+    min-width: 44px;
+  }
+}

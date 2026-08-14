@@ -224,4 +224,40 @@ describe("forecast timeline", () => {
     );
     expect(container.querySelector(".sim-plan-lane")).toBeNull();
   });
+
+  it("freezes the zoomed window during playback and resumes following after reset", () => {
+    const renderTimeline = (playbackTime: number) => (
+      <ForecastTimeline
+        currentMs={playbackTime}
+        onSelectRotation={vi.fn()}
+        onShowHistory={vi.fn()}
+        result={result}
+        selectedRotationId="rotation-queue"
+      />
+    );
+    const { container, rerender } = render(renderTimeline(currentMs));
+    const viewport = container.querySelector<HTMLElement>(".sim-timeline-viewport");
+    const headingRange = () =>
+      container.querySelector(".sim-timeline-heading span")?.textContent ?? "";
+    expect(viewport).not.toBeNull();
+    if (!viewport) return;
+    Object.defineProperties(viewport, {
+      clientWidth: { configurable: true, value: 1_000 },
+      getBoundingClientRect: {
+        configurable: true,
+        value: () => ({ left: 100, right: 1_100, width: 1_000 }),
+      },
+    });
+
+    fireEvent.wheel(viewport, { clientX: 650, deltaY: -1 });
+    expect(screen.getByText("150 %")).not.toBeNull();
+    const frozenRange = headingRange();
+
+    rerender(renderTimeline(currentMs + 30 * 60_000));
+    expect(headingRange()).toBe(frozenRange);
+
+    fireEvent.click(screen.getByRole("button", { name: "Gesamten Zeitverlauf anzeigen" }));
+    expect(screen.getByText("100 %")).not.toBeNull();
+    expect(headingRange()).not.toBe(frozenRange);
+  });
 });

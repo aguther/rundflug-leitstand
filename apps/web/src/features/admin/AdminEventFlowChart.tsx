@@ -11,6 +11,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
+import { useTimeDiagramViewport } from "../../shared/time-diagram-viewport";
 
 function hourLabel(value: string | number, timeZone: string): string {
   return new Intl.DateTimeFormat("de-DE", {
@@ -64,6 +66,27 @@ export function AdminEventFlowChart({
       })) ?? [],
     [flow],
   );
+  const from = flow ? Date.parse(flow.from) : 0;
+  const plannedUntil = flow ? Date.parse(flow.plannedUntil) : 1;
+  const observedUntil = flow ? Date.parse(flow.observedUntil) : 0;
+  const {
+    changeZoom,
+    dragging,
+    onClickCapture,
+    onPointerCancel,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    reset,
+    setViewportRef,
+    visibleDomain,
+    zoom,
+    zoomLevels,
+  } = useTimeDiagramViewport({
+    domain: { from, until: plannedUntil },
+    insets: { left: 26, right: 16 },
+    resetKey: flow ? `${flow.eventId}:${flow.from}:${flow.plannedUntil}` : "empty",
+  });
 
   if (loading) {
     return (
@@ -93,9 +116,6 @@ export function AdminEventFlowChart({
   }
 
   const finalPoint = flow.points.at(-1);
-  const from = Date.parse(flow.from);
-  const plannedUntil = Date.parse(flow.plannedUntil);
-  const observedUntil = Date.parse(flow.observedUntil);
   const summary = [
     { label: "Verkauft", value: finalPoint?.soldTickets ?? 0 },
     { label: "Abgeschlossen", value: finalPoint?.completedTickets ?? 0 },
@@ -105,6 +125,10 @@ export function AdminEventFlowChart({
       value: averageWaitMinutes === null ? "–" : `${Math.round(averageWaitMinutes)} Min.`,
     },
   ];
+  const timeTicks = Array.from(
+    { length: 9 },
+    (_, index) => visibleDomain.from + ((visibleDomain.until - visibleDomain.from) * index) / 8,
+  );
 
   return (
     <section className="admin-flow-panel">
@@ -131,9 +155,21 @@ export function AdminEventFlowChart({
           </div>
         ))}
       </dl>
+      <TimeDiagramZoomControls
+        onChange={changeZoom}
+        onReset={reset}
+        value={zoom}
+        zoomLevels={zoomLevels}
+      />
       <div
         aria-label={`Ticketverlauf: ${finalPoint?.soldTickets ?? 0} verkauft, ${finalPoint?.completedTickets ?? 0} abgeschlossen, ${finalPoint?.openTickets ?? 0} offen.`}
-        className="admin-flow-chart"
+        className={`admin-flow-chart time-diagram-viewport${zoom > 1 ? " is-pannable" : ""}${dragging ? " is-dragging" : ""}`}
+        onClickCapture={onClickCapture}
+        onPointerCancel={onPointerCancel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        ref={setViewportRef}
         role="img"
       >
         <ResponsiveContainer height="100%" width="100%">
@@ -148,11 +184,13 @@ export function AdminEventFlowChart({
               vertical={false}
             />
             <XAxis
+              allowDataOverflow
               dataKey="time"
-              domain={[from, plannedUntil]}
+              domain={[visibleDomain.from, visibleDomain.until]}
               minTickGap={48}
               scale="time"
               tickFormatter={(value: number) => hourLabel(value, timeZone)}
+              ticks={timeTicks}
               type="number"
             />
             <YAxis allowDecimals={false} domain={[0, "dataMax + 1"]} width={38} />
@@ -195,12 +233,14 @@ export function AdminEventFlowChart({
               strokeWidth={1.75}
               type="stepAfter"
             />
-            <ReferenceLine
-              className="admin-flow-now-line"
-              stroke="var(--ui-border-strong)"
-              strokeDasharray="4 5"
-              x={observedUntil}
-            />
+            {observedUntil >= visibleDomain.from && observedUntil <= visibleDomain.until ? (
+              <ReferenceLine
+                className="admin-flow-now-line"
+                stroke="var(--ui-border-strong)"
+                strokeDasharray="4 5"
+                x={observedUntil}
+              />
+            ) : null}
           </ComposedChart>
         </ResponsiveContainer>
       </div>

@@ -8,6 +8,12 @@ import { Clock3, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { type KeyboardEvent, useEffect, useState } from "react";
 import { Button, SidePanel } from "../../design-system/components";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "../../event-time";
+import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
+import {
+  clipTimeInterval,
+  timeAtRatio,
+  useTimeDiagramViewport,
+} from "../../shared/time-diagram-viewport";
 import {
   calculateCombinedDemandSummary,
   calculateDemandSummary,
@@ -300,14 +306,15 @@ function TimeInput({
 function DemandProfileChart({
   config,
   demand,
+  resetKey,
 }: Readonly<{
   config: SimulationConfig;
   demand: SimulationDemand;
+  resetKey: string;
 }>) {
   const width = 680;
   const height = 172;
   const padding = { top: 25, right: 16, bottom: 29, left: 42 };
-  const salesMinutes = Math.max(1, salesDurationMinutes(config.schedule));
   const windows = [...demand.windows].sort(
     (left, right) =>
       left.startOffsetMinutes - right.startOffsetMinutes ||
@@ -316,86 +323,135 @@ function DemandProfileChart({
   const maximumRate = Math.max(10, ...windows.map((window) => window.personsPerHour));
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
-  const xAt = (minutes: number) => padding.left + (minutes / salesMinutes) * chartWidth;
+  const salesFrom = Date.parse(config.schedule.salesStartAt);
+  const salesUntil = Date.parse(config.schedule.salesEndAt);
+  const {
+    changeZoom,
+    dragging,
+    onClickCapture,
+    onPointerCancel,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    reset,
+    setViewportRef,
+    visibleDomain,
+    zoom,
+    zoomLevels,
+  } = useTimeDiagramViewport({
+    domain: { from: salesFrom, until: salesUntil },
+    insetRatios: { left: padding.left / width, right: padding.right / width },
+    resetKey,
+  });
+  const xAt = (value: number) =>
+    padding.left +
+    ((value - visibleDomain.from) / Math.max(1, visibleDomain.until - visibleDomain.from)) *
+      chartWidth;
   const yAt = (rate: number) => padding.top + chartHeight - (rate / maximumRate) * chartHeight;
-  const operationsOffset =
-    (Date.parse(config.schedule.operationsStartAt) - Date.parse(config.schedule.salesStartAt)) /
-    MINUTE_MS;
-  const showOperationsMarker = operationsOffset >= 0 && operationsOffset <= salesMinutes;
+  const operationsAt = Date.parse(config.schedule.operationsStartAt);
+  const showOperationsMarker =
+    operationsAt >= visibleDomain.from && operationsAt <= visibleDomain.until;
   const ticks = [0, 0.25, 0.5, 0.75, 1];
 
   return (
-    <svg
-      aria-label="Nachfrageprofil über den Verkaufstag"
-      className="sim-demand-chart"
-      role="img"
-      viewBox={`0 0 ${width} ${height}`}
-    >
-      <title>Nachfrageprofil mit markiertem Beginn des Flugbetriebs und Personen je Stunde</title>
-      <text className="sim-demand-chart-unit" x={padding.left} y={12}>
-        Pers./Std.
-      </text>
-      {[0, 0.5, 1].map((ratio) => {
-        const rate = maximumRate * ratio;
-        const y = yAt(rate);
-        return (
-          <g key={ratio}>
-            <line
-              className="sim-demand-chart-grid"
-              x1={padding.left}
-              x2={width - padding.right}
-              y1={y}
-              y2={y}
-            />
-            <text textAnchor="end" x={padding.left - 7} y={y + 4}>
-              {Math.round(rate)}
-            </text>
-          </g>
-        );
-      })}
-      {windows.map((window) => {
-        const x = xAt(window.startOffsetMinutes);
-        const endX = xAt(window.endOffsetMinutes);
-        const y = yAt(window.personsPerHour);
-        return (
-          <g key={`${window.startOffsetMinutes}-${window.endOffsetMinutes}`}>
-            <rect
-              className="sim-demand-chart-area"
-              height={padding.top + chartHeight - y}
-              width={Math.max(0, endX - x)}
-              x={x}
-              y={y}
-            />
-            <path
-              className="sim-demand-chart-line"
-              d={`M ${x} ${padding.top + chartHeight} L ${x} ${y} L ${endX} ${y} L ${endX} ${padding.top + chartHeight}`}
-            />
-          </g>
-        );
-      })}
-      {showOperationsMarker ? (
-        <g>
-          <line
-            className="sim-demand-chart-operation"
-            x1={xAt(operationsOffset)}
-            x2={xAt(operationsOffset)}
-            y1={padding.top - 4}
-            y2={padding.top + chartHeight}
-          />
-          <text className="sim-demand-chart-operation-label" x={xAt(operationsOffset) + 5} y={21}>
-            Flugbetrieb startet
+    <div className="sim-demand-chart-stack">
+      <TimeDiagramZoomControls
+        onChange={changeZoom}
+        onReset={reset}
+        value={zoom}
+        zoomLevels={zoomLevels}
+      />
+      <div
+        className={`sim-demand-chart-viewport time-diagram-viewport${zoom > 1 ? " is-pannable" : ""}${dragging ? " is-dragging" : ""}`}
+        onClickCapture={onClickCapture}
+        onPointerCancel={onPointerCancel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        ref={setViewportRef}
+      >
+        <svg
+          aria-label="Nachfrageprofil über den Verkaufstag"
+          className="sim-demand-chart"
+          role="img"
+          viewBox={`0 0 ${width} ${height}`}
+        >
+          <title>
+            Nachfrageprofil mit markiertem Beginn des Flugbetriebs und Personen je Stunde
+          </title>
+          <text className="sim-demand-chart-unit" x={padding.left} y={12}>
+            Pers./Std.
           </text>
-        </g>
-      ) : null}
-      {ticks.map((ratio) => {
-        const offset = Math.round(salesMinutes * ratio);
-        return (
-          <text key={ratio} textAnchor={tickTextAnchor(ratio)} x={xAt(offset)} y={height - 7}>
-            {timeAtDemandOffset(config, offset)}
-          </text>
-        );
-      })}
-    </svg>
+          {[0, 0.5, 1].map((ratio) => {
+            const rate = maximumRate * ratio;
+            const y = yAt(rate);
+            return (
+              <g key={ratio}>
+                <line
+                  className="sim-demand-chart-grid"
+                  x1={padding.left}
+                  x2={width - padding.right}
+                  y1={y}
+                  y2={y}
+                />
+                <text textAnchor="end" x={padding.left - 7} y={y + 4}>
+                  {Math.round(rate)}
+                </text>
+              </g>
+            );
+          })}
+          {windows.map((window) => {
+            const clippedWindow = clipTimeInterval(
+              salesFrom + window.startOffsetMinutes * MINUTE_MS,
+              salesFrom + window.endOffsetMinutes * MINUTE_MS,
+              visibleDomain,
+            );
+            if (!clippedWindow) return null;
+            const x = xAt(clippedWindow.from);
+            const endX = xAt(clippedWindow.until);
+            const y = yAt(window.personsPerHour);
+            return (
+              <g key={`${window.startOffsetMinutes}-${window.endOffsetMinutes}`}>
+                <rect
+                  className="sim-demand-chart-area"
+                  height={padding.top + chartHeight - y}
+                  width={Math.max(0, endX - x)}
+                  x={x}
+                  y={y}
+                />
+                <path
+                  className="sim-demand-chart-line"
+                  d={`M ${x} ${padding.top + chartHeight} L ${x} ${y} L ${endX} ${y} L ${endX} ${padding.top + chartHeight}`}
+                />
+              </g>
+            );
+          })}
+          {showOperationsMarker ? (
+            <g>
+              <line
+                className="sim-demand-chart-operation"
+                x1={xAt(operationsAt)}
+                x2={xAt(operationsAt)}
+                y1={padding.top - 4}
+                y2={padding.top + chartHeight}
+              />
+              <text className="sim-demand-chart-operation-label" x={xAt(operationsAt) + 5} y={21}>
+                Flugbetrieb startet
+              </text>
+            </g>
+          ) : null}
+          {ticks.map((ratio) => {
+            const at = timeAtRatio(visibleDomain, ratio);
+            const offset = Math.round((at - salesFrom) / MINUTE_MS);
+            return (
+              <text key={ratio} textAnchor={tickTextAnchor(ratio)} x={xAt(at)} y={height - 7}>
+                {timeAtDemandOffset(config, offset)}
+              </text>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
   );
 }
 
@@ -1028,7 +1084,11 @@ export function ScenarioEditor({
                 Personen
               </p>
             </div>
-            <DemandProfileChart config={config} demand={activeDemand} />
+            <DemandProfileChart
+              config={config}
+              demand={activeDemand}
+              resetKey={`${selectedDemandProduct?.id ?? "event"}:${config.schedule.salesStartAt}:${config.schedule.salesEndAt}`}
+            />
             <div className="sim-demand-window-table">
               <div className="sim-demand-window-head">
                 <span>Von</span>

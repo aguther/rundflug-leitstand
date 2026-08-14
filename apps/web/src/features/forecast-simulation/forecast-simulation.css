@@ -434,6 +434,18 @@
   background: var(--ui-surface);
 }
 
+.sim-timeline-panel > .time-diagram-zoom {
+  padding: 2px 18px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.sim-timeline-viewport {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
 .sim-timeline-heading {
   min-height: 48px;
   display: flex;
@@ -886,13 +898,18 @@
 
 .sim-chart-interactive {
   position: relative;
+  overflow: hidden;
+}
+
+.sim-time-chart-stack > .time-diagram-zoom {
+  margin-top: 6px;
 }
 
 .sim-error-chart {
   width: 100%;
   height: 170px;
   margin-top: 8px;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .sim-error-chart:focus-visible,
@@ -1796,6 +1813,15 @@
   height: auto;
   display: block;
   margin: 0 14px 8px;
+}
+
+.sim-demand-chart-stack > .time-diagram-zoom {
+  width: calc(100% - 28px);
+  margin: 0 14px;
+}
+
+.sim-demand-chart-viewport {
+  overflow: hidden;
 }
 
 .sim-demand-chart text {
@@ -2798,7 +2824,11 @@
 .sim-history-chart {
   width: 100%;
   height: 245px;
-  overflow: visible;
+  overflow: hidden;
+}
+
+.sim-history-chart-wrap > .time-diagram-zoom {
+  margin-top: 5px;
 }
 
 .sim-history-chart text {
@@ -3006,6 +3036,11 @@
 .sim-aircraft-history-timeline {
   min-width: 840px;
   padding: 12px 0;
+}
+
+.sim-aircraft-history-content > .time-diagram-zoom {
+  width: calc(100% - 40px);
+  margin: 0 20px;
 }
 
 .sim-aircraft-history-scale {

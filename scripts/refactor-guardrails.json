@@ -904,7 +904,7 @@
     "apps/web/src/flight-line-supervisor-ui.test.ts -> apps/web/src/features/flight-line/FlightDirectorAnalyticsContent.tsx",
     "apps/web/src/flight-line-supervisor-ui.test.ts -> apps/web/src/features/flight-line/FlightDirectorAnalyticsDialog.tsx",
     "apps/web/src/flight-line-supervisor-ui.test.ts -> apps/web/src/features/flight-line/FlightDirectorOperationsDialog.tsx",
-    "apps/web/src/flight-line-supervisor-ui.test.ts -> apps/web/src/features/flight-line/analytics-diagram-viewport.ts",
+    "apps/web/src/flight-line-supervisor-ui.test.ts -> apps/web/src/shared/time-diagram-viewport.ts",
     "apps/web/src/flight-line-supervisor-ui.test.ts -> apps/web/src/features/operations/OperationalPlanPanel.tsx",
     "apps/web/src/flight-line-supervisor-ui.test.ts -> apps/web/src/flight-line-shared.tsx",
     "apps/web/src/flight-line-supervisor-ui.test.ts -> apps/web/src/flight-line-supervisor.tsx",

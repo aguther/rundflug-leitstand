@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import analyticsViewportSource from "./features/flight-line/analytics-diagram-viewport.ts?raw";
 import analyticsContentSource from "./features/flight-line/FlightDirectorAnalyticsContent.tsx?raw";
 import analyticsDialogSource from "./features/flight-line/FlightDirectorAnalyticsDialog.tsx?raw";
 import operationsDialogSource from "./features/flight-line/FlightDirectorOperationsDialog.tsx?raw";
@@ -9,6 +8,7 @@ import { expectedReviewAtFromPause } from "./flight-line-pause";
 import sharedSource from "./flight-line-shared.tsx?raw";
 import supervisorSource from "./flight-line-supervisor.tsx?raw";
 import appSource from "./flight-line-view.tsx?raw";
+import timeDiagramViewportSource from "./shared/time-diagram-viewport.ts?raw";
 import { readCssSource } from "./test-css-source";
 
 const flightLineSource = `${supervisorSource}\n${sharedSource}\n${operationsDialogSource}\n${operationalPlanSource}\n${analyticsDialogSource}\n${analyticsContentSource}`;
@@ -173,18 +173,18 @@ describe("Flight Director", () => {
     expect(analyticsContentSource).toContain("<LineChart");
     expect(analyticsContentSource).toContain("resourceTimelineRotations");
     expect(analyticsContentSource).toContain("Alle zugehörigen");
-    expect(analyticsContentSource).toContain("DiagramZoomControls");
-    expect(analyticsViewportSource).toMatch(
-      /ANALYTICS_ZOOM_LEVELS[^=]*= \[1, 1\.5, 2, 3, 4\.5, 6, 8, 12, 16, 24, 32\]/,
+    expect(analyticsContentSource).toContain("TimeDiagramZoomControls");
+    expect(timeDiagramViewportSource).toMatch(
+      /TIME_DIAGRAM_ZOOM_LEVELS[^=]*= \[[\s\S]*?192,[\s\S]*?512/,
     );
-    expect(analyticsViewportSource).toContain("analyticsZoomLevelsForSpan");
+    expect(timeDiagramViewportSource).toContain("timeDiagramZoomLevelsForSpan");
     expect(analyticsContentSource).toContain("<th>Ticketgruppe</th>");
-    expect(analyticsViewportSource).toContain(
+    expect(timeDiagramViewportSource).toContain(
       'addEventListener("wheel", listener, { passive: false })',
     );
     expect(analyticsContentSource).toContain("isAnimationActive={false}");
     expect(analyticsContentSource).toContain("{group.label}");
-    expect(flightLineStyles).toContain("overflow-x: scroll");
+    expect(flightLineStyles).toContain("overflow-x: hidden");
     expect(flightLineStyles).toMatch(/\.flight-director-forecast-chart\s*\{[^}]*overflow: hidden;/);
     expect(flightLineStyles).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
     expect(analyticsContentSource).toContain("Prognose öffnen");

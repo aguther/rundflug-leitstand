@@ -215,6 +215,14 @@ describe("FlightDirectorAnalyticsContent resource timeline", () => {
       releasePointerCapture: vi.fn(),
       setPointerCapture: vi.fn(),
     });
+    Object.defineProperties(viewport, {
+      clientWidth: { configurable: true, value: 800 },
+      getBoundingClientRect: {
+        configurable: true,
+        value: () => ({ left: 100, right: 900, width: 800 }),
+      },
+    });
+    fireEvent.wheel(viewport, { clientX: 500, deltaY: -1 });
 
     fireEvent.pointerDown(rotationButton, {
       button: 0,

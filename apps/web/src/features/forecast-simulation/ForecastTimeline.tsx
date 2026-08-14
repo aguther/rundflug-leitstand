@@ -1,4 +1,6 @@
 import type { KeyboardEvent } from "react";
+import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
+import { useTimeDiagramViewport } from "../../shared/time-diagram-viewport";
 
 import {
   forecastUncertaintyLabel,
@@ -77,10 +79,19 @@ const keyboardScrollableRegionProps = {
   tabIndex: 0,
 } as const;
 
-function phaseStyle(from: number, until: number, start: number, end: number) {
+function phaseStyle(
+  from: number,
+  until: number,
+  start: number,
+  end: number,
+  visibleFrom: number,
+  visibleUntil: number,
+) {
+  const boundedStart = Math.max(start, visibleFrom);
+  const boundedEnd = Math.min(end, visibleUntil);
   return {
-    left: `${clampPercent(percent(from, start, end))}%`,
-    width: `${Math.max(0.45, clampPercent(percent(until, start, end)) - clampPercent(percent(from, start, end)))}%`,
+    left: `${clampPercent(percent(Math.max(from, boundedStart), boundedStart, boundedEnd))}%`,
+    width: `${Math.max(0.45, clampPercent(percent(Math.min(until, boundedEnd), boundedStart, boundedEnd)) - clampPercent(percent(Math.max(from, boundedStart), boundedStart, boundedEnd)))}%`,
   };
 }
 
@@ -262,16 +273,35 @@ export function ForecastTimeline({
     Math.min(currentMs - halfWindow, simulationEnd - WINDOW_MINUTES * MINUTE_MS),
   );
   const windowEnd = Math.min(simulationEnd, windowStart + WINDOW_MINUTES * MINUTE_MS);
+  const {
+    changeZoom,
+    dragging,
+    onClickCapture,
+    onPointerCancel,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    reset,
+    setViewportRef,
+    visibleDomain,
+    zoom,
+    zoomLevels,
+  } = useTimeDiagramViewport({
+    domain: { from: windowStart, until: windowEnd },
+    freezeDomainWhileZoomed: true,
+    insets: { left: 112, right: 0 },
+    resetKey: result,
+  });
+  const viewStart = visibleDomain.from;
+  const viewEnd = visibleDomain.until;
   const tickCount = 6;
   const ticks = Array.from(
     { length: tickCount + 1 },
-    (_, index) => windowStart + ((windowEnd - windowStart) * index) / tickCount,
+    (_, index) => viewStart + ((viewEnd - viewStart) * index) / tickCount,
   );
   const visibleRotations = result.rotations.filter((rotation) => {
     if (!rotation.calledAt || !rotation.completedAt) return false;
-    return (
-      Date.parse(rotation.calledAt) < windowEnd && Date.parse(rotation.completedAt) > windowStart
-    );
+    return Date.parse(rotation.calledAt) < viewEnd && Date.parse(rotation.completedAt) > viewStart;
   });
   const queue = result.rotations.filter(
     (rotation) =>
@@ -282,13 +312,14 @@ export function ForecastTimeline({
   const selectedSnapshot = selected
     ? latestSnapshot(result.snapshots, selected.id, currentMs)
     : undefined;
-  const nowPosition = clampPercent(percent(currentMs, windowStart, windowEnd));
+  const nowPosition = clampPercent(percent(currentMs, viewStart, viewEnd));
+  const showNow = currentMs >= viewStart && currentMs <= viewEnd;
   const plannedSegments = buildPlannedSegments({
     events: result.events,
     plans: result.plannedOperations ?? [],
     simulationEnd,
-    windowEnd,
-    windowStart,
+    windowEnd: viewEnd,
+    windowStart: viewStart,
   });
   const sharedPlannedSegments = plannedSegments.filter(({ plan }) => plan.scopeType !== "AIRCRAFT");
   const sharedInterruptions = buildTimelineInterruptions(
@@ -296,7 +327,7 @@ export function ForecastTimeline({
     null,
     currentMs,
     simulationEnd,
-  ).filter(({ start, end }) => start < windowEnd && end >= windowStart);
+  ).filter(({ start, end }) => start < viewEnd && end >= viewStart);
 
   return (
     <section className="sim-timeline-panel" aria-label="Simulationszeitachse">
@@ -304,7 +335,7 @@ export function ForecastTimeline({
         <div>
           <strong>Zeitleiste</strong>
           <span>
-            {formatTime(windowStart)} – {formatTime(windowEnd)}
+            {formatTime(viewStart)} – {formatTime(viewEnd)}
           </span>
         </div>
         <fieldset className="sim-timeline-legend">
@@ -318,165 +349,77 @@ export function ForecastTimeline({
           <span className="sim-legend-interruption">Unterbrechung / Ausfall</span>
         </fieldset>
       </header>
-      <div className="sim-timeline-scale">
-        {ticks.map((tick) => (
-          <time key={tick} style={{ left: `${percent(tick, windowStart, windowEnd)}%` }}>
-            {formatTime(tick)}
-          </time>
-        ))}
-      </div>
-      <section
-        {...keyboardScrollableRegionProps}
-        aria-label="Tagesplan und Flugzeuge"
-        className="sim-timeline-lanes"
+      <TimeDiagramZoomControls
+        onChange={changeZoom}
+        onReset={reset}
+        value={zoom}
+        zoomLevels={zoomLevels}
+      />
+      <div
+        className={`sim-timeline-viewport time-diagram-viewport${zoom > 1 ? " is-pannable" : ""}${dragging ? " is-dragging" : ""}`}
+        onClickCapture={onClickCapture}
+        onPointerCancel={onPointerCancel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        ref={setViewportRef}
       >
-        <div className="sim-now-track">
-          <div className="sim-now-line" style={{ left: `${nowPosition}%` }}>
-            <time>{formatTime(currentMs)}</time>
-          </div>
+        <div className="sim-timeline-scale">
+          {ticks.map((tick) => (
+            <time key={tick} style={{ left: `${percent(tick, viewStart, viewEnd)}%` }}>
+              {formatTime(tick)}
+            </time>
+          ))}
         </div>
-        {sharedPlannedSegments.length > 0 || sharedInterruptions.length > 0 ? (
-          <div className="sim-aircraft-lane sim-plan-lane">
-            <div className="sim-aircraft-label">
-              <strong>Tagesplan / Betrieb</strong>
-              <small>Plan und globale Unterbrechung</small>
+        <section
+          {...keyboardScrollableRegionProps}
+          aria-label="Tagesplan und Flugzeuge"
+          className="sim-timeline-lanes"
+        >
+          {showNow ? (
+            <div className="sim-now-track">
+              <div className="sim-now-line" style={{ left: `${nowPosition}%` }}>
+                <time>{formatTime(currentMs)}</time>
+              </div>
             </div>
-            <div className="sim-lane-track">
-              {sharedPlannedSegments.map(({ plan, start, end }) => (
-                <span
-                  className="sim-planned-operation-bar"
-                  data-active={start <= currentMs && currentMs < end}
-                  key={plan.key}
-                  style={{
-                    left: `${clampPercent(percent(start, windowStart, windowEnd))}%`,
-                    width: `${Math.max(
-                      1.2,
-                      clampPercent(percent(end, windowStart, windowEnd)) -
-                        clampPercent(percent(start, windowStart, windowEnd)),
-                    )}%`,
-                  }}
-                  title={plan.publicNote ? `${plan.kind} · ${plan.publicNote}` : plan.kind}
-                >
-                  {plan.kind}
-                </span>
-              ))}
-              {sharedInterruptions.map((interruption) => (
-                <span
-                  className="sim-interruption-bar sim-interruption-bar--shared"
-                  data-active={interruption.active}
-                  data-tone={interruption.tone}
-                  key={interruption.id}
-                  style={{
-                    left: `${clampPercent(percent(interruption.start, windowStart, windowEnd))}%`,
-                    width: `${Math.max(
-                      1.2,
-                      clampPercent(percent(interruption.end, windowStart, windowEnd)) -
-                        clampPercent(percent(interruption.start, windowStart, windowEnd)),
-                    )}%`,
-                  }}
-                  title={interruptionTitle(interruption)}
-                >
-                  {interruption.label}
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : null}
-        {result.aircraft.map((aircraft) => {
-          const rotations = visibleRotations.filter(
-            (rotation) => rotation.aircraftId === aircraft.id,
-          );
-          const interruptions = buildTimelineInterruptions(
-            result.events,
-            aircraft.id,
-            currentMs,
-            simulationEnd,
-          ).filter(({ start, end }) => start < windowEnd && end >= windowStart);
-          return (
-            <div className="sim-aircraft-lane" key={aircraft.id}>
+          ) : null}
+          {sharedPlannedSegments.length > 0 || sharedInterruptions.length > 0 ? (
+            <div className="sim-aircraft-lane sim-plan-lane">
               <div className="sim-aircraft-label">
-                <strong>{aircraft.registration}</strong>
-                <small>{aircraft.aircraftType}</small>
-                <span>Sitzplätze {aircraft.capacity}</span>
+                <strong>Tagesplan / Betrieb</strong>
+                <small>Plan und globale Unterbrechung</small>
               </div>
               <div className="sim-lane-track">
-                {ticks.map((tick) => (
-                  <i
-                    aria-hidden="true"
-                    className="sim-lane-gridline"
-                    key={tick}
-                    style={{ left: `${percent(tick, windowStart, windowEnd)}%` }}
-                  />
-                ))}
-                {plannedSegments
-                  .filter(
-                    ({ plan }) => plan.scopeType === "AIRCRAFT" && plan.scopeId === aircraft.id,
-                  )
-                  .map(({ plan, start, end }) => (
-                    <span
-                      className="sim-planned-operation-bar sim-planned-operation-bar--aircraft"
-                      data-active={start <= currentMs && currentMs < end}
-                      key={plan.key}
-                      style={{
-                        left: `${clampPercent(percent(start, windowStart, windowEnd))}%`,
-                        width: `${Math.max(
-                          1.2,
-                          clampPercent(percent(end, windowStart, windowEnd)) -
-                            clampPercent(percent(start, windowStart, windowEnd)),
-                        )}%`,
-                      }}
-                      title={plan.publicNote ? `${plan.kind} · ${plan.publicNote}` : plan.kind}
-                    >
-                      {plan.kind}
-                    </span>
-                  ))}
-                {rotations.map((rotation) => {
-                  const called = Date.parse(rotation.calledAt ?? "");
-                  const departed = Date.parse(rotation.departedAt ?? "");
-                  const landed = Date.parse(rotation.landedAt ?? "");
-                  const completed = Date.parse(rotation.completedAt ?? "");
-                  const left = clampPercent(percent(called, windowStart, windowEnd));
-                  const right = clampPercent(percent(completed, windowStart, windowEnd));
-                  const currentStatus = statusAt(rotation, currentMs);
-                  return (
-                    <button
-                      aria-label={`Fluggruppe ${rotation.communicationNumber}, ${currentStatus}`}
-                      className="sim-rotation-bar"
-                      data-selected={rotation.id === selectedRotationId}
-                      key={rotation.id}
-                      onClick={() => onSelectRotation(rotation.id)}
-                      style={{ left: `${left}%`, width: `${Math.max(1.8, right - left)}%` }}
-                      type="button"
-                    >
-                      <b>{rotation.communicationNumber}</b>
-                      <span
-                        className="sim-phase sim-phase--boarding"
-                        style={phaseStyle(called, departed, called, completed)}
-                      />
-                      <span
-                        className="sim-phase sim-phase--flight"
-                        style={phaseStyle(departed, landed, called, completed)}
-                      />
-                      <span
-                        className="sim-phase sim-phase--ground"
-                        style={phaseStyle(landed, completed, called, completed)}
-                      />
-                      {currentMs < completed ? <span className="sim-future-mask" /> : null}
-                    </button>
-                  );
-                })}
-                {interruptions.map((interruption) => (
+                {sharedPlannedSegments.map(({ plan, start, end }) => (
                   <span
-                    className="sim-interruption-bar"
+                    className="sim-planned-operation-bar"
+                    data-active={start <= currentMs && currentMs < end}
+                    key={plan.key}
+                    style={{
+                      left: `${clampPercent(percent(start, viewStart, viewEnd))}%`,
+                      width: `${Math.max(
+                        1.2,
+                        clampPercent(percent(end, viewStart, viewEnd)) -
+                          clampPercent(percent(start, viewStart, viewEnd)),
+                      )}%`,
+                    }}
+                    title={plan.publicNote ? `${plan.kind} · ${plan.publicNote}` : plan.kind}
+                  >
+                    {plan.kind}
+                  </span>
+                ))}
+                {sharedInterruptions.map((interruption) => (
+                  <span
+                    className="sim-interruption-bar sim-interruption-bar--shared"
                     data-active={interruption.active}
                     data-tone={interruption.tone}
                     key={interruption.id}
                     style={{
-                      left: `${clampPercent(percent(interruption.start, windowStart, windowEnd))}%`,
+                      left: `${clampPercent(percent(interruption.start, viewStart, viewEnd))}%`,
                       width: `${Math.max(
                         1.2,
-                        clampPercent(percent(interruption.end, windowStart, windowEnd)) -
-                          clampPercent(percent(interruption.start, windowStart, windowEnd)),
+                        clampPercent(percent(interruption.end, viewStart, viewEnd)) -
+                          clampPercent(percent(interruption.start, viewStart, viewEnd)),
                       )}%`,
                     }}
                     title={interruptionTitle(interruption)}
@@ -486,9 +429,136 @@ export function ForecastTimeline({
                 ))}
               </div>
             </div>
-          );
-        })}
-      </section>
+          ) : null}
+          {result.aircraft.map((aircraft) => {
+            const rotations = visibleRotations.filter(
+              (rotation) => rotation.aircraftId === aircraft.id,
+            );
+            const interruptions = buildTimelineInterruptions(
+              result.events,
+              aircraft.id,
+              currentMs,
+              simulationEnd,
+            ).filter(({ start, end }) => start < viewEnd && end >= viewStart);
+            return (
+              <div className="sim-aircraft-lane" key={aircraft.id}>
+                <div className="sim-aircraft-label">
+                  <strong>{aircraft.registration}</strong>
+                  <small>{aircraft.aircraftType}</small>
+                  <span>Sitzplätze {aircraft.capacity}</span>
+                </div>
+                <div className="sim-lane-track">
+                  {ticks.map((tick) => (
+                    <i
+                      aria-hidden="true"
+                      className="sim-lane-gridline"
+                      key={tick}
+                      style={{ left: `${percent(tick, viewStart, viewEnd)}%` }}
+                    />
+                  ))}
+                  {plannedSegments
+                    .filter(
+                      ({ plan }) => plan.scopeType === "AIRCRAFT" && plan.scopeId === aircraft.id,
+                    )
+                    .map(({ plan, start, end }) => (
+                      <span
+                        className="sim-planned-operation-bar sim-planned-operation-bar--aircraft"
+                        data-active={start <= currentMs && currentMs < end}
+                        key={plan.key}
+                        style={{
+                          left: `${clampPercent(percent(start, viewStart, viewEnd))}%`,
+                          width: `${Math.max(
+                            1.2,
+                            clampPercent(percent(end, viewStart, viewEnd)) -
+                              clampPercent(percent(start, viewStart, viewEnd)),
+                          )}%`,
+                        }}
+                        title={plan.publicNote ? `${plan.kind} · ${plan.publicNote}` : plan.kind}
+                      >
+                        {plan.kind}
+                      </span>
+                    ))}
+                  {rotations.map((rotation) => {
+                    const called = Date.parse(rotation.calledAt ?? "");
+                    const departed = Date.parse(rotation.departedAt ?? "");
+                    const landed = Date.parse(rotation.landedAt ?? "");
+                    const completed = Date.parse(rotation.completedAt ?? "");
+                    const left = clampPercent(percent(called, viewStart, viewEnd));
+                    const right = clampPercent(percent(completed, viewStart, viewEnd));
+                    const currentStatus = statusAt(rotation, currentMs);
+                    return (
+                      <button
+                        aria-label={`Fluggruppe ${rotation.communicationNumber}, ${currentStatus}`}
+                        className="sim-rotation-bar"
+                        data-selected={rotation.id === selectedRotationId}
+                        key={rotation.id}
+                        onClick={() => onSelectRotation(rotation.id)}
+                        style={{ left: `${left}%`, width: `${Math.max(1.8, right - left)}%` }}
+                        type="button"
+                      >
+                        <b>{rotation.communicationNumber}</b>
+                        <span
+                          className="sim-phase sim-phase--boarding"
+                          style={phaseStyle(
+                            called,
+                            departed,
+                            called,
+                            completed,
+                            viewStart,
+                            viewEnd,
+                          )}
+                        />
+                        <span
+                          className="sim-phase sim-phase--flight"
+                          style={phaseStyle(
+                            departed,
+                            landed,
+                            called,
+                            completed,
+                            viewStart,
+                            viewEnd,
+                          )}
+                        />
+                        <span
+                          className="sim-phase sim-phase--ground"
+                          style={phaseStyle(
+                            landed,
+                            completed,
+                            called,
+                            completed,
+                            viewStart,
+                            viewEnd,
+                          )}
+                        />
+                        {currentMs < completed ? <span className="sim-future-mask" /> : null}
+                      </button>
+                    );
+                  })}
+                  {interruptions.map((interruption) => (
+                    <span
+                      className="sim-interruption-bar"
+                      data-active={interruption.active}
+                      data-tone={interruption.tone}
+                      key={interruption.id}
+                      style={{
+                        left: `${clampPercent(percent(interruption.start, viewStart, viewEnd))}%`,
+                        width: `${Math.max(
+                          1.2,
+                          clampPercent(percent(interruption.end, viewStart, viewEnd)) -
+                            clampPercent(percent(interruption.start, viewStart, viewEnd)),
+                        )}%`,
+                      }}
+                      title={interruptionTitle(interruption)}
+                    >
+                      {interruption.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      </div>
       <div className="sim-queue-row">
         <div>
           <strong>Warteschlange</strong>

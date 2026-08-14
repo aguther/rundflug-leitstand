@@ -618,66 +618,12 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  overflow-x: scroll;
+  overflow-x: hidden;
   overflow-y: hidden;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
   background: var(--ui-surface);
   overscroll-behavior-inline: contain;
-  scrollbar-gutter: stable;
-}
-
-.flight-director-chart-viewport.is-pannable {
-  cursor: grab;
-  user-select: none;
-}
-
-.flight-director-chart-viewport.is-pannable * {
-  user-select: none;
-}
-
-.flight-director-chart-viewport.is-dragging,
-.flight-director-chart-viewport.is-dragging * {
-  cursor: grabbing;
-  user-select: none;
-}
-
-.flight-director-diagram-zoom {
-  display: flex;
-  width: 100%;
-  min-height: 32px;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 5px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.flight-director-diagram-zoom > small {
-  margin-right: auto;
-  color: var(--ui-muted);
-  font-size: 0.64rem;
-}
-
-.flight-director-diagram-zoom .ds-button {
-  min-height: 30px;
-  gap: 4px;
-  padding: 3px 8px;
-  font-size: 0.66rem;
-}
-
-.flight-director-diagram-zoom .ds-button svg {
-  width: 14px;
-  height: 14px;
-}
-
-.flight-director-diagram-zoom > span {
-  min-width: 48px;
-  color: var(--ui-muted);
-  font-size: 0.68rem;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
 }
 
 .flight-director-forecast-chart .recharts-cartesian-axis-tick-value,
@@ -1128,10 +1074,6 @@
 }
 
 @media (max-width: 560px) {
-  .flight-director-diagram-zoom > small {
-    display: none;
-  }
-
   .flight-director-analytics-milestones,
   .flight-director-analytics-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -1,6 +1,12 @@
 import { ArrowUpRight, CheckCircle2, Download, Info, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button, ModalDialog } from "../../design-system/components";
+import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
+import {
+  clipTimeInterval,
+  timeToPercent,
+  useTimeDiagramViewport,
+} from "../../shared/time-diagram-viewport";
 import {
   forecastUncertaintyLabel,
   type SimulationAircraft,
@@ -112,9 +118,6 @@ function GroupForecastChart({
   snapshots: readonly SimulationForecastSnapshot[];
 }>) {
   const [activeSnapshotIndex, setActiveSnapshotIndex] = useState<number | null>(null);
-  if (snapshots.length === 0) {
-    return <div className="sim-history-empty">Für diese Gruppe liegt noch kein Snapshot vor.</div>;
-  }
   const orderedSnapshots = [...snapshots].sort(
     (left, right) => Date.parse(left.capturedAt) - Date.parse(right.capturedAt),
   );
@@ -123,6 +126,29 @@ function GroupForecastChart({
   const paddingX = 48;
   const paddingY = 28;
   const capturedTimes = orderedSnapshots.map((snapshot) => Date.parse(snapshot.capturedAt));
+  const minimumX = capturedTimes.length > 0 ? Math.min(...capturedTimes) : 0;
+  const maximumX = capturedTimes.length > 0 ? Math.max(...capturedTimes) : 1;
+  const {
+    changeZoom,
+    dragging,
+    onClickCapture,
+    onPointerCancel,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    reset,
+    setViewportRef,
+    visibleDomain,
+    zoom,
+    zoomLevels,
+  } = useTimeDiagramViewport({
+    domain: { from: minimumX, until: maximumX },
+    insetRatios: { left: paddingX / width, right: paddingX / width },
+    resetKey: rotation.id,
+  });
+  if (snapshots.length === 0) {
+    return <div className="sim-history-empty">Für diese Gruppe liegt noch kein Snapshot vor.</div>;
+  }
   const values = [
     ...orderedSnapshots.flatMap((snapshot) =>
       FORECAST_SERIES.map(([field]) => Date.parse(snapshot[field])),
@@ -131,13 +157,13 @@ function GroupForecastChart({
       .filter((value): value is string => value !== null)
       .map(Date.parse),
   ].filter(Number.isFinite);
-  const minimumX = Math.min(...capturedTimes);
-  const maximumX = Math.max(...capturedTimes);
   const minimumY = Math.min(...values);
   const maximumY = Math.max(...values);
   const x = (value: number) =>
     paddingX +
-    ((value - minimumX) / Math.max(TICK_FALLBACK_MS, maximumX - minimumX)) * (width - paddingX * 2);
+    ((value - visibleDomain.from) /
+      Math.max(TICK_FALLBACK_MS, visibleDomain.until - visibleDomain.from)) *
+      (width - paddingX * 2);
   const y = (value: number) =>
     height -
     paddingY -
@@ -175,7 +201,21 @@ function GroupForecastChart({
         <span data-series="actual">gestrichelt = Ist</span>
         <span data-series="cursor">Werte mit Maus anzeigen</span>
       </div>
-      <div className="sim-chart-interactive sim-history-chart-stage">
+      <TimeDiagramZoomControls
+        onChange={changeZoom}
+        onReset={reset}
+        value={zoom}
+        zoomLevels={zoomLevels}
+      />
+      <div
+        className={`sim-chart-interactive sim-history-chart-stage time-diagram-viewport${zoom > 1 ? " is-pannable" : ""}${dragging ? " is-dragging" : ""}`}
+        onClickCapture={onClickCapture}
+        onPointerCancel={onPointerCancel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        ref={setViewportRef}
+      >
         <svg
           aria-label="Interaktiver Verlauf sämtlicher Prognosesnapshots"
           className="sim-history-chart"
@@ -272,10 +312,10 @@ function GroupForecastChart({
             {formatTime(minimumY)}
           </text>
           <text x={paddingX} y={height - 5}>
-            {formatTime(minimumX)}
+            {formatTime(visibleDomain.from)}
           </text>
           <text textAnchor="end" x={width - paddingX} y={height - 5}>
-            {formatTime(maximumX)}
+            {formatTime(visibleDomain.until)}
           </text>
         </svg>
         {activeSnapshot && activeSnapshotX !== null ? (
@@ -358,95 +398,127 @@ function AircraftTimeline({
   endMs: number;
   onOpenGroup: (rotationId: string) => void;
 }>) {
-  const span = Math.max(1, endMs - startMs);
-  const position = (at: string) =>
-    Math.max(0, Math.min(100, ((Date.parse(at) - startMs) / span) * 100));
+  const {
+    changeZoom,
+    dragging,
+    onClickCapture,
+    onPointerCancel,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    reset,
+    setViewportRef,
+    visibleDomain,
+    zoom,
+    zoomLevels,
+  } = useTimeDiagramViewport({
+    domain: { from: startMs, until: endMs },
+    resetKey: aircraft.id,
+  });
+  const position = (at: number) => Math.max(0, Math.min(100, timeToPercent(at, visibleDomain)));
   return (
-    <section
-      className="sim-aircraft-history-timeline"
-      aria-label={`Tagesverlauf ${aircraft.registration}`}
-    >
-      <div className="sim-aircraft-history-scale">
-        {Array.from({ length: 9 }, (_, index) => {
-          const at = startMs + (span / 8) * index;
-          return (
-            <time key={at} style={{ left: `${(index / 8) * 100}%` }}>
-              {formatTime(at)}
-            </time>
-          );
-        })}
-      </div>
-      <div className="sim-aircraft-history-track">
-        {rotations.map((rotation) => {
-          if (!rotation.calledAt) return null;
-          const endAt = rotation.completedAt ?? new Date(endMs).toISOString();
-          const left = position(rotation.calledAt);
-          const right = position(endAt);
-          const totalMinutes = Math.max(
-            0.5,
-            (Date.parse(endAt) - Date.parse(rotation.calledAt)) / MINUTE_MS,
-          );
-          const boarding = rotation.departedAt
-            ? (Date.parse(rotation.departedAt) - Date.parse(rotation.calledAt)) / MINUTE_MS
-            : totalMinutes;
-          const flight =
-            rotation.departedAt && rotation.landedAt
-              ? (Date.parse(rotation.landedAt) - Date.parse(rotation.departedAt)) / MINUTE_MS
-              : 0;
-          return (
-            <button
-              aria-label={`Fluggruppe ${rotation.communicationNumber}`}
-              className="sim-aircraft-rotation-block"
-              key={rotation.id}
-              onClick={() => onOpenGroup(rotation.id)}
-              style={{ left: `${left}%`, width: `${Math.max(0.7, right - left)}%` }}
-              type="button"
-            >
-              <b>{rotation.communicationNumber}</b>
+    <>
+      <TimeDiagramZoomControls
+        onChange={changeZoom}
+        onReset={reset}
+        value={zoom}
+        zoomLevels={zoomLevels}
+      />
+      <section
+        aria-label={`Tagesverlauf ${aircraft.registration}`}
+        className={`sim-aircraft-history-timeline time-diagram-viewport${zoom > 1 ? " is-pannable" : ""}${dragging ? " is-dragging" : ""}`}
+        onClickCapture={onClickCapture}
+        onPointerCancel={onPointerCancel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        ref={setViewportRef}
+      >
+        <div className="sim-aircraft-history-scale">
+          {Array.from({ length: 9 }, (_, index) => {
+            const at =
+              visibleDomain.from + ((visibleDomain.until - visibleDomain.from) / 8) * index;
+            return (
+              <time key={at} style={{ left: `${(index / 8) * 100}%` }}>
+                {formatTime(at)}
+              </time>
+            );
+          })}
+        </div>
+        <div className="sim-aircraft-history-track">
+          {rotations.map((rotation) => {
+            if (!rotation.calledAt) return null;
+            const rotationStart = Date.parse(rotation.calledAt);
+            const rotationEnd = Date.parse(rotation.completedAt ?? new Date(endMs).toISOString());
+            const clippedRotation = clipTimeInterval(rotationStart, rotationEnd, visibleDomain);
+            if (!clippedRotation) return null;
+            const left = position(clippedRotation.from);
+            const right = position(clippedRotation.until);
+            const width = Math.max(0.7, right - left);
+            const departure = rotation.departedAt ? Date.parse(rotation.departedAt) : rotationEnd;
+            const landing = rotation.landedAt ? Date.parse(rotation.landedAt) : rotationEnd;
+            const phases = [
+              { className: "boarding", from: rotationStart, until: departure },
+              { className: "flight", from: departure, until: landing },
+              { className: "ground", from: landing, until: rotationEnd },
+            ];
+            return (
+              <button
+                aria-label={`Fluggruppe ${rotation.communicationNumber}`}
+                className="sim-aircraft-rotation-block"
+                key={rotation.id}
+                onClick={() => onOpenGroup(rotation.id)}
+                style={{ left: `${left}%`, width: `${width}%` }}
+                type="button"
+              >
+                <b>{rotation.communicationNumber}</b>
+                {phases.map((phase) => {
+                  const clippedPhase = clipTimeInterval(phase.from, phase.until, clippedRotation);
+                  if (!clippedPhase) return null;
+                  return (
+                    <span
+                      className={`sim-aircraft-phase sim-aircraft-phase--${phase.className}`}
+                      key={phase.className}
+                      style={{
+                        left: `${((position(clippedPhase.from) - left) / width) * 100}%`,
+                        width: `${Math.max(1, ((position(clippedPhase.until) - position(clippedPhase.from)) / width) * 100)}%`,
+                      }}
+                    />
+                  );
+                })}
+              </button>
+            );
+          })}
+          {blocks.map((block) => {
+            const clippedBlock = clipTimeInterval(
+              Date.parse(block.start.occurredAt),
+              block.end ? Date.parse(block.end.occurredAt) : endMs,
+              visibleDomain,
+            );
+            if (!clippedBlock) return null;
+            const left = position(clippedBlock.from);
+            const right = position(clippedBlock.until);
+            return (
               <span
-                className="sim-aircraft-phase sim-aircraft-phase--boarding"
-                style={{ width: `${Math.min(100, (boarding / totalMinutes) * 100)}%` }}
-              />
-              <span
-                className="sim-aircraft-phase sim-aircraft-phase--flight"
-                style={{
-                  left: `${Math.min(100, (boarding / totalMinutes) * 100)}%`,
-                  width: `${Math.min(100, (flight / totalMinutes) * 100)}%`,
-                }}
-              />
-              <span
-                className="sim-aircraft-phase sim-aircraft-phase--ground"
-                style={{
-                  left: `${Math.min(100, ((boarding + flight) / totalMinutes) * 100)}%`,
-                  right: 0,
-                }}
-              />
-            </button>
-          );
-        })}
-        {blocks.map((block) => {
-          const left = position(block.start.occurredAt);
-          const right = block.end ? position(block.end.occurredAt) : 100;
-          return (
-            <span
-              className="sim-aircraft-incident-block"
-              data-event={block.start.type}
-              key={block.start.id}
-              style={{ left: `${left}%`, width: `${Math.max(0.7, right - left)}%` }}
-              title={`${eventLabel(block.start.type)} ab ${formatTime(block.start.occurredAt)}`}
-            >
-              {eventLabel(block.start.type)}
-            </span>
-          );
-        })}
-      </div>
-      <div className="sim-aircraft-history-legend">
-        <span data-phase="boarding">Boarding / Bindung</span>
-        <span data-phase="flight">Flug</span>
-        <span data-phase="ground">Turnaround</span>
-        <span data-phase="return">Rückkehr bestätigt</span>
-      </div>
-    </section>
+                className="sim-aircraft-incident-block"
+                data-event={block.start.type}
+                key={block.start.id}
+                style={{ left: `${left}%`, width: `${Math.max(0.7, right - left)}%` }}
+                title={`${eventLabel(block.start.type)} ab ${formatTime(block.start.occurredAt)}`}
+              >
+                {eventLabel(block.start.type)}
+              </span>
+            );
+          })}
+        </div>
+        <div className="sim-aircraft-history-legend">
+          <span data-phase="boarding">Boarding / Bindung</span>
+          <span data-phase="flight">Flug</span>
+          <span data-phase="ground">Turnaround</span>
+          <span data-phase="return">Rückkehr bestätigt</span>
+        </div>
+      </section>
+    </>
   );
 }
 

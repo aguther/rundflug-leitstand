@@ -22,6 +22,8 @@ import {
 import { useMemo, useRef, useState } from "react";
 import { Button, ModalDialog } from "../../design-system/components";
 import { ThemeToggle } from "../../design-system/ThemeToggle";
+import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
+import { useTimeDiagramViewport } from "../../shared/time-diagram-viewport";
 import { CalibrationCsvError, calibrateFromCsv } from "./csv-calibration";
 import { calculateSimulationMetrics, runSimulation } from "./engine";
 import { ForecastTimeline } from "./ForecastTimeline";
@@ -168,9 +170,11 @@ function latestSnapshotBefore(
 }
 
 function ErrorChart({
+  resetKey,
   rotations,
   snapshots,
 }: Readonly<{
+  resetKey: unknown;
   rotations: readonly SimulationRotation[];
   snapshots: readonly SimulationForecastSnapshot[];
 }>) {
@@ -192,6 +196,26 @@ function ErrorChart({
       ];
     })
     .sort((left, right) => left.at - right.at);
+  const minimumTime = points.length > 0 ? Math.min(...points.map((point) => point.at)) : 0;
+  const maximumTime = points.length > 0 ? Math.max(...points.map((point) => point.at)) : 1;
+  const {
+    changeZoom,
+    dragging,
+    onClickCapture,
+    onPointerCancel,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    reset,
+    setViewportRef,
+    visibleDomain,
+    zoom,
+    zoomLevels,
+  } = useTimeDiagramViewport({
+    domain: { from: minimumTime, until: maximumTime },
+    insetRatios: { left: 26 / 720, right: 26 / 720 },
+    resetKey,
+  });
   if (points.length < 2) {
     return (
       <div className="sim-chart-empty">Noch nicht genügend abgeschlossene Prognosevergleiche.</div>
@@ -200,11 +224,12 @@ function ErrorChart({
   const width = 720;
   const height = 170;
   const padding = 26;
-  const minAt = Math.min(...points.map((point) => point.at));
-  const maxAt = Math.max(...points.map((point) => point.at));
   const maxError = Math.max(10, ...points.map((point) => Math.abs(point.error)));
   const plottedPoints = points.map((point) => {
-    const x = padding + ((point.at - minAt) / Math.max(1, maxAt - minAt)) * (width - padding * 2);
+    const x =
+      padding +
+      ((point.at - visibleDomain.from) / Math.max(1, visibleDomain.until - visibleDomain.from)) *
+        (width - padding * 2);
     const y = height / 2 - (point.error / maxError) * (height / 2 - padding);
     return { ...point, x, y };
   });
@@ -222,101 +247,117 @@ function ErrorChart({
     setActivePointIndex(nearestIndex);
   };
   return (
-    <div className="sim-chart-interactive sim-error-chart-stage">
-      <svg
-        aria-label="Interaktiver Verlauf des Boarding-Prognosefehlers"
-        className="sim-error-chart"
-        onPointerLeave={() => setActivePointIndex(null)}
-        onPointerMove={(event) => {
-          const matrix = event.currentTarget.getScreenCTM();
-          if (!matrix) return;
-          const pointer = event.currentTarget.createSVGPoint();
-          pointer.x = event.clientX;
-          pointer.y = event.clientY;
-          selectNearestPoint(pointer.matrixTransform(matrix.inverse()).x);
-        }}
-        role="img"
-        viewBox={`0 0 ${width} ${height}`}
+    <div className="sim-time-chart-stack">
+      <TimeDiagramZoomControls
+        onChange={changeZoom}
+        onReset={reset}
+        value={zoom}
+        zoomLevels={zoomLevels}
+      />
+      <div
+        className={`sim-chart-interactive sim-error-chart-stage time-diagram-viewport${zoom > 1 ? " is-pannable" : ""}${dragging ? " is-dragging" : ""}`}
+        onClickCapture={onClickCapture}
+        onPointerCancel={onPointerCancel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        ref={setViewportRef}
       >
-        <line
-          className="sim-chart-axis"
-          x1={padding}
-          x2={width - padding}
-          y1={height / 2}
-          y2={height / 2}
-        />
-        {[0.25, 0.75].map((position) => (
+        <svg
+          aria-label="Interaktiver Verlauf des Boarding-Prognosefehlers"
+          className="sim-error-chart"
+          onPointerLeave={() => setActivePointIndex(null)}
+          onPointerMove={(event) => {
+            const matrix = event.currentTarget.getScreenCTM();
+            if (!matrix) return;
+            const pointer = event.currentTarget.createSVGPoint();
+            pointer.x = event.clientX;
+            pointer.y = event.clientY;
+            selectNearestPoint(pointer.matrixTransform(matrix.inverse()).x);
+          }}
+          role="img"
+          viewBox={`0 0 ${width} ${height}`}
+        >
           <line
-            className="sim-chart-grid"
-            key={position}
+            className="sim-chart-axis"
             x1={padding}
             x2={width - padding}
-            y1={height * position}
-            y2={height * position}
+            y1={height / 2}
+            y2={height / 2}
           />
-        ))}
-        <polyline
-          className="sim-chart-line"
-          fill="none"
-          points={plottedPoints.map((point) => `${point.x},${point.y}`).join(" ")}
-        />
-        {activePoint ? (
-          <>
+          {[0.25, 0.75].map((position) => (
             <line
-              className="sim-chart-cursor"
-              x1={activePoint.x}
-              x2={activePoint.x}
-              y1={padding / 2}
-              y2={height - padding}
+              className="sim-chart-grid"
+              key={position}
+              x1={padding}
+              x2={width - padding}
+              y1={height * position}
+              y2={height * position}
             />
-            <circle
-              className="sim-chart-active-point"
-              cx={activePoint.x}
-              cy={activePoint.y}
-              r={4}
-            />
-          </>
+          ))}
+          <polyline
+            className="sim-chart-line"
+            fill="none"
+            points={plottedPoints.map((point) => `${point.x},${point.y}`).join(" ")}
+          />
+          {activePoint ? (
+            <>
+              <line
+                className="sim-chart-cursor"
+                x1={activePoint.x}
+                x2={activePoint.x}
+                y1={padding / 2}
+                y2={height - padding}
+              />
+              <circle
+                className="sim-chart-active-point"
+                cx={activePoint.x}
+                cy={activePoint.y}
+                r={4}
+              />
+            </>
+          ) : null}
+          <text x={2} y={height / 2 - 5}>
+            0
+          </text>
+          <text x={padding} y={height - 4}>
+            {formatTime(visibleDomain.from)}
+          </text>
+          <text textAnchor="end" x={width - padding} y={height - 4}>
+            {formatTime(visibleDomain.until)}
+          </text>
+        </svg>
+        {activePoint ? (
+          <output
+            className="sim-chart-tooltip"
+            data-align={activePoint.x > width * 0.68 ? "right" : "center"}
+            style={{ left: `${(activePoint.x / width) * 100}%` }}
+          >
+            <strong>Fluggruppe {activePoint.communicationNumber}</strong>
+            <dl>
+              <div>
+                <dt>Snapshot</dt>
+                <dd>{formatTime(activePoint.capturedAt)}</dd>
+              </div>
+              <div>
+                <dt>Boarding-Prognose</dt>
+                <dd>{formatTime(activePoint.predictedBoardingAt)}</dd>
+              </div>
+              <div>
+                <dt>Boarding (Ist)</dt>
+                <dd>{formatTime(activePoint.at)}</dd>
+              </div>
+              <div>
+                <dt>Fehler</dt>
+                <dd>
+                  {activePoint.error > 0 ? "+" : ""}
+                  {metric(activePoint.error, " Min.")}
+                </dd>
+              </div>
+            </dl>
+          </output>
         ) : null}
-        <text x={2} y={height / 2 - 5}>
-          0
-        </text>
-        <text x={padding} y={height - 4}>
-          {formatTime(minAt)}
-        </text>
-        <text textAnchor="end" x={width - padding} y={height - 4}>
-          {formatTime(maxAt)}
-        </text>
-      </svg>
-      {activePoint ? (
-        <output
-          className="sim-chart-tooltip"
-          data-align={activePoint.x > width * 0.68 ? "right" : "center"}
-          style={{ left: `${(activePoint.x / width) * 100}%` }}
-        >
-          <strong>Fluggruppe {activePoint.communicationNumber}</strong>
-          <dl>
-            <div>
-              <dt>Snapshot</dt>
-              <dd>{formatTime(activePoint.capturedAt)}</dd>
-            </div>
-            <div>
-              <dt>Boarding-Prognose</dt>
-              <dd>{formatTime(activePoint.predictedBoardingAt)}</dd>
-            </div>
-            <div>
-              <dt>Boarding (Ist)</dt>
-              <dd>{formatTime(activePoint.at)}</dd>
-            </div>
-            <div>
-              <dt>Fehler</dt>
-              <dd>
-                {activePoint.error > 0 ? "+" : ""}
-                {metric(activePoint.error, " Min.")}
-              </dd>
-            </div>
-          </dl>
-        </output>
-      ) : null}
+      </div>
     </div>
   );
 }
@@ -893,7 +934,11 @@ export function ForecastSimulationView() {
                 <strong>Prognosefehler über den Tagesverlauf</strong>
                 <span>Boarding · Fehler in Minuten · Werte mit Maus anzeigen</span>
               </header>
-              <ErrorChart rotations={visibleRotations} snapshots={visibleSnapshots} />
+              <ErrorChart
+                resetKey={result}
+                rotations={visibleRotations}
+                snapshots={visibleSnapshots}
+              />
             </div>
             <div className="sim-metrics-grid">
               <MetricCard
