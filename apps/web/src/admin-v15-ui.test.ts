@@ -136,9 +136,10 @@ describe("V1.5 administration UI", () => {
     expect(chartSource).toContain("<ComposedChart");
     expect(chartSource).toContain("strokeWidth={1.75}");
     expect(chartSource).toContain('type="stepAfter"');
-    expect(chartSource).toContain("<Tooltip");
+    expect(chartSource).not.toContain("<Tooltip");
+    expect(chartSource).toContain("timeAtRatio(visibleDomain, ratio)");
+    expect(chartSource).toContain("onMouseDownCapture={preventChartFocus}");
     expect(chartSource).toContain("isAnimationActive={false}");
-    expect(chartSource).toContain("cursor={false}");
     expect(chartSource).toContain("activeDot={false}");
     expect(chartSource).toContain("accessibilityLayer={false}");
     expect(chartSource).toContain("<ReferenceLine");

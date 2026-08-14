@@ -64,4 +64,59 @@ describe("admin event flow chart", () => {
       viewport.querySelector(".recharts-surface")?.getAttribute("tabindex") ?? null,
     ).toBeNull();
   });
+
+  it("positions its tooltip from the cursor instead of snapping to flow buckets", () => {
+    render(
+      <AdminEventFlowChart
+        averageWaitMinutes={18}
+        error={null}
+        flow={flow}
+        loading={false}
+        timeZone="UTC"
+      />,
+    );
+    const viewport = screen.getByRole("img", { name: /Ticketverlauf/ });
+    Object.defineProperties(viewport, {
+      clientWidth: { configurable: true, value: 800 },
+      getBoundingClientRect: {
+        configurable: true,
+        value: () => ({ left: 100, top: 50, right: 900, width: 800 }),
+      },
+    });
+
+    fireEvent.pointerMove(viewport, { buttons: 0, clientX: 315.5, clientY: 150 });
+    expect(screen.getByText("11:00 Uhr")).not.toBeNull();
+    expect(screen.getByText("Verkauft: 0")).not.toBeNull();
+    expect(document.querySelector<HTMLElement>(".admin-flow-tooltip-position")?.style.left).toBe(
+      "215.5px",
+    );
+
+    fireEvent.pointerMove(viewport, { buttons: 0, clientX: 694.5, clientY: 150 });
+    expect(screen.getByText("17:00 Uhr")).not.toBeNull();
+    expect(screen.getByText("Verkauft: 30")).not.toBeNull();
+    expect(document.querySelector<HTMLElement>(".admin-flow-tooltip-position")?.style.left).toBe(
+      "594.5px",
+    );
+
+    fireEvent.pointerLeave(viewport);
+    expect(screen.queryByText("17:00 Uhr")).toBeNull();
+  });
+
+  it("prevents mouse focus on the Recharts drawing surface", () => {
+    render(
+      <AdminEventFlowChart
+        averageWaitMinutes={18}
+        error={null}
+        flow={flow}
+        loading={false}
+        timeZone="UTC"
+      />,
+    );
+    const viewport = screen.getByRole("img", { name: /Ticketverlauf/ });
+    const mouseDown = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+
+    viewport.dispatchEvent(mouseDown);
+
+    expect(mouseDown.defaultPrevented).toBe(true);
+  });
 });

@@ -1,5 +1,11 @@
 import type { AdminEventFlow } from "@rundflug/contracts";
-import { useMemo } from "react";
+import {
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useMemo,
+  useState,
+} from "react";
 import {
   Area,
   CartesianGrid,
@@ -7,15 +13,27 @@ import {
   Line,
   ReferenceLine,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
 import {
+  timeAtRatio,
   timeDiagramAxisTickValues,
   useTimeDiagramViewport,
 } from "../../shared/time-diagram-viewport";
+
+const ADMIN_FLOW_CHART_INSETS = { left: 26, right: 16 } as const;
+const MINUTE_MS = 60_000;
+
+type FlowChartPoint = AdminEventFlow["points"][number] & { time: number };
+
+interface FlowHoverState {
+  at: number;
+  left: number;
+  point: FlowChartPoint;
+  top: number;
+}
 
 function hourLabel(value: string | number, timeZone: string): string {
   return new Intl.DateTimeFormat("de-DE", {
@@ -26,26 +44,31 @@ function hourLabel(value: string | number, timeZone: string): string {
 }
 
 function FlowTooltip({
-  active,
-  label,
-  payload,
+  at,
+  point,
   timeZone,
 }: Readonly<{
-  active?: boolean;
-  label?: number;
-  payload?: ReadonlyArray<{ dataKey?: unknown; value?: unknown }>;
+  at: number;
+  point: FlowChartPoint;
   timeZone: string;
 }>) {
-  if (!active || label === undefined || !payload?.length) return null;
-  const values = new Map(payload.map((entry) => [String(entry.dataKey), Number(entry.value ?? 0)]));
   return (
-    <div className="admin-flow-tooltip">
-      <strong>{hourLabel(label, timeZone)} Uhr</strong>
-      <span>Verkauft: {values.get("soldTickets") ?? 0}</span>
-      <span>Abgeschlossen: {values.get("completedTickets") ?? 0}</span>
-      <span>Offen: {values.get("openTickets") ?? 0}</span>
+    <div aria-hidden="true" className="admin-flow-tooltip">
+      <strong>{hourLabel(at, timeZone)} Uhr</strong>
+      <span>Verkauft: {point.soldTickets}</span>
+      <span>Abgeschlossen: {point.completedTickets}</span>
+      <span>Offen: {point.openTickets}</span>
     </div>
   );
+}
+
+function flowPointAtTime(chartData: readonly FlowChartPoint[], at: number): FlowChartPoint | null {
+  let matchingPoint = chartData[0] ?? null;
+  for (const point of chartData) {
+    if (point.time > at) break;
+    matchingPoint = point;
+  }
+  return matchingPoint;
 }
 
 export function AdminEventFlowChart({
@@ -69,6 +92,7 @@ export function AdminEventFlowChart({
       })) ?? [],
     [flow],
   );
+  const [hover, setHover] = useState<FlowHoverState | null>(null);
   const from = flow ? Date.parse(flow.from) : 0;
   const plannedUntil = flow ? Date.parse(flow.plannedUntil) : 1;
   const observedUntil = flow ? Date.parse(flow.observedUntil) : 0;
@@ -88,9 +112,73 @@ export function AdminEventFlowChart({
     zoomLevels,
   } = useTimeDiagramViewport({
     domain: { from, until: plannedUntil },
-    insets: { left: 26, right: 16 },
+    insets: ADMIN_FLOW_CHART_INSETS,
     resetKey: flow ? `${flow.eventId}:${flow.from}:${flow.plannedUntil}` : "empty",
   });
+
+  const updateHover = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.buttons !== 0) {
+        setHover(null);
+        return;
+      }
+      const viewport = event.currentTarget;
+      const bounds = viewport.getBoundingClientRect();
+      const plotWidth = Math.max(
+        1,
+        viewport.clientWidth - ADMIN_FLOW_CHART_INSETS.left - ADMIN_FLOW_CHART_INSETS.right,
+      );
+      const ratio = Math.min(
+        1,
+        Math.max(0, (event.clientX - bounds.left - ADMIN_FLOW_CHART_INSETS.left) / plotWidth),
+      );
+      const pointerTime = timeAtRatio(visibleDomain, ratio);
+      const at = Math.min(
+        visibleDomain.until,
+        Math.max(visibleDomain.from, Math.round(pointerTime / MINUTE_MS) * MINUTE_MS),
+      );
+      const point = flowPointAtTime(chartData, at);
+      if (!point) {
+        setHover(null);
+        return;
+      }
+      setHover({
+        at,
+        left: ADMIN_FLOW_CHART_INSETS.left + ratio * plotWidth,
+        point,
+        top: Math.min(108, Math.max(8, event.clientY - bounds.top - 46)),
+      });
+    },
+    [chartData, visibleDomain],
+  );
+
+  const handlePointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      onPointerMove(event);
+      updateHover(event);
+    },
+    [onPointerMove, updateHover],
+  );
+
+  const handlePointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      setHover(null);
+      onPointerDown(event);
+    },
+    [onPointerDown],
+  );
+
+  const handlePointerUp = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      onPointerUp(event);
+      if (!dragging) updateHover(event);
+    },
+    [dragging, onPointerUp, updateHover],
+  );
+
+  const preventChartFocus = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+  }, []);
 
   if (loading) {
     return (
@@ -169,10 +257,13 @@ export function AdminEventFlowChart({
         aria-label={`Ticketverlauf: ${finalPoint?.soldTickets ?? 0} verkauft, ${finalPoint?.completedTickets ?? 0} abgeschlossen, ${finalPoint?.openTickets ?? 0} offen.`}
         className={`admin-flow-chart time-diagram-viewport${zoom > 1 ? " is-pannable" : ""}${dragging ? " is-dragging" : ""}`}
         onClickCapture={onClickCapture}
+        onMouseDownCapture={preventChartFocus}
         onPointerCancel={onPointerCancel}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
+        onPointerDown={handlePointerDown}
+        onPointerLeave={() => setHover(null)}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onWheelCapture={() => setHover(null)}
         ref={setViewportRef}
         role="img"
       >
@@ -198,11 +289,6 @@ export function AdminEventFlowChart({
               type="number"
             />
             <YAxis allowDecimals={false} domain={[0, "dataMax + 1"]} width={38} />
-            <Tooltip
-              content={<FlowTooltip timeZone={timeZone} />}
-              cursor={false}
-              isAnimationActive={false}
-            />
             <Area
               activeDot={false}
               dataKey="completedTickets"
@@ -252,6 +338,15 @@ export function AdminEventFlowChart({
             ) : null}
           </ComposedChart>
         </ResponsiveContainer>
+        {hover ? (
+          <div
+            className="admin-flow-tooltip-position"
+            data-edge={hover.left > Math.max(1, viewportWidth) - 150 ? "right" : "default"}
+            style={{ left: hover.left, top: hover.top }}
+          >
+            <FlowTooltip at={hover.at} point={hover.point} timeZone={timeZone} />
+          </div>
+        ) : null}
       </div>
     </section>
   );

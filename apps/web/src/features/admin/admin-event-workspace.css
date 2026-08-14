@@ -70,11 +70,18 @@
 }
 
 .admin-flow-chart {
+  position: relative;
   height: 210px;
   width: 100%;
   min-height: 0;
   margin-top: 2px;
   overflow: hidden;
+}
+
+.admin-flow-chart :is(.recharts-wrapper, .recharts-surface):focus,
+.admin-flow-chart :is(.recharts-wrapper, .recharts-surface):focus-visible {
+  outline: 0;
+  box-shadow: none;
 }
 
 .admin-flow-panel > .time-diagram-zoom {
@@ -140,6 +147,17 @@
   box-shadow: var(--shadow-md);
   color: var(--ui-text);
   font-size: 0.72rem;
+}
+
+.admin-flow-tooltip-position {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  transform: translateX(10px);
+}
+
+.admin-flow-tooltip-position[data-edge="right"] {
+  transform: translateX(calc(-100% - 10px));
 }
 
 .admin-flow-tooltip strong {
