@@ -80,7 +80,7 @@ describe("admin event flow chart", () => {
       clientWidth: { configurable: true, value: 800 },
       getBoundingClientRect: {
         configurable: true,
-        value: () => ({ left: 100, top: 50, right: 900, width: 800 }),
+        value: () => ({ height: 210, left: 100, top: 50, right: 900, width: 800 }),
       },
     });
 
@@ -90,12 +90,20 @@ describe("admin event flow chart", () => {
     expect(document.querySelector<HTMLElement>(".admin-flow-tooltip-position")?.style.left).toBe(
       "215.5px",
     );
+    expect(document.querySelector<HTMLElement>(".admin-flow-tooltip-position")?.style.top).toBe(
+      "116px",
+    );
 
     fireEvent.pointerMove(viewport, { buttons: 0, clientX: 694.5, clientY: 150 });
     expect(screen.getByText("17:00 Uhr")).not.toBeNull();
     expect(screen.getByText("Verkauft: 30")).not.toBeNull();
     expect(document.querySelector<HTMLElement>(".admin-flow-tooltip-position")?.style.left).toBe(
       "594.5px",
+    );
+
+    fireEvent.pointerMove(viewport, { buttons: 0, clientX: 694.5, clientY: 240 });
+    expect(document.querySelector<HTMLElement>(".admin-flow-tooltip-position")?.style.top).toBe(
+      "80px",
     );
 
     fireEvent.pointerLeave(viewport);

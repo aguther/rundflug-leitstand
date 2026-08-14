@@ -11,6 +11,7 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
+  ReferenceDot,
   ReferenceLine,
   ResponsiveContainer,
   XAxis,
@@ -25,6 +26,8 @@ import {
 
 const ADMIN_FLOW_CHART_INSETS = { left: 26, right: 16 } as const;
 const MINUTE_MS = 60_000;
+const TOOLTIP_GAP_PX = 16;
+const TOOLTIP_HEIGHT_PX = 94;
 
 type FlowChartPoint = AdminEventFlow["points"][number] & { time: number };
 
@@ -142,11 +145,16 @@ export function AdminEventFlowChart({
         setHover(null);
         return;
       }
+      const pointerTop = event.clientY - bounds.top;
+      const chartHeight = Math.max(1, bounds.height || viewport.clientHeight);
+      const tooltipFitsBelow = pointerTop + TOOLTIP_GAP_PX + TOOLTIP_HEIGHT_PX <= chartHeight;
       setHover({
         at,
         left: ADMIN_FLOW_CHART_INSETS.left + ratio * plotWidth,
         point,
-        top: Math.min(108, Math.max(8, event.clientY - bounds.top - 46)),
+        top: tooltipFitsBelow
+          ? pointerTop + TOOLTIP_GAP_PX
+          : Math.max(8, pointerTop - TOOLTIP_GAP_PX - TOOLTIP_HEIGHT_PX),
       });
     },
     [chartData, visibleDomain],
@@ -328,6 +336,30 @@ export function AdminEventFlowChart({
               strokeWidth={1.75}
               type="stepAfter"
             />
+            {hover ? (
+              <>
+                <ReferenceDot
+                  className="admin-flow-hover-dot sold"
+                  fill="var(--ui-surface-raised)"
+                  ifOverflow="visible"
+                  r={4.5}
+                  stroke="var(--ui-accent)"
+                  strokeWidth={2}
+                  x={hover.at}
+                  y={hover.point.soldTickets}
+                />
+                <ReferenceDot
+                  className="admin-flow-hover-dot completed"
+                  fill="var(--ui-surface-raised)"
+                  ifOverflow="visible"
+                  r={3.5}
+                  stroke="var(--ui-success)"
+                  strokeWidth={2}
+                  x={hover.at}
+                  y={hover.point.completedTickets}
+                />
+              </>
+            ) : null}
             {observedUntil >= visibleDomain.from && observedUntil <= visibleDomain.until ? (
               <ReferenceLine
                 className="admin-flow-now-line"

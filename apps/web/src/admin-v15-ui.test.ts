@@ -139,6 +139,9 @@ describe("V1.5 administration UI", () => {
     expect(chartSource).not.toContain("<Tooltip");
     expect(chartSource).toContain("timeAtRatio(visibleDomain, ratio)");
     expect(chartSource).toContain("onMouseDownCapture={preventChartFocus}");
+    expect(chartSource.match(/<ReferenceDot/g)).toHaveLength(2);
+    expect(chartSource).toContain('className="admin-flow-hover-dot sold"');
+    expect(chartSource).toContain('className="admin-flow-hover-dot completed"');
     expect(chartSource).toContain("isAnimationActive={false}");
     expect(chartSource).toContain("activeDot={false}");
     expect(chartSource).toContain("accessibilityLayer={false}");

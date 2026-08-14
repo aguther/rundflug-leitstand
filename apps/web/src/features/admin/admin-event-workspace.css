@@ -153,11 +153,11 @@
   position: absolute;
   z-index: 2;
   pointer-events: none;
-  transform: translateX(10px);
+  transform: translateX(16px);
 }
 
 .admin-flow-tooltip-position[data-edge="right"] {
-  transform: translateX(calc(-100% - 10px));
+  transform: translateX(calc(-100% - 16px));
 }
 
 .admin-flow-tooltip strong {
