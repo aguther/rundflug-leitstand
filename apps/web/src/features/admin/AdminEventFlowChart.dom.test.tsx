@@ -60,5 +60,8 @@ describe("admin event flow chart", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Gesamten Zeitverlauf anzeigen" }));
     expect(screen.getByText("100 %")).not.toBeNull();
+    expect(
+      viewport.querySelector(".recharts-surface")?.getAttribute("tabindex") ?? null,
+    ).toBeNull();
   });
 });

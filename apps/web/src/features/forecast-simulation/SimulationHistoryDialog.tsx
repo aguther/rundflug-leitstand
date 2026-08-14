@@ -4,6 +4,7 @@ import { Button, ModalDialog } from "../../design-system/components";
 import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
 import {
   clipTimeInterval,
+  timeDiagramAxisTickValues,
   timeToPercent,
   useTimeDiagramViewport,
 } from "../../shared/time-diagram-viewport";
@@ -408,6 +409,7 @@ function AircraftTimeline({
     onPointerUp,
     reset,
     setViewportRef,
+    viewportWidth,
     visibleDomain,
     zoom,
     zoomLevels,
@@ -416,6 +418,10 @@ function AircraftTimeline({
     resetKey: aircraft.id,
   });
   const position = (at: number) => Math.max(0, Math.min(100, timeToPercent(at, visibleDomain)));
+  const ticks = timeDiagramAxisTickValues({
+    domain: visibleDomain,
+    pixelWidth: Math.max(320, viewportWidth || 720),
+  });
   return (
     <>
       <TimeDiagramZoomControls
@@ -435,15 +441,11 @@ function AircraftTimeline({
         ref={setViewportRef}
       >
         <div className="sim-aircraft-history-scale">
-          {Array.from({ length: 9 }, (_, index) => {
-            const at =
-              visibleDomain.from + ((visibleDomain.until - visibleDomain.from) / 8) * index;
-            return (
-              <time key={at} style={{ left: `${(index / 8) * 100}%` }}>
-                {formatTime(at)}
-              </time>
-            );
-          })}
+          {ticks.map((at) => (
+            <time key={at} style={{ left: `${position(at)}%` }}>
+              {formatTime(at)}
+            </time>
+          ))}
         </div>
         <div className="sim-aircraft-history-track">
           {rotations.map((rotation) => {

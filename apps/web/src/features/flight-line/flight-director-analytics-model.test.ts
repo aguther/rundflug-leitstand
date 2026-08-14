@@ -30,7 +30,8 @@ describe("flight director analytics model", () => {
     expect(tickStepMinutes(timeAxis(12, 8))).toBe(10);
   });
 
-  it("uses five-minute ticks for a short span in a wide viewport", () => {
+  it("uses minute ticks for a maximally zoomed short span in a wide viewport", () => {
+    expect(tickStepMinutes(timeAxis(0.25, 1, 1_600))).toBe(1);
     expect(tickStepMinutes(timeAxis(1, 1, 1_600))).toBe(5);
     expect(tickStepMinutes(timeAxis(4, 8, 720))).toBe(5);
   });
@@ -39,7 +40,7 @@ describe("flight director analytics model", () => {
     expect(tickStepMinutes(timeAxis(24, 1, 480))).toBe(360);
   });
 
-  it("never creates finer ticks than five minutes", () => {
+  it("never creates finer ticks than one minute", () => {
     const ticks = timeAxis(0.5, 8, 1_600);
     const intervals = ticks.slice(1).map((tick, index) => {
       const previous = ticks[index];
@@ -61,7 +62,7 @@ describe("flight director analytics model", () => {
       ticks.every((tick, index) => index === 0 || tick.value > (ticks[index - 1]?.value ?? 0)),
     ).toBe(true);
     expect(ticks[0]?.label).toBe("10:05");
-    expect(ticks.every((tick) => Number(tick.label.slice(3)) % 5 === 0)).toBe(true);
+    expect(ticks.every((tick) => tick.value % 60_000 === 0)).toBe(true);
   });
 
   it("formats labels in the event time zone and preserves the assumed label spacing", () => {

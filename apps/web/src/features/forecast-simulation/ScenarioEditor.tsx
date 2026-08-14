@@ -11,7 +11,8 @@ import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "../../event-t
 import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
 import {
   clipTimeInterval,
-  timeAtRatio,
+  timeDiagramAxisTickValues,
+  timeToPercent,
   useTimeDiagramViewport,
 } from "../../shared/time-diagram-viewport";
 import {
@@ -351,7 +352,10 @@ function DemandProfileChart({
   const operationsAt = Date.parse(config.schedule.operationsStartAt);
   const showOperationsMarker =
     operationsAt >= visibleDomain.from && operationsAt <= visibleDomain.until;
-  const ticks = [0, 0.25, 0.5, 0.75, 1];
+  const ticks = timeDiagramAxisTickValues({
+    domain: visibleDomain,
+    pixelWidth: chartWidth,
+  });
 
   return (
     <div className="sim-demand-chart-stack">
@@ -440,11 +444,18 @@ function DemandProfileChart({
               </text>
             </g>
           ) : null}
-          {ticks.map((ratio) => {
-            const at = timeAtRatio(visibleDomain, ratio);
+          {ticks.map((at, index) => {
             const offset = Math.round((at - salesFrom) / MINUTE_MS);
+            const ratio = timeToPercent(at, visibleDomain) / 100;
             return (
-              <text key={ratio} textAnchor={tickTextAnchor(ratio)} x={xAt(at)} y={height - 7}>
+              <text
+                key={at}
+                textAnchor={tickTextAnchor(
+                  index === 0 ? 0 : index === ticks.length - 1 ? 1 : ratio,
+                )}
+                x={xAt(at)}
+                y={height - 7}
+              >
                 {timeAtDemandOffset(config, offset)}
               </text>
             );

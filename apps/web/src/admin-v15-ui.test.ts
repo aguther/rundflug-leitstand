@@ -137,6 +137,10 @@ describe("V1.5 administration UI", () => {
     expect(chartSource).toContain("strokeWidth={1.75}");
     expect(chartSource).toContain('type="stepAfter"');
     expect(chartSource).toContain("<Tooltip");
+    expect(chartSource).toContain("isAnimationActive={false}");
+    expect(chartSource).toContain("cursor={false}");
+    expect(chartSource).toContain("activeDot={false}");
+    expect(chartSource).toContain("accessibilityLayer={false}");
     expect(chartSource).toContain("<ReferenceLine");
     expect(chartSource).toContain("soldTickets");
     expect(chartSource).toContain("completedTickets");

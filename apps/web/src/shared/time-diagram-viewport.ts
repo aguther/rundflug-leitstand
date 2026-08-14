@@ -43,6 +43,9 @@ export const DEFAULT_TIME_DIAGRAM_MINIMUM_VISIBLE_SPAN_MS = 15 * MINUTE_MS;
 export const TIME_DIAGRAM_ZOOM_LEVELS = [
   1, 1.5, 2, 3, 4.5, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512,
 ] as const;
+export const TIME_DIAGRAM_AXIS_STEPS_MINUTES = [
+  1, 2, 5, 10, 15, 30, 60, 120, 180, 240, 360, 720, 1_440,
+] as const;
 
 function normalizeDomain(domain: TimeDomain): TimeDomain {
   const from = Number.isFinite(domain.from) ? domain.from : 0;
@@ -56,6 +59,35 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 export function timeDomainSpan(domain: TimeDomain): number {
   return Math.max(1, domain.until - domain.from);
+}
+
+export function timeDiagramAxisTickValues({
+  domain,
+  minimumLabelSpacing = 40,
+  pixelWidth,
+}: {
+  domain: TimeDomain;
+  minimumLabelSpacing?: number;
+  pixelWidth: number;
+}): number[] {
+  const normalizedDomain = normalizeDomain(domain);
+  if (!Number.isFinite(pixelWidth) || pixelWidth <= 0) return [];
+  const spanMinutes = timeDomainSpan(normalizedDomain) / MINUTE_MS;
+  const requiredStepMinutes = Math.max(
+    1,
+    (spanMinutes * Math.max(1, minimumLabelSpacing)) / pixelWidth,
+  );
+  const largestPredefinedStep = TIME_DIAGRAM_AXIS_STEPS_MINUTES.at(-1) ?? 1_440;
+  const stepMinutes =
+    TIME_DIAGRAM_AXIS_STEPS_MINUTES.find((candidate) => candidate >= requiredStepMinutes) ??
+    Math.ceil(requiredStepMinutes / largestPredefinedStep) * largestPredefinedStep;
+  const stepMs = stepMinutes * MINUTE_MS;
+  const firstTick = Math.ceil(normalizedDomain.from / stepMs) * stepMs;
+  const ticks: number[] = [];
+  for (let value = firstTick; value <= normalizedDomain.until; value += stepMs) {
+    ticks.push(value);
+  }
+  return ticks;
 }
 
 export function timeDiagramZoomLevelsForSpan(

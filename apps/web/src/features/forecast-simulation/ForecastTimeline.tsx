@@ -1,6 +1,9 @@
 import type { KeyboardEvent } from "react";
 import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
-import { useTimeDiagramViewport } from "../../shared/time-diagram-viewport";
+import {
+  timeDiagramAxisTickValues,
+  useTimeDiagramViewport,
+} from "../../shared/time-diagram-viewport";
 
 import {
   forecastUncertaintyLabel,
@@ -283,6 +286,7 @@ export function ForecastTimeline({
     onPointerUp,
     reset,
     setViewportRef,
+    viewportWidth,
     visibleDomain,
     zoom,
     zoomLevels,
@@ -294,11 +298,10 @@ export function ForecastTimeline({
   });
   const viewStart = visibleDomain.from;
   const viewEnd = visibleDomain.until;
-  const tickCount = 6;
-  const ticks = Array.from(
-    { length: tickCount + 1 },
-    (_, index) => viewStart + ((viewEnd - viewStart) * index) / tickCount,
-  );
+  const ticks = timeDiagramAxisTickValues({
+    domain: visibleDomain,
+    pixelWidth: Math.max(320, viewportWidth || 720) - 112,
+  });
   const visibleRotations = result.rotations.filter((rotation) => {
     if (!rotation.calledAt || !rotation.completedAt) return false;
     return Date.parse(rotation.calledAt) < viewEnd && Date.parse(rotation.completedAt) > viewStart;

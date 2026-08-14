@@ -12,7 +12,10 @@ import {
   YAxis,
 } from "recharts";
 import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
-import { useTimeDiagramViewport } from "../../shared/time-diagram-viewport";
+import {
+  timeDiagramAxisTickValues,
+  useTimeDiagramViewport,
+} from "../../shared/time-diagram-viewport";
 
 function hourLabel(value: string | number, timeZone: string): string {
   return new Intl.DateTimeFormat("de-DE", {
@@ -79,6 +82,7 @@ export function AdminEventFlowChart({
     onPointerUp,
     reset,
     setViewportRef,
+    viewportWidth,
     visibleDomain,
     zoom,
     zoomLevels,
@@ -125,10 +129,10 @@ export function AdminEventFlowChart({
       value: averageWaitMinutes === null ? "–" : `${Math.round(averageWaitMinutes)} Min.`,
     },
   ];
-  const timeTicks = Array.from(
-    { length: 9 },
-    (_, index) => visibleDomain.from + ((visibleDomain.until - visibleDomain.from) * index) / 8,
-  );
+  const timeTicks = timeDiagramAxisTickValues({
+    domain: visibleDomain,
+    pixelWidth: Math.max(320, viewportWidth || 720) - 42,
+  });
 
   return (
     <section className="admin-flow-panel">
@@ -174,7 +178,7 @@ export function AdminEventFlowChart({
       >
         <ResponsiveContainer height="100%" width="100%">
           <ComposedChart
-            accessibilityLayer
+            accessibilityLayer={false}
             data={chartData}
             margin={{ top: 12, right: 16, bottom: 2, left: -12 }}
           >
@@ -187,7 +191,7 @@ export function AdminEventFlowChart({
               allowDataOverflow
               dataKey="time"
               domain={[visibleDomain.from, visibleDomain.until]}
-              minTickGap={48}
+              minTickGap={32}
               scale="time"
               tickFormatter={(value: number) => hourLabel(value, timeZone)}
               ticks={timeTicks}
@@ -196,9 +200,11 @@ export function AdminEventFlowChart({
             <YAxis allowDecimals={false} domain={[0, "dataMax + 1"]} width={38} />
             <Tooltip
               content={<FlowTooltip timeZone={timeZone} />}
-              cursor={{ stroke: "var(--ui-border-strong)", strokeDasharray: "3 4" }}
+              cursor={false}
+              isAnimationActive={false}
             />
             <Area
+              activeDot={false}
               dataKey="completedTickets"
               fill="transparent"
               isAnimationActive={false}
@@ -207,6 +213,7 @@ export function AdminEventFlowChart({
               type="stepAfter"
             />
             <Area
+              activeDot={false}
               className="admin-flow-open-area"
               dataKey="openTickets"
               fill="var(--admin-flow-open-fill)"
@@ -217,6 +224,7 @@ export function AdminEventFlowChart({
             />
             <Line
               className="admin-flow-line sold"
+              activeDot={false}
               dataKey="soldTickets"
               dot={false}
               isAnimationActive={false}
@@ -226,6 +234,7 @@ export function AdminEventFlowChart({
             />
             <Line
               className="admin-flow-line completed"
+              activeDot={false}
               dataKey="completedTickets"
               dot={false}
               isAnimationActive={false}

@@ -2,7 +2,7 @@ import type { ForecastHistory, OperationBoard, ResourceDayHistory } from "@rundf
 import { formatBookingGroupLabel } from "@rundflug/domain";
 
 const MINUTE_MS = 60_000;
-export const TIME_AXIS_STEPS_MINUTES = [5, 10, 15, 30, 60, 120, 180, 360, 720] as const;
+export const TIME_AXIS_STEPS_MINUTES = [1, 2, 5, 10, 15, 30, 60, 120, 180, 360, 720] as const;
 
 export type ForecastEntry = ForecastHistory["entries"][number];
 type Rotation = OperationBoard["rotations"][number];
@@ -109,10 +109,10 @@ export function calculateTimeAxisTicks({
     TIME_AXIS_STEPS_MINUTES.find((candidate) => candidate >= requiredStepMinutes) ??
     TIME_AXIS_STEPS_MINUTES.at(-1) ??
     720;
-  const scanFrom = Math.ceil(from / (5 * MINUTE_MS)) * 5 * MINUTE_MS;
+  const scanFrom = Math.ceil(from / MINUTE_MS) * MINUTE_MS;
   const ticks: TimeAxisTick[] = [];
 
-  for (let value = scanFrom; value <= until; value += 5 * MINUTE_MS) {
+  for (let value = scanFrom; value <= until; value += MINUTE_MS) {
     const local = localMinutesAndSeconds(value, timeZone);
     if (local.seconds !== 0 || local.minutes % stepMinutes !== 0) continue;
     if (ticks.at(-1)?.value === value) continue;

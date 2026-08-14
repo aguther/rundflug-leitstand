@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_TIME_DIAGRAM_MINIMUM_VISIBLE_SPAN_MS,
   timeAtRatio,
+  timeDiagramAxisTickValues,
   timeDiagramZoomLevelsForSpan,
   useTimeDiagramViewport,
   zoomTimeDomain,
@@ -93,6 +94,18 @@ describe("time diagram viewport", () => {
       );
     },
   );
+
+  it("resolves a maximally zoomed time axis to whole minutes, but never seconds", () => {
+    const from = Date.parse("2026-07-24T08:00:20.000Z");
+    const ticks = timeDiagramAxisTickValues({
+      domain: { from, until: from + 15 * 60_000 },
+      pixelWidth: 720,
+    });
+
+    expect(ticks.length).toBeGreaterThan(10);
+    expect(ticks.every((tick) => tick % 60_000 === 0)).toBe(true);
+    expect(ticks.slice(1).every((tick, index) => tick - (ticks[index] ?? 0) === 60_000)).toBe(true);
+  });
 
   it.each([0.2, 0.5, 0.8])("keeps the time at ratio %s stable while zooming", (ratio) => {
     const currentDomain = { from: 2 * HOUR_MS, until: 10 * HOUR_MS };
