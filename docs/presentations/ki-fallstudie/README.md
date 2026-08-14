@@ -4,7 +4,7 @@ Dieser Ordner bewahrt die Präsentation zur Entstehung des Rundflug-Leitstands u
 
 ## Inhalt
 
-- `rundflug-leitstand-ki-fallstudie.pptx`: 29 Folien zur Entstehungsgeschichte, zum Produkt, zu UX/UI-Freigaben, Tests, SonarQube, ADRs, arc42, paralleler KI-Arbeit, Aufwand und Frustmomenten.
+- `rundflug-leitstand-ki-fallstudie.pptx`: 35 vollständig neu gestaltete Folien. Die Dramaturgie führt vom realen Produkt und Gast-Erlebnis über Entstehung, UX-Freigaben, Architektur, ADRs und parallele KI-Arbeit bis zu Teststrategie, SonarQube-Bereinigung, Aufwand, Frustmomenten und Grenzen.
 - `assets/live/`: reale Screenshots der aktuellen Dark-Theme-Oberflächen, der Gast-PWA und der iOS-Push-Nachrichten.
 - `assets/simulator/`: Screenshots des Simulators und seiner Auswertungen mit synthetischen Daten.
 - `assets/sonarqube/`: SonarQube-Nachweise zum Weg von 778 bewerteten Findings zu null offenen Issues und einem bestandenen Quality Gate.
