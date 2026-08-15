@@ -6,11 +6,12 @@ Dieser Ordner enthält die druckfertige Präsentation zur Entstehung des Rundflu
 
 - `index.html` und `styles.css`: editierbare Präsentationsquelle im Format 16:9.
 - `render.cjs`: lokaler PDF-Renderer mit Bild-, Mermaid-, Folienzahl- und Layoutprüfung.
-- `rundflug-leitstand-ki-fallstudie.pdf`: finale Ausgabe mit 22 Hauptfolien und 18 vertiefenden Anhangsfolien.
-- `assets/live/`: reale Screenshots der aktuellen Dark-Theme-Oberflächen, der Gast-PWA und der iOS-Push-Nachrichten.
+- `rundflug-leitstand-ki-fallstudie.pdf`: finale Ausgabe mit 23 Hauptfolien und 18 vertiefenden Anhangsfolien.
+- `assets/live/`: reale Screenshots der aktuellen Dark-Theme-Oberflächen, der mobilen Flight Line, der Gast-PWA und der iOS-Push-Nachrichten.
 - `assets/simulator/`: Screenshots des Simulators und seiner Auswertungen mit synthetischen Daten.
 - `assets/sonarqube/`: SonarQube-Nachweise zum Weg von 778 bewerteten Findings zu null offenen Issues und einem bestandenen Quality Gate.
 - `assets/ux/`: fünf historische UX/UI-Stände, die vor dem Entfernen der früheren PowerPoint-Datei als eigenständige Projektnachweise gesichert wurden.
+- `assets/history/`: historische Kontextbilder, darunter das vom Auftraggeber bereitgestellte Festmotiv zum 70-jährigen Flugplatzjubiläum.
 
 ## Dramaturgie
 
@@ -18,8 +19,8 @@ Der rund 30-minütige Hauptteil folgt der Gliederung **Why – How – What**:
 
 - **Why** (Folien 1–4): konkreter Anlass beim Jubiläums-Rundflugbetrieb, operative Engpässe und das Ziel eines gemeinsamen Lagebilds.
 - **How** (Folien 5–12): Vorarbeit vor dem ersten Commit, 34-Tage-Verlauf, Rollenteilung zwischen Mensch und KI, UX-Freigaben, der zweistündige Simulator-Impuls, Live-Debugging, Frustmomente und kontrollierte parallele Integration.
-- **What** (Folien 13–20): Produktkarton, aktuelle Live-Ansichten, QR/PWA/Push, Prognose und Simulator sowie originale arc42-Architektur und Engineering-Evidenz.
-- **Fazit** (Folien 21–22): getrennte Einordnung von Kalenderzeit, menschlichem Aufwand und manueller Vergleichsschätzung sowie eine nüchterne Bilanz.
+- **What** (Folien 13–21): Produktkarton, aktuelle Desktop- und mobile Live-Ansichten, eine eigene FIDS-Folie, QR/PWA/Push, Prognose und Simulator sowie originale arc42-Architektur und Engineering-Evidenz.
+- **Fazit** (Folien 22–23): getrennte Einordnung von Kalenderzeit, menschlichem Aufwand und manueller Vergleichsschätzung sowie eine nüchterne Bilanz.
 - **Anhang** (A1–A18): Quellenmethode, Produkt- und Architekturdetails, originale Mermaid-Diagramme, ADR- und AGENTS-Beispiele, Testinventar, SonarQube-Nachweise und Aufwandsschätzung.
 
 Die Reibungspunkte zitieren reale Prompts aus dem Projektverlauf. Rekonstruierte Beobachtungen – etwa das gemeinsame Live-Debugging eines durch einen Adblocker beeinflussten Mobilproblems – sind ausdrücklich als Projektrückblick markiert. Sie sind bewusst Teil des Hauptteils, weil sie die Grenzen fehlenden Kontexts konkret machen.
@@ -47,7 +48,7 @@ Die Präsentation bindet kanonische Quellen ein, statt sie nochmals abzulegen:
 
 Vier Architektur- und Laufzeitdiagramme werden beim PDF-Build unverändert aus ihren Mermaid-Quellblöcken unter `docs/arc42/` gelesen und gerendert. Dadurch bleiben arc42-Dokumentation und Präsentation inhaltlich identisch, ohne zusätzliche SVG- oder Bildkopien.
 
-Vorhandene Live-, Simulator- und SonarQube-Bilder werden direkt aus ihren bestehenden Ordnern verwendet. Nur die fünf historischen UX/UI-Stände wurden ergänzt, weil sie zuvor ausschließlich in der nun entfernten PowerPoint-Datei eingebettet waren.
+Vorhandene Live-, Simulator- und SonarQube-Bilder werden direkt aus ihren bestehenden Ordnern verwendet. Ergänzt wurden ausschließlich die vom Auftraggeber neu bereitgestellten mobilen Flight-Line-Aufnahmen, das Festmotiv und fünf historische UX/UI-Stände, die zuvor ausschließlich in der nun entfernten PowerPoint-Datei eingebettet waren.
 
 ## Einordnung
 

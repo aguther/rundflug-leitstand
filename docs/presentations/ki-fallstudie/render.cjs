@@ -33,9 +33,9 @@ const canonicalDiagrams = [
 ];
 
 const expectedSlides = {
-  main: 22,
+  main: 23,
   appendix: 18,
-  total: 40,
+  total: 41,
 };
 
 function extractMermaidSource(markdown, heading, file) {
