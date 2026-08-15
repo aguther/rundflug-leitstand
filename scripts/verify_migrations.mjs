@@ -6,10 +6,6 @@ const root = resolve(import.meta.dirname, "..");
 const migrationsDirectory = resolve(root, "apps", "worker", "migrations");
 const readmePath = resolve(migrationsDirectory, "README.md");
 const registerPath = resolve(root, "docs", "operations", "migrations-current.md");
-const allowedDuplicate = new Set([
-  "0036_product_promised_flight_time.sql",
-  "0036_v1_5_stable_operations.sql",
-]);
 
 const files = (await readdir(migrationsDirectory))
   .filter((name) => /^\d{4}_.+\.sql$/.test(name))
@@ -22,14 +18,16 @@ for (const file of files) {
   byNumber.set(number, entries);
 }
 for (const [number, entries] of byNumber) {
-  if (
-    entries.length > 1 &&
-    (number !== "0036" ||
-      entries.length !== allowedDuplicate.size ||
-      entries.some((entry) => !allowedDuplicate.has(entry)))
-  ) {
+  if (entries.length > 1) {
+    throw new Error(`Doppelte Migrationsnummer ${number}: ${entries.join(", ")}`);
+  }
+}
+for (const [index, file] of files.entries()) {
+  const expectedNumber = String(index + 1).padStart(4, "0");
+  const actualNumber = file.slice(0, 4);
+  if (actualNumber !== expectedNumber) {
     throw new Error(
-      `Nicht registrierte doppelte Migrationsnummer ${number}: ${entries.join(", ")}`,
+      `Migrationsfolge ist nicht lückenlos: ${file} verwendet ${actualNumber}, erwartet ist ${expectedNumber}.`,
     );
   }
 }
@@ -54,19 +52,18 @@ for (const file of files) {
 }
 
 const lines = [
-  "# Aktuelles Migrationsregister – Release 1.11.0",
+  "# Aktuelles Migrationsregister – Release 1.12.0",
   "",
   "Diese Datei wird aus `apps/worker/migrations/*.sql` erzeugt. Vollständige Dateinamen sind die",
-  "D1-Identität; angewandte Dateien werden nicht nachträglich umbenannt.",
+  "D1-Identität der neu begonnenen V1.12-Historie; angewandte Dateien werden nicht nachträglich",
+  "umbenannt. Die vorherigen 69 Entwicklungsmigrationen werden nicht unterstützt und bleiben über Git",
+  "nachvollziehbar (ADR-0045).",
   "",
   "| Reihenfolge | Datei | Hinweis |",
   "| ---: | --- | --- |",
-  ...files.map((file, index) => {
-    const note = allowedDuplicate.has(file)
-      ? "historische Doppelnummer 0036, ausdrücklich erlaubt"
-      : "eindeutig";
-    return `| ${index + 1} | \`${file}\` | ${note} |`;
-  }),
+  ...files.map(
+    (file, index) => `| ${index + 1} | \`${file}\` | eindeutig und lückenlos ab \`0001\` |`,
+  ),
   "",
   `Gesamt: ${files.length} Migrationen. Wiederherstellungsnotizen werden gegen SQL und`,
   "`apps/worker/migrations/README.md` geprüft.",

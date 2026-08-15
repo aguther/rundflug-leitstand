@@ -951,7 +951,6 @@
     "apps/worker/src/ticket-group-recall.test.ts -> apps/web/src/features/public-status/PublicStatusContent.tsx",
     "apps/worker/src/ticket-group-recall.test.ts -> apps/web/src/fids-display.tsx",
     "apps/worker/src/ticket-group-recall.test.ts -> apps/worker/src/web-push.ts",
-    "apps/worker/src/ticket-group-recall.test.ts -> packages/domain/src/index.ts",
     "apps/worker/src/web-push.test.ts -> apps/worker/src/web-push.ts"
   ]
 }

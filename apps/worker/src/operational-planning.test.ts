@@ -1,17 +1,34 @@
 import { commandEnvelopeSchema, operationBoardSchema } from "@rundflug/contracts";
 import { describe, expect, it } from "vitest";
-import migration from "../migrations/0046_operational_plans.sql?raw";
-import slowdownMigration from "../migrations/0049_operational_plan_slowdown.sql?raw";
-import recurringMigration from "../migrations/0050_recurring_operational_rules.sql?raw";
+import { createMigratedTestDatabase, type SqliteRow } from "../test-support/migrated-database";
 
 describe("general operational planning", () => {
   it("stores plans separately from confirmed operational blocks", () => {
-    expect(migration).toContain("CREATE TABLE planned_operational_constraints");
-    expect(migration).toContain("status IN ('PLANNED', 'ACTIVE', 'CLEARED', 'CANCELED')");
-    expect(migration).toContain("ALTER TABLE operational_blocks ADD COLUMN planned_operation_id");
-    expect(migration).toContain("ALTER TABLE operation_days ADD COLUMN operations_start_at");
-    expect(slowdownMigration).toContain("ADD COLUMN effect_mode");
-    expect(slowdownMigration).toContain("duration_multiplier_percent BETWEEN 110 AND 300");
+    const database = createMigratedTestDatabase();
+    const tables = database
+      .prepare("SELECT name FROM sqlite_schema WHERE type = 'table'")
+      .all()
+      .map((row: SqliteRow) => String(row.name));
+    const planColumns = database
+      .prepare("PRAGMA table_info(planned_operational_constraints)")
+      .all();
+    const blockColumns = database.prepare("PRAGMA table_info(operational_blocks)").all();
+    const eventColumns = database.prepare("PRAGMA table_info(operation_days)").all();
+
+    expect(tables).toContain("planned_operational_constraints");
+    expect(planColumns).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "effect_mode" }),
+        expect.objectContaining({ name: "duration_multiplier_percent" }),
+      ]),
+    );
+    expect(blockColumns).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "planned_operation_id" })]),
+    );
+    expect(eventColumns).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "operations_start_at" })]),
+    );
+    database.close();
   });
 
   it("accepts approximate windows and rejects inverted durations", () => {
@@ -108,10 +125,23 @@ describe("general operational planning", () => {
   });
 
   it("keeps recurring rules versioned, unique, audited and non-automatic", () => {
-    expect(recurringMigration).toContain("CREATE TABLE recurring_operational_rules");
-    expect(recurringMigration).toContain("idx_recurring_operational_rules_active_target_kind");
-    expect(recurringMigration).toContain("recurring_rule_id");
-    expect(recurringMigration).toContain("recurrence_sequence");
+    const database = createMigratedTestDatabase();
+    const indexes = database.prepare("PRAGMA index_list(recurring_operational_rules)").all();
+    const planColumns = database
+      .prepare("PRAGMA table_info(planned_operational_constraints)")
+      .all();
+
+    expect(indexes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "idx_recurring_operational_rules_active_target_kind" }),
+      ]),
+    );
+    expect(planColumns).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "recurring_rule_id" }),
+        expect.objectContaining({ name: "recurrence_sequence" }),
+      ]),
+    );
 
     const command = {
       commandId: "550e8400-e29b-41d4-a716-446655440401",
@@ -147,5 +177,6 @@ describe("general operational planning", () => {
       }).success,
     ).toBe(false);
     expect(operationBoardSchema.shape.recurringOperationalRules).toBeTruthy();
+    database.close();
   });
 });

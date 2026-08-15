@@ -92,9 +92,9 @@ RELEASE_1_10_REQUIREMENTS = [
     {
         "id": "V1100-MIG-010",
         "section": "Migrationen",
-        "requirement": "SQL-Migrationen besitzen einen automatisch geprüften Registereintrag und eine Wiederherstellungsnotiz. Die historische Doppelnummer 0036 bleibt aus Gründen der angewandten D1-Historie unverändert und ist ausdrücklich registriert.",
-        "module": "apps/worker/migrations scripts/verify_migrations.mjs",
-        "tests": "npm run docs:migrations:check und Backup/Restore",
+        "requirement": "Die unterstützte D1-Historie beginnt inkompatibel mit einer ausführbaren V1.12-Baseline. Künftige SQL-Migrationen sind ab 0002 eindeutig und lückenlos und besitzen einen automatisch geprüften Registereintrag sowie eine Wiederherstellungs- oder Forward-Repair-Notiz.",
+        "module": "apps/worker/migrations/0001_v1_12_baseline.sql scripts/verify_migrations.mjs sowie ADR-0045",
+        "tests": "apps/worker/src/database-baseline.test.ts npm run docs:migrations:check und Backup/Restore",
     },
     {
         "id": "V1100-DEP-010",
@@ -321,7 +321,7 @@ RELEASE_1_11_REQUIREMENTS = [
         "id": "V1110-REC-010",
         "section": "Aktiver Gruppennachruf",
         "requirement": "Ein Nachruf ist ein eigenständig persistierter temporärer Vorgang mit eindeutiger ID, gruppenbezogener Sequenz, Start- und Ablaufzeit sowie optionalem Ende. Pro Buchungsgruppe ist höchstens ein Nachruf aktiv.",
-        "module": "packages/domain/src/ticket-group-recall.ts apps/worker/migrations/0055_ticket_group_recalls.sql sowie ADR-0038",
+        "module": "packages/domain/src/ticket-group-recall.ts apps/worker/migrations/0001_v1_12_baseline.sql sowie ADR-0038 und ADR-0045",
         "tests": "packages/domain/src/ticket-group-recall.test.ts und apps/worker/src/ticket-group-recall.test.ts",
     },
     {
@@ -349,7 +349,7 @@ RELEASE_1_11_REQUIREMENTS = [
         "id": "V1110-PSH-010",
         "section": "Gruppenspezifischer Web-Push",
         "requirement": "Jeder neu gestartete Nachruf erzeugt Web-Push ausschließlich für aktive Ticket- und Gruppenstatus-Abonnements derselben Buchungsgruppe. Die Deduplizierung berücksichtigt die Nachruf-ID, sodass ein späterer Nachruf erneut zugestellt wird.",
-        "module": "apps/worker/src/web-push.ts apps/worker/migrations/0055_ticket_group_recalls.sql sowie ADR-0038",
+        "module": "apps/worker/src/web-push.ts apps/worker/migrations/0001_v1_12_baseline.sql sowie ADR-0038 und ADR-0045",
         "tests": "apps/worker/src/web-push.test.ts und npm run test:ticket-group-recall",
     },
     {
@@ -377,7 +377,7 @@ RELEASE_1_11_REQUIREMENTS = [
         "id": "V1110-MIG-010",
         "section": "Migration und Wiederherstellung",
         "requirement": "Die D1-Migration für Nachrufe und Push-Deduplizierung besitzt eine Wiederherstellungsnotiz; Nachrufdaten sind in Backup, Ereignislöschung und Werksreset vollständig berücksichtigt.",
-        "module": "apps/worker/migrations/0055_ticket_group_recalls.sql apps/worker/src/backup.ts sowie ADR-0038",
+        "module": "apps/worker/migrations/0001_v1_12_baseline.sql apps/worker/src/backup.ts sowie ADR-0038 und ADR-0045",
         "tests": "npm run docs:migrations:check und npm run backup:restore:test",
     },
     {
@@ -418,6 +418,21 @@ def current_terms(value: object) -> str:
     ]
     for old, new in replacements:
         text = text.replace(old, new)
+    text = re.sub(
+        r"apps/worker/migrations/\d{4}_[A-Za-z0-9_.-]+\.sql",
+        "apps/worker/migrations/0001_v1_12_baseline.sql",
+        text,
+    )
+    text = re.sub(
+        r"apps/worker/src/(?:v1-5-stable-operations|privacy-schema-coverage|"
+        r"booking-segment-order|cashier-ticket-attribution|confirmed-dispatch-overtakes|"
+        r"distinct-public-push-migration|event-logo-theme-routes|flight-line-pilot-assignment|"
+        r"gate-display-filter-data-model|manifest-correction-data-model|"
+        r"resource-group-time-model-migration|rotation-data-model|turnaround-overrides|"
+        r"web-push-origin-migration|web-push-target-migration)\.test\.ts",
+        "apps/worker/src/database-baseline.test.ts",
+        text,
+    )
     text = re.sub(r"\bAssist\b", "Flight Line", text)
     return text
 

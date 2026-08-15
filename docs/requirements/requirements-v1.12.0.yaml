@@ -2208,7 +2208,7 @@ requirements:
   - id: V1100-MIG-010
     source: "1.10.0"
     section: "Migrationen"
-    requirement: "SQL-Migrationen besitzen einen automatisch geprüften Registereintrag und eine Wiederherstellungsnotiz. Die historische Doppelnummer 0036 bleibt aus Gründen der angewandten D1-Historie unverändert und ist ausdrücklich registriert."
+    requirement: "Die unterstützte D1-Historie beginnt inkompatibel mit einer ausführbaren V1.12-Baseline. Künftige SQL-Migrationen sind ab 0002 eindeutig und lückenlos und besitzen einen automatisch geprüften Registereintrag sowie eine Wiederherstellungs- oder Forward-Repair-Notiz."
     priority: MUSS
     stage: V1
     status: implemented

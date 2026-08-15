@@ -16,11 +16,9 @@ import outageRecoverySource from "../../../packages/domain/src/outage-recovery.t
 import queueSource from "../../../packages/domain/src/queue.ts?raw";
 import sonarProperties from "../../../sonar-project.properties?raw";
 import webManifestRaw from "../../web/package.json?raw";
-import initialMigration from "../migrations/0001_initial.sql?raw";
-import masterDataMigration from "../migrations/0015_product_and_gate_master_data.sql?raw";
-import multiEventMigration from "../migrations/0017_multi_event_templates.sql?raw";
 import workerManifestRaw from "../package.json?raw";
 import seedSource from "../seed/demo.sql?raw";
+import { createMigratedTestDatabase, type SqliteRow } from "../test-support/migrated-database";
 
 type Manifest = {
   allowScripts?: Record<string, boolean>;
@@ -236,11 +234,21 @@ describe("V1 maintainability and portability boundaries", () => {
   });
 
   it("models the V2-V4 extension seams without embedding them in the domain core", () => {
-    expect(initialMigration).toMatch(/CREATE TABLE resource_groups[\s\S]*CREATE TABLE products/);
-    expect(initialMigration).toMatch(/resource_group_id TEXT NOT NULL REFERENCES resource_groups/);
-    expect(initialMigration).toMatch(/passenger_seats INTEGER NOT NULL/);
-    expect(masterDataMigration).toMatch(/CREATE TABLE gates/);
-    expect(multiEventMigration).toMatch(/ALTER TABLE operation_days ADD COLUMN template_source_id/);
+    const database = createMigratedTestDatabase();
+    const tables = database
+      .prepare("SELECT name FROM sqlite_schema WHERE type = 'table'")
+      .all()
+      .map((row: SqliteRow) => String(row.name));
+    const columnsOf = (table: string) =>
+      database
+        .prepare(`PRAGMA table_info(${JSON.stringify(table)})`)
+        .all()
+        .map((row: SqliteRow) => String(row.name));
+
+    expect(tables).toEqual(expect.arrayContaining(["resource_groups", "products", "gates"]));
+    expect(columnsOf("products")).toContain("resource_group_id");
+    expect(columnsOf("aircraft")).toContain("passenger_seats");
+    expect(columnsOf("operation_days")).toContain("template_source_id");
     expect(seedSource).toContain("'panorama-20', 'demo-2026', 'rg-panorama'");
     expect(seedSource).toContain("'panorama-30', 'demo-2026', 'rg-panorama'");
     expect(interfaceDocumentation).toContain(

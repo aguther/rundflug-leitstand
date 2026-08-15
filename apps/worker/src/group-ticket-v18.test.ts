@@ -2,19 +2,30 @@ import { describe, expect, it } from "vitest";
 import cashier from "../../web/src/cashier-view.tsx?raw";
 import publicStatusContent from "../../web/src/features/public-status/PublicStatusContent.tsx?raw";
 import groupStatus from "../../web/src/group-status-view.tsx?raw";
-import migration from "../migrations/0042_group_status_codes_and_push.sql?raw";
-import targetMigration from "../migrations/0043_web_push_target_kind.sql?raw";
+import { createMigratedTestDatabase, type SqliteRow } from "../test-support/migrated-database";
 import webPush from "./web-push.ts?raw";
 
 describe("V1.8 public group ticket", () => {
-  it("backfills one protected group code from the oldest legacy ticket", () => {
-    expect(migration).toContain("ALTER TABLE ticket_groups ADD COLUMN public_status_code_hash");
-    expect(migration).toContain("ALTER TABLE ticket_groups ADD COLUMN public_status_code");
-    expect(migration).toMatch(
-      /SELECT t\.public_code_hash[\s\S]*ORDER BY t\.created_at, t\.id[\s\S]*LIMIT 1/,
+  it("stores protected group codes without personal identity fields", () => {
+    const database = createMigratedTestDatabase();
+    const columns = database.prepare("PRAGMA table_info(ticket_groups)").all();
+    const indexes = database.prepare("PRAGMA index_list(ticket_groups)").all();
+
+    expect(columns).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "public_status_code_hash" }),
+        expect.objectContaining({ name: "public_status_code" }),
+      ]),
     );
-    expect(migration).toContain("idx_ticket_groups_public_status_code_hash");
-    expect(migration).not.toMatch(/phone|guest_name|passenger_name/i);
+    expect(indexes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "idx_ticket_groups_public_status_code_hash", unique: 1 }),
+      ]),
+    );
+    expect(columns.map((column: SqliteRow) => String(column.name))).not.toEqual(
+      expect.arrayContaining(["phone", "guest_name", "passenger_name"]),
+    );
+    database.close();
   });
 
   it("creates a distinct group code and prints exactly one group QR document", () => {
@@ -39,10 +50,16 @@ describe("V1.8 public group ticket", () => {
   });
 
   it("migrates existing subscriptions to canonical group targets", () => {
-    expect(targetMigration).toContain("target_kind TEXT NOT NULL DEFAULT 'GROUP'");
-    expect(targetMigration).toContain("CHECK (target_kind IN ('TICKET', 'GROUP'))");
-    expect(targetMigration).toContain("D1 Time Travel");
-    expect(targetMigration).toContain("aus portablen R2-Backups ausgeschlossen");
+    const database = createMigratedTestDatabase();
+    const targetKind = database
+      .prepare("PRAGMA table_info(web_push_subscriptions)")
+      .all()
+      .find((column: SqliteRow) => column.name === "target_kind") as
+      | { dflt_value: string; notnull: number }
+      | undefined;
+
+    expect(targetKind).toMatchObject({ dflt_value: "'GROUP'", notnull: 1 });
     expect(webPush).toContain("publicPushTargetPath");
+    database.close();
   });
 });

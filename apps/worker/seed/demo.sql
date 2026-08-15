@@ -77,14 +77,14 @@ UPDATE resource_group_memberships
 
 INSERT OR IGNORE INTO products
   (id, operation_day_id, resource_group_id, gate_id, name, code, price_cents, sale_enabled, reference_capacity,
-   reference_duration_minutes, created_at, updated_at)
-VALUES ('panorama-20', 'demo-2026', 'rg-panorama', 'demo-2026-gate-main', '20 Min. Panorama', 'PAN20', 4500, 1, 4, 20,
+   reference_duration_minutes, promised_flight_minutes, created_at, updated_at)
+VALUES ('panorama-20', 'demo-2026', 'rg-panorama', 'demo-2026-gate-main', '20 Min. Panorama', 'PAN20', 4500, 1, 4, 20, 20,
         '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
 INSERT OR IGNORE INTO products
   (id, operation_day_id, resource_group_id, gate_id, name, code, price_cents, sale_enabled, reference_capacity,
-   reference_duration_minutes, created_at, updated_at)
-VALUES ('panorama-30', 'demo-2026', 'rg-panorama', 'demo-2026-gate-main', '30 Min. Panorama', 'PAN30', 6500, 1, 3, 30,
+   reference_duration_minutes, promised_flight_minutes, created_at, updated_at)
+VALUES ('panorama-30', 'demo-2026', 'rg-panorama', 'demo-2026-gate-main', '30 Min. Panorama', 'PAN30', 6500, 1, 3, 30, 30,
         '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
 -- Hashes ausschließlich synthetischer lokaler Demo-Tokens; keine Produktiv-Credentials.

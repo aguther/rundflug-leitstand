@@ -17,7 +17,7 @@ flowchart TB
         EDGE["Cloudflare-Edge<br/>HTTPS/TLS, Assets-Auslieferung"]
         WK["Worker rundflug-leitstand<br/>APP_ENV=acceptance"]
         DOI["Durable Object EventCoordinator<br/>eine Instanz je Veranstaltung, SQLite"]
-        D1[("D1 rundflug-leitstand<br/>fortlaufende Migrationen")]
+        D1[("D1 rundflug-leitstand<br/>V1.12-Baseline + Migrationen")]
         R2[("R2 rundflug-leitstand<br/>jurisdiction eu")]
         RL["Rate-Limiting-Bindings<br/>30/60 s öffentlich, 5/60 s Adminwiederherstellung"]
         CRON["Cron Trigger 15 2 * * *"]
@@ -89,6 +89,7 @@ flowchart TB
 ```
 
 Das Deployment ist bewusst manuell auszulösen und verlangt die exakte Eingabe `DEPLOY` sowie eine
-Zielumgebung. Migrationen sind additiv und besitzen jeweils eine Rollback- beziehungsweise
-Restore-Notiz; die vollständige Schema-Rückkehr erfolgt über D1 Time Travel oder eine Wiederherstellung
-in eine isolierte Datenbank, nicht durch manuellen Spaltenabbau in der laufenden Datenbank.
+Zielumgebung. Der einmalige inkompatible Neustart auf `0001_v1_12_baseline.sql` erfolgt ausschließlich
+über den in ADR-0045 beschriebenen vollständigen Neuaufbau. Danach sind Migrationen vorwärtsgerichtet
+und besitzen jeweils eine Wiederherstellungs- oder Forward-Repair-Notiz; ein manueller Spaltenabbau in
+der laufenden Datenbank ist nicht vorgesehen.

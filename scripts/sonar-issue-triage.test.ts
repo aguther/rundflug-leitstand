@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const properties = readFileSync(new URL("../sonar-project.properties", import.meta.url), "utf8");
@@ -61,6 +61,7 @@ describe("Sonar analysis configuration", () => {
     })
       .split(/\r?\n/)
       .filter(Boolean)
+      .filter((path) => existsSync(new URL(`../${path}`, import.meta.url)))
       .filter((path) =>
         /\.(?:c?js|mjs|mts|py|sql|css|html|json|webmanifest|ya?ml|md|txt|toml|properties|svg|ps1|cmd|sh|tsx?)$/i.test(
           path,

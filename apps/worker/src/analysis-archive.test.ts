@@ -1,28 +1,20 @@
 // @ts-expect-error Vitest runs in Node; the Worker production config intentionally excludes Node types.
-import { readdirSync, readFileSync } from "node:fs";
-// @ts-expect-error Vitest runs in Node; the Worker production config intentionally excludes Node types.
-import { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import {
+  createMigratedTestDatabase,
+  describeDatabaseSchema,
+} from "../test-support/migrated-database";
 import { analysisRetentionDays } from "./analysis-archive";
 import { analysisExportPageSize, analysisExportProjections } from "./analysis-export-projections";
 import type { Env } from "./types";
 
 const writerSource = readFileSync(new URL("./analysis-archive-writer.ts", import.meta.url), "utf8");
 const deletionSource = readFileSync(new URL("./event-deletion.ts", import.meta.url), "utf8");
-const migration = readFileSync(
-  new URL("../migrations/0063_analysis_day_archives.sql", import.meta.url),
-  "utf8",
-);
 
 describe("analysis archive boundaries", () => {
   it("prepares every projection against the complete migrated schema", () => {
-    const database = new DatabaseSync(":memory:");
-    const migrationsDirectory = new URL("../migrations/", import.meta.url);
-    for (const migrationName of readdirSync(migrationsDirectory)
-      .filter((name: string) => /^\d+.*\.sql$/.test(name))
-      .toSorted()) {
-      database.exec(readFileSync(new URL(migrationName, migrationsDirectory), "utf8"));
-    }
+    const database = createMigratedTestDatabase();
     database
       .prepare(
         `INSERT INTO operation_days (id, name, event_date, created_at, updated_at)
@@ -71,8 +63,17 @@ describe("analysis archive boundaries", () => {
   });
 
   it("keeps automatic archive jobs unique and their access events append-only", () => {
-    expect(migration).toContain("UNIQUE(operation_day_id, operation_day_version");
-    expect(migration).toContain("analysis_archive_events is append-only");
+    const database = createMigratedTestDatabase();
+    const schema = describeDatabaseSchema(database);
+    const archiveTable = schema.tables.find(({ name }) => name === "analysis_archives");
+    const triggerNames = schema.triggers.map(({ name }) => name);
+
+    expect(archiveTable?.indexes.some((index) => (index as { unique?: number }).unique === 1)).toBe(
+      true,
+    );
+    expect(triggerNames).toContain("analysis_archive_events_no_update");
+    expect(triggerNames).toContain("analysis_archive_events_no_delete");
+    database.close();
   });
 
   it("removes all event-scoped archive objects on event deletion", () => {

@@ -91,9 +91,9 @@ Werte, nicht nur den öffentlichen Schlüssel: Eine unvollständige Einrichtung 
 `PUSH_NOT_CONFIGURED` und die Statusseite bietet die Einwilligung gar nicht erst an, statt sie
 folgenlos entgegenzunehmen.
 
-Die D1-Migrationen `0006_web_push.sql`, `0021_web_push_delivery_queue.sql` und
-`0055_ticket_group_recalls.sql` müssen vor dem ersten Registrierungs- und Zustellungstest in der
-Zielumgebung angewendet sein.
+Die D1-Baseline `0001_v1_12_baseline.sql` muss vor dem ersten Registrierungs- und Zustellungstest in
+der Zielumgebung angewendet sein. Sie enthält Tabellen, Constraints und Deduplizierungsindizes der
+früheren Web-Push-Einzelmigrationen konsolidiert.
 
 ## Fachliche Auslösung
 

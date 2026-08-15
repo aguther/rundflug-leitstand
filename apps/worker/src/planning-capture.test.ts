@@ -1,6 +1,6 @@
 import type { ForecastCalculationResult, ForecastTimelinesInput } from "@rundflug/domain";
 import { describe, expect, it } from "vitest";
-import planningMigration from "../migrations/0062_hybrid_planning_capture.sql?raw";
+import { createMigratedTestDatabase, type SqliteRow } from "../test-support/migrated-database";
 import backupSource from "./backup.ts?raw";
 import { sha256Hex } from "./crypto";
 import eventDeletionSource from "./event-deletion.ts?raw";
@@ -244,12 +244,18 @@ describe("hybrid planning capture", () => {
   });
 
   it("links snapshots and maintains append-only lifecycle coverage", () => {
-    expect(planningMigration).toContain("CREATE TABLE planning_chunks");
-    expect(planningMigration).toContain("CREATE TABLE planning_contexts");
-    expect(planningMigration).toContain("CREATE TABLE planning_runs");
-    expect(planningMigration).toContain("CHECK (replay_distance BETWEEN 0 AND 10)");
-    expect(planningMigration).toContain(
-      "ALTER TABLE forecast_snapshots ADD COLUMN planning_run_id",
+    const database = createMigratedTestDatabase();
+    const tableNames = database
+      .prepare("SELECT name FROM sqlite_schema WHERE type = 'table'")
+      .all()
+      .map((row: SqliteRow) => String(row.name));
+    const forecastColumns = database.prepare("PRAGMA table_info(forecast_snapshots)").all();
+
+    expect(tableNames).toEqual(
+      expect.arrayContaining(["planning_chunks", "planning_contexts", "planning_runs"]),
+    );
+    expect(forecastColumns).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "planning_run_id" })]),
     );
     expect(planningCaptureSource).toContain("PLANNING_CAPTURE_COMPLETION_FAILED");
     for (const table of ["planning_chunks", "planning_contexts", "planning_runs"]) {
@@ -257,6 +263,7 @@ describe("hybrid planning capture", () => {
       expect(eventDeletionSource).toContain(`DELETE FROM ${table}`);
       expect(factoryResetSource).toContain(`"${table}"`);
     }
+    database.close();
   });
 
   it("persists an initial anchor with context and result chunks", async () => {

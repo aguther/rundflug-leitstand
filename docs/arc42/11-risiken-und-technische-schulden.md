@@ -46,7 +46,7 @@ Verbleibende, bewusst priorisierte Schulden:
 | Mittel | 128 ältere `?raw`-Importe in Produktionsquellen und 1.910 `.toContain(`-Assertions koppeln Tests an Quelltext statt an Verhalten | bestehenden Ratchet halten und bei jeder Änderung zuerst hochfrequentierte Tests auf DOM-, HTTP- oder Runtime-Verhalten umstellen |
 | Mittel | `cashier-view.tsx` (1.435 Zeilen), `flight-line-view.tsx` (2.148 Zeilen), `master-data-command-service.ts` (1.218 Zeilen) und `operations-routes.ts` (966 Zeilen) bleiben trotz ausgelagerter Präsentations-, Validierungs- und Projektionsmodule umfangreiche Orchestratoren | Zustands- und Seiteneffektfamilien einzeln unter Verhaltenstests extrahieren; keine Fachlogik in Präsentationshelfer verschieben |
 | Mittel | Haupt-Entry, Flight-Line-CSS und größter JavaScript-Chunk mit begrenztem Abstand zu den Assetbudgets | routentransitive Manifestwerte vor und nach jeder Änderung vergleichen; schwere Analysebausteine lazy halten |
-| Niedrig | Die Migrationsnummer `0036` existiert historisch zweimal; beide Dateien sind angewandt | eingefroren lassen, Register und Eindeutigkeitsprüfung beibehalten, neue Migrationen mit der nächsten freien Nummer |
+| Niedrig | Der inkompatible Baseline-Neustart verwirft alle Entwicklungs- und Abnahmedaten | Neuaufbau nur über das abgesicherte Verfahren aus ADR-0045; Baseline und leeren First-Run-Zustand vor Abnahme verifizieren |
 
 Die vormals monolithischen lokalen Simulationsengines sind in Szenario-, Lifecycle-, Forecast-,
 Precall-, Dispatch-, Snapshot- und Metrikmodule zerlegt. Gemeinsame deterministische Primitive und

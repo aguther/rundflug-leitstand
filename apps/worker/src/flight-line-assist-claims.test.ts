@@ -1,17 +1,45 @@
 import { describe, expect, it } from "vitest";
-import migration from "../migrations/0039_operator_owned_flight_line_claims.sql?raw";
+import {
+  applyDemoSeed,
+  createMigratedTestDatabase,
+  type SqliteRow,
+} from "../test-support/migrated-database";
 import { FACTORY_RESET_DELETE_TABLES } from "./factory-reset";
 
 describe("loginbasierte Flight-Line-Assist-Betreuungsreservierung (F-INT-070)", () => {
   it("stores at most one expiring login claim per aircraft", () => {
-    expect(migration).toContain("PRIMARY KEY (operation_day_id, aircraft_id)");
-    expect(migration).toContain("operator_account_id TEXT NOT NULL");
-    expect(migration).toContain("UNIQUE (operation_day_id, operator_account_id)");
-    expect(migration).toContain("expires_at TEXT NOT NULL");
+    const database = createMigratedTestDatabase();
+    applyDemoSeed(database);
+    database.exec(`
+      INSERT INTO operator_accounts
+        (id, login_code, role, pin_hash, created_at, updated_at)
+      VALUES
+        ('assist-a', 'FL-TEST-A', 'FLIGHT_LINE', 'synthetic-hash', '2026-08-15T08:00:00Z', '2026-08-15T08:00:00Z'),
+        ('assist-b', 'FL-TEST-B', 'FLIGHT_LINE', 'synthetic-hash', '2026-08-15T08:00:00Z', '2026-08-15T08:00:00Z');
+      INSERT INTO flight_line_assist_claims
+        (operation_day_id, aircraft_id, operator_account_id, claimed_at, expires_at)
+      VALUES ('demo-2026', 'aircraft-a', 'assist-a', '2026-08-15T08:00:00Z', '2026-08-15T08:05:00Z');
+    `);
+
+    expect(() =>
+      database.exec(`
+        INSERT INTO flight_line_assist_claims
+          (operation_day_id, aircraft_id, operator_account_id, claimed_at, expires_at)
+        VALUES ('demo-2026', 'aircraft-a', 'assist-b', '2026-08-15T08:01:00Z', '2026-08-15T08:06:00Z');
+      `),
+    ).toThrow(/UNIQUE/);
+    database.close();
   });
 
   it("keeps claim persistence free of personal data", () => {
-    expect(migration).not.toMatch(/phone|email/i);
+    const database = createMigratedTestDatabase();
+    const columns = database
+      .prepare("PRAGMA table_info(flight_line_assist_claims)")
+      .all()
+      .map((column: SqliteRow) => String(column.name));
+
+    expect(columns).not.toEqual(expect.arrayContaining(["phone", "email"]));
+    database.close();
   });
 
   it("removes ephemeral claims during a full factory reset", () => {

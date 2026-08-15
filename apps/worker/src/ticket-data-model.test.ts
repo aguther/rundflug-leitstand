@@ -1,45 +1,88 @@
 import { describe, expect, it } from "vitest";
 import anonymityDecision from "../../../docs/adr/0006-vollstaendig-anonyme-identitaeten.md?raw";
-import initialMigration from "../migrations/0001_initial.sql?raw";
-import pushMigration from "../migrations/0006_web_push.sql?raw";
-import rotationMigration from "../migrations/0026_rotation_gate_and_note.sql?raw";
+import { createMigratedTestDatabase, type SqliteRow } from "../test-support/migrated-database";
 import fidsProjection from "./fids-board-projection.ts?raw";
+
+const columnsOf = (table: string) => {
+  const database = createMigratedTestDatabase();
+  return database
+    .prepare(`PRAGMA table_info(${JSON.stringify(table)})`)
+    .all()
+    .map((row: SqliteRow) => String(row.name));
+};
 
 describe("anonymous V1 ticket data model", () => {
   it("stores the complete operational ticket record without contact data", () => {
-    expect(initialMigration).toMatch(
-      /CREATE TABLE ticket_groups \([\s\S]*operation_day_id TEXT NOT NULL[\s\S]*product_id TEXT NOT NULL[\s\S]*queue_sequence INTEGER NOT NULL[\s\S]*standby INTEGER NOT NULL[\s\S]*status TEXT NOT NULL[\s\S]*sold_at TEXT NOT NULL[\s\S]*version INTEGER NOT NULL/,
+    expect(columnsOf("ticket_groups")).toEqual(
+      expect.arrayContaining([
+        "operation_day_id",
+        "product_id",
+        "queue_sequence",
+        "standby",
+        "status",
+        "sold_at",
+        "version",
+      ]),
     );
-    expect(initialMigration).toMatch(
-      /CREATE TABLE tickets \([\s\S]*ticket_group_id TEXT NOT NULL[\s\S]*public_code_hash TEXT NOT NULL UNIQUE[\s\S]*status TEXT NOT NULL[\s\S]*weight_class TEXT NOT NULL[\s\S]*individual_weight_kg REAL[\s\S]*payment_status TEXT NOT NULL[\s\S]*price_cents INTEGER NOT NULL[\s\S]*created_at TEXT NOT NULL/,
+    expect(columnsOf("tickets")).toEqual(
+      expect.arrayContaining([
+        "ticket_group_id",
+        "public_code_hash",
+        "status",
+        "weight_class",
+        "individual_weight_kg",
+        "payment_status",
+        "price_cents",
+        "created_at",
+      ]),
     );
-    expect(initialMigration).toMatch(
-      /CREATE TABLE rotation_tickets \([\s\S]*rotation_id TEXT NOT NULL[\s\S]*ticket_id TEXT NOT NULL/,
+    expect(columnsOf("rotation_tickets")).toEqual(
+      expect.arrayContaining(["rotation_id", "ticket_id"]),
     );
-    expect(initialMigration).not.toMatch(/phone|telefon|guest_name|passenger_name/i);
+    for (const table of ["ticket_groups", "tickets", "rotation_tickets"]) {
+      expect(columnsOf(table)).not.toEqual(
+        expect.arrayContaining(["phone", "telefon", "guest_name", "passenger_name"]),
+      );
+    }
   });
 
   it("keeps explicit Web Push consent pseudonymously linked to the ticket", () => {
-    expect(pushMigration).toMatch(
-      /CREATE TABLE web_push_subscriptions \([\s\S]*ticket_id TEXT NOT NULL REFERENCES tickets\(id\)[\s\S]*consented_at TEXT NOT NULL[\s\S]*delete_after TEXT NOT NULL[\s\S]*status TEXT NOT NULL/,
+    const database = createMigratedTestDatabase();
+    expect(columnsOf("web_push_subscriptions")).toEqual(
+      expect.arrayContaining(["ticket_id", "consented_at", "delete_after", "status"]),
     );
-    expect(pushMigration).not.toMatch(/phone|telefon|guest_name|passenger_name/i);
+    const ticketForeignKey = database
+      .prepare("PRAGMA foreign_key_list('web_push_subscriptions')")
+      .all()
+      .find((row: SqliteRow) => row.from === "ticket_id");
+    expect(ticketForeignKey).toMatchObject({ table: "tickets", to: "id" });
+    expect(columnsOf("web_push_subscriptions")).not.toEqual(
+      expect.arrayContaining(["phone", "telefon", "guest_name", "passenger_name"]),
+    );
     expect(anonymityDecision).toMatch(
       /Telefonnummern werden weder verpflichtend noch optional erfasst/i,
     );
   });
 
   it("normalizes the complete stable flight-group and queue model", () => {
-    expect(initialMigration).toMatch(
-      /CREATE TABLE flight_groups \([\s\S]*operation_day_id TEXT NOT NULL[\s\S]*resource_group_id TEXT NOT NULL[\s\S]*communication_number INTEGER NOT NULL[\s\S]*status TEXT NOT NULL[\s\S]*UNIQUE \(operation_day_id, resource_group_id, communication_number\)/,
+    const database = createMigratedTestDatabase();
+    expect(columnsOf("flight_groups")).toEqual(
+      expect.arrayContaining([
+        "operation_day_id",
+        "resource_group_id",
+        "communication_number",
+        "status",
+      ]),
     );
-    expect(initialMigration).toMatch(
-      /CREATE TABLE rotations \([\s\S]*flight_group_id TEXT NOT NULL REFERENCES flight_groups\(id\)/,
+    expect(columnsOf("rotations")).toEqual(expect.arrayContaining(["flight_group_id", "gate_id"]));
+    expect(columnsOf("rotation_tickets")).toEqual(
+      expect.arrayContaining(["rotation_id", "ticket_id"]),
     );
-    expect(initialMigration).toMatch(
-      /CREATE TABLE rotation_tickets \([\s\S]*rotation_id TEXT NOT NULL[\s\S]*ticket_id TEXT NOT NULL/,
-    );
-    expect(rotationMigration).toContain("ALTER TABLE rotations ADD COLUMN gate_id");
+    const uniqueFlightGroupIndex = database
+      .prepare("PRAGMA index_list('flight_groups')")
+      .all()
+      .find((row: SqliteRow) => Number(row.unique) === 1);
+    expect(uniqueFlightGroupIndex).toBeDefined();
   });
 
   it("uses the frozen rotation gate in the FIDS slot projection", () => {

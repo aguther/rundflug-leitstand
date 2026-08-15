@@ -1,8 +1,5 @@
-// @ts-expect-error Vitest runs in Node; the Worker production config intentionally excludes Node types.
-import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it, vi } from "vitest";
-import leaseMigration from "../migrations/0064_dispatch_recommendation_leases.sql?raw";
-import memberMigration from "../migrations/0066_dispatch_recommendation_lease_members.sql?raw";
+import { createMigratedTestDatabase } from "../test-support/migrated-database";
 import {
   DispatchRecommendationLeaseService,
   type StoredDispatchRecommendationLease,
@@ -10,6 +7,8 @@ import {
 import { EVENT_DELETION_SQL } from "./event-deletion";
 import { FACTORY_RESET_DELETE_TABLES } from "./factory-reset";
 import type { Env } from "./types";
+
+type DatabaseSync = ReturnType<typeof createMigratedTestDatabase>;
 
 interface LeasePreparedQuery {
   sql: string;
@@ -112,19 +111,20 @@ function storedLease(
 }
 
 function createLeaseDatabase(): DatabaseSync {
-  const database = new DatabaseSync(":memory:");
+  const database = createMigratedTestDatabase();
   database.exec(`
-    PRAGMA foreign_keys = ON;
-    CREATE TABLE operation_days (id TEXT PRIMARY KEY) STRICT;
-    CREATE TABLE aircraft (id TEXT PRIMARY KEY) STRICT;
-    CREATE TABLE operator_accounts (id TEXT PRIMARY KEY) STRICT;
-  `);
-  database.exec(leaseMigration);
-  database.exec(memberMigration);
-  database.exec(`
-    INSERT INTO operation_days (id) VALUES ('event-a');
-    INSERT INTO aircraft (id) VALUES ('aircraft-a'), ('aircraft-b');
-    INSERT INTO operator_accounts (id) VALUES ('account-a'), ('account-b');
+    INSERT INTO operation_days (id, name, event_date, created_at, updated_at)
+    VALUES ('event-a', 'Synthetic', '2026-08-15', '2026-08-15T08:00:00Z', '2026-08-15T08:00:00Z');
+    INSERT INTO aircraft
+      (id, registration, aircraft_type, passenger_seats, created_at, updated_at)
+    VALUES
+      ('aircraft-a', 'D-TSTA', 'SYNTHETIC', 3, '2026-08-15T08:00:00Z', '2026-08-15T08:00:00Z'),
+      ('aircraft-b', 'D-TSTB', 'SYNTHETIC', 3, '2026-08-15T08:00:00Z', '2026-08-15T08:00:00Z');
+    INSERT INTO operator_accounts
+      (id, login_code, role, pin_hash, created_at, updated_at)
+    VALUES
+      ('account-a', 'FD-01', 'FLIGHT_DIRECTOR', 'synthetic-hash', '2026-08-15T08:00:00Z', '2026-08-15T08:00:00Z'),
+      ('account-b', 'FD-02', 'FLIGHT_DIRECTOR', 'synthetic-hash', '2026-08-15T08:00:00Z', '2026-08-15T08:00:00Z');
   `);
   return database;
 }

@@ -65,9 +65,13 @@ Jedes Schreibkommando trägt mindestens `commandId`, `eventId`, `deviceId`, `exp
 
 - D1 ist die relationale Source of Truth; das Durable Object darf flüchtigen Cache halten, aber
   keinen ausschließlich dort vorhandenen fachlichen Zustand.
-- Die fortlaufenden SQL-Migrationen unter `apps/worker/migrations/` sind ausschließlich additiv. Jede Migration mit
-  operativer Wirkung besitzt eine Notiz in `docs/operations/backup-restore.md` beziehungsweise ein
-  eigenes Migrationsdokument.
+- Die unterstützte D1-Historie beginnt gemäß ADR-0045 mit der konsolidierten
+  `0001_v1_12_baseline.sql`. Sie wird durch echte SQLite-Ausführung, ein semantisches
+  Introspektionsmanifest und `PRAGMA foreign_key_check` geprüft. Die 69 vorherigen
+  Entwicklungsmigrationen bleiben nur in Git nachvollziehbar und besitzen keinen Upgradepfad.
+- Neue SQL-Migrationen sind ab `0002` eindeutig, lückenlos und vorwärtsgerichtet. Jede Migration mit
+  operativer Wirkung besitzt eine Wiederherstellungs- oder Forward-Repair-Notiz in
+  `docs/operations/backup-restore.md` beziehungsweise ein eigenes Migrationsdokument.
 - Tabellen sind `STRICT`; fachliche Invarianten werden zusätzlich durch `CHECK`-Bedingungen,
   Fremdschlüssel und partielle Unique-Indizes abgesichert.
 - `operational_events` und `forecast_snapshots` sind append-only; D1-Trigger verbieten `UPDATE` und

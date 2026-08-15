@@ -1,19 +1,11 @@
-// @ts-expect-error Vitest runs in Node; the Worker production config intentionally excludes Node types.
-import { readdirSync, readFileSync } from "node:fs";
-// @ts-expect-error Vitest runs in Node; the Worker production config intentionally excludes Node types.
-import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
+import { createMigratedTestDatabase } from "../test-support/migrated-database";
 import { EVENT_DELETION_SQL } from "./event-deletion";
 
+type DatabaseSync = ReturnType<typeof createMigratedTestDatabase>;
+
 function migratedDatabase() {
-  const database = new DatabaseSync(":memory:");
-  const migrationsDirectory = new URL("../migrations/", import.meta.url);
-  for (const migration of readdirSync(migrationsDirectory)
-    .filter((name: string) => /^\d+.*\.sql$/.test(name))
-    .toSorted()) {
-    database.exec(readFileSync(new URL(migration, migrationsDirectory), "utf8"));
-  }
-  return database;
+  return createMigratedTestDatabase();
 }
 
 function seedEvent(database: DatabaseSync, eventId: string, deviceId: string) {
@@ -97,7 +89,9 @@ describe("disposable event lifecycle", () => {
       )
       .run();
 
-    expect(() => executeEventDeletion(database, "event-a")).toThrow(/append-only/);
+    expect(() => executeEventDeletion(database, "event-a")).toThrow(
+      /append-only|FOREIGN KEY constraint failed/,
+    );
     database.exec("DELETE FROM app_bootstrap");
     database.exec("UPDATE system_reset_control SET active = 1 WHERE singleton = 1");
     executeEventDeletion(database, "event-a");

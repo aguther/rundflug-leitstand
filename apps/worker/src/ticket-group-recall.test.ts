@@ -1,9 +1,13 @@
 import { commandEnvelopeSchema } from "@rundflug/contracts/operations-dispatch";
+import { assertRoleMayExecute, DomainRuleError } from "@rundflug/domain";
 import { describe, expect, it } from "vitest";
-import domain from "../../../packages/domain/src/index.ts?raw";
 import publicStatus from "../../web/src/features/public-status/PublicStatusContent.tsx?raw";
 import fids from "../../web/src/fids-display.tsx?raw";
-import migration from "../migrations/0055_ticket_group_recalls.sql?raw";
+import {
+  applyDemoSeed,
+  createMigratedTestDatabase,
+  type SqliteRow,
+} from "../test-support/migrated-database";
 import push from "./web-push.ts?raw";
 
 describe("V1.11 aktiver Gruppennachruf", () => {
@@ -41,30 +45,77 @@ describe("V1.11 aktiver Gruppennachruf", () => {
       "CLEAR_TICKET_GROUP_RECALL",
       "RESTORE_TICKET_GROUP_TO_QUEUE",
     ]);
-    expect(domain).toContain(
-      'START_TICKET_GROUP_RECALL: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]',
-    );
-    expect(domain).toContain(
-      'CLEAR_TICKET_GROUP_RECALL: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]',
-    );
-    expect(domain).toContain(
-      'RESTORE_TICKET_GROUP_TO_QUEUE: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]',
-    );
+    for (const command of commands) {
+      for (const role of ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"] as const) {
+        expect(() => assertRoleMayExecute(role, command.type)).not.toThrow();
+      }
+      for (const role of ["CASHIER", "DISPLAY"] as const) {
+        expect(() => assertRoleMayExecute(role, command.type)).toThrow(DomainRuleError);
+      }
+    }
   });
 
   it("persistiert Sequenz, Zeitraum und höchstens einen aktiven Vorgang je Gruppe", () => {
-    expect(migration).toContain("CREATE TABLE ticket_group_recalls");
-    expect(migration).toContain("UNIQUE(ticket_group_id, sequence)");
-    expect(migration).toMatch(
-      /CREATE UNIQUE INDEX uq_ticket_group_recalls_active[\s\S]*WHERE ended_at IS NULL/,
-    );
-    expect(migration).toContain("CHECK (expires_at > started_at)");
+    const database = createMigratedTestDatabase();
+    applyDemoSeed(database);
+    database.exec(`
+      INSERT INTO ticket_groups
+        (id, operation_day_id, product_id, queue_sequence, status, sold_at)
+      VALUES
+        ('synthetic-ticket-group', 'demo-2026', 'panorama-20', 100, 'WAITING',
+         '2026-08-10T08:00:00.000Z');
+      INSERT INTO ticket_group_recalls
+        (id, operation_day_id, ticket_group_id, sequence, started_at, expires_at)
+      VALUES
+        ('recall-1', 'demo-2026', 'synthetic-ticket-group', 1,
+         '2026-08-10T08:10:00.000Z', '2026-08-10T08:20:00.000Z');
+    `);
+
+    expect(() =>
+      database.exec(`
+        INSERT INTO ticket_group_recalls
+          (id, operation_day_id, ticket_group_id, sequence, started_at, expires_at)
+        VALUES
+          ('recall-2', 'demo-2026', 'synthetic-ticket-group', 2,
+           '2026-08-10T08:11:00.000Z', '2026-08-10T08:21:00.000Z');
+      `),
+    ).toThrow(/UNIQUE constraint failed/);
+
+    database.exec(`
+      UPDATE ticket_group_recalls
+         SET ended_at = '2026-08-10T08:12:00.000Z', end_reason = 'MANUAL'
+       WHERE id = 'recall-1';
+      INSERT INTO ticket_group_recalls
+        (id, operation_day_id, ticket_group_id, sequence, started_at, expires_at)
+      VALUES
+        ('recall-2', 'demo-2026', 'synthetic-ticket-group', 2,
+         '2026-08-10T08:13:00.000Z', '2026-08-10T08:23:00.000Z');
+    `);
+    expect(
+      database.prepare("SELECT sequence FROM ticket_group_recalls WHERE ended_at IS NULL").get(),
+    ).toMatchObject({ sequence: 2 });
+
+    expect(() =>
+      database.exec(`
+        INSERT INTO ticket_group_recalls
+          (id, operation_day_id, ticket_group_id, sequence, started_at, expires_at)
+        VALUES
+          ('recall-invalid', 'demo-2026', 'synthetic-ticket-group', 3,
+           '2026-08-10T08:30:00.000Z', '2026-08-10T08:30:00.000Z');
+      `),
+    ).toThrow(/CHECK constraint failed/);
   });
 
   it("dedupliziert Push pro Nachruf-ID und adressiert ausschließlich die konkrete Buchungsgruppe", () => {
-    expect(migration).toMatch(
-      /CREATE UNIQUE INDEX uq_web_push_deliveries_recall[\s\S]*subscription_id, ticket_group_recall_id/,
-    );
+    const database = createMigratedTestDatabase();
+    const recallIndex = database
+      .prepare("PRAGMA index_info('uq_web_push_deliveries_recall')")
+      .all()
+      .map((row: SqliteRow) => ({ ...row }));
+    expect(recallIndex.map((row: SqliteRow) => row.name)).toEqual([
+      "subscription_id",
+      "ticket_group_recall_id",
+    ]);
     expect(push).toContain("subscription.ticket_group_id = recall.ticket_group_id");
     expect(push).toContain("delivery.ticket_group_recall_id = ?1");
     expect(push).not.toContain("recall.rotation_id");
@@ -80,7 +131,14 @@ describe("V1.11 aktiver Gruppennachruf", () => {
   });
 
   it("nimmt keine Namen oder frei formulierten öffentlichen Texte in den Vorgang auf", () => {
-    expect(migration).not.toMatch(/guest_name|passenger_name|phone_number/i);
+    const database = createMigratedTestDatabase();
+    const recallColumns = database
+      .prepare("PRAGMA table_info('ticket_group_recalls')")
+      .all()
+      .map((row: SqliteRow) => String(row.name));
+    expect(recallColumns).not.toEqual(
+      expect.arrayContaining(["guest_name", "passenger_name", "phone_number"]),
+    );
     const command = commandEnvelopeSchema.parse({
       commandId: "d35d70d4-c302-431a-89b8-83b7cad9d198",
       eventId: "synthetic-event",

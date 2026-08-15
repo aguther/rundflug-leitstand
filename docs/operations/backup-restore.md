@@ -1,5 +1,17 @@
 # Backup und Wiederherstellung
 
+## Aktuelle V1.12-Baseline und inkompatibler Neuaufbau
+
+Der unterstützte Installationspfad beginnt mit `0001_v1_12_baseline.sql`. Die nachfolgenden
+historischen Migrationsnotizen dokumentieren weiterhin den früheren Entwicklungsverlauf, sind aber
+kein Upgradepfad für bestehende Instanzen. Alte lokale oder Cloudflare-D1-Datenbanken und portable
+Backups werden nicht in die Baseline importiert. Sie werden nach verifiziertem Factory Reset
+verworfen und als leere D1 in EU-Jurisdiktion neu aufgebaut; Remote-Demo-Seeds sind ausgeschlossen.
+
+Scheitert dieser einmalige Neuaufbau, wird die neue leere D1 nochmals gelöscht und aus derselben
+Baseline erzeugt. Nach erfolgreicher Abnahme gelten für Migrationen ab `0002` wieder die jeweils
+dokumentierten Wiederherstellungs- oder Forward-Repair-Verfahren. Details stehen in ADR-0045.
+
 ## Geplante Erweiterung 1.12 – Analysemetadaten
 
 Nach Einführung der zugehörigen Migrationen werden `planning_chunks`, `planning_contexts`,
@@ -45,7 +57,7 @@ Ein älterer Worker kann die additive Spalte ignorieren. Falls eine vollständig
 ist, wird D1 auf den Zeitpunkt vor 0059 zurückgesetzt oder die Sicherung in eine isolierte Datenbank
 eingespielt; ein manueller Tabellenneuaufbau in der laufenden Datenbank ist nicht vorgesehen.
 
-## Migrationsnotiz 0054 – aktive Gruppennachrufe
+## Historische Migrationsnotiz 0055 – aktive Gruppennachrufe
 
 Migration `0055_ticket_group_recalls.sql` legt die Nachrufhistorie an und baut
 `web_push_deliveries` mit getrennten Referenzen und Deduplizierungen für Rotation und Nachruf neu

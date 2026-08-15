@@ -1,23 +1,10 @@
-// @ts-expect-error Vitest runs in Node; the Worker production config intentionally excludes Node types.
-import { readdirSync, readFileSync } from "node:fs";
-// @ts-expect-error Vitest runs in Node; the Worker production config intentionally excludes Node types.
-import { DatabaseSync } from "node:sqlite";
-// @ts-expect-error Vitest runs in Node; the Worker production config intentionally excludes Node types.
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { createMigratedTestDatabase } from "../test-support/migrated-database";
 import { fidsOperatorRoles, mayAccessFids } from "./fids-authorization";
 
-const migrationsDirectory = fileURLToPath(new URL("../migrations/", import.meta.url));
-
 describe("FIDS V1.7.3 persistence and authorization", () => {
-  it("migrates existing accounts safely and enforces DISPLAY preference constraints", () => {
-    const database = new DatabaseSync(":memory:");
-    const migrations = readdirSync(migrationsDirectory)
-      .filter((name: string) => /^\d{4}.*\.sql$/.test(name))
-      .sort();
-    for (const name of migrations.filter((entry: string) => entry < "0041")) {
-      database.exec(readFileSync(`${migrationsDirectory}/${name}`, "utf8"));
-    }
+  it("persists DISPLAY preferences with compatible defaults and constraints", () => {
+    const database = createMigratedTestDatabase();
     database.exec(`
       INSERT INTO operation_days
         (id, name, event_date, time_zone, status, created_at, updated_at)
@@ -35,9 +22,6 @@ describe("FIDS V1.7.3 persistence and authorization", () => {
               '2026-07-22T08:00:00Z', '2026-07-22T08:00:00Z',
               '2026-07-23T00:00:00Z', '2026-07-23T00:00:00Z');
     `);
-    database.exec(
-      readFileSync(`${migrationsDirectory}/0041_fids_display_accounts_and_preferences.sql`, "utf8"),
-    );
     database.exec(`
       INSERT INTO operator_accounts
         (id, login_code, role, pin_hash, active, failed_attempts, session_version,
@@ -50,11 +34,6 @@ describe("FIDS V1.7.3 persistence and authorization", () => {
       VALUES ('display-1', 'event-1', 20, 'DOUBLE', 'DARK', 1,
               '2026-07-22T08:00:00Z', '2026-07-22T08:00:00Z');
     `);
-    database.exec(readFileSync(`${migrationsDirectory}/0061_fids_fixed_split_filters.sql`, "utf8"));
-    database.exec(
-      readFileSync(`${migrationsDirectory}/0065_fids_shared_flight_grouping.sql`, "utf8"),
-    );
-
     expect(
       database.prepare("SELECT role FROM operator_accounts WHERE id = 'admin-1'").get(),
     ).toEqual({ role: "ADMIN" });
