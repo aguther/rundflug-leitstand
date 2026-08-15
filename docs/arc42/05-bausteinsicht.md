@@ -188,8 +188,10 @@ keine Daten in D1, R2 oder Durable Objects.
 
 `AppShell` trennt persistente Zustandsmeldungen von transienten Aktionsbestätigungen. Persistente
 Hinweise liegen inline unter dem Header; `PwaUpdate` koordiniert den expliziten Service-Worker-Reload
-über eine Dirty-/Pending-Registry. Der Catch-all des `FeatureRouter` rendert `NotFoundPage`, ohne eine
-Rollenansicht und deren Datenzugriffe als vermeintlichen Standard zu mounten.
+über eine Dirty-/Pending-Registry. Bleibt die vom Service Worker zugesagte Navigation aus, löst ein
+zeitlich begrenzter Fallback genau einen normalen Seiten-Reload aus. Der Catch-all des `FeatureRouter`
+rendert `NotFoundPage`, ohne eine Rollenansicht und deren Datenzugriffe als vermeintlichen Standard zu
+mounten.
 
 ```mermaid
 flowchart LR

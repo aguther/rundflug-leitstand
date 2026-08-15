@@ -200,7 +200,9 @@ Reset, `DISPLAY` besitzt ausschließlich Lesezugriff auf die Boardprojektion.
   keine Controls. Nur kurzlebige Aktionsbestätigungen dürfen als schwebende Toasts erscheinen.
 - PWA-Updates verwenden den Prompt-Modus. `PwaUpdate` führt
   `idle | available | blocked | applying | failed` und lädt einen neuen Stand nur nach bewusster
-  Aktion. Tokenbasierte Dirty-/Pending-Blocker verhindern den Reload während offener Arbeit.
+  Aktion. Tokenbasierte Dirty-/Pending-Blocker verhindern den Reload während offener Arbeit. Nach
+  Übergabe an den Service Worker erzwingt ein Vier-Sekunden-Fallback den Reload, falls dessen
+  regulärer Navigationswechsel ausbleibt; ein gemeldeter Updatefehler bricht den Fallback ab.
 - Unbekannte Frontendpfade zeigen eine eigene Not-found-Seite und mounten keine Kassenansicht;
   unbekannte API-Pfade behalten ihre 404-Semantik.
 - Je Rolle existiert ein eigenes Web-App-Manifest mit eigenem Icon-Satz, damit installierte Geräte

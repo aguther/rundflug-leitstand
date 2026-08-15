@@ -34,6 +34,10 @@ Flight-Line-Übernahmefreigabe dürfen durch die Korrektur nicht neu interpretie
 - Eine tokenbasierte Dirty-/Pending-Registry blockiert den Reload, solange mindestens ein geändertes
   Formular oder ein laufendes Schreibkommando registriert ist. Ein bereits bewusst angefordertes
   Update wird erst nach Freigabe aller Tokens angewandt.
+- Nach der bewussten Freigabe bleibt der vom PWA-Plugin gesteuerte Service-Worker-Wechsel der
+  Primärpfad. Falls er innerhalb von vier Sekunden keinen Navigationswechsel auslöst, erzwingt die
+  Anwendung genau einen normalen Seiten-Reload. Ein abgewiesener Updateversuch löscht diesen Fallback
+  und wechselt in `failed`.
 - Die zustandsabhängige Standardaktion von Flight Line und Flight Director behält Icon, Position und
   Zustandslogik und erhält lediglich ein sichtbares deutsches Textlabel in einem je Breakpoint festen
   Slot. `Flugzeug freigeben` bleibt davon getrennt und ändert keinen Flugzeugzustand.

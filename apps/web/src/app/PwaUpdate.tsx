@@ -15,7 +15,15 @@ export interface PwaUpdateSnapshot {
 
 const listeners = new Set<() => void>();
 const blockers = new Map<string, UpdateBlockerKind>();
+const RELOAD_FALLBACK_DELAY_MS = 4_000;
 let updateServiceWorker: UpdateServiceWorker | null = null;
+let reloadFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+function defaultReloadApplication() {
+  window.location.reload();
+}
+
+let reloadApplication = defaultReloadApplication;
 let snapshot: PwaUpdateSnapshot = {
   status: "idle",
   dirtyCount: 0,
@@ -45,6 +53,20 @@ function hasBlockers(): boolean {
   return blockers.size > 0;
 }
 
+function clearReloadFallback() {
+  if (reloadFallbackTimer === null) return;
+  globalThis.clearTimeout(reloadFallbackTimer);
+  reloadFallbackTimer = null;
+}
+
+function scheduleReloadFallback() {
+  clearReloadFallback();
+  reloadFallbackTimer = globalThis.setTimeout(() => {
+    reloadFallbackTimer = null;
+    reloadApplication();
+  }, RELOAD_FALLBACK_DELAY_MS);
+}
+
 async function applyAvailableUpdate() {
   if (!updateServiceWorker) return;
   if (hasBlockers()) {
@@ -52,9 +74,11 @@ async function applyAvailableUpdate() {
     return;
   }
   publish({ applyRequested: false, status: "applying" });
+  scheduleReloadFallback();
   try {
     await updateServiceWorker(true);
   } catch {
+    clearReloadFallback();
     publish({ status: "failed" });
   }
 }
@@ -72,6 +96,7 @@ export function requestPwaUpdate() {
 }
 
 export function deferPwaUpdate() {
+  clearReloadFallback();
   if (typeof window !== "undefined") delete window.rundflugPwaUpdateServiceWorker;
   publish({ applyRequested: false, status: "idle" });
 }
@@ -167,6 +192,18 @@ function updateCopy(update: PwaUpdateSnapshot): { title: string; description: st
   };
 }
 
+function updateActionLabel(update: PwaUpdateSnapshot): string {
+  if (update.status === "blocked") return "Nach Abschluss";
+  if (update.status === "failed") return "Erneut versuchen";
+  return "Jetzt aktualisieren";
+}
+
+function updateNoticeTone(update: PwaUpdateSnapshot): "danger" | "info" | "warning" {
+  if (update.status === "failed") return "danger";
+  if (update.status === "blocked") return "warning";
+  return "info";
+}
+
 export function PwaUpdateNotice() {
   useEffect(() => {
     const receiveAvailableUpdate = () => {
@@ -189,7 +226,7 @@ export function PwaUpdateNotice() {
     <PageNotice
       dismissible={false}
       noticeKey={`pwa-update:${update.status}:${update.applyRequested}`}
-      tone={update.status === "failed" ? "danger" : blocked ? "warning" : "info"}
+      tone={updateNoticeTone(update)}
     >
       <div className="pwa-update-notice">
         <span className="pwa-update-copy">
@@ -203,11 +240,7 @@ export function PwaUpdateNotice() {
             type="button"
           >
             <RefreshCw aria-hidden="true" size={16} />
-            {blocked
-              ? "Nach Abschluss"
-              : update.status === "failed"
-                ? "Erneut versuchen"
-                : "Jetzt aktualisieren"}
+            {updateActionLabel(update)}
           </button>
           {!applying ? (
             <button onClick={deferPwaUpdate} type="button">
@@ -221,8 +254,10 @@ export function PwaUpdateNotice() {
 }
 
 export function resetPwaUpdateStateForTests() {
+  clearReloadFallback();
   blockers.clear();
   updateServiceWorker = null;
+  reloadApplication = defaultReloadApplication;
   snapshot = {
     status: "idle",
     dirtyCount: 0,
@@ -230,4 +265,8 @@ export function resetPwaUpdateStateForTests() {
     applyRequested: false,
   };
   for (const listener of listeners) listener();
+}
+
+export function setPwaUpdateReloadForTests(reload: () => void) {
+  reloadApplication = reload;
 }

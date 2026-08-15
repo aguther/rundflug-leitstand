@@ -6,11 +6,15 @@ import {
   registerUpdateBlocker,
   requestPwaUpdate,
   resetPwaUpdateStateForTests,
+  setPwaUpdateReloadForTests,
 } from "./PwaUpdate";
 
 describe("PWA update coordination", () => {
   beforeEach(resetPwaUpdateStateForTests);
-  afterEach(resetPwaUpdateStateForTests);
+  afterEach(() => {
+    resetPwaUpdateStateForTests();
+    vi.useRealTimers();
+  });
 
   it("never applies an available update without an explicit request", async () => {
     const updateServiceWorker = vi.fn().mockResolvedValue(undefined);
@@ -60,5 +64,19 @@ describe("PWA update coordination", () => {
     await requestPwaUpdate();
 
     expect(getPwaUpdateSnapshot().status).toBe("failed");
+  });
+
+  it("forces a reload when the service-worker updater does not navigate", async () => {
+    vi.useFakeTimers();
+    const reload = vi.fn();
+    const updateServiceWorker = vi.fn().mockResolvedValue(undefined);
+    setPwaUpdateReloadForTests(reload);
+    announcePwaUpdate(updateServiceWorker);
+
+    await requestPwaUpdate();
+    expect(reload).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(reload).toHaveBeenCalledOnce();
   });
 });
