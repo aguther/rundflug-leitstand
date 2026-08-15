@@ -44,14 +44,20 @@ Verbleibende, bewusst priorisierte Schulden:
 | --- | --- | --- |
 | Mittel | Der Forecast-Legacy-Vergleichspfad bleibt bis zum zweifachen Release-/Replay-Nachweis erhalten | Abschaltkriterien aus ADR-0041 erfüllen; keine neuen Fachregeln im Legacy-Pfad ergänzen |
 | Mittel | Der erste fokussierte Mutationstest erreicht insgesamt 73,59 %, einzelne Prognosemodule liegen jedoch darunter | Überlebende Mutanten nach fachlichem Risiko priorisieren, Tests ergänzen und den globalen sowie modulbezogenen Wert ausschließlich nach oben ratcheten |
-| Mittel | `cashier-view.tsx` (1.435 Zeilen), `flight-line-view.tsx` (2.148 Zeilen), `master-data-command-service.ts` (1.218 Zeilen) und `operations-routes.ts` (966 Zeilen) bleiben trotz ausgelagerter Präsentations-, Validierungs- und Projektionsmodule umfangreiche Orchestratoren | Zustands- und Seiteneffektfamilien einzeln unter Verhaltenstests extrahieren; keine Fachlogik in Präsentationshelfer verschieben |
-| Mittel | Haupt-Entry, Flight-Line-CSS und größter JavaScript-Chunk mit begrenztem Abstand zu den Assetbudgets | routentransitive Manifestwerte vor und nach jeder Änderung vergleichen; schwere Analysebausteine lazy halten |
+| Mittel | `CashierWorkspace.tsx` (1.441 Zeilen), `FlightLineWorkspace.tsx` (2.144 Zeilen), `master-data-command-service.ts` (1.218 Zeilen) und `operations-routes.ts` (966 Zeilen) bleiben trotz dünner Route-Shells und ausgelagerter Präsentations-, Validierungs- und Projektionsmodule umfangreiche Orchestratoren | Zustands- und Seiteneffektfamilien einzeln unter Verhaltenstests extrahieren; Zielgröße 300 Zeilen für neue Komponenten und Hooks; keine Fachlogik in Präsentationshelfer verschieben |
+| Niedrig | Der Administrations-Entry wird wegen seiner zwingenden Online-Abhängigkeit nicht im PWA-Precache vorgehalten | Offline-Betrieb bleibt auf lesbare bestätigte operative Snapshots und lokale Kassenentwürfe begrenzt; Administration erst bei bestätigter Verbindung öffnen |
 | Niedrig | Der inkompatible Baseline-Neustart verwirft alle Entwicklungs- und Abnahmedaten | Neuaufbau nur über das abgesicherte Verfahren aus ADR-0045; Baseline und leeren First-Run-Zustand vor Abnahme verifizieren |
 
 Die vormals monolithischen lokalen Simulationsengines sind in Szenario-, Lifecycle-, Forecast-,
 Precall-, Dispatch-, Snapshot- und Metrikmodule zerlegt. Gemeinsame deterministische Primitive und
 Golden-Seed-Tests verhindern Drift; die Operational-Tests werden nicht mehr aus dem Coverage-Lauf
 ausgeschlossen. Größenratchets schützen die erreichten Orchestratorgrenzen.
+
+Die Rollenrouten sind nun 6 bis 8 Zeilen große Shells. Der historische globale Flight-Line-Layer ist
+entfernt; Flight Line und Flight Director besitzen getrennte CSS-Chunks. Die gemessenen harten Grenzen
+liegen bei 93,87 KiB globaler CSS, 71,00 KiB Flight-Line-CSS, 313,48 KiB für den größten
+JavaScript-Chunk und 1.356,12 KiB PWA-Precache. Die Ratchets erlauben höchstens zwei Prozent Wachstum,
+ohne die vereinbarten harten Obergrenzen zu überschreiten.
 
 Der Operations-Contract ist in vier Command-Familien sowie getrennte Board- und Assistance-Module
 zerlegt; Exhaustiveness- und Subpath-Tests schützen die kompatible Fassade. Produktive Domain-Module

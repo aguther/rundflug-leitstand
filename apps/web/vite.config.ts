@@ -57,6 +57,9 @@ const operationalPwa = VitePWA({
     ],
     importScripts: ["/push-sw.js"],
     globIgnores: [
+      // Administration requires a confirmed backend connection and is loaded on demand.
+      "**/admin-view-*.js",
+      "**/admin-view-*.css",
       "**/ForecastSimulationView-*.js",
       "**/ForecastSimulationView-*.css",
       "**/comparison-worker-*.js",
@@ -75,6 +78,7 @@ export default defineConfig(({ mode }) => {
   );
   return {
     build: {
+      cssMinify: "lightningcss",
       manifest: true,
     },
     define: {

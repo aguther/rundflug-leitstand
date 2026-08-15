@@ -139,14 +139,14 @@ mit dem eingecheckten Snapshot von `5e1dce` sowie den festen Budgets.
 
 | Asset | Stand 1.12.0 roh | Stand 1.12.0 gzip | Budget roh | Budget gzip |
 |---|---:|---:|---:|---:|
-| globales CSS | 115,28 KiB | 21,45 KiB | 120 KiB | 24 KiB |
-| Flight-Line-CSS | 98,97 KiB | 15,60 KiB | 100 KiB | 18 KiB |
-| Admin-Route-Entry | 126,41 KiB | 35,89 KiB | 180 KiB | 48 KiB |
-| Haupt-Entry | 206,71 KiB | 64,56 KiB | 215 KiB | 68 KiB |
-| größter JavaScript-Chunk | 348,03 KiB | 100,05 KiB | 360 KiB | 105 KiB |
-| gesamter PWA-Precache | 1.414,30 KiB | – | 1,60 MiB | – |
+| globales CSS | 93,87 KiB | 17,44 KiB | 95,75 KiB | 17,79 KiB |
+| Flight-Line-CSS | 71,00 KiB | 11,42 KiB | 72,42 KiB | 11,65 KiB |
+| Admin-Route-Entry | 133,93 KiB | 38,41 KiB | 180 KiB | 48 KiB |
+| Haupt-Entry | 183,94 KiB | 58,15 KiB | 215 KiB | 68 KiB |
+| größter JavaScript-Chunk | 313,48 KiB | 91,99 KiB | 319,74 KiB | 93,83 KiB |
+| gesamter PWA-Precache | 1.356,12 KiB | – | 1,33 MiB | – |
 
-Alle neun geprüften Routen bleiben mit ihrer transitiven Erstladegröße innerhalb des jeweiligen
+Alle zehn geprüften Routen bleiben mit ihrer transitiven Erstladegröße innerhalb des jeweiligen
 Ausgangssnapshots plus zwei Prozent. Analyse- und Diagrammflächen sowie Admin-Teilflächen werden nur
 auf den benötigten Routen beziehungsweise Zuständen geladen. Globales, Admin-, Flight-Line-, FIDS-
 und Simulations-CSS besitzen getrennte Auslieferungsgrenzen.
@@ -178,8 +178,8 @@ Der abschließende Prüflauf auf dem integrierten Inhalt wurde mit npm 12.0.2 au
 | Mittel | `forecast-timeline-service.ts` liegt mit 1.479 Zeilen unmittelbar an der allgemeinen Modulgrenze. | Reine Timeline-Projektion und historische Kalibrierung in getrennte Worker-Adapter schneiden; Domainregeln und Ereignisreihenfolge unverändert lassen. |
 | Mittel | 135 ältere Produktions-TS/TSX-`?raw`-Importe und 1.805 `.toContain(`-Assertions bestehen außerhalb der vier gesperrten Zieldateien fort. | Den bestehenden Ratchet beibehalten und bei jeder Änderung zuerst die hoch frequentierten Worker-, Kassen- und Flight-Line-Quelltexttests durch DOM-, HTTP- oder Runtime-Verhalten ersetzen. Keine pauschale Entfernung legitimer Artefakt- oder Textprüfungen. |
 | Mittel | `master-data-command-service.ts` umfasst 1.300 und `operations-routes.ts` 1.043 Zeilen. | Stammdatenfamilien nach Gate/Produkt und Ressource/Flugzeug trennen; Operations-Routen weiter auf Transport und Response-Mapping reduzieren. |
-| Mittel | Haupt-Entry, Flight-Line-CSS und größter JavaScript-Chunk besitzen nur noch begrenzten Abstand zu ihren harten Budgets. | Bei neuen Diagramm- oder Flight-Line-Funktionen routentransitive Manifestwerte vor und nach der Änderung vergleichen; schwere Analysebausteine weiterhin lazy laden und keine globale CSS-Rückverlagerung zulassen. |
-| Niedrig | Historisch existiert die Migrationsnummer `0036` zweimal. Die Dateien sind bereits angewandt und dürfen nicht umbenannt werden. | Das automatisch erzeugte Migrationsregister und die Eindeutigkeitsprüfung beibehalten; neue Migrationen ausschließlich mit der nächsten freien Nummer anlegen. |
+| Mittel | Flight-Line-CSS und PWA-Precache besitzen nur noch begrenzten Abstand zu ihren harten Budgets. | Bei neuen Flight-Line-Funktionen routentransitive Manifestwerte vor und nach der Änderung vergleichen; schwere Analysebausteine weiterhin lazy laden, den Admin-Entry nicht in den Precache zurücknehmen und keine globale CSS-Rückverlagerung zulassen. |
+| Mittel | `CashierWorkspace.tsx` und `FlightLineWorkspace.tsx` bleiben trotz dünner Route-Shells umfangreiche Orchestratoren. | Zustands- und Seiteneffektfamilien einzeln unter Verhaltenstests extrahieren; neue Komponenten und Hooks auf höchstens 300 Zeilen begrenzen. |
 
 ## Leitplanken für weitere Schnitte
 

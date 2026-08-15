@@ -7,6 +7,9 @@ import { FeatureRouter } from "./FeatureRouter";
 vi.mock("./admin-view", () => ({ AdminView: () => <p>Administration-Route</p> }));
 vi.mock("./cashier-view", () => ({ CashierView: () => <p>Kassen-Route</p> }));
 vi.mock("./fids-view", () => ({ FidsView: () => <p>FIDS-Route</p> }));
+vi.mock("./flight-director-view", () => ({
+  FlightDirectorView: () => <p>Flight-Director-Route</p>,
+}));
 vi.mock("./flight-line-view", () => ({ FlightLineView: () => <p>Flight-Line-Route</p> }));
 vi.mock("./features/forecast-simulation/ForecastSimulationView", () => ({
   default: () => <p>Simulations-Route</p>,
@@ -43,7 +46,7 @@ describe("feature router", () => {
     for (const [path, text] of [
       ["/setup", "Setup-Route"],
       ["/datenschutz", "Datenschutz-Route"],
-      ["/flight-director", "Flight-Line-Route"],
+      ["/flight-director", "Flight-Director-Route"],
       ["/flight-line", "Flight-Line-Route"],
       ["/fids", "FIDS-Route"],
       ["/admin", "Administration-Route"],

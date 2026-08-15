@@ -11,6 +11,9 @@ const FidsView = lazy(() => import("./fids-view").then((module) => ({ default: m
 const FlightLineView = lazy(() =>
   import("./flight-line-view").then((module) => ({ default: module.FlightLineView })),
 );
+const FlightDirectorView = lazy(() =>
+  import("./flight-director-view").then((module) => ({ default: module.FlightDirectorView })),
+);
 const ForecastSimulationView = lazy(
   () => import("./features/forecast-simulation/ForecastSimulationView"),
 );
@@ -55,7 +58,8 @@ export function FeatureRouter() {
   else if (ticketCode) view = <TicketStatusView code={ticketCode.toUpperCase()} />;
   else if (path === "/setup") view = <SetupView />;
   else if (path === "/datenschutz") view = <PrivacyView />;
-  else if (path === "/flight-director" || path === "/flight-line") view = <FlightLineView />;
+  else if (path === "/flight-director") view = <FlightDirectorView />;
+  else if (path === "/flight-line") view = <FlightLineView />;
   else if (path === "/fids") view = <FidsView />;
   else if (path === "/admin") view = <AdminView />;
   else if (path === "/simulation") view = <ForecastSimulationView />;

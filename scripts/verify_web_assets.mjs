@@ -9,18 +9,19 @@ import { GIT_EXECUTABLE } from "./lib/tool-executables.mjs";
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 export const WEB_ASSET_BUDGETS = {
-  globalCss: { rawBytes: 120 * 1024, gzipBytes: 24 * 1024 },
-  flightLineCss: { rawBytes: 100 * 1024, gzipBytes: 18 * 1024 },
+  globalCss: { rawBytes: 98_044, gzipBytes: 18_215 },
+  flightLineCss: { rawBytes: 74_161, gzipBytes: 11_933 },
   adminEntry: { rawBytes: 180 * 1024, gzipBytes: 48 * 1024 },
   mainEntry: { rawBytes: 215 * 1024, gzipBytes: 68 * 1024 },
-  largestJavaScriptChunk: { rawBytes: 360 * 1024, gzipBytes: 105 * 1024 },
-  pwaPrecache: { rawBytes: Math.floor(1.6 * 1024 * 1024) },
+  largestJavaScriptChunk: { rawBytes: 327_418, gzipBytes: 96_085 },
+  pwaPrecache: { rawBytes: 1_394_606 },
 };
 
 export const WEB_ROUTE_ENTRIES = {
   admin: "src/admin-view.tsx",
   cashier: "src/cashier-view.tsx",
   fids: "src/fids-view.tsx",
+  flightDirector: "src/flight-director-view.tsx",
   flightLine: "src/flight-line-view.tsx",
   groupStatus: "src/group-status-view.tsx",
   privacy: "src/privacy-view.tsx",

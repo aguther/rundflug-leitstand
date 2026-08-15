@@ -207,7 +207,9 @@ Reset, `DISPLAY` besitzt ausschließlich Lesezugriff auf die Boardprojektion.
   unbekannte API-Pfade behalten ihre 404-Semantik.
 - Je Rolle existiert ein eigenes Web-App-Manifest mit eigenem Icon-Satz, damit installierte Geräte
   eindeutig erkennbar bleiben.
-- Rollenansichten werden lazy geladen; ein Asset-Budget wird durch `npm run web:assets:verify`
+- Rollenansichten werden lazy geladen; Flight Line und Flight Director besitzen getrennte
+  CSS-Einstiege. Der Administrations-Entry wird wegen seiner zwingenden Online-Abhängigkeit nicht
+  vorab im Service Worker gespeichert. Ein Asset-Budget wird durch `npm run web:assets:verify`
   überwacht.
 - Die aktive Veranstaltung wird nach Auswahl und Sitzungsprüfung über `ActiveEventProvider`
   bereitgestellt. REST-, Offline- und WebSocket-Hooks sowie Geräteidentitäten lesen diese Laufzeitquelle;

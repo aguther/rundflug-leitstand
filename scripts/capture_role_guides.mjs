@@ -5,7 +5,9 @@ import { chromium } from "@playwright/test";
 import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const outputDirectory = resolve(root, "docs", "roles", "images");
+const outputDirectory = resolve(
+  process.env.ROLE_GUIDE_OUTPUT ?? resolve(root, "docs", "roles", "images"),
+);
 const baseUrl = process.env.ROLE_GUIDE_BASE_URL ?? "http://127.0.0.1:8799";
 const managesLocalWorker = !process.env.ROLE_GUIDE_BASE_URL;
 const pin = "123456";

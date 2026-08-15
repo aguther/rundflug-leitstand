@@ -18,13 +18,18 @@
     },
     {
       "path": "apps/web/src/cashier-view.tsx",
-      "maxLines": 1549,
-      "targetLines": 1200
+      "maxLines": 6,
+      "targetLines": 500
     },
     {
       "path": "apps/web/src/flight-line-view.tsx",
-      "maxLines": 2197,
-      "targetLines": 1600
+      "maxLines": 11,
+      "targetLines": 500
+    },
+    {
+      "path": "apps/web/src/flight-director-view.tsx",
+      "maxLines": 8,
+      "targetLines": 500
     },
     {
       "path": "apps/web/src/operation-workspace.tsx",
@@ -133,6 +138,16 @@
     }
   ],
   "extractedModuleBudgets": [
+    {
+      "path": "apps/web/src/features/cashier/CashierWorkspace.tsx",
+      "maxLines": 1441,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/flight-line/FlightLineWorkspace.tsx",
+      "maxLines": 2144,
+      "targetLines": 300
+    },
     {
       "path": "apps/web/src/event-context.tsx",
       "maxLines": 60,

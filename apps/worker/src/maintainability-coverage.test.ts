@@ -192,6 +192,7 @@ describe("V1 maintainability and portability boundaries", () => {
       "fflate",
       "hono",
       "jsdom",
+      "lightningcss",
       "lucide-react",
       "mermaid",
       "qrcode",
