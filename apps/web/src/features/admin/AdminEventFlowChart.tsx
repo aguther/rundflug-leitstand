@@ -28,6 +28,7 @@ const ADMIN_FLOW_CHART_INSETS = { left: 26, right: 16 } as const;
 const MINUTE_MS = 60_000;
 const TOOLTIP_GAP_PX = 16;
 const TOOLTIP_HEIGHT_PX = 94;
+const HOVER_DOT_RADIUS = 4.5;
 
 type FlowChartPoint = AdminEventFlow["points"][number] & { time: number };
 
@@ -87,18 +88,20 @@ export function AdminEventFlowChart({
   loading: boolean;
   timeZone: string;
 }>) {
-  const chartData = useMemo(
-    () =>
-      flow?.points.map((point) => ({
-        ...point,
-        time: Date.parse(point.at),
-      })) ?? [],
-    [flow],
-  );
-  const [hover, setHover] = useState<FlowHoverState | null>(null);
   const from = flow ? Date.parse(flow.from) : 0;
   const plannedUntil = flow ? Date.parse(flow.plannedUntil) : 1;
   const observedUntil = flow ? Date.parse(flow.observedUntil) : 0;
+  const chartData = useMemo(
+    () =>
+      flow?.points
+        .map((point) => ({
+          ...point,
+          time: Date.parse(point.at),
+        }))
+        .filter((point) => point.time <= observedUntil) ?? [],
+    [flow, observedUntil],
+  );
+  const [hover, setHover] = useState<FlowHoverState | null>(null);
   const {
     changeZoom,
     dragging,
@@ -136,7 +139,12 @@ export function AdminEventFlowChart({
         Math.max(0, (event.clientX - bounds.left - ADMIN_FLOW_CHART_INSETS.left) / plotWidth),
       );
       const pointerTime = timeAtRatio(visibleDomain, ratio);
+      if (pointerTime > observedUntil) {
+        setHover(null);
+        return;
+      }
       const at = Math.min(
+        observedUntil,
         visibleDomain.until,
         Math.max(visibleDomain.from, Math.round(pointerTime / MINUTE_MS) * MINUTE_MS),
       );
@@ -157,7 +165,7 @@ export function AdminEventFlowChart({
           : Math.max(8, pointerTop - TOOLTIP_GAP_PX - TOOLTIP_HEIGHT_PX),
       });
     },
-    [chartData, visibleDomain],
+    [chartData, observedUntil, visibleDomain],
   );
 
   const handlePointerMove = useCallback(
@@ -215,7 +223,7 @@ export function AdminEventFlowChart({
     );
   }
 
-  const finalPoint = flow.points.at(-1);
+  const finalPoint = chartData.at(-1);
   const summary = [
     { label: "Verkauft", value: finalPoint?.soldTickets ?? 0 },
     { label: "Abgeschlossen", value: finalPoint?.completedTickets ?? 0 },
@@ -342,7 +350,7 @@ export function AdminEventFlowChart({
                   className="admin-flow-hover-dot sold"
                   fill="var(--ui-surface-raised)"
                   ifOverflow="visible"
-                  r={4.5}
+                  r={HOVER_DOT_RADIUS}
                   stroke="var(--ui-accent)"
                   strokeWidth={2}
                   x={hover.at}
@@ -352,7 +360,7 @@ export function AdminEventFlowChart({
                   className="admin-flow-hover-dot completed"
                   fill="var(--ui-surface-raised)"
                   ifOverflow="visible"
-                  r={3.5}
+                  r={HOVER_DOT_RADIUS}
                   stroke="var(--ui-success)"
                   strokeWidth={2}
                   x={hover.at}

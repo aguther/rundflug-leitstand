@@ -65,7 +65,7 @@ describe("admin event flow chart", () => {
     ).toBeNull();
   });
 
-  it("positions its tooltip from the cursor instead of snapping to flow buckets", () => {
+  it("positions its tooltip from the cursor and stops at the observed time", () => {
     render(
       <AdminEventFlowChart
         averageWaitMinutes={18}
@@ -83,6 +83,9 @@ describe("admin event flow chart", () => {
         value: () => ({ height: 210, left: 100, top: 50, right: 900, width: 800 }),
       },
     });
+    expect(viewport.getAttribute("aria-label")).toBe(
+      "Ticketverlauf: 21 verkauft, 12 abgeschlossen, 9 offen.",
+    );
 
     fireEvent.pointerMove(viewport, { buttons: 0, clientX: 315.5, clientY: 150 });
     expect(screen.getByText("11:00 Uhr")).not.toBeNull();
@@ -94,20 +97,16 @@ describe("admin event flow chart", () => {
       "116px",
     );
 
-    fireEvent.pointerMove(viewport, { buttons: 0, clientX: 694.5, clientY: 150 });
-    expect(screen.getByText("17:00 Uhr")).not.toBeNull();
-    expect(screen.getByText("Verkauft: 30")).not.toBeNull();
-    expect(document.querySelector<HTMLElement>(".admin-flow-tooltip-position")?.style.left).toBe(
-      "594.5px",
-    );
+    fireEvent.pointerMove(viewport, { buttons: 0, clientX: 378.6, clientY: 150 });
+    expect(screen.getByText("12:00 Uhr")).not.toBeNull();
+    expect(screen.getByText("Verkauft: 21")).not.toBeNull();
 
-    fireEvent.pointerMove(viewport, { buttons: 0, clientX: 694.5, clientY: 240 });
-    expect(document.querySelector<HTMLElement>(".admin-flow-tooltip-position")?.style.top).toBe(
-      "80px",
-    );
+    fireEvent.pointerMove(viewport, { buttons: 0, clientX: 694.5, clientY: 150 });
+    expect(screen.queryByText("17:00 Uhr")).toBeNull();
+    expect(document.querySelector(".admin-flow-tooltip-position")).toBeNull();
 
     fireEvent.pointerLeave(viewport);
-    expect(screen.queryByText("17:00 Uhr")).toBeNull();
+    expect(screen.queryByText("12:00 Uhr")).toBeNull();
   });
 
   it("prevents mouse focus on the Recharts drawing surface", () => {
