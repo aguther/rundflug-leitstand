@@ -406,7 +406,7 @@
 .flight-assist-v15 .assist-v15-action-bar {
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(4, 56px);
+  grid-template-columns: 240px auto;
   justify-content: start;
   gap: 8px;
   min-height: 56px;
@@ -417,7 +417,25 @@
 
 .flight-assist-v15 .assist-v15-primary-action {
   width: 240px;
-  white-space: nowrap;
+  min-width: 240px;
+  height: 56px;
+  padding-inline: 14px;
+}
+
+.flight-assist-v15 .assist-v15-primary-action .ds-button-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+
+.flight-assist-v15 .assist-v15-primary-label {
+  display: -webkit-box;
+  overflow: hidden;
+  line-height: 1.05;
+  text-align: center;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .flight-assist-v15 .assist-v15-secondary-actions {
@@ -760,7 +778,7 @@
   }
 
   .flight-assist-v15 .assist-v15-action-bar {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: 184px auto;
   }
 
   .flight-assist-v15 .assist-v15-secondary-actions {
@@ -775,9 +793,9 @@
 
   .flight-assist-v15 .assist-v15-primary-action {
     width: 184px;
+    min-width: 184px;
     max-width: 100%;
     font-size: 0.8rem;
-    white-space: nowrap;
   }
 
   .flight-assist-v15 .assist-v15-turnaround {
@@ -979,7 +997,6 @@
   flex: 0 0 auto;
 }
 
-.flight-assist-v15 .assist-v15-primary-action,
 .flight-assist-v15 .assist-v15-secondary-actions .ds-icon-button {
   width: 56px;
   min-width: 56px;
@@ -1025,7 +1042,14 @@
   }
 
   .flight-assist-v15 .assist-v15-action-bar {
-    grid-template-columns: 56px auto;
+    grid-template-columns: 160px auto;
+  }
+
+  .flight-assist-v15 .assist-v15-primary-action {
+    width: 160px;
+    min-width: 160px;
+    padding-inline: 8px;
+    font-size: 0.72rem;
   }
 
   .flight-assist-v15 .flight-director-current-timeline {

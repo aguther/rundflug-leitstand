@@ -1,5 +1,5 @@
 import type { OperationBoard, TicketSearchRequest, TicketSearchResult } from "@rundflug/contracts";
-import { Check, Maximize2 } from "lucide-react";
+import { AlertTriangle, Check, CircleCheck, Gauge, Maximize2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { PageNotice } from "../../app/PageNotifications";
 import {
@@ -12,6 +12,79 @@ import type { TicketReceipt } from "../operations/operation-types";
 import { TicketPaper } from "./CashierTicketPresentation";
 
 export type TicketListTab = TicketSearchRequest["status"];
+type CashierProduct = OperationBoard["products"][number];
+
+const capacityPriority: Record<CashierProduct["capacityStatus"], number> = {
+  AVAILABLE: 0,
+  LIMITED: 1,
+  MANUAL_REVIEW: 2,
+  SOLD_OUT: 3,
+};
+
+const capacityLabels: Record<CashierProduct["capacityStatus"], string> = {
+  AVAILABLE: "Kapazität verfügbar",
+  LIMITED: "Kapazität begrenzt",
+  MANUAL_REVIEW: "Kapazität manuell prüfen",
+  SOLD_OUT: "Keine prognostizierte Kapazität",
+};
+
+export function cashierCapacityGuidance(products: CashierProduct[] | undefined): {
+  label: string;
+  recommendation: string;
+  tone: "loading" | "positive" | "warning";
+} {
+  if (!products) {
+    return {
+      label: "Kapazität wird geladen",
+      recommendation: "Verkaufsempfehlung wird ermittelt",
+      tone: "loading",
+    };
+  }
+  const saleProducts = products.filter((product) => product.saleEnabled);
+  if (saleProducts.length === 0) {
+    return {
+      label: "Keine Verkaufsprodukte aktiv",
+      recommendation: "Verkauf nicht verfügbar",
+      tone: "warning",
+    };
+  }
+  const limitingProduct = saleProducts.reduce((current, product) =>
+    capacityPriority[product.capacityStatus] > capacityPriority[current.capacityStatus]
+      ? product
+      : current,
+  );
+  const saleRecommended = saleProducts.every((product) => product.saleRecommended);
+  return {
+    label: capacityLabels[limitingProduct.capacityStatus],
+    recommendation: saleRecommended
+      ? "Verkauf empfohlen"
+      : "Verkauf derzeit nicht empfohlen · bewusster Verkauf bleibt möglich",
+    tone: saleRecommended ? "positive" : "warning",
+  };
+}
+
+export function CashierCapacityGuidance({
+  products,
+}: Readonly<{ products: CashierProduct[] | undefined }>) {
+  const guidance = cashierCapacityGuidance(products);
+  const Icon =
+    guidance.tone === "positive"
+      ? CircleCheck
+      : guidance.tone === "warning"
+        ? AlertTriangle
+        : Gauge;
+  return (
+    <output
+      aria-live="polite"
+      className={`cashier-capacity-guidance tone-${guidance.tone}`}
+      data-testid="cashier-capacity-guidance"
+    >
+      <Icon aria-hidden="true" size={18} />
+      <strong>{guidance.label}</strong>
+      <span>{guidance.recommendation}</span>
+    </output>
+  );
+}
 
 export function ticketMatchesListStatus(entry: TicketSearchResult, status: TicketListTab) {
   if (status === "CANCELED") return entry.groupStatus === "CANCELED";
@@ -109,10 +182,10 @@ export function CashierNotifications({
   }
   return (
     <>
-      <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
-      {draftNotice}
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
       <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
+      <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
+      {draftNotice}
       <OperationalNotice note={board?.event.operationalNote} />
     </>
   );

@@ -629,6 +629,9 @@ export function FlightLineAssist({
               size="touch"
             >
               {PrimaryActionIcon ? <PrimaryActionIcon aria-hidden="true" /> : null}
+              <span className="assist-v15-primary-label">
+                {primaryPresentation?.shortLabel ?? "Keine Aktion"}
+              </span>
             </IconButton>
             <fieldset className="assist-v15-secondary-actions" aria-label="Flugzeugstatus">
               <IconButton

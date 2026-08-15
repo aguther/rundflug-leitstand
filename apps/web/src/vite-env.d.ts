@@ -8,3 +8,7 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+interface Window {
+  rundflugPwaUpdateServiceWorker?: (reloadPage?: boolean) => Promise<void>;
+}

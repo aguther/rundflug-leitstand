@@ -24,7 +24,7 @@ ist die Übersicht; verbindlich ist jeweils der ADR-Text mit Kontext, Alternativ
 | [0017](../adr/0017-kassenkorrektur-druck-und-releaseversion.md) | Kassenkorrektur, Ticketdruck und konsistente Releaseversion | Korrektur als Storno und Neuverkauf; Version als gemeinsame Wahrheit |
 | [0018](../adr/0018-separate-pilotenzuweisung-und-kompakte-flight-line.md) | Separate Pilotenzuweisung, kompakte Flight Line | Pilotenbindung getrennt vom Flugzeug; mobiler Ein-Bildschirm-Ablauf |
 | [0019](../adr/0019-getrennte-assist-auswahl-und-arbeitsansicht.md) | Getrennte Auswahl- und Arbeitsansicht für Unterstützungsaufgaben | weniger Fehlbedienung durch klar getrennte Bildschirmzustände |
-| [0020](../adr/0020-transiente-und-persistente-ui-meldungen.md) | Transiente und persistente UI-Meldungen | Störungs- und Konfliktmeldungen verschwinden nicht unbemerkt |
+| [0020](../adr/0020-transiente-und-persistente-ui-meldungen.md) | Transiente und persistente UI-Meldungen, teilweise ersetzt | Trennung bleibt; gemeinsame Overlay-Fläche wurde durch ADR-0047 ersetzt |
 | [0021](../adr/0021-display-konten-und-fids-einstellungen.md) | Display-Konten und kontobezogene FIDS-Einstellungen | Monitore laufen mit eigener Rolle ohne operative Rechte |
 | [0022](../adr/0022-getrennte-buchungs-und-fluggruppenkennungen.md) | Getrennte Buchungs- und Fluggruppenkennungen | Verkaufsvorgang und Kommunikationsnummer bleiben unabhängig |
 | [0023](../adr/0023-oeffentlicher-gruppencode.md) | Öffentlicher Gruppencode statt sichtbarer Personencodes | eine Gruppe teilt einen anonymen Statuszugang |
@@ -51,6 +51,7 @@ ist die Übersicht; verbindlich ist jeweils der ADR-Text mit Kontext, Alternativ
 | [0044](../adr/0044-eigenstaendiger-simulations-fids-tab.md) | Eigenständiger Simulations-FIDS-Tab mit lokalem Zustandskanal | direkte Route ohne Popup-/Portal-Kopplung; versionierte flüchtige Tab-Synchronisation ohne Backend oder Browser-Storage |
 | [0045](../adr/0045-d1-v1-12-schema-baseline.md) | Inkompatible D1-Schema-Baseline für V1.12 | eine ausführbare Baseline statt 69 Entwicklungsmigrationen; künftige Nummerierung eindeutig und lückenlos ab `0002` |
 | [0046](../adr/0046-verhaltensbasierte-testarchitektur.md) | Verhaltensbasierte Testarchitektur und Qualitätsratchets | keine TypeScript-Quelltexttests; ausführbare Domain-, SQLite-, Runtime-, DOM- und Browsergrenzen sowie Coverage- und Mutation-Ratchets |
+| [0047](../adr/0047-operative-ui-shell-und-bewusste-pwa-updates.md) | Operative UI-Shell und bewusste PWA-Updates | persistente Inline-Hinweise, mobile Sticky-Geometrie, expliziter Update-Reload und sicherer Routing-Fallback |
 
 ## Offene Entscheidungen
 

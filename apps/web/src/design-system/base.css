@@ -466,6 +466,30 @@ body {
 }
 
 @media (max-width: 760px) {
+  html:has(body > #root > .cashier-shell),
+  html:has(body > #root > .flight-line-shell),
+  body:has(> #root > .cashier-shell),
+  body:has(> #root > .flight-line-shell),
+  #root:has(> .cashier-shell),
+  #root:has(> .flight-line-shell),
+  .cashier-shell,
+  .flight-line-shell {
+    overflow-x: clip;
+    overflow-y: visible;
+    scroll-padding-top: calc(var(--header-height) + env(safe-area-inset-top, 0px) + 60px);
+  }
+
+  .cashier-shell > .app-header,
+  .flight-line-shell > .app-header {
+    position: sticky;
+    z-index: 60;
+    top: 0;
+    min-height: calc(var(--header-height) + env(safe-area-inset-top, 0px));
+    box-sizing: border-box;
+    padding-top: calc(7px + env(safe-area-inset-top, 0px));
+    background: var(--ui-surface);
+  }
+
   .app-header.app-header--compact {
     width: 100%;
     display: flex;

@@ -1,3 +1,3 @@
-export function registerSW(): () => void {
-  return () => undefined;
+export function registerSW(): (reloadPage?: boolean) => Promise<void> {
+  return async () => undefined;
 }

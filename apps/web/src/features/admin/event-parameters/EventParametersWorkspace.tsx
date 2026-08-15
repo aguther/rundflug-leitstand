@@ -1,6 +1,7 @@
 import type { EventLogoTheme, EventSnapshot } from "@rundflug/contracts";
 import { AlertTriangle, RotateCcw, Save } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useUpdateBlocker } from "../../../app/PwaUpdate";
 import { Button, CheckboxField, ConfirmationDialog, Tabs } from "../../../design-system/components";
 import { LocalizedDateTimeInput } from "../../../localized-date-input";
 import { EventWorkspaceFrame } from "../event-workspace/EventWorkspaceFrame";
@@ -45,6 +46,7 @@ export function EventParametersWorkspace({
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const workspaceRef = useRef<HTMLElement>(null);
   const form = useEventParametersForm(event);
+  useUpdateBlocker("dirty", "admin-event-parameters", form.dirty);
   const errors = submitAttempted ? form.validation.errors : {};
   const groundMinutes = useMemo(() => {
     const values = [

@@ -1,6 +1,15 @@
+import { lazy, Suspense } from "react";
 import { resolveConnectionStatus, useConnectivity } from "../shared/hooks/use-connectivity";
 import { AppHeader } from "./AppHeader";
 import { ActionNotificationStack, PageNotice, PageNotificationRegion } from "./PageNotifications";
+
+const PwaUpdateNotice = lazy(() =>
+  import("./PwaUpdate").then((module) => ({ default: module.PwaUpdateNotice })),
+);
+
+function showsOperationalPwaUpdate(pathname: string): boolean {
+  return ["/kasse", "/flight-line", "/flight-director", "/admin"].includes(pathname);
+}
 
 export function AppShell({
   title,
@@ -46,14 +55,19 @@ export function AppShell({
         title={title}
       />
       <PageNotificationRegion>
+        {notifications}
         {connectionStatus === "offline" ? (
           <PageNotice noticeKey="app-offline" tone="warning">
             Offline · letzter bestätigter Stand bleibt sichtbar; operative Aktionen sind gesperrt.
           </PageNotice>
         ) : null}
-        {notifications}
-        <ActionNotificationStack />
+        {showsOperationalPwaUpdate(window.location.pathname) ? (
+          <Suspense fallback={null}>
+            <PwaUpdateNotice />
+          </Suspense>
+        ) : null}
       </PageNotificationRegion>
+      <ActionNotificationStack />
       {children}
     </main>
   );

@@ -18,8 +18,12 @@ applyInitialTheme();
 
 if (import.meta.env.MODE !== "simulator") {
   const { registerSW } = await import("virtual:pwa-register");
-  registerSW({
+  const updateServiceWorker = registerSW({
     immediate: true,
+    onNeedRefresh() {
+      window.rundflugPwaUpdateServiceWorker = updateServiceWorker;
+      window.dispatchEvent(new Event("rundflug:pwa-update-available"));
+    },
   });
 }
 

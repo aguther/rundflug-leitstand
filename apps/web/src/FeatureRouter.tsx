@@ -27,6 +27,9 @@ const TicketStatusView = lazy(() =>
 const GroupStatusView = lazy(() =>
   import("./group-status-view").then((module) => ({ default: module.GroupStatusView })),
 );
+const NotFoundPage = lazy(() =>
+  import("./app/NotFoundPage").then((module) => ({ default: module.NotFoundPage })),
+);
 
 export function FeatureBoundary({
   children,
@@ -47,7 +50,7 @@ export function FeatureRouter() {
   const ticketCode = ticketMatch?.[1];
   const groupMatch = /^\/gruppe\/([A-Za-z2-9]{12,32})$/.exec(path);
   const groupCode = groupMatch?.[1];
-  let view: ReactNode = <CashierView />;
+  let view: ReactNode = <NotFoundPage />;
   if (groupCode) view = <GroupStatusView code={groupCode.toUpperCase()} />;
   else if (ticketCode) view = <TicketStatusView code={ticketCode.toUpperCase()} />;
   else if (path === "/setup") view = <SetupView />;
@@ -57,5 +60,6 @@ export function FeatureRouter() {
   else if (path === "/admin") view = <AdminView />;
   else if (path === "/simulation") view = <ForecastSimulationView />;
   else if (path === "/simulation/fids") view = <SimulationFidsView />;
+  else if (path === "/" || path === "/kasse") view = <CashierView />;
   return <FeatureBoundary routeKey={path}>{view}</FeatureBoundary>;
 }

@@ -2000,9 +2000,9 @@ export function FlightLineView() {
         title={FLIGHT_LINE_ASSIST_MODE ? "Flight Line" : "Flight Director"}
         notifications={
           <>
-            <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
             <EmergencyNotice active={board?.event.emergencyMode ?? false} />
             <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
+            <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
             <OperationalNotice note={board?.event.operationalNote} />
           </>
         }

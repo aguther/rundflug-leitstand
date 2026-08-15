@@ -22,6 +22,7 @@ vi.mock("./ticket-status-view", () => ({
 vi.mock("./group-status-view", () => ({
   GroupStatusView: ({ code }: { code: string }) => <p>Gruppe {code}</p>,
 }));
+vi.mock("./app/NotFoundPage", () => ({ NotFoundPage: () => <p>Not-found-Route</p> }));
 
 async function expectRoute(path: string, text: string) {
   window.history.replaceState({}, "", path);
@@ -38,7 +39,7 @@ describe("feature router", () => {
     await expectRoute("/gruppe/zyxW98765432", "Gruppe ZYXW98765432");
   });
 
-  it("routes every named workspace and falls back to the cashier", async () => {
+  it("routes every named workspace and only opens the cashier on its known paths", async () => {
     for (const [path, text] of [
       ["/setup", "Setup-Route"],
       ["/datenschutz", "Datenschutz-Route"],
@@ -48,14 +49,16 @@ describe("feature router", () => {
       ["/admin", "Administration-Route"],
       ["/simulation", "Simulations-Route"],
       ["/simulation/fids", "Simulations-FIDS-Route"],
-      ["/unbekannt", "Kassen-Route"],
+      ["/", "Kassen-Route"],
+      ["/kasse", "Kassen-Route"],
+      ["/unbekannt", "Not-found-Route"],
     ] as const) {
       await expectRoute(path, text);
     }
   });
 
   it("rejects malformed or ambiguous public codes", async () => {
-    await expectRoute("/ticket/invalid-0000", "Kassen-Route");
-    await expectRoute("/gruppe/short", "Kassen-Route");
+    await expectRoute("/ticket/invalid-0000", "Not-found-Route");
+    await expectRoute("/gruppe/short", "Not-found-Route");
   });
 });

@@ -196,6 +196,53 @@ CURRENT_BASE_REQUIREMENT_OVERRIDES = {
 }
 
 CURRENT_DELTA_REQUIREMENT_OVERRIDES = {
+    "V17-UI-020": {
+        "module": (
+            "apps/web/src/app/PageNotifications.tsx AppShell.tsx PwaUpdate.tsx und ADR-0047; "
+            "persistente Zustände inline priorisiert und transiente Aktionen als Overlay"
+        ),
+        "tests": (
+            "PageNotifications.dom.test.tsx PwaUpdate.dom.test.tsx und mobile "
+            "Browserabnahme der Sticky-Geometrie"
+        ),
+    },
+    "V17-UI-040": {
+        "module": "apps/web/src/app/PageNotifications.tsx AppShell.tsx und ADR-0047",
+        "tests": (
+            "PageNotifications.dom.test.tsx Aktionsmeldungs-Timeouttests und "
+            "Browserabnahme ohne Controlüberdeckung"
+        ),
+    },
+    "V171-ACT-010": {
+        "module": (
+            "apps/web/src/flight-line-assist.tsx flight-line-supervisor.tsx und "
+            "Flight-Line-CSS mit sichtbarer Standardaktion in festem Slot"
+        ),
+        "tests": (
+            "Flight-Line-DOM-Tests sowie Browsermessung 160×56 iPhone und 240×56 iPad "
+            "ohne horizontalen Überlauf"
+        ),
+    },
+    "V19-RTE-010": {
+        "module": (
+            "apps/web FeatureRouter Navigation NotFoundPage Installationsmetadaten "
+            "Workerprofile und PWA-Manifeste"
+        ),
+        "tests": (
+            "navigation.test.ts FeatureRouter-/NotFound-DOM-Tests install-metadata.test.ts "
+            "pwa-installability.test.ts und Browserabnahme"
+        ),
+    },
+    "V191-CAS-010": {
+        "module": (
+            "apps/web/src/cashier-view.tsx CashierViewPresentation.tsx "
+            "apps/worker/src/event-coordinator.ts und scripts/verify_sale_guards.mjs"
+        ),
+        "tests": (
+            "CashierViewPresentation.test.ts cashier-workflows.dom.test.tsx "
+            "sale-capacity-policy.test.ts Browserabnahme und test:sale-guards"
+        ),
+    },
     "V18-FLT-010": {
         "module": (
             "ADR-0037 + apps/web/src/flight-line-supervisor.tsx und "
@@ -261,6 +308,18 @@ CURRENT_BASE_STATUS_OVERRIDES = {
 }
 
 CURRENT_BASE_TRACE_OVERRIDES = {
+    "T-010": {
+        "Modul": (
+            "BP-12 + React/Vite-PWA + ansichtsspezifische Standalone-Manifeste/Startpfade + "
+            "Service-Worker-Prompt mit Dirty-/Pending-Blockierung + sichere "
+            "Navigation-Fallbacks + vollständige Icon-Familien + serverseitige "
+            "Erst-HTML-Metadaten + Produktionsbuild"
+        ),
+        "Tests": (
+            "PwaUpdate-Zustands-/DOM-Tests PWA-Installierbarkeit Produktionsbuild und "
+            "responsive Browsernachweise"
+        ),
+    },
     "F-MON-010": {
         "Tests": (
             "ADR-0009 ADR-0022 und ADR-0037 + gemeinsamer PublicBoard-Vertrag + "

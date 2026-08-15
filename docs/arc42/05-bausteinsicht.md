@@ -155,8 +155,8 @@ flowchart TB
 flowchart TB
     APP["App.tsx<br/>nur Komposition und Routing"]
     PROV["AuthProvider,<br/>ActionNotificationProvider"]
-    ROUTER["FeatureRouter<br/>lazy geladene Rollenansichten"]
-    SHELLM["app/<br/>AppShell, AppHeader, Navigation,<br/>Realtime-Refresh-Scheduler"]
+    ROUTER["FeatureRouter<br/>lazy geladene Rollenansichten,<br/>explizite Not-found-Seite"]
+    SHELLM["app/<br/>AppShell, AppHeader, Navigation,<br/>PageNotifications, PwaUpdate,<br/>Realtime-Refresh-Scheduler"]
     FEAT["features/<br/>auth, cashier, flight-line, admin, fids,<br/>public-status, analysis, forecast-simulation"]
     DS["design-system/<br/>Tokens, Themes, Button, DataTable,<br/>ModalDialog, SidePanel, StatusPill"]
     API["api.ts, board-sync.ts, event-context.ts,<br/>Offline-Snapshot in IndexedDB"]
@@ -185,6 +185,11 @@ Routing. Rollenansichten werden lazy geladen, damit ein Monitor nicht den Verwal
 API-Zugriff liegt gebündelt in `api.ts` und den Feature-Clients; Komponenten führen keine fachlichen
 Zustandsübergänge selbst aus. Der Prognosesimulator arbeitet ausschließlich im Browser und schreibt
 keine Daten in D1, R2 oder Durable Objects.
+
+`AppShell` trennt persistente Zustandsmeldungen von transienten Aktionsbestätigungen. Persistente
+Hinweise liegen inline unter dem Header; `PwaUpdate` koordiniert den expliziten Service-Worker-Reload
+über eine Dirty-/Pending-Registry. Der Catch-all des `FeatureRouter` rendert `NotFoundPage`, ohne eine
+Rollenansicht und deren Datenzugriffe als vermeintlichen Standard zu mounten.
 
 ```mermaid
 flowchart LR

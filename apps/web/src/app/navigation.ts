@@ -54,3 +54,10 @@ export function mayOpenEventRoute(role: OperatorRole, pathname: string): boolean
     isDestinationActive(pathname, destination.href),
   );
 }
+
+export function isKnownAuthenticatedRoute(pathname: string): boolean {
+  if (pathname === "/" || pathname === "/simulation" || pathname === "/simulation/fids") {
+    return true;
+  }
+  return appDestinations.some((destination) => isDestinationActive(pathname, destination.href));
+}

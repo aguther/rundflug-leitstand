@@ -9,7 +9,7 @@ import { resolveSourceRevision } from "./source-revision.ts";
 const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 const operationalPwa = VitePWA({
-  registerType: "autoUpdate",
+  registerType: "prompt",
   includeAssets: ["icons/pwa/brand/favicon.svg", "icons/pwa/brand/apple-touch-icon-180.png"],
   manifest: {
     name: "Rundflug-Leitstand",

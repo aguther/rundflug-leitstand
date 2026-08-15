@@ -36,7 +36,11 @@ vi.mock("./flight-line-shared", () => ({
   PilotChangeIcon: () => null,
   PilotIcon: () => null,
   primaryAircraftActionLabel: () => "Primäraktion",
-  primaryAircraftActionPresentation: () => ({ Icon: () => null, tone: "primary" }),
+  primaryAircraftActionPresentation: () => ({
+    Icon: () => null,
+    shortLabel: "Boarding starten",
+    tone: "primary",
+  }),
   rotationHistoryForAircraft: shared.rotationHistoryForAircraft,
 }));
 
@@ -175,6 +179,7 @@ describe("flight line assist workflow", () => {
     await waitFor(() => expect(onClaim).toHaveBeenCalledWith("aircraft-1"));
     expect(props.onSelectAircraft).toHaveBeenCalledWith("aircraft-1");
     expect(screen.getByRole("button", { name: "Flugzeug freigeben" })).toBeTruthy();
+    expect(screen.getByText("Boarding starten")).toBeTruthy();
     expect(screen.getByText("Aktueller Umlauf")).toBeTruthy();
   });
 

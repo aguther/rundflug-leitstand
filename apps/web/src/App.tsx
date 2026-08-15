@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { isKnownAuthenticatedRoute } from "./app/navigation";
 import { ActionNotificationProvider } from "./app/PageNotifications";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
 import { EventScopedApplication } from "./features/auth/EventScopedApplication";
@@ -26,7 +27,10 @@ function isPublicRoute(pathname: string): boolean {
 
 function AuthenticatedApplication() {
   const { session, loading } = useAuth();
-  if (isPublicRoute(window.location.pathname))
+  if (
+    isPublicRoute(window.location.pathname) ||
+    !isKnownAuthenticatedRoute(window.location.pathname)
+  )
     return (
       <Suspense fallback={<ApplicationLoading />}>
         <FeatureRouter />

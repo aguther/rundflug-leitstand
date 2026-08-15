@@ -193,6 +193,16 @@ Reset, `DISPLAY` besitzt ausschließlich Lesezugriff auf die Boardprojektion.
   Administration öffnen erst nach „Neu“ oder „Bearbeiten“ als Drawer oder Dialog.
 - Layoutkonstanz ist verbindlich: Lade-, Filter- und Statuswechsel dürfen keine Sprünge erzeugen;
   umfangreiche Listen erhalten genau einen begrenzten Scrollbereich.
+- In Kasse, Flight Line und Flight Director bleibt der App-Header auf iPhone-Breiten am oberen Rand.
+  Eine aktive persistente Hinweisregion bildet direkt darunter einen kompakten Sticky-Stack, zeigt
+  genau einen priorisierten Zustand und macht weitere Zustände über eine zugängliche Anzahl sichtbar.
+- Persistente Betriebs-, Offline-, Konflikt-, Fehler- und Updatezustände liegen inline und überdecken
+  keine Controls. Nur kurzlebige Aktionsbestätigungen dürfen als schwebende Toasts erscheinen.
+- PWA-Updates verwenden den Prompt-Modus. `PwaUpdate` führt
+  `idle | available | blocked | applying | failed` und lädt einen neuen Stand nur nach bewusster
+  Aktion. Tokenbasierte Dirty-/Pending-Blocker verhindern den Reload während offener Arbeit.
+- Unbekannte Frontendpfade zeigen eine eigene Not-found-Seite und mounten keine Kassenansicht;
+  unbekannte API-Pfade behalten ihre 404-Semantik.
 - Je Rolle existiert ein eigenes Web-App-Manifest mit eigenem Icon-Satz, damit installierte Geräte
   eindeutig erkennbar bleiben.
 - Rollenansichten werden lazy geladen; ein Asset-Budget wird durch `npm run web:assets:verify`
@@ -207,6 +217,10 @@ Reset, `DISPLAY` besitzt ausschließlich Lesezugriff auf die Boardprojektion.
   Flight-Line-Stylesheets werden über gemeinsame Selektorgruppen auf die zentralen `--ui-*`-Tokens
   abgebildet. Dadurch bleiben Light-/Dark-Darstellung und Spezifität erhalten, ohne die Regeln pro
   Teiloberfläche zu duplizieren.
+
+ADR-0047 begründet Meldungsflächen, Updatekoordination, mobile Sticky-Geometrie und sicheren
+Routing-Fallback. Flight Line und Flight Director behalten ihre bestehende Aktionsanordnung; nur die
+zustandsabhängige Standardaktion besitzt zusätzlich ein sichtbares Label in einem festen Slot.
 
 ## 8.10 Zeit, Sprache und Texte
 

@@ -1103,36 +1103,49 @@ input:focus-visible {
   flex-direction: column;
 }
 .page-notification-region {
-  position: fixed;
-  z-index: 60;
-  top: 76px;
-  right: max(12px, env(safe-area-inset-right));
-  width: min(420px, calc(100vw - 24px));
-  max-height: calc(100dvh - 92px);
+  z-index: 55;
+  width: 100%;
+  box-sizing: border-box;
   display: grid;
-  gap: 8px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  pointer-events: none;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 8px clamp(10px, 2vw, 24px);
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-bg);
 }
-.page-notification-region:empty {
+
+.page-notification-region[hidden] {
   display: none;
+}
+
+.page-notification-list {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.page-notification-more {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 6px;
+  color: var(--ui-text);
+  background: var(--ui-control);
+  cursor: pointer;
 }
 .page-notification {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: center;
   gap: 10px;
   margin: 0;
-  padding: 11px 11px 11px 13px;
+  padding: 8px 9px 8px 11px;
   border: 1px solid var(--ui-border-strong);
   border-left-width: 4px;
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--ui-text);
-  background: color-mix(in srgb, var(--ui-surface-raised) 96%, transparent);
-  box-shadow: 0 12px 34px rgb(0 0 0 / 28%);
-  backdrop-filter: blur(12px);
-  pointer-events: auto;
+  background: var(--ui-surface-raised);
   animation: page-notification-in 160ms ease-out;
 }
 .page-notification-success {
@@ -1193,6 +1206,68 @@ input:focus-visible {
 .page-notification-close:hover {
   background: color-mix(in srgb, currentColor 10%, transparent);
 }
+
+.action-notification-region {
+  position: fixed;
+  z-index: 65;
+  top: 76px;
+  right: max(12px, env(safe-area-inset-right, 0px));
+  width: min(420px, calc(100vw - 24px));
+  display: grid;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.action-notification-region .page-notification {
+  box-shadow: 0 12px 34px rgb(0 0 0 / 28%);
+  pointer-events: auto;
+}
+
+.pwa-update-notice {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pwa-update-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.pwa-update-copy > strong,
+.pwa-update-copy > small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pwa-update-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.pwa-update-actions > button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.pwa-update-actions > button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
 @keyframes page-notification-in {
   from {
     opacity: 0;
@@ -1220,13 +1295,44 @@ input:focus-visible {
 }
 @media (max-width: 760px) {
   .page-notification-region {
-    top: 70px;
-    right: max(8px, env(safe-area-inset-right));
-    width: calc(100vw - 16px);
-    max-height: calc(100dvh - 82px);
+    position: sticky;
+    top: calc(var(--header-height) + env(safe-area-inset-top, 0px));
+    grid-template-columns: minmax(0, 1fr);
+    padding: 6px 8px;
+    background: var(--ui-bg);
   }
   .page-notification {
-    padding: 9px;
+    min-height: 52px;
+    box-sizing: border-box;
+    padding: 7px 8px;
+  }
+  .page-notification-content small {
+    display: none;
+  }
+  .page-notification-list > .page-notification:not(:first-child) {
+    display: none;
+  }
+  .page-notification-region.is-expanded .page-notification-list > .page-notification {
+    display: grid;
+  }
+  .page-notification-more {
+    min-height: 36px;
+  }
+  .action-notification-region {
+    top: calc(var(--header-height) + env(safe-area-inset-top, 0px) + 8px);
+    right: max(8px, env(safe-area-inset-right, 0px));
+    width: calc(100vw - 16px);
+  }
+  .pwa-update-notice {
+    gap: 8px;
+  }
+  .pwa-update-copy > small {
+    display: none;
+  }
+  .pwa-update-actions > button {
+    min-height: 44px;
+    padding-inline: 8px;
+    font-size: 0.75rem;
   }
 }
 .app-header > div {

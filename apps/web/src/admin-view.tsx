@@ -500,14 +500,14 @@ export function AdminView() {
       title="Administration"
       notifications={
         <>
+          <EmergencyNotice active={board?.event.emergencyMode ?? false} />
+          <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
           <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
           {setupRequired ? (
             <PageNotice noticeKey="setup-required" tone="warning">
               Dieses System ist noch nicht eingerichtet. <a href="/setup">Ersteinrichtung öffnen</a>
             </PageNotice>
           ) : null}
-          <EmergencyNotice active={board?.event.emergencyMode ?? false} />
-          <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
           <OperationalNotice note={board?.event.operationalNote} />
         </>
       }

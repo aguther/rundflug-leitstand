@@ -680,6 +680,7 @@ export function FlightLineSupervisorConsole({
                 </span>
                 <span className="flight-director-row-actions">
                   <IconButton
+                    className="flight-director-primary-action"
                     label={primaryAircraftActionLabel(entry, rotation)}
                     disabled={rotation?.status === "COMPLETED" || actionBusy}
                     busy={pendingAction === "primary"}
@@ -691,6 +692,7 @@ export function FlightLineSupervisorConsole({
                     type="button"
                   >
                     <PrimaryActionIcon aria-hidden="true" />
+                    <span>{primaryPresentation.shortLabel}</span>
                   </IconButton>
                   <IconButton
                     aria-pressed={entry.operationalState === "REFUELING"}

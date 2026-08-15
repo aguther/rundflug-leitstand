@@ -1,6 +1,6 @@
 # ADR-0020: Transiente und persistente UI-Meldungen
 
-- Status: Akzeptiert
+- Status: Teilweise ersetzt durch ADR-0047
 - Datum: 2026-07-21
 - Entscheidung: Auftraggeber
 - Betroffene Anforderungen: V17-UI-020, V17-UI-040
@@ -26,3 +26,9 @@ betriebliche Zustände erkennbar bleiben, solange sie fachlich bestehen.
 
 Ansichten veröffentlichen Aktionsmeldungen über einen gemeinsamen React-Kontext. Es entstehen keine
 neuen Transportverträge, Abhängigkeiten, Datenbankfelder oder Auditereignisse.
+
+## Nachfolgende Entscheidung
+
+ADR-0047 behält die Trennung zwischen transienten und persistenten Meldungen bei, ersetzt aber die
+gemeinsame Overlay-Fläche: Persistente Zustände liegen nun inline unter dem App-Header; nur transiente
+Aktionsbestätigungen schweben weiterhin über dem Inhalt.

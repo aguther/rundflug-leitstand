@@ -73,11 +73,11 @@ describe("application access routing", () => {
     expect(screen.getByText("Authentifizierte Anwendung")).toBeTruthy();
   });
 
-  it("keeps malformed public-looking paths behind authentication", () => {
+  it("routes malformed and unknown frontend paths to the not-found surface without authentication", async () => {
     for (const path of ["/ticket/invalid-0000", "/gruppe/short"]) {
       window.history.replaceState({}, "", path);
       render(<App />);
-      expect(screen.getByText("Anmeldeseite")).toBeTruthy();
+      expect(await screen.findByText("Öffentliche Route")).toBeTruthy();
       cleanup();
     }
   });
@@ -96,6 +96,6 @@ describe("application access routing", () => {
 
     window.history.replaceState({}, "", "/simulation/unknown");
     render(<App />);
-    expect(screen.getByText("Anmeldeseite")).toBeTruthy();
+    expect(await screen.findByText("Öffentliche Route")).toBeTruthy();
   });
 });

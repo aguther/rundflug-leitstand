@@ -4,6 +4,7 @@ import {
   destinationsForRole,
   homeForRole,
   isDestinationActive,
+  isKnownAuthenticatedRoute,
   mayOpenEventRoute,
 } from "./navigation";
 
@@ -35,6 +36,14 @@ describe("V1.2 app navigation", () => {
       expect(mayOpenEventRoute("DISPLAY", path)).toBe(false);
     }
     expect(appDestinations.some((entry) => entry.href === "/simulation")).toBe(false);
+  });
+
+  it("distinguishes known authenticated routes from not-found paths", () => {
+    expect(isKnownAuthenticatedRoute("/kasse")).toBe(true);
+    expect(isKnownAuthenticatedRoute("/flight-line")).toBe(true);
+    expect(isKnownAuthenticatedRoute("/simulation/fids")).toBe(true);
+    expect(isKnownAuthenticatedRoute("/unbekannt")).toBe(false);
+    expect(isKnownAuthenticatedRoute("/flight-line/assist")).toBe(false);
   });
 
   it("resolves the operational home and visible destinations for every role", () => {

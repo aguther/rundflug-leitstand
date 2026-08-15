@@ -37,6 +37,50 @@
   min-width: 0;
   margin: 0;
 }
+
+.cashier-capacity-guidance {
+  height: 44px;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 20px auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+  font-size: 0.78rem;
+}
+
+.cashier-capacity-guidance > strong {
+  color: var(--cashier-capacity-heading, var(--ui-text));
+  white-space: nowrap;
+}
+
+.cashier-capacity-guidance > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cashier-capacity-guidance > svg {
+  color: var(--cashier-capacity-icon, var(--ui-muted));
+}
+
+.cashier-capacity-guidance.tone-positive {
+  --cashier-capacity-icon: var(--ui-success);
+}
+
+.cashier-capacity-guidance.tone-warning {
+  --cashier-capacity-heading: var(--ui-warning-text);
+  --cashier-capacity-icon: var(--ui-warning-text);
+  border-color: color-mix(in srgb, var(--ui-warning) 58%, var(--ui-border));
+  color: var(--ui-warning-text);
+  background: var(--ui-warning-soft);
+}
 .cashier-sale-title {
   min-width: 0;
 }
@@ -1027,6 +1071,14 @@
   .cashier-sale-heading {
     align-items: stretch;
     flex-direction: column;
+  }
+  .cashier-capacity-guidance {
+    height: 74px;
+    grid-template-columns: 20px minmax(0, 1fr);
+  }
+  .cashier-capacity-guidance > span {
+    grid-column: 2;
+    white-space: normal;
   }
   .cashier-group-size {
     width: 100%;

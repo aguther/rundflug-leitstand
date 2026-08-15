@@ -197,7 +197,7 @@
 .flight-director-row-actions {
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(6, var(--control-touch));
+  grid-template-columns: 168px repeat(5, var(--control-touch));
   gap: 5px;
 }
 
@@ -207,6 +207,28 @@
   height: var(--control-touch);
   border-color: var(--ui-border-strong);
   background: var(--ui-control);
+}
+
+.flight-director-row-actions .flight-director-primary-action {
+  width: 168px;
+  min-width: 168px;
+  padding-inline: 10px;
+}
+
+.flight-director-row-actions .flight-director-primary-action .ds-button-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.flight-director-row-actions .flight-director-primary-action span {
+  display: -webkit-box;
+  overflow: hidden;
+  line-height: 1.05;
+  text-align: center;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .flight-director-group-head {

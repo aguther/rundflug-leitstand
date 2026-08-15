@@ -42,6 +42,7 @@ import {
 import { getTicketGroupPrintData, searchTickets, sendCommand } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { useActionMessageBridge } from "./app/PageNotifications";
+import { useUpdateBlocker } from "./app/PwaUpdate";
 import {
   Button,
   CheckboxField,
@@ -62,6 +63,7 @@ import {
 } from "./features/cashier/CashierTicketPresentation";
 import {
   activeFlightEmptyLabel,
+  CashierCapacityGuidance,
   CashierNotifications,
   CashierTicketGroupHeader,
   CashierTicketPaperPreview,
@@ -189,6 +191,11 @@ export function CashierView() {
   const cashierOrderHasChanged = cashierProductOrderChanged(
     expectedCashierProductIds,
     orderedCashierProductIds,
+  );
+  useUpdateBlocker(
+    "dirty",
+    "cashier-sale-draft",
+    size !== 1 || pendingDraftCount > 0 || (cashierOrderEditing && cashierOrderHasChanged),
   );
   const currency = (cents: number) =>
     (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -947,6 +954,7 @@ export function CashierView() {
               </div>
             ) : null}
           </div>
+          {!cashierOrderEditing ? <CashierCapacityGuidance products={board?.products} /> : null}
           {cashierOrderEditing ? (
             <>
               <ol aria-label="Kassenreihenfolge der Produkte" className="cashier-order-editor">

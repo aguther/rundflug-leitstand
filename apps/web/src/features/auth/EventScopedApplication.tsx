@@ -1,6 +1,6 @@
 import type { EventCatalogEntry, OperatorSession } from "@rundflug/contracts";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { homeForRole, mayOpenEventRoute } from "../../app/navigation";
+import { homeForRole, isKnownAuthenticatedRoute, mayOpenEventRoute } from "../../app/navigation";
 import { ActiveEventProvider, rememberActiveEvent, resolveActiveEvent } from "../../event-context";
 import { eventSelectionLocation } from "../../event-navigation";
 import { loadSelectableEvents } from "./api";
@@ -75,7 +75,7 @@ export function EventScopedApplication({ session }: Readonly<{ session: Operator
     return <Loading>Arbeitsbereich wird geöffnet …</Loading>;
   }
   const permitted = mayOpenEventRoute(session.account.role, window.location.pathname);
-  if (!permitted) {
+  if (isKnownAuthenticatedRoute(window.location.pathname) && !permitted) {
     window.location.replace(homeForRole(session.account.role));
     return <Loading>Arbeitsbereich wird geöffnet …</Loading>;
   }
