@@ -11,6 +11,8 @@ wrangler.*.generated.jsonc
 .env.*
 !.env.example
 coverage/
+reports/mutation/
+.stryker-tmp/
 playwright-report/
 test-results/
 tmp/

@@ -20,14 +20,17 @@
 - `apps/worker/src/planned-operation-audit-reason.test.ts` und
   `apps/worker/src/operational-planning.test.ts`: rollen- und aktionsbezogene Auditgründe,
   abgelehnte Browser-Gründe und privater Betriebsplan ohne internes Grundfeld
-- `apps/web/src/admin-v15-ui.test.ts`: Navigation, Legacy-Links, Schritte, Diagramm und
-  Importvorschau
-- `apps/web/src/admin-modernization-ui.test.ts`: zugängliche segmentierte Tabs, gemeinsame
-  Betriebsplantabelle, rollenabhängige Bestätigung, Kontenmodalen und iPad-Reduktionen
+- `apps/web/src/admin-view.dom.test.tsx`, `apps/web/src/admin-ux.dom.test.tsx` und
+  `apps/web/src/features/admin/AdminEventFlowChart.dom.test.tsx`: Navigation, zugängliche
+  Arbeitsbereiche, Diagramm und Nutzerinteraktion
+- `apps/web/src/features/admin/operations/OperationsWorkspace.dom.test.tsx` und
+  `apps/web/src/features/admin/AdminShellDialogs.dom.test.tsx`: segmentierte Arbeitsbereiche,
+  Betriebsplantabelle, rollenabhängige Bestätigung und Kontendialoge
 - `apps/worker/src/operator-account-management.test.ts`: Admin-Schutz, Sitzungswiderruf und
   geschütztes Löschen von Konten; eigene und letzte aktive Administrationskonten bleiben erhalten
-- `apps/web/src/admin-v1-completion-ui.test.ts`: zentrierte Editoren, Tooltip-Auslösung,
-  Rollenabgrenzung und Abschlusskorrektur
+- `apps/web/src/features/admin/completion/CompletionWorkspace.dom.test.tsx` und
+  `apps/web/src/features/admin/completion/ManifestCorrectionPanel.dom.test.tsx`: Rollenabgrenzung,
+  Abschlusskorrektur und zugängliche Interaktion
 - `apps/web/src/flight-line-supervisor-ui.test.ts`: Kopfzeilenpriorität, Betriebsdialog,
   organisatorische Kommandos und Admin-only-Not-Halt-Aufhebung
 

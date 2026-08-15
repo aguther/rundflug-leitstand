@@ -11,7 +11,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/fids-display.tsx features/fids/useFidsExperience.ts fids-location.ts sowie ADR-0039",
-      "tests": "fids-display-ui.test.ts fids-location.test.ts useFidsExperience.dom.test.tsx und Browser-Konzeptvergleich",
+      "tests": "fids-display.dom.test.tsx fids-location.test.ts useFidsExperience.dom.test.tsx und Browser-Konzeptvergleich",
       "traceStatus": "umgesetzt"
     },
     {
@@ -35,7 +35,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/fids-display.tsx features/fids/fids-v12.css sowie ADR-0039",
-      "tests": "fids-display.dom.test.tsx fids-display-ui.test.ts fids-v12.test.ts useFidsExperience.dom.test.tsx und Light-/Dark-Browserabnahme",
+      "tests": "fids-display.dom.test.tsx useFidsExperience.dom.test.tsx und Light-/Dark-Browserabnahme",
       "traceStatus": "umgesetzt"
     },
     {
@@ -47,7 +47,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/features/fids/FidsSettingsDialog.tsx fids-display.tsx und ADR-0039",
-      "tests": "fids-display-ui.test.ts und Dialog-Browserabnahme",
+      "tests": "FidsSettingsDialog.dom.test.tsx und Dialog-Browserabnahme",
       "traceStatus": "umgesetzt"
     },
     {
@@ -83,7 +83,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "packages/contracts/src/index.ts apps/worker/src/fids-preferences-storage.ts fids-board-projection.ts index.ts und apps/web/src/api.ts",
-      "tests": "Contract- fids-preferences- und public-board-priority.test.ts sowie Endpunktabnahme",
+      "tests": "Contract- und fids-preferences-Tests sowie apps/worker/src/fids-board-projection.test.ts und Endpunktabnahme",
       "traceStatus": "umgesetzt"
     },
     {
@@ -119,7 +119,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/flight-line-assist.tsx und features/flight-line/flight-line-assist-v15.css",
-      "tests": "flight-line-assist-ui.test.ts und mobile Browserabnahme",
+      "tests": "flight-line-assist.dom.test.tsx und mobile Browserabnahme",
       "traceStatus": "umgesetzt"
     },
     {

@@ -50,6 +50,7 @@ ist die Übersicht; verbindlich ist jeweils der ADR-Text mit Kontext, Alternativ
 | [0043](../adr/0043-familienvertraege-und-isoliertes-worker-testharness.md) | Familienverträge und isoliertes Worker-Testharness | kompatible Operations-Fassade mit vier Command-Familien; parallele lokale Verifier ohne geteilten Port oder D1-Zustand |
 | [0044](../adr/0044-eigenstaendiger-simulations-fids-tab.md) | Eigenständiger Simulations-FIDS-Tab mit lokalem Zustandskanal | direkte Route ohne Popup-/Portal-Kopplung; versionierte flüchtige Tab-Synchronisation ohne Backend oder Browser-Storage |
 | [0045](../adr/0045-d1-v1-12-schema-baseline.md) | Inkompatible D1-Schema-Baseline für V1.12 | eine ausführbare Baseline statt 69 Entwicklungsmigrationen; künftige Nummerierung eindeutig und lückenlos ab `0002` |
+| [0046](../adr/0046-verhaltensbasierte-testarchitektur.md) | Verhaltensbasierte Testarchitektur und Qualitätsratchets | keine TypeScript-Quelltexttests; ausführbare Domain-, SQLite-, Runtime-, DOM- und Browsergrenzen sowie Coverage- und Mutation-Ratchets |
 
 ## Offene Entscheidungen
 

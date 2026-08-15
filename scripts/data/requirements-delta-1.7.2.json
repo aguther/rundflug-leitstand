@@ -11,7 +11,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/design-system/components.css",
-      "tests": "design-system/components.test.ts und Browserabnahme mit Tastaturfokus",
+      "tests": "design-system/components/Field.dom.test.tsx und Browserabnahme mit Tastaturfokus",
       "traceStatus": "umgesetzt"
     },
     {
@@ -23,7 +23,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/cashier-view.tsx und features/cashier/cashier-v12.css",
-      "tests": "cashier-v12.test.ts und responsive Browserabnahme",
+      "tests": "cashier-workflows.dom.test.tsx und responsive Browserabnahme",
       "traceStatus": "umgesetzt"
     },
     {
@@ -83,7 +83,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/flight-line-assist.tsx und features/flight-line/flight-line-assist-v15.css",
-      "tests": "flight-line-assist-ui.test.ts und Browserabnahme ab 320×568",
+      "tests": "flight-line-assist.dom.test.tsx und Browserabnahme ab 320×568",
       "traceStatus": "umgesetzt"
     },
     {
@@ -95,7 +95,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/flight-line-assist.tsx und Assist-CSS",
-      "tests": "flight-line-assist-ui.test.ts und Browserabnahme für Übernahme sowie Aktualisieren",
+      "tests": "flight-line-assist.dom.test.tsx und Browserabnahme für Übernahme sowie Aktualisieren",
       "traceStatus": "umgesetzt"
     },
     {

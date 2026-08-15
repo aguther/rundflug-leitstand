@@ -1,28 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import pushWorker from "../../web/public/push-sw.js?raw";
-import publicStatusCopy from "./public-status-copy.ts?raw";
+import { PUBLIC_STATUS_MESSAGES } from "./public-status-copy";
 
 describe("öffentlicher Status V1.8", () => {
   it("trennt GO-TO-GATE- und BOARDING-Copy exakt", () => {
-    expect(publicStatusCopy).toContain(
-      '"Bitte kommen Sie jetzt zum Gate und warten Sie dort auf den Boardingaufruf."',
+    expect(PUBLIC_STATUS_MESSAGES.COME_TO_FLIGHT_LINE).toBe(
+      "Bitte kommen Sie jetzt zum Gate und warten Sie dort auf den Boardingaufruf.",
     );
-    expect(publicStatusCopy).toContain(
-      '"Das Boarding hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit."',
+    expect(PUBLIC_STATUS_MESSAGES.BOARDING).toBe(
+      "Das Boarding hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.",
     );
-    expect(publicStatusCopy).not.toContain('"Bitte jetzt zur Flight Line kommen."');
-    expect(publicStatusCopy).not.toContain('"Bitte jetzt zum angegebenen Gate kommen."');
-  });
-
-  it("öffnet aus Push ausschließlich validierte Statuspfade des eigenen Ursprungs", () => {
-    expect(pushWorker).toContain("^\\/(?:ticket|gruppe)\\/");
-    expect(pushWorker).toContain("safePublicStatusPath");
-    expect(pushWorker).toContain("target.origin !== self.location.origin");
-    expect(pushWorker).toContain("data?.web_push === 8030");
-    expect(pushWorker).toContain("notification?.navigate");
-    expect(pushWorker).toContain("self.clients.openWindow(targetPath)");
-    expect(pushWorker).not.toContain('openWindow(event.notification.data?.url ?? "/")');
-    expect(pushWorker).not.toContain('tag: "rundflug-ticket-status"');
   });
 
   it("zeigt deklarative Push-Daten auch in Browsern ohne nativen Fallback sichtbar an", async () => {

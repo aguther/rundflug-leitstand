@@ -52,6 +52,30 @@ describe("verbleibende Kapazität", () => {
     ).toBe("SOLD_OUT");
   });
 
+  it("distinguishes a limited sale recommendation from a critical manual review", () => {
+    const assess = (openTickets: number) =>
+      assessRemainingCapacity({
+        remainingOperatingMinutes: 20,
+        expectedRotationMinutes: 20,
+        activeAircraftSeats: [4],
+        openTickets,
+        predictionQuality: "STABLE",
+        warningThreshold: 3,
+        criticalThreshold: 1,
+      });
+
+    expect(assess(2)).toMatchObject({
+      remainingSellableSeats: 2,
+      status: "LIMITED",
+      saleRecommended: true,
+    });
+    expect(assess(3)).toMatchObject({
+      remainingSellableSeats: 1,
+      status: "MANUAL_REVIEW",
+      saleRecommended: false,
+    });
+  });
+
   it("reserves one conservative gap for planned refueling", () => {
     const result = assessRemainingCapacity({
       remainingOperatingMinutes: 120,
@@ -112,6 +136,49 @@ describe("verbleibende Kapazität", () => {
 
     expect(assess(30)).toMatchObject({ projectedSeats: 18, remainingSellableSeats: 12 });
     expect(assess(45)).toMatchObject({ projectedSeats: 12, remainingSellableSeats: 6 });
+  });
+
+  it("does not recommend a sale when no compatible resource lane remains", () => {
+    const availability = createQueueAvailability({
+      activeAircraft: 1,
+      busyAircraftMinutes: [],
+      lanes: [
+        {
+          laneId: "incompatible",
+          aircraftId: "aircraft-other",
+          passengerSeats: 4,
+          lowerMinutes: 0,
+          expectedMinutes: 0,
+          upperMinutes: 0,
+          constraints: [],
+        },
+      ],
+    });
+
+    expect(
+      assessMarginalProductCapacity({
+        operationsEndMinutes: 60,
+        availabilityAfterQueue: availability,
+        duration: {
+          lowerMinutes: 20,
+          expectedMinutes: 20,
+          upperMinutes: 20,
+          quality: "STABLE",
+          sampleCount: 0,
+        },
+        compatibleAircraftIds: new Set(["aircraft-compatible"]),
+        queuedSeatsCompletedByEnd: 0,
+        openTickets: 0,
+        predictionQuality: "STABLE",
+        warningThreshold: 4,
+        criticalThreshold: 2,
+      }),
+    ).toMatchObject({
+      projectedSeats: 0,
+      remainingSellableSeats: 0,
+      status: "SOLD_OUT",
+      saleRecommended: false,
+    });
   });
 
   it("applies recurring pauses before recommending another sale batch", () => {

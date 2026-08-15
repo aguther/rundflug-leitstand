@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import anonymityDecision from "../../../docs/adr/0006-vollstaendig-anonyme-identitaeten.md?raw";
 import { createMigratedTestDatabase, type SqliteRow } from "../test-support/migrated-database";
-import fidsProjection from "./fids-board-projection.ts?raw";
 
 const columnsOf = (table: string) => {
   const database = createMigratedTestDatabase();
@@ -83,9 +82,5 @@ describe("anonymous V1 ticket data model", () => {
       .all()
       .find((row: SqliteRow) => Number(row.unique) === 1);
     expect(uniqueFlightGroupIndex).toBeDefined();
-  });
-
-  it("uses the frozen rotation gate in the FIDS slot projection", () => {
-    expect(fidsProjection).toContain("LEFT JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)");
   });
 });

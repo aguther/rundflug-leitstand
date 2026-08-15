@@ -5,7 +5,6 @@ import {
   currentDispatchPlanRevision,
   supportSafeOperationBoard,
 } from "./analysis-snapshot";
-import snapshotSource from "./analysis-snapshot.ts?raw";
 import type { Env } from "./types";
 
 const HASH = "a".repeat(64);
@@ -197,12 +196,6 @@ describe("support-safe analysis snapshot", () => {
     expect(serialized).toContain("capacityStatus");
     expect(serialized).not.toContain("canary");
     expect(serialized).not.toContain("pushEndpoint");
-  });
-
-  it("V1120-DIA-020 binds the export to the exact manual planning run", () => {
-    expect(snapshotSource).toContain("run.id = ?1");
-    expect(snapshotSource).toContain("input.planningRunId");
-    expect(snapshotSource).not.toContain("ORDER BY run.calculation_now DESC");
   });
 
   it("exports a validated, support-safe snapshot for the exact planning run", async () => {

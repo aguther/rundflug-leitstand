@@ -4,7 +4,7 @@ import {
   createMigratedTestDatabase,
   describeDatabaseSchema,
 } from "../test-support/migrated-database";
-import backupSource from "./backup.ts?raw";
+import { BACKUP_TABLES } from "./backup";
 
 describe("forecast snapshot retention", () => {
   it("keeps the persisted timeline schema versioned", () => {
@@ -44,7 +44,7 @@ describe("forecast snapshot retention", () => {
       /append-only/,
     );
     expect(() => database.exec("DELETE FROM forecast_snapshots")).toThrow(/append-only/);
-    expect(backupSource).toContain('"forecast_snapshots"');
+    expect(BACKUP_TABLES).toContain("forecast_snapshots");
     database.close();
   });
 });

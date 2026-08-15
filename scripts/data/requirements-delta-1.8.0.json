@@ -11,7 +11,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/design-system/components und asynchrone Anwendungsaktionen",
-      "tests": "components.test.ts sowie UI-Quelltests und Browserabnahme",
+      "tests": "design-system/components/semantics.dom.test.tsx und busy-indicator.test.ts sowie Browserabnahme",
       "traceStatus": "umgesetzt"
     },
     {
@@ -35,7 +35,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/cashier-view.tsx und cashier-v12.css",
-      "tests": "cashier-v1-6.test.ts cashier-v12.test.ts und Browserabnahme",
+      "tests": "cashier-workflows.dom.test.tsx und Browserabnahme",
       "traceStatus": "umgesetzt"
     },
     {

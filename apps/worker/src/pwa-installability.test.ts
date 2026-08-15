@@ -1,14 +1,12 @@
 // @ts-expect-error Vitest runs in Node; the Worker production config intentionally excludes Node types.
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import wranglerConfig from "../../../wrangler.jsonc?raw";
 import indexHtml from "../../web/index.html?raw";
 import adminManifest from "../../web/public/manifests/admin.webmanifest?raw";
 import fidsManifest from "../../web/public/manifests/fids.webmanifest?raw";
 import flightDirectorManifest from "../../web/public/manifests/flight-director.webmanifest?raw";
 import flightLineManifest from "../../web/public/manifests/flight-line.webmanifest?raw";
 import kasseManifest from "../../web/public/manifests/kasse.webmanifest?raw";
-import viteConfig from "../../web/vite.config.ts?raw";
 import { INTERNAL_APP_INSTALL_PROFILES } from "./public-install-routes";
 
 const iconProfiles = [
@@ -43,16 +41,6 @@ function pngDimensions(url: URL): { width: number; height: number } {
 }
 
 describe("T-010 PWA installability and icon family", () => {
-  it("ships the branded root manifest with regular and maskable icon sizes", () => {
-    expect(viteConfig).toContain('display: "standalone"');
-    expect(viteConfig).toContain("/icons/pwa/brand/icon-192.png");
-    expect(viteConfig).toContain("/icons/pwa/brand/icon-512.png");
-    expect(viteConfig).toContain("/icons/pwa/brand/maskable-192.png");
-    expect(viteConfig).toContain("/icons/pwa/brand/maskable-512.png");
-    expect(viteConfig).toContain('purpose: "maskable"');
-    expect(viteConfig).toContain('navigateFallback: "/index.html"');
-  });
-
   it("exposes the new brand favicon and iOS icon in the generic document", () => {
     expect(indexHtml).toContain(
       'rel="icon" href="/icons/pwa/brand/favicon.svg" type="image/svg+xml"',
@@ -159,15 +147,5 @@ describe("T-010 PWA installability and icon family", () => {
       expect(profile.appleTouchIconHref).toBe(`/icons/pwa/${iconProfile}/apple-touch-icon-180.png`);
       expect(profile.manifestHref).toBe(`/manifests/${iconProfile}.webmanifest`);
     }
-    for (const path of ["/kasse", "/flight-director", "/flight-line", "/fids/*", "/admin"]) {
-      expect(wranglerConfig).toContain(path);
-    }
-    expect(wranglerConfig).not.toContain('"/flight-line/*"');
-  });
-
-  it("umgeht für installierbare Routen den generischen Workbox-Navigationsfallback", () => {
-    expect(viteConfig).toContain("/^\\/(?:ticket|gruppe)\\//");
-    expect(viteConfig).toContain("/^\\/(?:kasse|admin|fids)(?:\\/|$)/");
-    expect(viteConfig).toContain("/^\\/(?:flight-director|flight-line)(?:\\/|$)/");
   });
 });

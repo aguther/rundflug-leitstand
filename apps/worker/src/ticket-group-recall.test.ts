@@ -1,14 +1,11 @@
 import { commandEnvelopeSchema } from "@rundflug/contracts/operations-dispatch";
 import { assertRoleMayExecute, DomainRuleError } from "@rundflug/domain";
 import { describe, expect, it } from "vitest";
-import publicStatus from "../../web/src/features/public-status/PublicStatusContent.tsx?raw";
-import fids from "../../web/src/fids-display.tsx?raw";
 import {
   applyDemoSeed,
   createMigratedTestDatabase,
   type SqliteRow,
 } from "../test-support/migrated-database";
-import push from "./web-push.ts?raw";
 
 describe("V1.11 aktiver Gruppennachruf", () => {
   it("trennt den öffentlichen Nachruf vom bisherigen Queue-Kommando und berechtigt die drei Rollen", () => {
@@ -116,18 +113,6 @@ describe("V1.11 aktiver Gruppennachruf", () => {
       "subscription_id",
       "ticket_group_recall_id",
     ]);
-    expect(push).toContain("subscription.ticket_group_id = recall.ticket_group_id");
-    expect(push).toContain("delivery.ticket_group_recall_id = ?1");
-    expect(push).not.toContain("recall.rotation_id");
-    expect(push).toContain('deliverStoredPushSubscriptions(env, "TICKET_GROUP_RECALL"');
-  });
-
-  it("projiziert den aktiven Vorgang in Leitstand, Ticket, Gruppe und FIDS ohne Normalstatus zu ersetzen", () => {
-    expect(fids).toContain("group.activeRecall");
-    expect(fids).toContain("<span>NACHRUF</span>");
-    expect(fids).toContain("fids-status-cell");
-    expect(publicStatus).toContain("PublicRecallNotice");
-    expect(publicStatus).toContain("recall.publicMessage");
   });
 
   it("nimmt keine Namen oder frei formulierten öffentlichen Texte in den Vorgang auf", () => {

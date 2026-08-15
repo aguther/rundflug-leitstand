@@ -9,6 +9,7 @@
       "!**/.claude",
       "!wrangler.*.generated.jsonc",
       "!coverage",
+      "!reports/mutation",
       "!tmp",
       "!apps/worker/src/worker-configuration.d.ts",
       "!docs/ui/icon-system",

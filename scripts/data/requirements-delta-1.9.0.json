@@ -23,7 +23,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/cashier-view.tsx cashier-guidance.ts und cashier-v12.css",
-      "tests": "cashier-guidance.test.ts v19-ui.test.ts cashier-v12.test.ts und Browserabnahme",
+      "tests": "cashier-guidance.test.ts cashier-workflows.dom.test.tsx und Browserabnahme",
       "traceStatus": "umgesetzt"
     },
     {
@@ -35,7 +35,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/features/cashier/cashier-v12.css und styles.css",
-      "tests": "v19-ui.test.ts cashier-v12.test.ts und 58x100-mm-Print-to-PDF; physische POS-58-Prüfung extern",
+      "tests": "cashier-workflows.dom.test.tsx und 58x100-mm-Print-to-PDF; physische POS-58-Prüfung extern",
       "traceStatus": "umgesetzt"
     },
     {

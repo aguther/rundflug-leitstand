@@ -1,144 +1,120 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { applyDemoSeed, createD1TestDatabase } from "../test-support/migrated-database";
 import {
   countFidsProjectionRows,
-  type FidsProjectionRow,
   loadAllFidsProjectionRows,
   loadFidsProjectionRows,
 } from "./fids-board-projection";
-import projectionSource from "./fids-board-projection.ts?raw";
 
-function recordingDatabase(result: { count?: number; rows?: FidsProjectionRow[] }): {
-  db: D1Database;
-  statements: string[];
-  bindings: unknown[][];
-} {
-  const statements: string[] = [];
-  const bindings: unknown[][] = [];
-  const db = {
-    prepare(statement: string) {
-      statements.push(statement);
-      return {
-        bind(...values: unknown[]) {
-          bindings.push(values);
-          return {
-            first: async () => ({ total_items: result.count ?? 0 }),
-            all: async () => ({ results: result.rows ?? [] }),
-          };
-        },
-      };
-    },
-  } as unknown as D1Database;
-  return { db, statements, bindings };
-}
-
+const now = "2026-08-15T10:00:00.000Z";
 const projectionInput = {
-  eventId: "event-synthetic",
-  filter: {
-    productIds: ["product-b", "product-a"],
-    gateIds: ["gate-a"],
-    rotationStatuses: [],
-  },
-  departedVisibilityCutoff: "2026-08-02T08:00:00.000Z",
-  now: "2026-08-02T08:00:15.000Z",
-  band: "PREPARE" as const,
-  excludedRowIds: ["rotation-a:group-a"],
+  eventId: "demo-2026",
+  filter: { productIds: [] as string[], gateIds: [] as string[], rotationStatuses: [] as string[] },
+  departedVisibilityCutoff: "2026-08-15T09:30:00.000Z",
+  now,
+  band: "ALL" as const,
 };
 
 describe("protected FIDS board projection", () => {
-  it("applies event filters before ranking, counting and page limits", async () => {
-    const projectedStart = projectionSource.indexOf("WITH projected AS");
-    const rankedStart = projectionSource.indexOf("), ranked AS");
-    const productFilter = projectionSource.indexOf("p.id IN (SELECT value FROM json_each(?2))");
-    const gateFilter = projectionSource.indexOf("g.id IN (SELECT value FROM json_each(?3))");
-    const selectedStart = projectionSource.indexOf("), selected AS");
-    expect(projectedStart).toBeGreaterThanOrEqual(0);
-    expect(productFilter).toBeGreaterThan(projectedStart);
-    expect(gateFilter).toBeGreaterThan(productFilter);
-    expect(rankedStart).toBeGreaterThan(gateFilter);
-    expect(selectedStart).toBeGreaterThan(rankedStart);
-    expect(projectionSource).toContain(
-      "LEFT JOIN products p ON p.id = COALESCE(tg.product_id, fg.product_id)",
-    );
-    expect(projectionSource).toContain("LEFT JOIN booking_group_parts booking_part");
+  let testDatabase: ReturnType<typeof createD1TestDatabase>;
 
-    const recording = recordingDatabase({ count: 17 });
-    await expect(countFidsProjectionRows(recording.db, projectionInput)).resolves.toBe(17);
-    expect(recording.statements[0]?.match(/\bWITH\b/g)).toHaveLength(1);
-    expect(recording.statements[0]).toContain("WITH relevant_booking_group_rotations AS");
-    expect(recording.statements[0]).toContain("booking_part.part_number");
-    expect(recording.statements[0]).toContain("SELECT COUNT(*) AS total_items FROM selected");
-    expect(recording.bindings[0]).toEqual([
-      "event-synthetic",
-      '["product-b","product-a"]',
-      '["gate-a"]',
-      "[]",
-      "2026-08-02T08:00:00.000Z",
-      "2026-08-02T08:00:15.000Z",
-      "PREPARE",
-      '["rotation-a:group-a"]',
-    ]);
+  beforeEach(() => {
+    testDatabase = createD1TestDatabase();
+    applyDemoSeed(testDatabase.database);
+    testDatabase.database.exec(`
+      INSERT INTO flight_groups
+        (id, operation_day_id, resource_group_id, product_id, communication_number, status,
+         queue_position, precalled_at, precall_decision_status, created_at, updated_at)
+      VALUES
+        ('group-called', 'demo-2026', 'rg-panorama', 'panorama-20', 101, 'CALLED', 1,
+         NULL, NULL, '${now}', '${now}'),
+        ('group-precalled', 'demo-2026', 'rg-panorama', 'panorama-20', 102, 'DRAFT', 2,
+         '2026-08-15T09:55:00.000Z', 'GO_TO_GATE', '${now}', '${now}'),
+        ('group-prepare', 'demo-2026', 'rg-panorama', 'panorama-30', 103, 'DRAFT', 3,
+         NULL, 'PREPARE', '${now}', '${now}'),
+        ('group-waiting', 'demo-2026', 'rg-panorama', 'panorama-30', 104, 'DRAFT', 4,
+         NULL, 'WAITING', '${now}', '${now}'),
+        ('group-departed', 'demo-2026', 'rg-panorama', 'panorama-20', 105, 'COMPLETED', 5,
+         NULL, NULL, '${now}', '${now}');
+
+      INSERT INTO rotations
+        (id, operation_day_id, flight_group_id, status, departed_at, dispatch_order,
+         created_at, updated_at)
+      VALUES
+        ('rotation-called', 'demo-2026', 'group-called', 'CALLED', NULL, NULL, '${now}', '${now}'),
+        ('rotation-precalled', 'demo-2026', 'group-precalled', 'DRAFT', NULL, 1, '${now}', '${now}'),
+        ('rotation-prepare', 'demo-2026', 'group-prepare', 'DRAFT', NULL, 2, '${now}', '${now}'),
+        ('rotation-waiting', 'demo-2026', 'group-waiting', 'DRAFT', NULL, 3, '${now}', '${now}'),
+        ('rotation-departed', 'demo-2026', 'group-departed', 'COMPLETED',
+         '2026-08-15T09:45:00.000Z', NULL, '${now}', '${now}');
+    `);
   });
 
-  it("binds a bounded page after all projection filters", async () => {
-    const recording = recordingDatabase({ rows: [] });
+  afterEach(() => testDatabase.close());
+
+  it("filters before counting and returns the public rows in operational priority order", async () => {
+    await expect(countFidsProjectionRows(testDatabase.d1, projectionInput)).resolves.toBe(5);
     await expect(
-      loadFidsProjectionRows(recording.db, { ...projectionInput, limit: 8, offset: 16 }),
-    ).resolves.toEqual([]);
-    expect(recording.statements[0]).toContain("LIMIT ?9 OFFSET ?10");
-    expect(recording.bindings[0]?.slice(-2)).toEqual([8, 16]);
+      loadAllFidsProjectionRows(testDatabase.d1, projectionInput).then((rows) =>
+        rows.map(({ rotation_id }) => rotation_id),
+      ),
+    ).resolves.toEqual([
+      "rotation-called",
+      "rotation-precalled",
+      "rotation-prepare",
+      "rotation-waiting",
+      "rotation-departed",
+    ]);
+
+    await expect(
+      loadAllFidsProjectionRows(testDatabase.d1, {
+        ...projectionInput,
+        filter: { ...projectionInput.filter, productIds: ["panorama-30"] },
+      }).then((rows) => rows.map(({ product_id }) => product_id)),
+    ).resolves.toEqual(["panorama-30", "panorama-30"]);
   });
 
-  it("loads the complete filtered projection before optional shared-flight grouping", async () => {
-    const recording = recordingDatabase({ rows: [] });
-    await expect(loadAllFidsProjectionRows(recording.db, projectionInput)).resolves.toEqual([]);
-    expect(recording.statements[0]).not.toContain("LIMIT ?9 OFFSET ?10");
-    expect(recording.bindings[0]?.[6]).toBe("PREPARE");
+  it("separates actionable, preparation, lower-priority and recent-departure bands", async () => {
+    const rotationsForBand = async (
+      band: "ACTIONABLE" | "PREPARE" | "LOWER" | "RECENT_DEPARTURE",
+    ) =>
+      loadAllFidsProjectionRows(testDatabase.d1, { ...projectionInput, band }).then((rows) =>
+        rows.map(({ rotation_id }) => rotation_id),
+      );
+
+    await expect(rotationsForBand("ACTIONABLE")).resolves.toEqual([
+      "rotation-called",
+      "rotation-precalled",
+    ]);
+    await expect(rotationsForBand("PREPARE")).resolves.toEqual(["rotation-prepare"]);
+    await expect(rotationsForBand("LOWER")).resolves.toEqual([
+      "rotation-prepare",
+      "rotation-waiting",
+    ]);
+    await expect(rotationsForBand("RECENT_DEPARTURE")).resolves.toEqual(["rotation-departed"]);
   });
 
-  it("selects recent departures only inside the configured cutoff", async () => {
-    const recording = recordingDatabase({ rows: [] });
-    await loadFidsProjectionRows(recording.db, {
-      ...projectionInput,
-      band: "RECENT_DEPARTURE",
-      limit: 8,
-      offset: 0,
-    });
-    expect(recording.statements[0]).toContain("status IN ('IN_FLIGHT', 'LANDED', 'COMPLETED')");
-    expect(recording.statements[0]).toContain(
-      "r.status NOT IN ('IN_FLIGHT', 'LANDED', 'COMPLETED') OR r.departed_at > ?5",
-    );
-    expect(recording.statements[0]).toContain(
-      "?7 = 'RECENT_DEPARTURE' AND recent_departure_band = 1",
-    );
-    expect(recording.bindings[0]?.[6]).toBe("RECENT_DEPARTURE");
+  it("applies exclusions and pagination to the already filtered projection", async () => {
+    await expect(
+      loadFidsProjectionRows(testDatabase.d1, {
+        ...projectionInput,
+        excludedRowIds: ["rotation-called:group-called"],
+        limit: 2,
+        offset: 1,
+      }).then((rows) => rows.map(({ rotation_id }) => rotation_id)),
+    ).resolves.toEqual(["rotation-prepare", "rotation-waiting"]);
   });
 
-  it("categorically excludes actionable and recent-departure rows from lower paging", async () => {
-    const recording = recordingDatabase({ count: 4 });
-    await countFidsProjectionRows(recording.db, {
-      ...projectionInput,
-      band: "LOWER",
-      excludedRowIds: ["selected-prepare"],
-    });
-    expect(recording.statements[0]).toContain(
-      "?7 = 'LOWER' AND actionable_band = 0 AND recent_departure_band = 0",
-    );
-    expect(recording.bindings[0]?.[6]).toBe("LOWER");
-    expect(recording.bindings[0]?.[7]).toBe('["selected-prepare"]');
-  });
+  it("hides departures older than the configured visibility cutoff", async () => {
+    testDatabase.database
+      .prepare("UPDATE rotations SET departed_at = ?1 WHERE id = 'rotation-departed'")
+      .run("2026-08-15T09:00:00.000Z");
 
-  it("keeps the ALL band ordering unchanged for the anonymous projection", async () => {
-    const recording = recordingDatabase({ rows: [] });
-    await loadFidsProjectionRows(recording.db, {
-      ...projectionInput,
-      band: "ALL",
-      limit: 8,
-      offset: 0,
-    });
-    expect(recording.statements[0]).toContain("?7 = 'ALL'");
-    expect(recording.statements[0]).toMatch(
-      /CASE WHEN status IN \('IN_FLIGHT', 'LANDED', 'COMPLETED'\)\s+THEN departed_at END DESC/,
-    );
-    expect(recording.bindings[0]?.[6]).toBe("ALL");
+    await expect(
+      countFidsProjectionRows(testDatabase.d1, {
+        ...projectionInput,
+        band: "RECENT_DEPARTURE",
+      }),
+    ).resolves.toBe(0);
   });
 });

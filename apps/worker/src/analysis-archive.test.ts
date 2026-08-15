@@ -1,5 +1,3 @@
-// @ts-expect-error Vitest runs in Node; the Worker production config intentionally excludes Node types.
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   createMigratedTestDatabase,
@@ -8,9 +6,6 @@ import {
 import { analysisRetentionDays } from "./analysis-archive";
 import { analysisExportPageSize, analysisExportProjections } from "./analysis-export-projections";
 import type { Env } from "./types";
-
-const writerSource = readFileSync(new URL("./analysis-archive-writer.ts", import.meta.url), "utf8");
-const deletionSource = readFileSync(new URL("./event-deletion.ts", import.meta.url), "utf8");
 
 describe("analysis archive boundaries", () => {
   it("prepares every projection against the complete migrated schema", () => {
@@ -55,13 +50,6 @@ describe("analysis archive boundaries", () => {
     expect(sql).not.toContain("reason TEXT");
   });
 
-  it("keeps the zip and R2 path streaming", () => {
-    expect(writerSource).toContain("createMultipartUpload");
-    expect(writerSource).toContain("TransformStream");
-    expect(writerSource).not.toContain("zipSync");
-    expect(writerSource).not.toContain("new Blob");
-  });
-
   it("keeps automatic archive jobs unique and their access events append-only", () => {
     const database = createMigratedTestDatabase();
     const schema = describeDatabaseSchema(database);
@@ -74,12 +62,6 @@ describe("analysis archive boundaries", () => {
     expect(triggerNames).toContain("analysis_archive_events_no_update");
     expect(triggerNames).toContain("analysis_archive_events_no_delete");
     database.close();
-  });
-
-  it("removes all event-scoped archive objects on event deletion", () => {
-    expect(deletionSource).toContain("`analysis/" + "$" + "{response.eventId}" + "/`");
-    expect(deletionSource).toContain("DELETE FROM analysis_archive_events");
-    expect(deletionSource).toContain("DELETE FROM analysis_archives");
   });
 
   it("requires explicit bounded production retention", () => {

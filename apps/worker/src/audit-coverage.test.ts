@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createMigratedTestDatabase } from "../test-support/migrated-database";
-import dailyReport from "./daily-report.ts?raw";
 
 describe("append-only operational audit coverage", () => {
-  it("keeps historical rebooking events readable after V16-KAS-050 removed new rebooking", () => {
-    expect(dailyReport).toContain("TICKET_GROUP_REBOOKED");
-  });
-
   it("prevents updates and deletes at the D1 source of truth", () => {
     const database = createMigratedTestDatabase();
     database.exec(`

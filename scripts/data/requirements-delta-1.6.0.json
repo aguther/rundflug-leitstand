@@ -11,7 +11,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/cashier-view.tsx",
-      "tests": "apps/web/src/cashier-v1-6.test.ts",
+      "tests": "apps/web/src/cashier-workflows.dom.test.tsx und Browserabnahme",
       "traceStatus": "umgesetzt"
     },
     {
@@ -35,7 +35,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/features/cashier/cashier-v12.css",
-      "tests": "apps/web/src/cashier-v1-6.test.ts und Browserabnahme",
+      "tests": "apps/web/src/cashier-workflows.dom.test.tsx und Browserabnahme",
       "traceStatus": "umgesetzt"
     },
     {

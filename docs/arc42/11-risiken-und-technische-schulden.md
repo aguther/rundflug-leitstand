@@ -43,7 +43,7 @@ Verbleibende, bewusst priorisierte Schulden:
 | Priorität | Befund | Nächster geplanter Schnitt |
 | --- | --- | --- |
 | Mittel | Der Forecast-Legacy-Vergleichspfad bleibt bis zum zweifachen Release-/Replay-Nachweis erhalten | Abschaltkriterien aus ADR-0041 erfüllen; keine neuen Fachregeln im Legacy-Pfad ergänzen |
-| Mittel | 128 ältere `?raw`-Importe in Produktionsquellen und 1.910 `.toContain(`-Assertions koppeln Tests an Quelltext statt an Verhalten | bestehenden Ratchet halten und bei jeder Änderung zuerst hochfrequentierte Tests auf DOM-, HTTP- oder Runtime-Verhalten umstellen |
+| Mittel | Der erste fokussierte Mutationstest erreicht insgesamt 73,59 %, einzelne Prognosemodule liegen jedoch darunter | Überlebende Mutanten nach fachlichem Risiko priorisieren, Tests ergänzen und den globalen sowie modulbezogenen Wert ausschließlich nach oben ratcheten |
 | Mittel | `cashier-view.tsx` (1.435 Zeilen), `flight-line-view.tsx` (2.148 Zeilen), `master-data-command-service.ts` (1.218 Zeilen) und `operations-routes.ts` (966 Zeilen) bleiben trotz ausgelagerter Präsentations-, Validierungs- und Projektionsmodule umfangreiche Orchestratoren | Zustands- und Seiteneffektfamilien einzeln unter Verhaltenstests extrahieren; keine Fachlogik in Präsentationshelfer verschieben |
 | Mittel | Haupt-Entry, Flight-Line-CSS und größter JavaScript-Chunk mit begrenztem Abstand zu den Assetbudgets | routentransitive Manifestwerte vor und nach jeder Änderung vergleichen; schwere Analysebausteine lazy halten |
 | Niedrig | Der inkompatible Baseline-Neustart verwirft alle Entwicklungs- und Abnahmedaten | Neuaufbau nur über das abgesicherte Verfahren aus ADR-0045; Baseline und leeren First-Run-Zustand vor Abnahme verifizieren |
@@ -57,6 +57,12 @@ Der Operations-Contract ist in vier Command-Familien sowie getrennte Board- und 
 zerlegt; Exhaustiveness- und Subpath-Tests schützen die kompatible Fassade. Produktive Domain-Module
 besitzen keine Rückimporte aus dem eigenen Barrel. Die neun zuvor fest verdrahteten lokalen
 Worker-Verifier verwenden einen gemeinsamen, pro Lauf isolierten Port-, D1- und Assets-Lebenszyklus.
+
+Die frühere Kopplung von Tests an produktive TypeScript-Quelltexte ist vollständig entfernt. Guardrails
+halten rohe Importe und Dateisystem-Lesezugriffe auf `.ts`/`.tsx` bei null. Datenbanktests führen die
+produktive Baseline in SQLite aus; globale und kritische Domain-Coverage-Ratchets sowie der fokussierte
+Stryker-Lauf sichern die Verhaltensaussage zusätzlich ab. Details dokumentieren ADR-0046 und der
+Nachweis `docs/verification/behavioral-test-quality-2026-08-15.md`.
 
 ## 11.3 Leitplanken für weitere Umbauten
 

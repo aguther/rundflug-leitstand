@@ -15,7 +15,6 @@ import {
   shouldQueuePreparationNotification,
   vapidConfiguration,
 } from "./web-push";
-import pushSource from "./web-push.ts?raw";
 
 describe("Web-Push-Endpunkte", () => {
   const pushContext = (
@@ -140,12 +139,6 @@ describe("Web-Push-Endpunkte", () => {
       expect(secondPart.body).toMatch(/^Teilflug 2 von 2 der Gruppe G-PAN-0101: /);
     },
   );
-
-  it("ermittelt das öffentliche Gate aus Umlauf oder Produkt ohne Gastdaten im Payload", () => {
-    expect(pushSource).toContain("g.label AS gate_label");
-    expect(pushSource).toContain("JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)");
-    expect(pushSource).not.toMatch(/guest_name|passenger_name|phone_number/i);
-  });
 
   it("liefert einen deklarativen, service-worker-unabhängigen iOS-Payload", () => {
     const payload = JSON.parse(

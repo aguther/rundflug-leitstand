@@ -233,21 +233,26 @@ werden dadurch nicht in Familiendienste dupliziert; deren D1-Batches bleiben die
 
 | Ebene | Werkzeug / Nachweis |
 | --- | --- |
-| Fachlogik | Vitest-Unit-Tests neben jedem Domänenmodul |
+| Fachlogik | Vitest-Zustands-, Grenzwert- und Negativtests neben jedem Domänenmodul; Mutationstests prüfen die Aussagekraft in besonders kritischen Modulen |
 | Verträge | Schema-Tests in `packages/contracts` inklusive Modul-Exportprüfung; Familien-Exhaustiveness hält 57 Schemaoptionen und 59 eindeutige Command-Discriminatoren lückenlos |
-| Worker-Laufzeit | `@cloudflare/vitest-pool-workers` über `vitest.worker.config.ts`; eigener PR-CI-Job |
+| Datenbank | Gemeinsamer In-Memory-SQLite-Builder führt die produktive Baseline aus, aktiviert Fremdschlüssel und stellt synthetische Fixtures sowie eine D1-kompatible Testbindung bereit |
+| Worker-Laufzeit | `@cloudflare/vitest-pool-workers` über `vitest.worker.config.ts` und echte D1-Testbindungen; Mocks bleiben auf gezielte Fehlerpfade beschränkt; eigener PR-CI-Job |
 | Oberfläche | Testing Library und jsdom für DOM-Tests, Playwright für Browserläufe |
 | Integration | zahlreiche `scripts/verify_*.mjs`-Läufe; lokale Worker-Verifier erhalten über `scripts/lib/worker-test-harness.mjs` je Instanz freien Port, temporären D1-Zustand und Assets; 18 V1-Kernsuiten als eigener PR-CI-Job, Soak und Abnahmetag als getrennte Langzeitabnahmen |
-| Architekturregeln | `apps/worker/src/maintainability-coverage.test.ts`, `npm run refactor:guardrails` (Dateibudgets, Importverbote) |
-| Coverage | expliziter Produktionscode-Nenner für `apps` und `packages`; lokale abgerundete Ratchets 56 % Statements, 50 % Branches, 54 % Functions und 58 % Lines; 80 % SonarQube-Ziel für neuen Code |
+| Architekturregeln | `apps/worker/src/maintainability-coverage.test.ts`, `npm run refactor:guardrails` (Dateibudgets, Importverbote, keine Quelltextimporte oder Dateisystem-Lesezugriffe auf produktive `.ts`-/`.tsx`-Dateien in Tests, reine Domain-Abhängigkeiten) |
+| Coverage | expliziter Produktionscode-Nenner für `apps` und `packages`; Ratchets 81 % Statements, 71 % Branches, 80 % Functions und 84 % Lines; zehn kritische Domainmodule jeweils mindestens 90 % Lines und 85 % Branches; 80 % SonarQube-Ziel für neuen Code |
+| Mutation | Stryker mit offiziellem Vitest-Runner für neun fokussierte Module aus Queue, Kapazität, Prognose, Turnaround, Nachruf und Outage Recovery; Schwellen `break: 73`, `low: 80`, `high: 90` |
 | Dokumentation | `npm run docs:verify` prüft Architektur-, Datenschutz-, Lizenz-, Link-, Rollen- und Releasekonsistenz |
-| Refactoring-Ratchets | `npm run refactor:guardrails` scannt ausschließlich Tests unter den expliziten Quellwurzeln `apps` und `packages`; ignorierte Worktrees sowie generierte Wrangler-Zielkonfigurationen bleiben außerhalb lokaler Gates |
+| Refactoring-Ratchets | `npm run refactor:guardrails` scannt ausschließlich Tests unter den expliziten Quellwurzeln `apps` und `packages`; zulässige Artefakttests validieren JSON, YAML, Konfiguration, generierte Dokumente und Datenschutz, während ausführbares Verhalten nicht über SQL-Fragmente, JSX, CSS-Klassen oder interne Funktionsnamen belegt wird |
 | Anforderungen | `npm run requirements:verify` und Traceability-CSV |
 | Statische Analyse | Biome sowie nachgelagerter SonarQube-Scan, der den LCOV-Bericht des Basisjobs übernimmt und auf das Quality Gate wartet |
 
 Der vollständige Gesamtnachweis ist `npm run check`. Die PR-CI führt Basisprüfung/Coverage,
 Worker-Runtime, V1-Kernintegration, Backup-Restore und Dokumentation parallel aus; der Sonar-Job
 folgt abhängig vom erfolgreichen Basisjob und der Verfügbarkeit des geschützten Tokens.
+Der getrennte Mutationstest läuft wöchentlich und manuell, veröffentlicht HTML- und JSON-Berichte
+als CI-Artefakte und ist vor der Integration eines Branches verpflichtend, der eines der ausgewählten
+Domainmodule ändert. ADR-0046 begründet Auswahl, Schwellen und Ratchet-Verfahren.
 
 ## 8.13 Betrieb, Sicherung und Wiederherstellung
 

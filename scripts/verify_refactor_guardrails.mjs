@@ -10,6 +10,8 @@ const testFilePattern = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const productionTypeScriptPattern = /\.(?:ts|tsx)$/;
 const rawImportPattern = /(?:\bfrom\s+|\bimport\s*)["']([^"']+\?raw)["']/g;
 const moduleImportPattern = /(?:\bfrom\s+|\bimport\s*)["']([^"']+)["']/g;
+const productionSourceReadPattern =
+  /\breadFile(?:Sync)?\s*\(\s*new URL\(\s*["']([^"']+\.(?:ts|tsx))["']\s*,\s*import\.meta\.url\s*\)/g;
 const forbiddenProductionRawImportTargets = new Set([
   "apps/web/src/admin-view.tsx",
   "apps/worker/src/event-coordinator.ts",
@@ -71,6 +73,55 @@ export async function collectProductionRawImports(
   return [...new Set(imports)].sort(compareTechnicalStrings);
 }
 
+export async function collectProductionSourceReads(
+  repositoryRoot = root,
+  sourceRoots = productionSourceRoots,
+) {
+  const files = (
+    await Promise.all(
+      sourceRoots.map((sourceRoot) => collectFiles(resolve(repositoryRoot, sourceRoot))),
+    )
+  ).flat();
+  const reads = [];
+  for (const testFile of files.filter((path) => testFilePattern.test(path))) {
+    const content = await readFile(testFile, "utf8");
+    for (const match of content.matchAll(productionSourceReadPattern)) {
+      const sourcePath = resolve(dirname(testFile), match[1]);
+      const relativeSource = normalizePath(relative(repositoryRoot, sourcePath));
+      if (
+        relativeSource.startsWith("../") ||
+        testFilePattern.test(relativeSource) ||
+        relativeSource.endsWith(".d.ts")
+      ) {
+        continue;
+      }
+      reads.push(`${normalizePath(relative(repositoryRoot, testFile))} -> ${relativeSource}`);
+    }
+  }
+  return [...new Set(reads)].sort(compareTechnicalStrings);
+}
+
+export async function collectDomainExternalImports(repositoryRoot = root) {
+  const domainSourceRoot = resolve(repositoryRoot, "packages", "domain", "src");
+  const files = (await collectFiles(domainSourceRoot)).filter(
+    (path) =>
+      productionTypeScriptPattern.test(path) &&
+      !testFilePattern.test(path) &&
+      !path.endsWith(".d.ts"),
+  );
+  const imports = [];
+  for (const file of files) {
+    const content = await readFile(file, "utf8");
+    for (const match of content.matchAll(moduleImportPattern)) {
+      const specifier = match[1];
+      if (!specifier.startsWith(".")) {
+        imports.push(`${normalizePath(relative(repositoryRoot, file))} -> ${specifier}`);
+      }
+    }
+  }
+  return [...new Set(imports)].sort(compareTechnicalStrings);
+}
+
 export async function collectInternalDomainBarrelImports(repositoryRoot = root) {
   const domainSourceRoot = resolve(repositoryRoot, "packages", "domain", "src");
   const domainBarrel = resolve(domainSourceRoot, "index.ts");
@@ -116,6 +167,8 @@ async function verifySizeBudgets(config) {
 async function run() {
   const config = JSON.parse(await readFile(configPath, "utf8"));
   const currentRawImports = await collectProductionRawImports();
+  const productionSourceReads = await collectProductionSourceReads();
+  const domainExternalImports = await collectDomainExternalImports();
   const internalDomainBarrelImports = await collectInternalDomainBarrelImports();
   if (process.argv.includes("--write-baseline")) {
     config.allowedProductionRawImports = currentRawImports;
@@ -141,6 +194,18 @@ async function run() {
     );
   }
 
+  if (productionSourceReads.length > 0) {
+    failures.push(
+      `tests reading production TypeScript as text:\n${productionSourceReads.join("\n")}`,
+    );
+  }
+
+  if (domainExternalImports.length > 0) {
+    failures.push(
+      `production domain modules importing external adapters:\n${domainExternalImports.join("\n")}`,
+    );
+  }
+
   if (unexpected.length > 0) {
     failures.push(`new production TypeScript raw imports:\n${unexpected.join("\n")}`);
   }
@@ -156,7 +221,7 @@ async function run() {
     throw new Error(`Refactor guardrails failed:\n\n${failures.join("\n\n")}`);
   }
 
-  console.log(`OK: ${currentRawImports.length} grandfathered production raw imports; no additions`);
+  console.log(`OK: ${currentRawImports.length} production TypeScript source-text imports`);
   for (const observation of observations) console.log(observation);
 }
 

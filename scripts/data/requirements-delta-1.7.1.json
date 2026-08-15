@@ -35,7 +35,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/flight-line-assist.tsx und flight-line-assist-v15.css",
-      "tests": "flight-line-assist-ui.test.ts und Browserabnahme",
+      "tests": "flight-line-assist.dom.test.tsx und Browserabnahme",
       "traceStatus": "umgesetzt"
     },
     {

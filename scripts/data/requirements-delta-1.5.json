@@ -23,7 +23,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/app",
-      "tests": "apps/web/src/features/auth/event-selection.test.ts",
+      "tests": "apps/web/src/FeatureRouter.dom.test.tsx und apps/web/src/app/navigation.test.ts",
       "traceStatus": "umgesetzt"
     },
     {
@@ -131,7 +131,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/fids-display.tsx",
-      "tests": "apps/web/src/fids-display-ui.test.ts",
+      "tests": "apps/web/src/fids-display.dom.test.tsx und apps/web/src/features/fids/useFidsExperience.dom.test.tsx",
       "traceStatus": "umgesetzt"
     },
     {

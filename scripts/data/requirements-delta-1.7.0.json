@@ -11,7 +11,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/cashier-view.tsx und features/cashier/cashier-v12.css",
-      "tests": "cashier-v1-6.test.ts und Browserabnahme mit drei Produkten",
+      "tests": "cashier-workflows.dom.test.tsx und Browserabnahme mit drei Produkten",
       "traceStatus": "umgesetzt"
     },
     {
@@ -23,7 +23,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/cashier-view.tsx und features/cashier/cashier-v12.css",
-      "tests": "cashier-v1-6.test.ts und responsive Browserabnahme",
+      "tests": "cashier-workflows.dom.test.tsx und responsive Browserabnahme",
       "traceStatus": "umgesetzt"
     },
     {
@@ -47,7 +47,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/cashier-view.tsx",
-      "tests": "cashier-v1-6.test.ts und Verkaufsablauf im Browser",
+      "tests": "cashier-workflows.dom.test.tsx und Verkaufsablauf im Browser",
       "traceStatus": "umgesetzt"
     },
     {
@@ -71,7 +71,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/cashier-view.tsx und features/cashier/cashier-v12.css",
-      "tests": "cashier-v1-6.test.ts Drucktest und Browserdialog",
+      "tests": "cashier-workflows.dom.test.tsx und Browserdialog",
       "traceStatus": "umgesetzt"
     },
     {
@@ -83,7 +83,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/features/cashier/cashier-v12.css",
-      "tests": "cashier-v1-6.test.ts und Browserabnahme 1194×679",
+      "tests": "cashier-workflows.dom.test.tsx und Browserabnahme 1194×679",
       "traceStatus": "umgesetzt"
     },
     {
@@ -167,7 +167,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/features/flight-line/flight-line-assist-v15.css",
-      "tests": "flight-line-assist-ui.test.ts und Browserabnahme Desktop/Mobil",
+      "tests": "flight-line-assist.dom.test.tsx und Browserabnahme Desktop/Mobil",
       "traceStatus": "umgesetzt"
     }
   ]

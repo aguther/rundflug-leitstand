@@ -11,7 +11,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/cashier-view.tsx apps/worker/src/event-coordinator.ts und scripts/verify_sale_guards.mjs",
-      "tests": "cashier-v12.test.ts sale-capacity-policy.test.ts und test:sale-guards",
+      "tests": "cashier-workflows.dom.test.tsx sale-capacity-policy.test.ts und test:sale-guards",
       "traceStatus": "umgesetzt"
     },
     {
@@ -35,7 +35,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/features/cashier/cashier-v12.css und docs/operations/pos-58-direct-print.md",
-      "tests": "cashier-v12.test.ts Print-to-PDF und physische POS-58-Prüfung extern",
+      "tests": "cashier-workflows.dom.test.tsx Print-to-PDF und physische POS-58-Prüfung extern",
       "traceStatus": "umgesetzt"
     },
     {
@@ -47,7 +47,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/features/public-status/public-status-model.ts und public-status-v18.css",
-      "tests": "public-status-model.test.ts public-status-ui.test.ts und mobile Browserabnahme",
+      "tests": "public-status-model.test.ts public-status-part.dom.test.tsx und mobile Browserabnahme",
       "traceStatus": "umgesetzt"
     },
     {
@@ -59,7 +59,7 @@
       "stage": "V1",
       "status": "implemented",
       "module": "apps/web/src/time-window.ts und fids-display.tsx",
-      "tests": "time-window.test.ts fids-display-ui.test.ts und Browserabnahme",
+      "tests": "time-window.test.ts fids-display.dom.test.tsx und Browserabnahme",
       "traceStatus": "umgesetzt"
     },
     {

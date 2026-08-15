@@ -59,3 +59,21 @@ Die höheren Schwellen verhindern, dass die erreichte Bestandsabdeckung in folge
 verloren geht. Sie sind weiterhin ein Ratchet, nicht das Ziel: Nach jedem reproduzierbar höheren
 Paket werden sie erneut auf den abgerundeten Messwert angehoben. Es wurden keine neuen
 Coverage-Exclusions hinzugefügt.
+
+## Ratchet-Anhebung vom 15. August 2026
+
+Nach der Entfernung quelltextgekoppelter Tests und dem Ausbau der verhaltensbasierten Datenbank-,
+Worker-, Domain- und DOM-Tests wurde die vollständige Grundmenge erneut gemessen. Der Lauf bestand
+mit 306 Testdateien, 1.788 erfolgreichen und sechs gezielt übersprungenen Tests:
+
+| Kennzahl | Messwert | neue abgerundete Mindestschwelle |
+| --- | ---: | ---: |
+| Statements | 81,50 % (15.954 / 19.574) | 81 % |
+| Branches | 71,99 % (10.916 / 15.163) | 71 % |
+| Functions | 80,70 % (4.190 / 5.192) | 80 % |
+| Lines | 84,01 % (14.772 / 17.583) | 84 % |
+
+Zusätzlich prüft `scripts/verify_domain_coverage.mjs` zehn sicherheits- und betriebskritische
+Domainmodule einzeln auf mindestens 90 % Line- und 85 % Branch-Coverage. Der niedrigste gemessene
+Line-Wert beträgt 94,44 %, der niedrigste Branch-Wert 85,07 %. Die nach Entfernung der
+Quelltextassertionen gestiegenen globalen Werte sind damit kein Effekt künstlicher Artefakttests.

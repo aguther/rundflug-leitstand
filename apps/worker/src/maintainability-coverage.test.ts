@@ -9,16 +9,14 @@ import rootManifestRaw from "../../../package.json?raw";
 import packageLockRaw from "../../../package-lock.json?raw";
 import contractsManifestRaw from "../../../packages/contracts/package.json?raw";
 import domainManifestRaw from "../../../packages/domain/package.json?raw";
-import capacitySource from "../../../packages/domain/src/capacity.ts?raw";
-import forecastSource from "../../../packages/domain/src/forecast.ts?raw";
-import domainIndexSource from "../../../packages/domain/src/index.ts?raw";
-import outageRecoverySource from "../../../packages/domain/src/outage-recovery.ts?raw";
-import queueSource from "../../../packages/domain/src/queue.ts?raw";
 import sonarProperties from "../../../sonar-project.properties?raw";
 import webManifestRaw from "../../web/package.json?raw";
 import workerManifestRaw from "../package.json?raw";
-import seedSource from "../seed/demo.sql?raw";
-import { createMigratedTestDatabase, type SqliteRow } from "../test-support/migrated-database";
+import {
+  applyDemoSeed,
+  createMigratedTestDatabase,
+  type SqliteRow,
+} from "../test-support/migrated-database";
 
 type Manifest = {
   allowScripts?: Record<string, boolean>;
@@ -63,6 +61,8 @@ describe("V1 maintainability and portability boundaries", () => {
       "@cloudflare/workers-types": "^5.20260801.1",
       "@playwright/test": "^1.62.1",
       "@sonar/scan": "^5.0.0",
+      "@stryker-mutator/core": "10.0.0",
+      "@stryker-mutator/vitest-runner": "10.0.0",
       "@testing-library/user-event": "^14.6.4",
       "@vitest/coverage-v8": "^4.1.10",
       jsdom: "^30.0.1",
@@ -137,7 +137,7 @@ describe("V1 maintainability and portability boundaries", () => {
     expect(rootManifest.scripts).toMatchObject({
       sonar: "npm run test:coverage && sonar-scanner-npm",
       "test:coverage":
-        'vitest run --coverage --exclude=apps/web/src/features/forecast-simulation/comparison.test.ts --testNamePattern="^(?!.*projects all 300 eligible groups beyond the bounded dispatch horizon).*$"',
+        'vitest run --coverage --exclude=apps/web/src/features/forecast-simulation/comparison.test.ts --testNamePattern="^(?!.*projects all 300 eligible groups beyond the bounded dispatch horizon).*$" && node scripts/verify_domain_coverage.mjs',
     });
     expect(rootManifest.scripts?.build).not.toContain("sonar");
     expect(rootManifest.scripts?.check).not.toContain("sonar");
@@ -183,6 +183,8 @@ describe("V1 maintainability and portability boundaries", () => {
       "@cloudflare/vitest-pool-workers",
       "@playwright/test",
       "@sonar/scan",
+      "@stryker-mutator/core",
+      "@stryker-mutator/vitest-runner",
       "@testing-library/react",
       "@testing-library/user-event",
       "@vitest/coverage-v8",
@@ -219,22 +221,9 @@ describe("V1 maintainability and portability boundaries", () => {
     expect(packageLockRaw).not.toContain("@block65/custom-error");
   });
 
-  it("keeps the complete domain package free of UI, HTTP, database and Cloudflare adapters", () => {
-    const domainSource = [
-      domainIndexSource,
-      capacitySource,
-      forecastSource,
-      outageRecoverySource,
-      queueSource,
-    ].join("\n");
-
-    expect(domainSource).not.toMatch(
-      /cloudflare:|DurableObject|D1Database|R2Bucket|\bHono\b|\bReact\b|fetch\(|Request\b|Response\b/,
-    );
-  });
-
   it("models the V2-V4 extension seams without embedding them in the domain core", () => {
     const database = createMigratedTestDatabase();
+    applyDemoSeed(database);
     const tables = database
       .prepare("SELECT name FROM sqlite_schema WHERE type = 'table'")
       .all()
@@ -249,11 +238,19 @@ describe("V1 maintainability and portability boundaries", () => {
     expect(columnsOf("products")).toContain("resource_group_id");
     expect(columnsOf("aircraft")).toContain("passenger_seats");
     expect(columnsOf("operation_days")).toContain("template_source_id");
-    expect(seedSource).toContain("'panorama-20', 'demo-2026', 'rg-panorama'");
-    expect(seedSource).toContain("'panorama-30', 'demo-2026', 'rg-panorama'");
+    expect(
+      database
+        .prepare("SELECT id, resource_group_id FROM products ORDER BY id")
+        .all()
+        .map((row: SqliteRow) => ({ ...row })),
+    ).toEqual([
+      { id: "panorama-20", resource_group_id: "rg-panorama" },
+      { id: "panorama-30", resource_group_id: "rg-panorama" },
+    ]);
     expect(interfaceDocumentation).toContain(
       "Weitere Datenquellen integrieren sich über neue Adapter",
     );
+    database.close();
   });
 });
 

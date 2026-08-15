@@ -1,10 +1,10 @@
 import type { ForecastCalculationResult, ForecastTimelinesInput } from "@rundflug/domain";
 import { describe, expect, it } from "vitest";
 import { createMigratedTestDatabase, type SqliteRow } from "../test-support/migrated-database";
-import backupSource from "./backup.ts?raw";
+import { BACKUP_TABLES } from "./backup";
 import { sha256Hex } from "./crypto";
-import eventDeletionSource from "./event-deletion.ts?raw";
-import factoryResetSource from "./factory-reset.ts?raw";
+import { EVENT_DELETION_SQL } from "./event-deletion";
+import { FACTORY_RESET_DELETE_TABLES } from "./factory-reset";
 import {
   canonicalPlanningChunk,
   canonicalPlanningJson,
@@ -15,7 +15,6 @@ import {
   planningContextChunkValues,
   preparePlanningCapture,
 } from "./planning-capture";
-import planningCaptureSource from "./planning-capture.ts?raw";
 import type { Env } from "./types";
 
 interface PreparedQuery {
@@ -257,11 +256,12 @@ describe("hybrid planning capture", () => {
     expect(forecastColumns).toEqual(
       expect.arrayContaining([expect.objectContaining({ name: "planning_run_id" })]),
     );
-    expect(planningCaptureSource).toContain("PLANNING_CAPTURE_COMPLETION_FAILED");
     for (const table of ["planning_chunks", "planning_contexts", "planning_runs"]) {
-      expect(backupSource).toContain(`"${table}"`);
-      expect(eventDeletionSource).toContain(`DELETE FROM ${table}`);
-      expect(factoryResetSource).toContain(`"${table}"`);
+      expect(BACKUP_TABLES).toContain(table);
+      expect(
+        EVENT_DELETION_SQL.some((statement) => statement.startsWith(`DELETE FROM ${table}`)),
+      ).toBe(true);
+      expect(FACTORY_RESET_DELETE_TABLES).toContain(table);
     }
     database.close();
   });

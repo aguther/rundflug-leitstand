@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import biomeConfigRaw from "../biome.json?raw";
 import {
+  collectDomainExternalImports,
   collectInternalDomainBarrelImports,
   collectProductionRawImports,
+  collectProductionSourceReads,
 } from "./verify_refactor_guardrails.mjs";
 
 const temporaryDirectories: string[] = [];
@@ -62,6 +64,27 @@ describe("refactor guardrail source scope", () => {
     expect(biomeConfig.files.includes).toContain("!wrangler.*.generated.jsonc");
   });
 
+  it("reports tests that read production TypeScript as file content", async () => {
+    const repositoryRoot = await mkdtemp(join(tmpdir(), "source-read-guardrail-"));
+    temporaryDirectories.push(repositoryRoot);
+    const sourceDirectory = join(repositoryRoot, "apps", "worker", "src");
+    await Promise.all([
+      mkdir(sourceDirectory, { recursive: true }),
+      mkdir(join(repositoryRoot, "packages"), { recursive: true }),
+    ]);
+    await Promise.all([
+      writeFile(join(sourceDirectory, "service.ts"), "export const value = 1;\n"),
+      writeFile(
+        join(sourceDirectory, "service.test.ts"),
+        'const source = readFileSync(new URL("./service.ts", import.meta.url), "utf8");\nvoid source;\n',
+      ),
+    ]);
+
+    await expect(collectProductionSourceReads(repositoryRoot)).resolves.toEqual([
+      "apps/worker/src/service.test.ts -> apps/worker/src/service.ts",
+    ]);
+  });
+
   it("reports production modules that import the public domain barrel", async () => {
     const repositoryRoot = await mkdtemp(join(tmpdir(), "domain-barrel-guardrail-"));
     temporaryDirectories.push(repositoryRoot);
@@ -83,6 +106,24 @@ describe("refactor guardrail source scope", () => {
     await expect(collectInternalDomainBarrelImports(repositoryRoot)).resolves.toEqual([
       "packages/domain/src/direct.ts",
       "packages/domain/src/nested/indirect.ts",
+    ]);
+  });
+
+  it("reports external adapter imports in the pure domain package", async () => {
+    const repositoryRoot = await mkdtemp(join(tmpdir(), "domain-external-guardrail-"));
+    temporaryDirectories.push(repositoryRoot);
+    const domainSource = join(repositoryRoot, "packages", "domain", "src");
+    await mkdir(domainSource, { recursive: true });
+    await Promise.all([
+      writeFile(
+        join(domainSource, "allowed.ts"),
+        'import { value } from "./value";\nvoid value;\n',
+      ),
+      writeFile(join(domainSource, "forbidden.ts"), 'import { Hono } from "hono";\nvoid Hono;\n'),
+    ]);
+
+    await expect(collectDomainExternalImports(repositoryRoot)).resolves.toEqual([
+      "packages/domain/src/forbidden.ts -> hono",
     ]);
   });
 });

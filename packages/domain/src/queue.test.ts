@@ -111,10 +111,68 @@ describe("resource-group queue planning", () => {
     ).toBe("COMPLETED");
   });
 
+  it("derives every preserved, active and terminal booking-group state", () => {
+    const derive = (
+      rotationStates: Parameters<typeof deriveBookingGroupOperationalStatus>[0]["rotationStates"],
+    ) => deriveBookingGroupOperationalStatus({ rotationStates, pendingSegmentPresent: false });
+
+    expect(
+      deriveBookingGroupOperationalStatus({
+        rotationStates: ["DRAFT"],
+        pendingSegmentPresent: false,
+        preservedStatus: "MISSING",
+      }),
+    ).toBe("MISSING");
+    expect(derive(["IN_FLIGHT"])).toBe("IN_FLIGHT");
+    expect(derive(["LANDED"])).toBe("LANDED");
+    expect(derive(["CANCELED", "CANCELED"])).toBe("CANCELED");
+    expect(derive([])).toBe("QUEUED");
+    expect(derive(["CANCELED", "COMPLETED"])).toBe("COMPLETED");
+  });
+
+  it("rejects invalid booking-group split inputs", () => {
+    expect(() =>
+      planBookingGroupSplit({ groupSize: 0, referenceCapacity: 4, splitAcknowledged: true }),
+    ).toThrowError(/Gruppengröße/);
+    expect(() =>
+      planBookingGroupSplit({ groupSize: 4, referenceCapacity: 0, splitAcknowledged: true }),
+    ).toThrowError(/Referenzkapazität/);
+  });
+
+  it("prioritizes standby groups and reports exhausted compatible capacity", () => {
+    const plan = planNextRotations({
+      groups: [
+        { id: "regular", size: 2, queueSequence: 1, productId: "p1", standby: false },
+        { id: "standby", size: 2, queueSequence: 2, productId: "p1", standby: true },
+      ],
+      aircraft: [{ id: "a1", capacity: 2, compatibleProductIds: ["p1"], available: true }],
+      standbyPriority: true,
+    });
+
+    expect(plan.assignments[0]?.groupIds).toEqual(["standby"]);
+    expect(plan.unassigned).toEqual([{ groupId: "regular", reason: "NO_CAPACITY" }]);
+    expect(() =>
+      planNextRotations({
+        groups: [{ id: "invalid", size: 0, queueSequence: 1, productId: "p1", standby: false }],
+        aircraft: [],
+        standbyPriority: false,
+      }),
+    ).toThrowError(/Gruppengröße/);
+  });
+
   it("rejects queue mutations once a rotation is in flight", () => {
     expect(() =>
       assertQueueMutationAllowed({ rotationState: "IN_FLIGHT", action: "CANCEL" }),
     ).toThrowError(/nach IM FLUG/);
+    expect(() =>
+      assertQueueMutationAllowed({ rotationState: "LANDED", action: "DEFER" }),
+    ).toThrowError(/nach IM FLUG/);
+    expect(() =>
+      assertQueueMutationAllowed({ rotationState: "COMPLETED", action: "NO_SHOW" }),
+    ).toThrowError(/nach IM FLUG/);
+    expect(() =>
+      assertQueueMutationAllowed({ rotationState: "DRAFT", action: "CANCEL" }),
+    ).not.toThrow();
   });
 
   it("allows a reasoned whole-group move until takeoff and protects target capacity", () => {
@@ -151,6 +209,39 @@ describe("resource-group queue planning", () => {
         targetCapacity: 4,
       }),
     ).toThrowError(/nach IM FLUG/);
+    expect(() =>
+      assertManualGroupMoveAllowed({
+        sourceStates: ["DRAFT"],
+        targetState: "LANDED",
+        sameResourceGroup: true,
+        sameProduct: true,
+        groupSize: 1,
+        targetOccupiedSeats: 0,
+        targetCapacity: 4,
+      }),
+    ).toThrowError(/nach IM FLUG/);
+    expect(() =>
+      assertManualGroupMoveAllowed({
+        sourceStates: ["DRAFT"],
+        targetState: "DRAFT",
+        sameResourceGroup: false,
+        sameProduct: true,
+        groupSize: 1,
+        targetOccupiedSeats: 0,
+        targetCapacity: 4,
+      }),
+    ).toThrowError(/Ressourcengruppe/);
+    expect(() =>
+      assertManualGroupMoveAllowed({
+        sourceStates: ["DRAFT"],
+        targetState: "DRAFT",
+        sameResourceGroup: true,
+        sameProduct: false,
+        groupSize: 1,
+        targetOccupiedSeats: 0,
+        targetCapacity: 4,
+      }),
+    ).toThrowError(/Produkte/);
   });
 
   it("reduces a draft rotation by evicting only a whole queue suffix", () => {
@@ -178,5 +269,34 @@ describe("resource-group queue planning", () => {
         segments: [{ ticketGroupId: "first", size: 2 }],
       }),
     ).toThrowError(/nur vor dem Aufruf/);
+  });
+
+  it("rejects invalid and unchanged usable capacities and invalid segments", () => {
+    const base = {
+      rotationState: "DRAFT" as const,
+      called: false,
+      baselineCapacity: 4,
+      currentUsableCapacity: null,
+      requestedUsableCapacity: 3,
+      segments: [] as Array<{ ticketGroupId: string; size: number }>,
+    };
+
+    for (const requestedUsableCapacity of [0, 5, 2.5]) {
+      expect(() =>
+        planRotationCapacityReduction({ ...base, requestedUsableCapacity }),
+      ).toThrowError(/Basiskapazität/);
+    }
+    expect(() =>
+      planRotationCapacityReduction({
+        ...base,
+        currentUsableCapacity: 3,
+      }),
+    ).toThrowError(/bereits so eingestellt/);
+    expect(() =>
+      planRotationCapacityReduction({
+        ...base,
+        segments: [{ ticketGroupId: "invalid", size: 0 }],
+      }),
+    ).toThrowError(/gültige Größe/);
   });
 });

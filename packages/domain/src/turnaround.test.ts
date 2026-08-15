@@ -50,4 +50,36 @@ describe("turnaround profile resolution", () => {
       totalGroundMinutes: 17,
     });
   });
+
+  it("uses zero for omitted event values and falls back to the event source identifier", () => {
+    expect(
+      resolveTurnaroundProfile({
+        event: {
+          sourceId: "event-fallback",
+          boardingMinutes: null,
+          deboardingMinutes: null,
+          bufferMinutes: null,
+        },
+        product: {
+          boardingMinutes: 2,
+          deboardingMinutes: null,
+          bufferMinutes: null,
+        } as never,
+        aircraftProduct: {
+          boardingMinutes: null,
+          deboardingMinutes: 3,
+          bufferMinutes: null,
+        } as never,
+      }),
+    ).toEqual({
+      boarding: { valueMinutes: 2, sourceLevel: "PRODUCT", sourceId: "event-fallback" },
+      deboarding: {
+        valueMinutes: 3,
+        sourceLevel: "AIRCRAFT_PRODUCT",
+        sourceId: "event-fallback",
+      },
+      buffer: { valueMinutes: 0, sourceLevel: "EVENT", sourceId: "event-fallback" },
+      totalGroundMinutes: 5,
+    });
+  });
 });

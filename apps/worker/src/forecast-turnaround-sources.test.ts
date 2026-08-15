@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { createMigratedTestDatabase } from "../test-support/migrated-database";
-import historySource from "./forecast-history.ts?raw";
 
 describe("candidate-specific turnaround forecasts", () => {
   it("stores assumptions and append-only snapshot sources while keeping legacy rows readable", () => {
@@ -21,10 +20,5 @@ describe("candidate-specific turnaround forecasts", () => {
       ]),
     );
     database.close();
-  });
-
-  it("exposes the stored source fields through internal forecast history", () => {
-    expect(historySource).toContain("fs.boarding_source");
-    expect(historySource).toContain("fs.assumed_aircraft_id");
   });
 });

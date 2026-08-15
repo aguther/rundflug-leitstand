@@ -12,12 +12,6 @@ import {
   sendCommand,
   verifyAdminPin,
 } from "./api";
-import apiSource from "./api.ts?raw";
-
-const operationBoardSource = readFileSync(
-  new URL("./features/operations/use-operation-board.ts", import.meta.url),
-  "utf8",
-);
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -91,9 +85,6 @@ describe("content-blocker-neutral operational routing", () => {
       easyPrivacyWorkerRule,
     );
     expect(`${workerOrigin}/api/events/synthetic-event/operations`).toMatch(easyPrivacyWorkerRule);
-    expect(apiSource).not.toContain("/api/events/");
-    expect(operationBoardSource).toContain("/api/control/");
-    expect(operationBoardSource).not.toContain("/api/public/events/");
   });
 });
 
@@ -345,5 +336,3 @@ describe("web push configuration status", () => {
     });
   });
 });
-
-import { readFileSync } from "node:fs";
