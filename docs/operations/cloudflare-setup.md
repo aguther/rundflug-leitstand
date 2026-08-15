@@ -1,4 +1,4 @@
-# Cloudflare-Einrichtung – Release 1.11.0
+# Cloudflare-Einrichtung – Release 1.12.0
 
 Die aktuelle, vollständige und wiederaufnehmbare Anleitung steht in
 [Cloudflare-Neuaufbau](cloudflare-neuaufbau.md). Sie ersetzt die manuelle Pflege fester D1-IDs,

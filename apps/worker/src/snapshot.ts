@@ -44,5 +44,8 @@ export function rowToSnapshot(row: StoredEventRow): EventSnapshot {
 }
 
 export function safeErrorMessage(reason: unknown): string {
-  return reason instanceof Error ? reason.message : "Unbekannter Fehler";
+  if (!(reason instanceof Error)) return "Unknown error";
+  return ["Error", "TypeError", "RangeError", "SyntaxError"].includes(reason.name)
+    ? reason.name
+    : "Error";
 }

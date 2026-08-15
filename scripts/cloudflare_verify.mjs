@@ -88,14 +88,17 @@ const meta = await getJson("/api/meta");
 const setup = await getJson("/api/setup/status");
 const push = await getJson("/api/public/push/config");
 if (
-  health.applicationVersion !== "1.11.0" ||
-  health.requirementsVersion !== "1.11.0" ||
-  meta.applicationVersion !== "1.11.0" ||
-  meta.requirementsVersion !== "1.11.0"
+  health.applicationVersion !== "1.12.0" ||
+  health.requirementsVersion !== "1.12.0" ||
+  meta.applicationVersion !== "1.12.0" ||
+  meta.requirementsVersion !== "1.12.0"
 ) {
-  throw new Error("Healthcheck meldet nicht den konsistenten Release 1.11.0.");
+  throw new Error("Healthcheck meldet nicht den konsistenten Release 1.12.0.");
 }
 if (meta.dataJurisdiction !== "eu") throw new Error("/api/meta meldet keine EU-Jurisdiktion.");
+if (!/^[0-9a-f]{40}$/i.test(meta.sourceRevision ?? "")) {
+  throw new Error("/api/meta meldet keine eindeutige Deployment-Revision.");
+}
 if (!push.publicKey)
   throw new Error("Web-Push-Konfiguration enthält keinen öffentlichen Schlüssel.");
 
@@ -107,6 +110,7 @@ process.stdout.write(
       health: "ok",
       version: health.applicationVersion,
       jurisdiction: meta.dataJurisdiction,
+      sourceRevision: meta.sourceRevision,
       setupRequired: setup.setupRequired,
       push: "configured",
       migrations: "current",

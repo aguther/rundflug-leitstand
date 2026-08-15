@@ -313,7 +313,7 @@ export class EventCoordinator extends DurableObject<Env> {
           JSON.stringify({
             level: "error",
             code: "DISPATCH_RECOMMENDATION_LEASE_FAILED",
-            message: error instanceof Error ? error.message : "Unknown dispatch lease failure",
+            message: safeErrorMessage(error),
           }),
         );
         return json(

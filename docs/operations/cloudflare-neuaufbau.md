@@ -1,4 +1,4 @@
-# Cloudflare-Neuaufbau – Release 1.11.0
+# Cloudflare-Neuaufbau – Release 1.12.0
 
 Diese Anleitung baut eine **leere, eigenständig deploybare Umgebung** aus einem frischen Checkout
 auf. Sie importiert keine Sicherung und schaltet keine bestehende Domain um. Das Bootstrap löscht
@@ -124,7 +124,8 @@ npm run cloudflare:verify -- \
 ```
 
 Die Prüfung verlangt: keine offene Migration, alle fünf Secret-Namen, Health- und Metadaten in
-Version 1.11.0, EU-Datenjurisdiktion, Setup-Status und einen öffentlichen VAPID-Schlüssel. Danach
+Version 1.12.0, EU-Datenjurisdiktion, eindeutige Deployment-Revision, Setup-Status und einen
+öffentlichen VAPID-Schlüssel. Danach
 werden in einem privaten Browserfenster je ein Rollen-Smoke-Test für Kasse, Flight Line, Flight
 Director, FIDS und Administration sowie ein öffentlicher Gruppenstatus geprüft.
 
@@ -156,9 +157,59 @@ Eingaben und startet erst nach der Bestätigung `PERFORMANCE`. Der Lauf führt a
 Veranstaltungs-IDs sowie HTTP-Ziele werden vom Skript abgelehnt. Details und Datensatzanforderungen
 sind in `docs/verification/scale-performance-v1.md` dokumentiert.
 
-## 8. Fehlerbehebung ohne Datenverlust
+## 8. Monatliche Runtime-Wartung
 
-- Niemals D1/R2 löschen, leeren oder unter demselben Namen neu erstellen.
+Der geplante Workflow `Cloudflare-Maintenance` prüft am ersten Tag jedes Monats zusätzlich zum
+manuellen Start:
+
+- ein Höchstalter von 45 Tagen für die Compatibility-Date,
+- den gemeinsamen Stand von Wrangler, workerd, Worker-Typen und Worker-Testpool,
+- unveränderte generierte Bindings und Worker-Runtime-Tests,
+- persistierte, gesampelte Observability,
+- `/api/health`, `/api/meta`, die Deployment-Revision, Migrationen und Secrets,
+- sowie durch Verhaltenstests, dass freie Fehlerdetails mit PINs, Tokens, Telefonnummern,
+  Push-Endpunkten und öffentlichen Ticketcodes nicht in Worker-Logs gelangen.
+
+Der normale Build prüft dieselbe Konfiguration, wird aber nicht allein durch das Kalenderalter der
+Compatibility-Date instabil. Für das GitHub-Environment `rundflug-leitstand` wird zusätzlich die
+Variable `CLOUDFLARE_DEPLOYMENT_URL` gepflegt.
+
+## 9. Einmaliger D1-Baseline-Neuaufbau
+
+Der folgende Ablauf ist ausschließlich für das ausdrücklich zum Datenverlust freigegebene Ziel und
+erst nach Factory Reset, leerem R2 und erfolgreichem `npm run check` zulässig. Ohne `--confirm` führt
+das CLI nur Konto-, Manifest-, Ressourcen- und Jurisdiktionsprüfungen aus:
+
+```bash
+npm run cloudflare:recreate-d1 -- --target rundflug-leitstand
+```
+
+Die Ausgabe nennt den exakt erforderlichen Bestätigungstext. Erst der zweite Lauf darf löschen:
+
+```bash
+npm run cloudflare:recreate-d1 -- \
+  --target rundflug-leitstand \
+  --confirm DELETE-rundflug-leitstand-db
+```
+
+Der erwartete Text wird immer aus dem D1-Namen im ignorierten Zielmanifest abgeleitet; das Beispiel
+ist daher nicht zu kopieren, wenn die Vorschau einen anderen Namen meldet. Das CLI löscht nur die
+bestätigte Remote-D1, legt sie unter demselben Namen mit `jurisdiction eu` neu an, aktualisiert lokale
+Zieldateien und wendet ausschließlich `0001_v1_12_baseline.sql` an. R2, Worker, URL und Secrets
+werden weder gelöscht noch verändert. Es erfolgt kein Deployment und kein Remote-Demo-Seed.
+
+Schlägt der Lauf nach der Löschung fehl, wird nicht zur alten D1-ID zurückgewechselt. Nach einer vom
+CLI selbst bestätigten Neuanlage markiert das Zielmanifest den Neuaufbau als ausstehend; derselbe
+Befehl mit derselben exakten Bestätigung setzt dann ausschließlich diesen belegten Zwischenstand fort,
+ohne D1 erneut zu löschen. Neue Ressource und Zielmanifest werden geprüft, die Baseline wird erneut
+angewandt und erst danach separat deployt.
+Ein fachlich erforderlicher Daten-Restore erfolgt ausschließlich in einer isolierten Datenbank nach
+`backup-restore.md`.
+
+## 10. Fehlerbehebung ohne Datenverlust
+
+- Außerhalb des ausdrücklich freigegebenen Baseline-Neuaufbaus niemals D1/R2 löschen, leeren oder
+  unter demselben Namen neu erstellen.
 - Bei Namens- oder Accountabweichung abbrechen, Namensblatt und
   `.wrangler/targets/<ziel>.json` vergleichen.
 - Bei einer Teilmenge vorhandener Secrets erst Ziel und Account prüfen. Danach entweder fehlende

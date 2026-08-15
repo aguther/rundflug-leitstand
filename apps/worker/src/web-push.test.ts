@@ -237,13 +237,11 @@ describe("Web-Push-Konfiguration", () => {
   });
 
   it("hält Push-Endpunkte aus Fehlerprotokollen heraus", () => {
-    expect(pushErrorMessage(new Error("Invalid URL: https://web.push.apple.com/QIs0Rgeheim"))).toBe(
-      "Invalid URL: [endpunkt]",
+    expect(pushErrorMessage(new Error("Invalid URL: https://web.push.invalid/secret"))).toBe(
+      "Error",
     );
-    expect(pushErrorMessage(new Error("Web-Push-TTL ist ungültig."))).toBe(
-      "Web-Push-TTL ist ungültig.",
-    );
-    expect(pushErrorMessage("kein Fehlerobjekt")).toBe("Unbekannter Fehler");
+    expect(pushErrorMessage(new TypeError("synthetic-token"))).toBe("TypeError");
+    expect(pushErrorMessage("synthetic failure")).toBe("Unknown error");
   });
 });
 

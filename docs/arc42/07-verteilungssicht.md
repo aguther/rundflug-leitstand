@@ -40,7 +40,7 @@ flowchart TB
 | Knoten | Ausführungsumgebung | Bemerkung |
 | --- | --- | --- |
 | Endgeräte | moderne Browser, installierbare PWA je Rolle (eigene Web-App-Manifeste und Icons) | Offline-Snapshot in IndexedDB; iOS-Web-Push erfordert die installierte PWA |
-| Worker | V8-Isolate am Cloudflare-Edge, `compatibility_date` 2026-07-11, `nodejs_compat` | liefert zusätzlich die statischen Assets aus; `/api/*` und Rollenpfade laufen zuerst durch den Worker |
+| Worker | V8-Isolate am Cloudflare-Edge, `compatibility_date` 2026-08-15, `nodejs_compat` | liefert zusätzlich die statischen Assets aus; `/api/*` und Rollenpfade laufen zuerst durch den Worker; persistierte Logs und niedrig gesampelte Traces sind aktiviert |
 | Durable Object | SQLite-basiert, außerhalb der Entwicklung mit `jurisdiction("eu")` angefordert | genau eine aktive Instanz je Veranstaltung; hibernierende WebSockets |
 | D1 | Cloudflare-verwaltetes SQLite, Bindung `DB` | Source of Truth; Time Travel als kurzfristiger Wiederherstellungspfad |
 | R2 | Bucket mit `jurisdiction: eu`, Bindung `BACKUPS` | portable ZIP-/NDJSON-Sicherungen als Multipart-Archiv plus SHA-256-Sidecar, Veranstaltungslogos und Analysepakete; keine öffentlichen Bucket-URLs |
@@ -86,6 +86,8 @@ flowchart TB
     APPLY --> BUILD["npm run build:web"]
     MIG -->|"keine offenen"| BUILD
     BUILD --> DEP["wrangler deploy"]
+    MAIN --> MON["monatlich: Cloudflare-Maintenance"]
+    MON --> RUNTIME["Compatibility-Date, Toolchain,<br/>Bindings, Runtime, Logs, Health/Meta"]
 ```
 
 Das Deployment ist bewusst manuell auszulösen und verlangt die exakte Eingabe `DEPLOY` sowie eine
@@ -93,3 +95,8 @@ Zielumgebung. Der einmalige inkompatible Neustart auf `0001_v1_12_baseline.sql` 
 über den in ADR-0045 beschriebenen vollständigen Neuaufbau. Danach sind Migrationen vorwärtsgerichtet
 und besitzen jeweils eine Wiederherstellungs- oder Forward-Repair-Notiz; ein manueller Spaltenabbau in
 der laufenden Datenbank ist nicht vorgesehen.
+
+Der monatliche Workflow läuft gegen das geschützte Ziel `rundflug-leitstand`. Nur dort gilt das
+45-Tage-Ratchet für die Compatibility-Date; normale PR- und Build-Läufe bleiben zeitstabil. Der
+einmalige Baseline-Neuaufbau verwendet das read-only startende CLI aus ADR-0049. Deployment und
+Remote-Seeds sind ausdrücklich kein Bestandteil dieses Löschkommandos.

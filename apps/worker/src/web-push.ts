@@ -47,9 +47,9 @@ export function vapidConfiguration(env: Env): VapidConfiguration | null {
   };
 }
 
-/** Laufzeitfehler können die aufgerufene URL führen; Push-Endpunkte gehören nie in Protokolle. */
+/** Runtime diagnostics expose only an error class and never push endpoints or credentials. */
 export function pushErrorMessage(reason: unknown): string {
-  return safeErrorMessage(reason).replaceAll(/https?:\/\/\S+/g, "[endpunkt]");
+  return safeErrorMessage(reason);
 }
 
 const DEFAULT_PUSH_RETENTION_DAYS = 7;

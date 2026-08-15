@@ -180,6 +180,11 @@ if (r2Info.code !== 0) {
 
 const baseConfig = JSON.parse(await readFile(resolve(repositoryRoot, "wrangler.jsonc"), "utf8"));
 const generatedConfig = createTargetWranglerConfig(baseConfig, profile, databaseId);
+const sourceRevision = await run("git", ["rev-parse", "HEAD"], {
+  echo: false,
+  errorMessage: "Die auszurollende Git-Revision konnte nicht bestimmt werden.",
+});
+generatedConfig.vars.SOURCE_REVISION = sourceRevision.stdout.trim();
 generatedConfig.account_id = selectedAccountId;
 await writeFile(configPath, `${JSON.stringify(generatedConfig, null, 2)}\n`, "utf8");
 await writeManifest({

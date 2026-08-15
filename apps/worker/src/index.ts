@@ -34,6 +34,7 @@ import { limitApiBody, requireValidJsonBody } from "./request-body-boundaries";
 import { runScheduledMaintenance } from "./scheduled-maintenance";
 import { registerSetupRoutes } from "./setup-routes";
 import { registerSimulationPlanExportRoutes } from "./simulation-plan-export-routes";
+import { safeErrorMessage } from "./snapshot";
 import { registerTicketReadRoutes } from "./ticket-read-routes";
 import { httpsRedirectLocation } from "./transport-security";
 import type { Env } from "./types";
@@ -173,7 +174,11 @@ app.onError((error, context) => {
     );
   }
   console.error(
-    JSON.stringify({ level: "error", code: "UNHANDLED_API_ERROR", message: error.message }),
+    JSON.stringify({
+      level: "error",
+      code: "UNHANDLED_API_ERROR",
+      message: safeErrorMessage(error),
+    }),
   );
   return context.json({ error: { code: "INTERNAL_ERROR", message: "Interner Fehler." } }, 500);
 });

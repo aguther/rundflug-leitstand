@@ -1,10 +1,12 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import {
   createTargetWranglerConfig,
   generatedConfigPath,
   parseCloudflareTargetArguments,
   repositoryRoot,
+  requiredCloudflareSecrets,
+  targetManifestPath,
 } from "./cloudflare-target.mjs";
 
 const target = process.env.CLOUDFLARE_TARGET;
@@ -35,4 +37,27 @@ const config = createTargetWranglerConfig(baseConfig, profile, databaseId);
 config.account_id = accountId;
 const output = generatedConfigPath(profile);
 await writeFile(output, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+const manifestPath = targetManifestPath(profile);
+await mkdir(dirname(manifestPath), { recursive: true });
+await writeFile(
+  manifestPath,
+  `${JSON.stringify(
+    {
+      target: profile.target,
+      accountId,
+      workerName: profile.workerName,
+      d1Name: profile.d1Name,
+      d1DatabaseId: databaseId,
+      r2Name: profile.r2Name,
+      appEnv: profile.appEnv,
+      jurisdiction: "eu",
+      requiredSecrets: [...requiredCloudflareSecrets],
+      configPath: output,
+      deploymentUrl: process.env.CLOUDFLARE_DEPLOYMENT_URL ?? null,
+    },
+    null,
+    2,
+  )}\n`,
+  "utf8",
+);
 process.stdout.write(`${output}\n`);
