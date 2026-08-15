@@ -193,8 +193,9 @@ Das manifestbasierte Asset-Ratchet misst den vollständigen statischen Importgra
 
 `AppShell` trennt persistente Zustandsmeldungen von transienten Aktionsbestätigungen. Persistente
 Hinweise liegen inline unter dem Header; `PwaUpdate` koordiniert den expliziten Service-Worker-Reload
-über eine Dirty-/Pending-Registry. Bleibt die vom Service Worker zugesagte Navigation aus, löst ein
-zeitlich begrenzter Fallback genau einen normalen Seiten-Reload aus. Der Catch-all des `FeatureRouter`
+über eine Dirty-/Pending-Registry. Plugin-Bestätigung und native `controllerchange`-Benachrichtigung
+laufen in denselben einmaligen Reload-Handler; bleiben beide aus, erzwingt ein zeitlich begrenzter
+Watchdog denselben Seiten-Reload. Der Catch-all des `FeatureRouter`
 rendert `NotFoundPage`, ohne eine Rollenansicht und deren Datenzugriffe als vermeintlichen Standard zu
 mounten.
 

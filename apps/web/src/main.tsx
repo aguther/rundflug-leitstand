@@ -6,6 +6,7 @@ import { App } from "./App";
 import { AppErrorBoundary } from "./app/AppErrorBoundary";
 import "./app/app-error-boundary.css";
 import { applyInitialInstallMetadata } from "./app/install-metadata";
+import { PWA_UPDATE_CONTROLLER_READY_EVENT } from "./app/pwa-update-events";
 import { applyInitialTheme, ThemeProvider } from "./design-system/theme";
 import "./design-system/tokens.css";
 import "./styles.css";
@@ -20,6 +21,9 @@ if (import.meta.env.MODE !== "simulator") {
   const { registerSW } = await import("virtual:pwa-register");
   const updateServiceWorker = registerSW({
     immediate: true,
+    onNeedReload() {
+      window.dispatchEvent(new Event(PWA_UPDATE_CONTROLLER_READY_EVENT));
+    },
     onNeedRefresh() {
       window.rundflugPwaUpdateServiceWorker = updateServiceWorker;
       window.dispatchEvent(new Event("rundflug:pwa-update-available"));

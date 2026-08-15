@@ -6,6 +6,7 @@ import {
   PwaUpdateNotice,
   registerUpdateBlocker,
   resetPwaUpdateStateForTests,
+  setPwaUpdateReloadForTests,
 } from "./PwaUpdate";
 
 describe("PwaUpdateNotice", () => {
@@ -18,6 +19,7 @@ describe("PwaUpdateNotice", () => {
     cleanup();
     resetPwaUpdateStateForTests();
     delete window.rundflugPwaUpdateServiceWorker;
+    vi.useRealTimers();
   });
 
   it("waits for a conscious action before applying an available update", async () => {
@@ -66,5 +68,37 @@ describe("PwaUpdateNotice", () => {
 
     expect(screen.queryByText("Update verfügbar")).toBeNull();
     expect(updateServiceWorker).not.toHaveBeenCalled();
+  });
+
+  it("reloads as soon as the new service worker controls the page", async () => {
+    vi.useFakeTimers();
+    const serviceWorker = new EventTarget();
+    const originalServiceWorker = Object.getOwnPropertyDescriptor(navigator, "serviceWorker");
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: serviceWorker,
+    });
+    const reload = vi.fn();
+    const updateServiceWorker = vi.fn().mockResolvedValue(undefined);
+    setPwaUpdateReloadForTests(reload);
+    render(<PwaUpdateNotice />);
+
+    act(() => announcePwaUpdate(updateServiceWorker));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Jetzt aktualisieren" }));
+      await Promise.resolve();
+    });
+    expect(updateServiceWorker).toHaveBeenCalledWith(true);
+
+    act(() => serviceWorker.dispatchEvent(new Event("controllerchange")));
+
+    expect(reload).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(reload).toHaveBeenCalledOnce();
+    if (originalServiceWorker) {
+      Object.defineProperty(navigator, "serviceWorker", originalServiceWorker);
+    } else {
+      Reflect.deleteProperty(navigator, "serviceWorker");
+    }
   });
 });

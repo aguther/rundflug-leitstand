@@ -1,6 +1,7 @@
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { PageNotice } from "./PageNotifications";
+import { PWA_UPDATE_CONTROLLER_READY_EVENT } from "./pwa-update-events";
 
 export type PwaUpdateStatus = "idle" | "available" | "blocked" | "applying" | "failed";
 export type UpdateBlockerKind = "dirty" | "pending";
@@ -18,6 +19,7 @@ const blockers = new Map<string, UpdateBlockerKind>();
 const RELOAD_FALLBACK_DELAY_MS = 4_000;
 let updateServiceWorker: UpdateServiceWorker | null = null;
 let reloadFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+let removeControllerChangeListener: (() => void) | null = null;
 
 function defaultReloadApplication() {
   window.location.reload();
@@ -59,11 +61,37 @@ function clearReloadFallback() {
   reloadFallbackTimer = null;
 }
 
+function clearControllerChangeListener() {
+  removeControllerChangeListener?.();
+  removeControllerChangeListener = null;
+}
+
+function reloadUpdatedApplication() {
+  clearReloadFallback();
+  clearControllerChangeListener();
+  reloadApplication();
+}
+
+function monitorControllerChange() {
+  clearControllerChangeListener();
+  if (typeof window === "undefined") return;
+  const serviceWorker = typeof navigator === "undefined" ? undefined : navigator.serviceWorker;
+  const handleControllerChange = () => reloadUpdatedApplication();
+  window.addEventListener(PWA_UPDATE_CONTROLLER_READY_EVENT, handleControllerChange, {
+    once: true,
+  });
+  serviceWorker?.addEventListener("controllerchange", handleControllerChange, { once: true });
+  removeControllerChangeListener = () => {
+    window.removeEventListener(PWA_UPDATE_CONTROLLER_READY_EVENT, handleControllerChange);
+    serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
+  };
+}
+
 function scheduleReloadFallback() {
   clearReloadFallback();
   reloadFallbackTimer = globalThis.setTimeout(() => {
     reloadFallbackTimer = null;
-    reloadApplication();
+    reloadUpdatedApplication();
   }, RELOAD_FALLBACK_DELAY_MS);
 }
 
@@ -74,11 +102,13 @@ async function applyAvailableUpdate() {
     return;
   }
   publish({ applyRequested: false, status: "applying" });
+  monitorControllerChange();
   scheduleReloadFallback();
   try {
     await updateServiceWorker(true);
   } catch {
     clearReloadFallback();
+    clearControllerChangeListener();
     publish({ status: "failed" });
   }
 }
@@ -97,6 +127,7 @@ export function requestPwaUpdate() {
 
 export function deferPwaUpdate() {
   clearReloadFallback();
+  clearControllerChangeListener();
   if (typeof window !== "undefined") delete window.rundflugPwaUpdateServiceWorker;
   publish({ applyRequested: false, status: "idle" });
 }
@@ -255,6 +286,7 @@ export function PwaUpdateNotice() {
 
 export function resetPwaUpdateStateForTests() {
   clearReloadFallback();
+  clearControllerChangeListener();
   blockers.clear();
   updateServiceWorker = null;
   reloadApplication = defaultReloadApplication;
