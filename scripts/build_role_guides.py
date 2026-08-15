@@ -17,7 +17,7 @@ from reportlab.platypus import KeepInFrame, Paragraph, Spacer
 ROOT = Path(__file__).resolve().parents[1]
 ROLE_DIRECTORY = ROOT / "docs" / "roles"
 OUTPUT_DIRECTORY = ROOT / "output" / "pdf" / "roles"
-VERSION = "1.11.0"
+VERSION = "1.12.0"
 GUIDES = {
     "kasse": [(0.13, 0.18), (0.30, 0.13), (0.40, 0.18), (0.36, 0.31), (0.77, 0.34)],
     "flight-line": [(0.08, 0.12), (0.10, 0.31), (0.18, 0.31), (0.26, 0.31), (0.14, 0.57)],
@@ -40,12 +40,28 @@ def compact(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip()).replace("**", "").replace("`", "")
 
 
+def list_items(text: str, marker: re.Pattern[str]) -> list[str]:
+    items: list[str] = []
+    current: list[str] = []
+    for line in text.splitlines():
+        match = marker.match(line)
+        if match:
+            if current:
+                items.append(compact(" ".join(current)))
+            current = [match.group(1)]
+        elif current and line.startswith((" ", "\t")) and line.strip():
+            current.append(line.strip())
+    if current:
+        items.append(compact(" ".join(current)))
+    return items
+
+
 def bullets(text: str) -> list[str]:
-    return [compact(value) for value in re.findall(r"^- (.+)$", text, flags=re.MULTILINE)]
+    return list_items(text, re.compile(r"^- (.+)$"))
 
 
 def numbered(text: str) -> list[str]:
-    return [compact(value) for value in re.findall(r"^\d+\. (.+)$", text, flags=re.MULTILINE)]
+    return list_items(text, re.compile(r"^\d+\. (.+)$"))
 
 
 def register_font() -> str:

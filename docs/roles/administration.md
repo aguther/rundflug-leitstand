@@ -1,6 +1,6 @@
 # Einweisung Administration
 
-Version 1.11.0 · Ziel: Veranstaltung, Konten, Stammdaten, Sicherung und Reset kontrolliert verwalten.
+Version 1.12.0 · Ziel: Veranstaltung, Konten, Stammdaten, Sicherung und Reset kontrolliert verwalten.
 
 ## Einstieg
 
@@ -16,7 +16,7 @@ Mit dem Administratorkonto anmelden, Veranstaltung wählen und **Administration*
 5. Storno, Löschung, Neustart und Werksreset nur mit Begründung, Bestätigung und aktueller Konto-PIN.
 6. Nach Werksreset im selben Browser `/setup` fortsetzen; Notfallcode nur bei verlorenem Grant.
 
-![Aktuelle Administrationsansicht mit synthetischen Daten](images/administration-1.11.0.png)
+![Aktuelle Administrationsansicht mit synthetischen Daten](images/administration-1.12.0.png)
 
 ## Normalfall
 
@@ -25,6 +25,8 @@ Mit dem Administratorkonto anmelden, Veranstaltung wählen und **Administration*
 ## Stopp/Hilfe holen
 
 - Bei fehlendem Backup, falscher Zielumgebung, D1-/R2-Fehler oder unklarer Migration nichts löschen.
+- Eine angebotene Aktualisierung erst ohne geänderte Eingaben oder laufende Administration anwenden;
+  danach Versions- und Betriebsstatus erneut prüfen.
 - Werksreset, R2-Leerung, Domainwechsel und Produktion benötigen eine zweite verantwortliche Person.
 - Bei verlorenem Browser und Grant den Installations-Notfallcode aus dem Passwortsafe verwenden;
   fehlt auch er, Secret bewusst in Cloudflare rotieren.

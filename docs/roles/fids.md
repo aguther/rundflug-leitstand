@@ -1,6 +1,6 @@
 # Einweisung FIDS
 
-Version 1.11.0 · Ziel: den öffentlichen Gruppenstatus ruhig, lesbar und aktuell anzeigen.
+Version 1.12.0 · Ziel: den öffentlichen Gruppenstatus ruhig, lesbar und aktuell anzeigen.
 
 ## Einstieg
 
@@ -17,7 +17,7 @@ setzen; Veranstaltung, Verbindung und sichtbare Zeilen prüfen.
    Nachruf müssen Glocke und normaler Gruppenstatus gleichzeitig sichtbar bleiben.
 5. Nach Neustart Vollbild, automatische Aktualisierung und Bildschirmsperre erneut prüfen.
 
-![Aktuelle FIDS-Ansicht mit synthetischen Daten](images/fids-1.11.0.png)
+![Aktuelle FIDS-Ansicht mit synthetischen Daten](images/fids-1.12.0.png)
 
 ## Normalfall
 
@@ -26,6 +26,8 @@ Anmelden → Veranstaltung → Vollbild → Lesbarkeit prüfen → Anzeige beoba
 ## Stopp/Hilfe holen
 
 - Bei „Offline“, eingefrorener Anzeige oder falscher Veranstaltung Bildschirm nicht öffentlich lassen.
+- Eine angebotene Aktualisierung bewusst anwenden und anschließend Veranstaltung, Vollbild und
+  sichtbare Gruppenstände erneut prüfen.
 - Keine Daten per Browserkonsole, URL-Parameter oder fremdem Konto manipulieren.
 - Abweichende Gruppenstände an Flight Director melden; FIDS selbst steuert keinen Betrieb.
 

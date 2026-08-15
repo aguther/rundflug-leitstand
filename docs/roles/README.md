@@ -1,4 +1,4 @@
-# Einweisungspaket – Release 1.11.0
+# Einweisungspaket – Release 1.12.0
 
 Die Markdown-Dateien sind die wartbaren Quellen. `npm run test:browser:roles` baut eine isolierte
 lokale D1 mit synthetischen Daten auf, startet den lokalen Worker, prüft alle fünf Rollenansichten

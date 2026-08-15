@@ -254,7 +254,7 @@ try {
       );
     }
     await page.screenshot({
-      path: resolve(outputDirectory, `${role.slug}-1.11.0.png`),
+      path: resolve(outputDirectory, `${role.slug}-1.12.0.png`),
       fullPage: false,
     });
     process.stdout.write(

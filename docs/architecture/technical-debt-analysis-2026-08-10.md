@@ -99,9 +99,9 @@ Folgende Aussagen wurden präzisiert oder verworfen:
 - `packages/domain/src/forecast.ts` besitzt 92,5 % Sonar-Coverage und umfangreiche Tests. Das Problem
   ist die innere Komplexität und fehlende isolierte Testbarkeit einzelner Phasen, nicht eine generell
   ungetestete Gesamtfunktion.
-- Die fünf Rollen-PDFs mit `v1.11.0` im Namen sind keine versehentlich veralteten Buildartefakte.
-  V1.12 führt die V1.11-Rollenblätter ausdrücklich fort; `npm run docs:guides:check` bestätigt alle
-  fünf Dateien. Sie bleiben versioniert.
+- Die fünf zum Analysezeitpunkt vorhandenen Rollen-PDFs mit `v1.11.0` im Namen waren keine
+  versehentlich veralteten Buildartefakte. Im anschließenden Verbesserungsprogramm wurden Quellen,
+  synthetische Screenshots und PDFs bewusst auf V1.12 aktualisiert und die V1.11-Artefakte ersetzt.
 - `style-src 'unsafe-inline'` ist kein isolierter Quick Win. Das Frontend besitzt 28 dynamische
   Inline-Styles, vor allem für Diagrammpositionen. Eine CSP-Härtung benötigt eine geplante Migration
   auf CSS-Variablen, Nonces oder andere kompatible Darstellungsmechanismen.
@@ -306,7 +306,7 @@ eigenen Branch und verweist in Tests, Commit-Body oder PR auf die betroffenen Re
 | **AP-12** | P2 | Hoch | XL | Forecast-Adapter wird in Loader, reinen Projector, Repository, Precall-Evaluator und Publication Service geteilt. Danach wird die Domain entlang Sampling, Verfügbarkeit, Projektion und Diagnostik zerlegt. Legacy-Pfad erhält ADR und Abschaltkriterium. |
 | **AP-13** | P2 | Mittel–hoch | L | Gemeinsame deterministische Simulationsprimitive mit Seed-Stabilitätstest. Beide Engines werden in fachliche Phasen zerlegt und die operative Engine vollständig in Coverage aufgenommen. |
 | **AP-14** | P2 | Mittel–hoch | L | Event-ID wandert aus der Importzeit in React Context; `operation-workspace.tsx`, Kasse und Flight Line werden in Kontext, Hooks und präsentierende Feature-Komponenten aufgeteilt. Freigegebenes UI-Konzept und Light-/Dark-Browserabgleich sind Pflicht. |
-| **AP-15** | P3 | Mittel | L | Gemeinsames isoliertes Worker-Testharness, direkte interne Domain-Imports, Contracts nach Command-Familien und CSS-Konsolidierung. ADR-0010 wird als teilweise ersetzt markiert; die verifizierten V1.11-Rollen-PDFs bleiben erhalten. |
+| **AP-15** | P3 | Mittel | L | Gemeinsames isoliertes Worker-Testharness, direkte interne Domain-Imports, Contracts nach Command-Familien und CSS-Konsolidierung. ADR-0010 wird als teilweise ersetzt markiert. Die damalige Aufbewahrungsempfehlung für V1.11-Rollen-PDFs wurde im anschließenden Verbesserungsprogramm durch vollständig neu erzeugte V1.12-Artefakte abgelöst. |
 
 ### Empfohlene Reihenfolge und Abhängigkeiten
 
@@ -332,7 +332,8 @@ Ausgeführt und erfolgreich:
 - `npm run requirements:verify`: 341 aktuelle Anforderungen und vollständige Traceability.
 - `npm audit --audit-level=moderate` und `npm audit --omit=dev`: keine Findings.
 - `npm ci --dry-run`.
-- `npm run docs:guides:check`: fünf gültige Rollenblätter für V1.11.0.
+- `npm run docs:guides:check`: zum Analysezeitpunkt fünf gültige Rollenblätter für V1.11.0; der
+  nachfolgende Dokumentationslauf prüft die ersetzenden V1.12-Artefakte.
 
 Nicht als erfolgreich behauptet:
 

@@ -9,9 +9,16 @@ from pypdf import PdfReader
 ROOT = Path(__file__).resolve().parents[1]
 ROLE_DIRECTORY = ROOT / "docs" / "roles"
 PDF_DIRECTORY = ROOT / "output" / "pdf" / "roles"
-VERSION = "1.11.0"
+VERSION = "1.12.0"
 ROLES = ["kasse", "flight-line", "flight-director", "fids", "administration"]
 FORBIDDEN = ["Flight Line Assist", "Flight Line Supervisor", "BOOTSTRAP_TOKEN", "000000"]
+REQUIRED_ROLE_TEXT = {
+    "kasse": ["Verkaufsempfehlung ist keine Verkaufssperre", "Nach Abschluss aktualisieren"],
+    "flight-line": ["stabil breiten Standardbutton", "exklusive Bearbeitung"],
+    "flight-director": ["blockierte Aktualisierung", "Dauerhafte Betriebs-, Offline-"],
+    "fids": ["angebotene Aktualisierung bewusst anwenden"],
+    "administration": ["Versions- und Betriebsstatus erneut prüfen"],
+}
 
 
 def verify_markdown(markdown_path: Path) -> None:
@@ -44,9 +51,12 @@ def verify_pdf(pdf_path: Path, role: str) -> None:
     if not 1 <= len(reader.pages) <= maximum_pages:
         raise ValueError(f"{pdf_path}: unzulässige Seitenzahl {len(reader.pages)}")
     text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    normalized_text = re.sub(r"\s+", " ", text)
     required = [VERSION, "Kernschritte", "Stopp / Hilfe holen", "Wesentliche Invarianten"]
     if any(value not in text for value in required):
         raise ValueError(f"{pdf_path}: Pflichttext fehlt")
+    if any(value not in normalized_text for value in REQUIRED_ROLE_TEXT[role]):
+        raise ValueError(f"{pdf_path}: rollenspezifischer V1.12-Inhalt fehlt")
     if any(value in text for value in FORBIDDEN):
         raise ValueError(f"{pdf_path}: veralteter oder sensitiver Begriff")
     if embedded_image_count(reader) < 1:

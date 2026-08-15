@@ -1,11 +1,12 @@
 # Einweisung Flight Director
 
-Version 1.11.0 · Ziel: Queue, Flugzeuge und Konflikte übergreifend koordinieren.
+Version 1.12.0 · Ziel: Queue, Flugzeuge und Konflikte übergreifend koordinieren.
 
 ## Einstieg
 
 Mit dem Flight-Director-Konto anmelden, Veranstaltung wählen und **Flight Director** öffnen.
-„Verbunden“, Veranstaltung und Filter müssen zum aktuellen Betrieb passen.
+„Verbunden“, Veranstaltung und Filter müssen zum aktuellen Betrieb passen. Dauerhafte Betriebs-,
+Offline- und Updatehinweise stehen direkt unter der beim Scrollen erreichbaren Kopfzeile.
 
 ## Kernschritte
 
@@ -19,7 +20,7 @@ Mit dem Flight-Director-Konto anmelden, Veranstaltung wählen und **Flight Direc
 6. **Auswertungen** öffnet die Tagesverläufe für Fluggruppen, Flugzeuge und anonyme Pilotencodes.
    Das Diagrammsymbol einer Fluggruppe springt direkt in ihren Prognoseverlauf.
 
-![Aktuelle Flight-Director-Ansicht mit synthetischen Daten](images/flight-director-1.11.0.png)
+![Aktuelle Flight-Director-Ansicht mit synthetischen Daten](images/flight-director-1.12.0.png)
 
 ## Normalfall
 
@@ -28,6 +29,8 @@ Lage prüfen → Gruppe wählen → Vorschlag prüfen → NEXT bestätigen → E
 ## Stopp/Hilfe holen
 
 - Bei Doppelzuordnung, falscher Gruppierung, fehlendem Audit oder stale write nicht weiterarbeiten.
+- „Jetzt aktualisieren“ nur ohne laufende Schreibaktion wählen; eine blockierte Aktualisierung erst
+  nach Abschluss des Vorgangs anwenden.
 - Bei Notfall, globaler Unterbrechung oder unklarer Sicherheitslage örtliche Leitung einschalten.
 - Weitreichende Stammdaten-, Lösch- und Resetaktionen an Administration übergeben.
 
