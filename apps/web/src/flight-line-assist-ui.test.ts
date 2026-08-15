@@ -218,6 +218,22 @@ describe("Flight Line", () => {
     expect(assistSource).toContain("BookingGroupAssignmentDialog");
   });
 
+  it("keeps phone actions operable and short landscape details reachable", () => {
+    expect(assistStyles).toMatch(
+      /@media \(max-width: 560px\) \{[\s\S]*?\.assist-v15-action-bar \{\s*grid-template-columns: 56px auto;/,
+    );
+    expect(assistStyles).toContain("@media (max-height: 500px)");
+    expect(assistStyles).toMatch(
+      /@media \(max-height: 500px\) \{[\s\S]*?\.flight-assist\.flight-assist-v15\.is-work-mode \{[\s\S]*?height: calc\(100dvh - var\(--header-height\)\);[\s\S]*?overflow-y: auto;[\s\S]*?overscroll-behavior: contain;/,
+    );
+    expect(assistStyles).toMatch(
+      /\.flight-assist-v15\.is-work-mode \.assist-v15-active-column \{\s*height: auto;\s*min-height: 100%;\s*grid-template-rows: auto auto auto;/,
+    );
+    expect(assistStyles).toMatch(
+      /\.flight-assist-v15\.is-work-mode \.assist-v15-rotation-detail \{\s*min-height: 145px;\s*flex: 0 0 auto;/,
+    );
+  });
+
   it("allows the shared unavailable abort during boarding and off-block", () => {
     expect(assistSource).toContain(
       'assignedRotation && ["CALLED", "IN_FLIGHT", "LANDED"].includes(assignedRotation.status)',

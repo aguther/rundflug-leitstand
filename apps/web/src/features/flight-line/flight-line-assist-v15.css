@@ -1025,7 +1025,7 @@
   }
 
   .flight-assist-v15 .assist-v15-action-bar {
-    grid-template-columns: repeat(4, 56px);
+    grid-template-columns: 56px auto;
   }
 
   .flight-assist-v15 .flight-director-current-timeline {
@@ -1069,6 +1069,27 @@
 
   .flight-assist-v15 .flight-director-current-rotation.is-booking-groups-only dd {
     font-size: 0.78rem;
+  }
+}
+
+@media (max-height: 500px) {
+  .flight-assist.flight-assist-v15.is-work-mode {
+    height: calc(100dvh - var(--header-height));
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .flight-assist-v15.is-work-mode .assist-v15-active-column {
+    height: auto;
+    min-height: 100%;
+    grid-template-rows: auto auto auto;
+  }
+
+  .flight-assist-v15.is-work-mode .assist-v15-rotation-detail {
+    min-height: 145px;
+    flex: 0 0 auto;
   }
 }
 
