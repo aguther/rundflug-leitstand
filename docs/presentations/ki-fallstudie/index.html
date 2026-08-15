@@ -2,503 +2,619 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=1280, initial-scale=1">
-  <title>Rundflug-Leitstand – KI-Fallstudie</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rundflug-Leitstand · KI-Fallstudie</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<main class="deck">
 
-<section class="slide dark">
-  <div class="cover-art"><img src="assets/live/11-fids-live.png" alt="Öffentliche Abflugtafel des Rundflug-Leitstands"></div>
-  <div class="route-dots"></div>
-  <div class="eyebrow">Fallstudie · Juli–August 2026</div>
-  <div class="title-wrap" style="margin-top:110px;width:670px">
+<!-- 01 -->
+<section class="slide dark cover" data-section="main">
+  <div class="cover-rule"></div>
+  <div class="cover-copy" data-fit-check>
+    <div class="kicker cyan">KI-FALLSTUDIE · JULI–AUGUST 2026</div>
     <h1>34 Tage.<br>Ein echtes System.</h1>
-    <p class="subtitle" style="max-width:610px;margin-top:26px">Wie aus Vereinswissen, Anforderungen und KI-gestütztem Engineering ein vollständiger Rundflug-Leitstand entstand.</p>
+    <p class="lead">Eine Fallstudie über KI-gestützte Produktentwicklung am Beispiel des Rundflug-Leitstands.</p>
+    <div class="cover-meta">Andreas + KI-Agent · Stand 15. August 2026</div>
   </div>
-  <div style="position:absolute;left:66px;bottom:86px;z-index:4;display:flex;gap:14px">
-    <span class="tag cyan">341 Anforderungen</span><span class="tag amber">Live-PWA</span><span class="tag green">1.800 Testfälle</span>
+  <div class="cover-signal" aria-hidden="true">
+    <div class="signal-number">34</div>
+    <div class="signal-label">Kalendertage</div>
+    <div class="signal-line"></div>
+    <div class="signal-stat"><b>341</b><span>Anforderungen</span></div>
+    <div class="signal-stat"><b>1.878</b><span>Testfälle</span></div>
   </div>
-  <div class="cover-line"></div>
-  <div class="slide-number">01</div>
 </section>
 
-<section class="slide white">
-  <div class="eyebrow">Kernaussage</div><div class="slide-number">02</div>
-  <div class="title-wrap" style="margin-top:74px">
-    <div class="statement">KI machte Produktion schnell.<br><em>Urteilskraft wurde knapp.</em></div>
-  </div>
-  <div class="grid-2" style="margin-top:78px">
-    <div class="panel borderless" style="padding-left:0">
-      <div class="eyebrow" style="color:var(--muted)">Klassische Entwicklung</div>
-      <h3 style="font-size:30px;margin-top:18px">Schreib- und Prüfkapazität begrenzt</h3>
-      <p class="subtitle" style="font-size:19px">Design, Implementierung, Tests, Dokumentation und Integration konkurrieren um dieselbe Zeit.</p>
-    </div>
-    <div class="panel dark">
-      <div class="eyebrow">KI-gestützte Entwicklung</div>
-      <h3 style="font-size:30px;margin-top:18px">Kontext und Verantwortung begrenzt</h3>
-      <p class="subtitle" style="font-size:19px">Priorisieren, Fachregeln klären, Verhalten bewerten, Risiken abwägen und Freigaben entscheiden.</p>
+<!-- 02 -->
+<section class="slide" data-section="main">
+  <div class="section-label why">WHY · AUSGANGSLAGE</div>
+  <div class="title-wrap" data-fit-check><h2>Der Ausgangspunkt: 70 Jahre Flugplatz Günzburg-Donauried</h2></div>
+  <div class="origin-layout">
+    <div class="origin-number"><span>70</span><small>Jahre</small></div>
+    <div class="origin-story">
+      <div class="story-row"><b>Jubiläumsveranstaltung</b><p>Rundflugbetrieb mit vielen Gästen und mehreren beteiligten Rollen.</p></div>
+      <div class="story-row"><b>Zwei Angebote</b><p>Normale Rundflüge und Oldtimer-Flüge mit unterschiedlichen Kapazitäten.</p></div>
+      <div class="story-row"><b>Analoger Ausgangspunkt</b><p>Tickets trugen im Wesentlichen eine Nummer; der operative Zusammenhang blieb vor Ort zu klären.</p></div>
     </div>
   </div>
-  <div class="takeaway light">Schneller Code erhöht den Wert guter Anforderungen – und die Kosten schlechter Entscheidungen.</div>
+  <div class="source-note">Quelle: Projektrückblick von Andreas · historische Einordnung, keine zeitgestempelte Betriebsaufzeichnung</div>
 </section>
 
-<section class="slide">
-  <div class="title-accent"></div><div class="eyebrow">Produkt</div><div class="slide-number">03</div>
-  <div class="title-wrap"><h2>Der Rundflugtag ist ein Koordinationsproblem – kein Ticketshop</h2><p class="subtitle">Viele Rollen verändern gleichzeitig denselben operativen Zustand. Das System macht daraus ein gemeinsames, auditierbares Lagebild.</p></div>
-  <div class="step-line" style="grid-template-columns:repeat(6,1fr);margin-top:88px">
-    <div class="step"><div class="step-dot">01</div><h3>Verkauf</h3><p>Tickets & Gruppen</p></div>
-    <div class="step"><div class="step-dot">02</div><h3>Queues</h3><p>Ressourcen flexibel</p></div>
-    <div class="step"><div class="step-dot">03</div><h3>Flight Line</h3><p>Ist-Ereignisse</p></div>
-    <div class="step"><div class="step-dot">04</div><h3>Prognose</h3><p>Zeitfenster</p></div>
-    <div class="step"><div class="step-dot">05</div><h3>FIDS & QR</h3><p>öffentlicher Status</p></div>
-    <div class="step"><div class="step-dot navy">06</div><h3>Audit</h3><p>Wiederanlauf</p></div>
-  </div>
-  <div class="takeaway">Das Produkt koordiniert Entscheidungen – es trifft keine flugbetrieblichen Entscheidungen.</div>
-</section>
-
-<section class="slide white">
-  <div class="title-accent"></div><div class="eyebrow">Produktkarton</div><div class="slide-number">04</div>
-  <div class="title-wrap"><h2>Ein Betriebssystem für den Rundflugtag</h2></div>
-  <div class="split-40" style="margin-top:38px">
-    <div class="panel dark" style="min-height:430px;display:flex;flex-direction:column;justify-content:space-between">
-      <div><div class="eyebrow">Rundflug-Leitstand · V1.12</div><h3 style="font-size:35px;margin-top:35px">Von der Kasse bis zum Abschluss</h3><p class="subtitle" style="font-size:18px">Alle Rollen sehen denselben bestätigten Betriebszustand – passend zu ihrer Aufgabe.</p></div>
-      <div><span class="tag cyan">PWA</span> <span class="tag cyan">Echtzeit</span> <span class="tag cyan">Offline-Überbrückung</span></div>
+<!-- 03 -->
+<section class="slide" data-section="main">
+  <div class="section-label why">WHY · BETRIEBSPROBLEM</div>
+  <div class="title-wrap" data-fit-check><h2>Eine Ticketnummer reichte für den operativen Ablauf nicht aus</h2></div>
+  <div class="bottleneck" data-fit-check>
+    <div class="ticket-stack">
+      <span>128</span><span>129</span><span>130</span><span>131</span><span>132</span>
+      <div class="stack-caption">Gäste mit Nummern</div>
     </div>
-    <div class="role-list">
-      <div class="role-row"><div class="role-num">01</div><h3>Kasse</h3><p>Tickets, Gruppen, Druck und Storno</p></div>
-      <div class="role-row"><div class="role-num">02</div><h3>Operation</h3><p>Queues, Flight Line und Dispatch</p></div>
-      <div class="role-row"><div class="role-num">03</div><h3>Prognose</h3><p>Zeitfenster, Simulator und Analyse</p></div>
-      <div class="role-row"><div class="role-num">04</div><h3>Gäste</h3><p>FIDS, QR-Status und Web-Push</p></div>
-      <div class="role-row"><div class="role-num">05</div><h3>Betrieb</h3><p>Audit, Rollen, Backup und Reset</p></div>
+    <div class="memory-box">
+      <div class="memory-title">Flight Line</div>
+      <p>Welche Nummer ist als Nächstes dran?</p>
+      <p>Normal- oder Oldtimer-Flug?</p>
+      <p>Welches Flugzeug ist verfügbar?</p>
+    </div>
+    <div class="oldtimer-box">
+      <div class="plane-icon">✈</div>
+      <b>Oldtimer</b>
+      <span>1 Platz</span>
+      <span>≈ 15 Minuten</span>
     </div>
   </div>
-</section>
-
-<section class="slide">
-  <div class="title-accent"></div><div class="eyebrow">Produkt · Live</div><div class="slide-number">05</div>
-  <div class="title-wrap"><h2>Kasse, QR-Code und Audit in einem Bildschirm</h2><p class="subtitle">Ein Verkauf erzeugt die Buchungsgruppe, Teilflüge, einen druckbaren QR-Code und die operative Nachverfolgbarkeit.</p></div>
-  <div class="image-frame" style="height:430px;margin-top:28px"><img src="assets/live/01-cashier-qr-live.png" alt="Live-Kassenansicht mit QR-Code"></div>
-  <div class="source-note">Echter Systemzustand im Dark Theme · synthetische Beispieldaten</div>
-</section>
-
-<section class="slide white">
-  <div class="title-accent"></div><div class="eyebrow">Produkt · Ablauf</div><div class="slide-number">06</div>
-  <div class="title-wrap"><h2>Vom Ticket bis zum Abschluss bleibt jede Gruppe nachvollziehbar</h2><p class="subtitle">Die Kommunikationskennung bleibt stabil; Flugzeugzuordnung, Zeitfenster und operative Empfehlung dürfen sich kontrolliert verändern.</p></div>
-  <div class="step-line" style="grid-template-columns:repeat(5,1fr);margin-top:75px">
-    <div class="step"><div class="step-dot">1</div><h3>Verkauf</h3><p>Buchungsgruppe<br>und QR-Ticket</p></div>
-    <div class="step"><div class="step-dot">2</div><h3>Warten</h3><p>Queue-Position<br>und Zeitfenster</p></div>
-    <div class="step"><div class="step-dot amber">3</div><h3>Aufruf</h3><p>Bitte zum Gate<br>oder Boarding</p></div>
-    <div class="step"><div class="step-dot">4</div><h3>Flug</h3><p>Start, Landung<br>und Turnaround</p></div>
-    <div class="step"><div class="step-dot navy">5</div><h3>Abschluss</h3><p>Historie, Audit<br>und Auswertung</p></div>
+  <div class="impact-strip">
+    <b>Lange Wartekette</b><span>Menschen standen in der Hitze und konnten die Wartezeit kaum anderweitig nutzen.</span>
   </div>
-  <div class="takeaway">Menschliche Bestätigung bleibt an allen operativen Übergängen erhalten.</div>
+  <div class="source-note">Quelle: Projektrückblick von Andreas · Flugzeit und Kapazität als rückblickende Größenordnung</div>
 </section>
 
-<section class="slide">
-  <div class="title-accent"></div><div class="eyebrow">Produkt · QR-Status</div><div class="slide-number">07</div>
-  <div class="title-wrap compact"><h2>Der QR-Code wird zur persönlichen, anonymen Abfluganzeige</h2></div>
-  <div class="phone-row" style="margin-top:30px;justify-content:space-between;padding:0 20px">
-    <div class="phone-stage"><div class="phone"><img src="assets/live/14-guest-waiting-live.png" alt="Warten"></div><div class="stage">Warten</div></div>
-    <div class="phone-stage"><div class="phone"><img src="assets/live/16-guest-gate-live.png" alt="Bitte zum Gate"></div><div class="stage">Bitte zum Gate</div></div>
-    <div class="phone-stage"><div class="phone"><img src="assets/live/17-guest-boarding-live.png" alt="Boarding"></div><div class="stage">Boarding</div></div>
-    <div class="phone-stage"><div class="phone"><img src="assets/live/18-guest-in-flight-live.png" alt="Im Flug"></div><div class="stage">Im Flug</div></div>
-    <div class="phone-stage"><div class="phone"><img src="assets/live/19-guest-completed-live.png" alt="Abgeschlossen"></div><div class="stage">Abgeschlossen</div></div>
+<!-- 04 -->
+<section class="slide" data-section="main">
+  <div class="section-label why">WHY · ZIELBILD</div>
+  <div class="title-wrap" data-fit-check><h2>Das Ziel war weniger Warten – und ein gemeinsames Lagebild</h2></div>
+  <div class="shared-state">
+    <div class="state-center">
+      <span>BESTÄTIGTER<br>BETRIEBSZUSTAND</span>
+      <small>eine gemeinsame Quelle</small>
+    </div>
+    <div class="state-node n1"><b>Verkauf</b><span>Tickets & Gruppen</span></div>
+    <div class="state-node n2"><b>Flight Line</b><span>Aufruf & Ereignisse</span></div>
+    <div class="state-node n3"><b>Betriebsleitung</b><span>Lage & Prognose</span></div>
+    <div class="state-node n4"><b>Gäste</b><span>FIDS · QR · Push</span></div>
   </div>
-  <div class="source-note">Keine Gastnamen im Kernsystem · sichtbare Zeiten bleiben Prognosen</div>
-</section>
-
-<section class="slide white">
-  <div class="title-accent"></div><div class="eyebrow">Produkt · Web-Push</div><div class="slide-number">08</div>
-  <div class="title-wrap compact"><h2>Push folgt derselben bestätigten Ereigniskette</h2><p class="subtitle">Der Gast entscheidet freiwillig über Benachrichtigungen; das System publiziert erst nach bestätigter Persistenz.</p></div>
-  <div class="grid-3" style="margin-top:28px;align-items:start">
-    <div class="phone-stage"><div class="phone" style="height:410px;width:194px"><img src="assets/live/20-push-go-to-gate-live.png" alt="Push Bitte zum Gate"></div><div class="stage">15:40 · Bitte zum Gate</div></div>
-    <div class="phone-stage"><div class="phone" style="height:410px;width:194px"><img src="assets/live/21-push-boarding-live.png" alt="Push Boarding"></div><div class="stage">15:43 · Boarding</div></div>
-    <div class="phone-stage"><div class="phone" style="height:410px;width:194px"><img src="assets/live/23-push-completed-live.png" alt="Push Abschluss"></div><div class="stage">15:44 · Abschluss</div></div>
+  <div class="target-band">
+    <span>frei bewegen</span><span>rechtzeitig informiert werden</span><span>denselben Zustand sehen</span><span>Prognosen als Hilfe nutzen</span>
   </div>
+  <div class="source-note">Quelle: Anforderungen V1.12.0 · Prognosen sind Entscheidungshilfen, keine garantierten Uhrzeiten</div>
 </section>
 
-<section class="slide">
-  <div class="title-accent"></div><div class="eyebrow">Produkt · Analyse</div><div class="slide-number">09</div>
-  <div class="title-wrap"><h2>Aus Live-Ereignissen entstehen Prognose, Diagnose und Tagesauswertung</h2></div>
-  <div class="split-60" style="margin-top:30px">
-    <div><div class="image-frame" style="height:390px"><img src="assets/live/10-forecast-analytics-live.png" alt="Tagesauswertung mit Prognoseverlauf"></div><div class="caption"><strong>Prognoseverlauf:</strong> Snapshots machen Annahmen, Veränderung und Datenbasis sichtbar.</div></div>
-    <div style="display:grid;gap:20px"><div class="image-frame flat" style="height:180px"><img src="assets/live/06-active-operations-live.png" alt="Aktiver Betrieb"></div><div class="panel dark"><h3>Entscheidungshilfe, keine Garantie</h3><p class="small" style="margin-top:13px">Zeitfenster, Datenqualität und aktuelle Annahme werden gemeinsam angezeigt.</p></div></div>
+<!-- 05 -->
+<section class="slide" data-section="main">
+  <div class="section-label how">HOW · ENTSTEHUNG</div>
+  <div class="title-wrap" data-fit-check><h2>Die Entwicklung begann vor dem ersten Commit</h2></div>
+  <div class="timeline five" data-fit-check>
+    <div class="time-step"><span>01</span><b>Ideen sammeln</b><p>Gespräch mit einem Vereinskollegen und KI-gestützte Perspektiven.</p></div>
+    <div class="time-step"><span>02</span><b>Dokumente erzeugen</b><p>Mehrere Sichtweisen und Anforderungssammlungen.</p></div>
+    <div class="time-step"><span>03</span><b>Überdeckung bilden</b><p>Widersprüche finden, Begriffe und Grenzen schärfen.</p></div>
+    <div class="time-step"><span>04</span><b>Meta-Prompt bauen</b><p>Auftrag für eine initiale Version&nbsp;1 formulieren.</p></div>
+    <div class="time-step final"><span>05</span><b>Repository starten</b><p>Grundstruktur, Dateien und <code>AGENTS.md</code>.</p></div>
   </div>
+  <div class="callout pale-blue"><b>Ergebnis vor dem Coding</b><span>Ein geschärfter Anforderungskatalog und ein arbeitsfähiges Repository als Startmaschine.</span></div>
+  <div class="source-note">Quelle: Projektrückblick von Andreas · Repository-Historie ab 11. Juli 2026</div>
 </section>
 
-<section class="slide white">
-  <div class="title-accent"></div><div class="eyebrow">KI-Hebel · Simulator</div><div class="slide-number">10</div>
-  <div class="title-wrap"><h2>Der Simulator macht Ablauf, Fehler und Lernwirkung messbar</h2><p class="subtitle">Nachfrage, Ressourcen, Störungen und Zeitmodell werden mit reproduzierbarem Seed durchgespielt.</p></div>
-  <div class="split-60" style="margin-top:28px">
-    <div><div class="image-frame" style="height:380px"><img src="assets/simulator/simulator-start-dark.png" alt="Simulator-Szenario"></div><div class="caption"><strong>Szenario:</strong> virtuelle Zeit, Queue, Flugphasen und Störereignisse</div></div>
-    <div style="display:grid;gap:18px"><div class="image-frame flat" style="height:176px"><img src="assets/simulator/simulator-history-dark.png" alt="Prognosehistorie"></div><div class="image-frame flat" style="height:176px"><img src="assets/simulator/simulator-metrics-dark.png" alt="Simulatorkennzahlen"></div></div>
+<!-- 06 -->
+<section class="slide" data-section="main">
+  <div class="section-label how">HOW · VERLAUF</div>
+  <div class="title-wrap" data-fit-check><h2>Vier Phasen strukturierten die 34 Kalendertage</h2></div>
+  <div class="phase-line" data-fit-check>
+    <div class="phase"><div class="date">11.–17. JUL</div><span>1</span><h3>Fundament</h3><p>Anforderungen<br>Architektur<br>V1-Vertikalschnitte</p></div>
+    <div class="phase cyan"><div class="date">18.–25. JUL</div><span>2</span><h3>Realitätscheck</h3><p>iPhone & iPad<br>Kasse · Flight Line<br>FIDS · Tickets</p></div>
+    <div class="phase"><div class="date">26. JUL–6. AUG</div><span>3</span><h3>Operative Tiefe</h3><p>Forecast V2<br>Simulator<br>Recall & Dispatch</p></div>
+    <div class="phase dark-node"><div class="date">8.–14. AUG</div><span>4</span><h3>Härtung</h3><p>arc42 · Coverage<br>SonarQube<br>Refactoring</p></div>
   </div>
+  <div class="phase-foot"><b>34 Tage Kalenderdifferenz</b><span>11. Juli bis 14. August · davon 33 Tage mit Commits auf <code>main</code></span></div>
+  <div class="source-note">Quelle: Git-Historie · Kalenderzeit ist nicht gleich aktive menschliche Arbeitszeit</div>
 </section>
 
-<section class="slide">
-  <div class="title-accent"></div><div class="eyebrow">KI-Hebel · Entstehung</div><div class="slide-number">11</div>
-  <div class="title-wrap"><h2>Ein fachlicher Wunsch wurde in rund zwei Stunden zum Prognoselabor</h2></div>
-  <div class="split-40" style="margin-top:44px">
-    <div class="panel dark" style="min-height:360px"><div class="eyebrow">22. Juli · 21:04</div><p class="quote" style="margin-top:58px">Optimal wäre es, wenn der Simulator lokal ausgeführt werden kann …</p><p class="small" style="margin-top:36px">Menschlicher Beitrag: Ziel, Randbedingungen und Freigabe – ohne technischen Detailentwurf.</p></div>
-    <div><div class="step-line" style="grid-template-columns:repeat(3,1fr);margin-top:72px"><div class="step"><div class="step-dot">21:04</div><h3>Wunsch</h3><p>lokal · gleiche Logik</p></div><div class="step"><div class="step-dot">22:11</div><h3>Plan frei</h3><p>Domainfunktion + Baseline</p></div><div class="step"><div class="step-dot navy">23:05</div><h3>Commit</h3><p>Simulator läuft</p></div></div><div class="panel soft-cyan" style="margin-top:66px;text-align:center"><strong>Keine Cloud-Ressourcen · kein Login · gleiche reine Prognoselogik</strong></div></div>
+<!-- 07 -->
+<section class="slide" data-section="main">
+  <div class="section-label how">HOW · ZUSAMMENARBEIT</div>
+  <div class="title-wrap" data-fit-check><h2>Der Mensch führte fachlich, die KI bearbeitete die Engineering-Schleife</h2></div>
+  <div class="dual-loop" data-fit-check>
+    <div class="loop human">
+      <div class="loop-label">MENSCH · FACHFÜHRUNG</div>
+      <b>Ziel und Fachregeln</b><i>→</i><b>Priorität</b><i>→</i><b>Beobachtung</b><i>→</i><b>Korrektur & Freigabe</b>
+    </div>
+    <div class="handoff down">AUFTRAG ↓</div>
+    <div class="loop ai">
+      <div class="loop-label">KI · ENGINEERING</div>
+      <b>Analysieren</b><i>→</i><b>Implementieren</b><i>→</i><b>Testen</b><i>→</i><b>Dokumentieren</b><i>→</i><b>Evidenz liefern</b>
+    </div>
+    <div class="handoff up">↑ EVIDENZ</div>
   </div>
-  <div class="takeaway light">Danach wuchs das Labor durch kurze Feedbacks: Historie, A/B-Tuning, FIDS, Nachfragewellen und Störungen.</div>
+  <div class="callout dark-callout"><b>Autonomie im Ablauf</b><span>Fachliche Bewertung, Zieländerung und Freigabe blieben beim Menschen.</span></div>
 </section>
 
-<section class="slide white">
-  <div class="title-accent"></div><div class="eyebrow">Entstehung</div><div class="slide-number">12</div>
-  <div class="title-wrap"><h2>Die Entwicklung begann vor dem ersten Commit</h2><p class="subtitle">KI beschleunigte zuerst die Problemklärung – und erst danach das Programmieren.</p></div>
-  <div class="step-line" style="grid-template-columns:repeat(5,1fr);margin-top:82px">
-    <div class="step"><div class="step-dot">01</div><h3>Ideen sammeln</h3><p>Gespräch mit Vereinskollegen</p></div>
-    <div class="step"><div class="step-dot">02</div><h3>Dokumente</h3><p>Sichtweisen & Anforderungen</p></div>
-    <div class="step"><div class="step-dot">03</div><h3>Überdeckung</h3><p>Widersprüche schärfen</p></div>
-    <div class="step"><div class="step-dot">04</div><h3>Meta-Prompt</h3><p>Auftrag für Version 1</p></div>
-    <div class="step"><div class="step-dot navy">05</div><h3>Repository</h3><p>Grundstock + AGENTS.md</p></div>
+<!-- 08 -->
+<section class="slide" data-section="main">
+  <div class="section-label how">HOW · UX/UI</div>
+  <div class="title-wrap" data-fit-check><h2>UX war ein Freigabeprozess</h2></div>
+  <div class="ux-stages" data-fit-check>
+    <figure><div class="concept-tag">KONZEPT</div><img src="assets/ux/01-ideation-board.png" alt="Frühes UX-Ideenboard"><figcaption><b>1 · Ideenraum</b><span>Rollen und Gesamtfluss</span></figcaption></figure>
+    <figure><div class="concept-tag">KONZEPT</div><img src="assets/ux/02-flight-line-concept.png" alt="Vereinfachtes Flight-Line-Konzept"><figcaption><b>2 · Vereinfachen</b><span>Kritik und klare Entscheidungen</span></figcaption></figure>
+    <figure><div class="concept-tag approved">FREIGEGEBENES KONZEPT</div><img src="assets/ux/03-flight-line-approved.png" alt="Freigegebenes Flight-Line-Konzept"><figcaption><b>3 · Freigeben</b><span>Rollen- und Geräteansicht</span></figcaption></figure>
   </div>
-  <div class="takeaway light">Ergebnis vor dem Coding: geschärfter Anforderungskatalog und arbeitsfähiges Repository.</div>
+  <div class="process-ribbon">Konzept <i>→</i> Kritik <i>→</i> Freigabe <i>→</i> Implementierung <i>→</i> Browser-Abgleich</div>
+  <div class="source-note">Quelle: historische UX-Renderings aus der Repository-Historie · keine Live-Oberflächen</div>
 </section>
 
-<section class="slide">
-  <div class="title-accent"></div><div class="eyebrow">Entstehung · 34 Tage</div><div class="slide-number">13</div>
-  <div class="title-wrap"><h2>Vier Phasen machten aus Anforderungen ein belastbares System</h2></div>
-  <div class="step-line" style="grid-template-columns:repeat(4,1fr);margin-top:98px">
-    <div class="step"><div class="step-dot">1</div><div class="eyebrow">11.–17. Jul</div><h3 style="margin-top:12px">Fundament</h3><p>Anforderungen · Architektur · Vertikalschnitte</p></div>
-    <div class="step"><div class="step-dot" style="background:var(--cyan)">2</div><div class="eyebrow" style="color:var(--cyan)">18.–25. Jul</div><h3 style="margin-top:12px">Realitätscheck</h3><p>iPhone · iPad · Kasse · Flight Line · FIDS</p></div>
-    <div class="step"><div class="step-dot">3</div><div class="eyebrow">26. Jul–6. Aug</div><h3 style="margin-top:12px">Operative Tiefe</h3><p>Forecast V2 · Simulator · Recall · Dispatch</p></div>
-    <div class="step"><div class="step-dot navy">4</div><div class="eyebrow" style="color:var(--ink)">8.–14. Aug</div><h3 style="margin-top:12px">Härtung</h3><p>arc42 · Coverage · SonarQube · Refactoring</p></div>
+<!-- 09 -->
+<section class="slide" data-section="main">
+  <div class="section-label how">HOW · KI-HEBEL</div>
+  <div class="title-wrap" data-fit-check><h2>Ein fachlicher Wunsch wurde in rund zwei Stunden zum Prognoselabor</h2></div>
+  <div class="wish-layout" data-fit-check>
+    <blockquote>
+      <div class="quote-date">22. JULI · 21:04</div>
+      „Optimal wäre es, wenn der Simulator lokal ausgeführt werden kann …“
+      <footer>Menschlicher Beitrag: Ziel, Randbedingungen und Freigabe</footer>
+    </blockquote>
+    <div class="wish-timeline">
+      <div><time>21:04</time><span></span><b>Wunsch</b><small>lokal · gleiche Logik</small></div>
+      <div><time>22:11</time><span></span><b>Plan freigegeben</b><small>Domänenfunktion + Baseline</small></div>
+      <div class="done"><time>23:05</time><span></span><b>Commit</b><small>Simulator läuft</small></div>
+    </div>
   </div>
-  <div class="takeaway">Frühe Geschwindigkeit erzeugte später gezielte Konsolidierung.</div>
+  <div class="callout pale-blue"><b>Wandzeit, nicht Arbeitszeiterfassung</b><span>Die Zeitachse belegt Anfrage und Commit – nicht, wie viele Minuten Mensch oder KI jeweils aktiv arbeiteten.</span></div>
+  <div class="source-note">Quelle: Projektchat und Git-Historie vom 22. Juli 2026</div>
 </section>
 
-<section class="slide white">
-  <div class="title-accent"></div><div class="eyebrow">UX/UI</div><div class="slide-number">14</div>
-  <div class="title-wrap"><h2>UX war ein Freigabeprozess – keine nachträgliche Kosmetik</h2></div>
-  <div class="grid-3" style="margin-top:34px">
-    <div><div class="image-frame flat" style="height:270px"><img src="assets/ux/01-ideation-board.png" alt="UX-Ideenraum"></div><div class="caption"><span class="tag blue">1</span> <strong>Ideenraum</strong><br>Rollen und Gesamtfluss</div></div>
-    <div><div class="image-frame flat" style="height:270px"><img src="assets/ux/02-flight-line-concept.png" alt="Flight-Line-Konzept"></div><div class="caption"><span class="tag blue">2</span> <strong>Vereinfachen</strong><br>Kritik und klare Entscheidungen</div></div>
-    <div><div class="image-frame flat" style="height:270px"><img src="assets/ux/03-flight-line-approved.png" alt="Freigegebenes Flight-Line-Konzept"></div><div class="caption"><span class="tag blue">3</span> <strong>Freigeben</strong><br>Rollen- und Geräteansichten</div></div>
+<!-- 10 -->
+<section class="slide" data-section="main">
+  <div class="section-label how">HOW · LIVE-DIAGNOSE</div>
+  <div class="title-wrap" data-fit-check><h2>Live-Debugging verband reale Bedienung mit Plattformdiagnose</h2></div>
+  <div class="debug-lanes" data-fit-check>
+    <div class="debug-lane device"><div class="lane-label">ANDREAS · GERÄT</div><b>Aktion auslösen</b><span>Push aktivieren oder Statuswechsel anstoßen</span></div>
+    <div class="debug-arrow">→</div>
+    <div class="debug-lane platform"><div class="lane-label">KI · CLOUDFLARE-LOGS</div><b>Requests vergleichen</b><span>eingegangen · erwartet · fehlend</span></div>
+    <div class="debug-arrow">→</div>
+    <div class="debug-lane diagnosis"><div class="lane-label">GEMEINSAME ANALYSE</div><b>Blockade eingrenzen</b><span>Implementierung verbessern und Umgebung prüfen</span></div>
+    <div class="debug-arrow">→</div>
+    <div class="debug-lane result"><div class="lane-label">ERGEBNIS</div><b>Adblocker als Teilursache</b><span>reale Plattformzustände waren entscheidend</span></div>
   </div>
-  <div class="takeaway">Konzept → Kritik → Freigabe → Implementierung → Browser-Abgleich</div>
+  <div class="split-insight"><div><b>Code war nicht die ganze Erklärung.</b><p>Einige Implementierungsdetails wurden korrigiert.</p></div><div><b>Die Umgebung war nicht neutral.</b><p>Ein Teil der Requests wurde außerhalb der Anwendung blockiert.</p></div></div>
+  <div class="source-note">Quelle: Projektrückblick von Andreas · Ablauf rekonstruiert, keine zeitgestempelten Logs im Präsentationsarchiv</div>
 </section>
 
-<section class="slide">
-  <div class="title-accent"></div><div class="eyebrow">UX/UI · Finish</div><div class="slide-number">15</div>
-  <div class="title-wrap compact"><h2>Freigegebene Konzepte wurden am echten Dark Theme überprüft</h2></div>
-  <div class="grid-3" style="margin-top:35px">
-    <div><div class="image-frame" style="height:290px"><img src="assets/ux/04-operations-concept.png" alt="Historisches Operations-Konzept"></div><div class="caption"><strong>Historisches Konzept</strong><br>Betriebsleitung</div></div>
-    <div><div class="image-frame" style="height:290px"><img src="assets/live/06-active-operations-live.png" alt="Live Operations"></div><div class="caption"><strong>Live-System</strong><br>stabile Ein-Bildschirm-Ansicht</div></div>
-    <div><div class="image-frame" style="height:290px"><img src="assets/live/11-fids-live.png" alt="Live FIDS"></div><div class="caption"><strong>Öffentliche Anzeige</strong><br>lesbar auf Distanz</div></div>
+<!-- 11 -->
+<section class="slide" data-section="main">
+  <div class="section-label how">HOW · REIBUNG</div>
+  <div class="title-wrap" data-fit-check><h2>Konkrete Prompts zeigen die Frustmomente</h2></div>
+  <div class="friction-grid" data-fit-check>
+    <article>
+      <div class="prompt">„Alles ist voll mit Fehlern …“</div>
+      <h3>Setup, Auth und iOS</h3>
+      <p><b>Fehlender Kontext:</b> reale Plattformzustände.</p>
+      <p><b>Korrektur:</b> Gerät, Logs und Implementierung gemeinsam prüfen.</p>
+    </article>
+    <article>
+      <div class="prompt">„… handwerklich schlecht umgesetzt.“</div>
+      <h3>UI-Finish</h3>
+      <p><b>Fehlender Maßstab:</b> konkrete Viewports und Abnahmebilder.</p>
+      <p><b>Korrektur:</b> Browser-QA, feste Fluchten und stabile Layouts.</p>
+    </article>
+    <article>
+      <div class="prompt paraphrase">74&nbsp;% „unsichere“ Prognosen</div>
+      <h3>Plausibel – fachlich falsch</h3>
+      <p><b>Fehlende Semantik:</b> Lernwertalter wurde falsch gedeutet.</p>
+      <p><b>Korrektur:</b> Simulation machte den Fehler messbar.</p>
+    </article>
   </div>
-  <div class="takeaway light">Historische Freigaben gaben die Richtung vor; echte Viewports entschieden über das Finish.</div>
+  <div class="friction-thesis"><b>Frust war ein Signal:</b> Kontext, Umgebung oder Qualitätsmaßstab fehlten.</div>
+  <div class="source-note">Wörtliche Ausschnitte: Projektchat · dritte Spalte ist eine gekennzeichnete Zusammenfassung, kein wörtliches Zitat</div>
 </section>
 
-<section class="slide white">
-  <div class="title-accent violet"></div><div class="eyebrow violet">Zusammenarbeit</div><div class="slide-number">16</div>
-  <div class="title-wrap"><h2>Der Mensch führte fachlich – die KI schloss die Engineering-Schleife</h2></div>
-  <div class="grid-2" style="margin-top:40px">
-    <div class="panel dark" style="min-height:360px"><div class="eyebrow amber">Andreas · Domain Owner</div><h3 style="font-size:33px;margin-top:42px">Zielbild und Fachregeln</h3><p class="subtitle" style="font-size:19px">Prioritäten setzen<br>reale Abläufe erklären<br>Verhalten testen<br>Korrekturen entscheiden<br>Risiken und Freigaben bewerten</p></div>
-    <div class="panel" style="min-height:360px"><div class="eyebrow">KI · Engineering-Agent</div><h3 style="font-size:33px;margin-top:42px">Umsetzung und Absicherung</h3><p class="subtitle" style="font-size:19px">Anforderungen analysieren<br>Code und Migrationen schreiben<br>Tests und Browser-QA ausführen<br>Dokumentation aktualisieren<br>Refactoring integrieren</p></div>
-  </div>
-  <div class="takeaway violet">Gemeinsame Schleife: beobachten → korrigieren → absichern</div>
-</section>
-
-<section class="slide">
-  <div class="title-accent violet"></div><div class="eyebrow violet">Engineering</div><div class="slide-number">17</div>
-  <div class="title-wrap compact"><h2>AGENTS.md macht aus Prompts einen überprüfbaren Engineering-Vertrag</h2></div>
-  <div class="role-list" style="margin-top:34px">
-    <div class="role-row"><div class="role-num" style="background:var(--violet)">01</div><h3>Quellen der Wahrheit</h3><p>Requirements · ADRs · Tests · arc42</p></div>
-    <div class="role-row"><div class="role-num" style="background:var(--violet)">02</div><h3>Fachliche Invarianten</h3><p>Gruppenschutz · Audit · Idempotenz · stale writes</p></div>
-    <div class="role-row"><div class="role-num" style="background:var(--violet)">03</div><h3>Architekturgrenzen</h3><p>Domain rein · Verträge zentral · Cloudflare in Adaptern</p></div>
-    <div class="role-row"><div class="role-num" style="background:var(--violet)">04</div><h3>Qualitätsgates</h3><p>Lint · Typen · Tests · Build · Doku · Browser</p></div>
-    <div class="role-row"><div class="role-num" style="background:var(--navy)">05</div><h3>Git & Integration</h3><p>eigener Worktree · Rebase · Fast-forward · Cleanup</p></div>
-  </div>
-  <div class="takeaway violet">Autonomie entsteht nicht durch weniger Regeln – sondern durch klare, überprüfbare Regeln.</div>
-</section>
-
-<section class="slide white">
-  <div class="title-accent violet"></div><div class="eyebrow violet">Engineering · Parallelität</div><div class="slide-number">18</div>
-  <div class="title-wrap compact"><h2>Parallele Änderungen bleiben isoliert – und integrieren linear nach main</h2></div>
-  <div class="git-history" style="margin-top:20px" aria-label="Horizontaler Git-Verlauf mit zwei parallelen Arbeitszweigen">
-    <svg viewBox="0 0 1140 350" role="img">
-      <title>Zwei parallele Worktrees integrieren nacheinander linear nach main</title>
-      <path class="git-path main" d="M72 175 H1068" />
-      <path class="git-path branch-a" d="M72 175 C105 175 115 72 172 72 H480 C540 72 550 175 612 175" />
-      <path class="git-path branch-b-old" d="M72 175 C112 175 120 278 178 278 H455" />
-      <path class="git-path branch-b" d="M612 175 C660 175 662 278 720 278 H920 C980 278 985 175 1040 175" />
-      <path class="git-rebase" d="M455 278 C505 278 540 238 590 199" />
-      <path class="git-rebase-arrow" d="M580 201 L594 197 L588 211" />
-
-      <circle class="git-commit main" cx="72" cy="175" r="13" />
-      <circle class="git-commit branch-a" cx="210" cy="72" r="13" />
-      <circle class="git-commit branch-a" cx="350" cy="72" r="13" />
-      <circle class="git-commit branch-a" cx="480" cy="72" r="13" />
-      <circle class="git-commit main" cx="612" cy="175" r="15" />
-      <circle class="git-commit branch-b-old muted" cx="220" cy="278" r="11" />
-      <circle class="git-commit branch-b-old muted" cx="365" cy="278" r="11" />
-      <circle class="git-commit branch-b" cx="748" cy="278" r="13" />
-      <circle class="git-commit branch-b" cx="865" cy="278" r="13" />
-      <circle class="git-commit main" cx="1040" cy="175" r="15" />
-
-      <g class="git-stage-labels">
-        <text x="72" y="151" text-anchor="middle">Basis</text>
-        <text x="210" y="42" text-anchor="middle">Worktree A</text>
-        <text x="350" y="42" text-anchor="middle">Umsetzen</text>
-        <text x="480" y="42" text-anchor="middle">Tests + Review</text>
-        <text x="612" y="151" text-anchor="middle">A integriert · t1</text>
-        <text x="292" y="326" text-anchor="middle">B vor Rebase</text>
-        <text x="748" y="326" text-anchor="middle">Rebase + Tests</text>
-        <text x="865" y="326" text-anchor="middle">Freigabe</text>
-        <text x="1040" y="151" text-anchor="middle">B integriert · t2</text>
-      </g>
-
-      <g class="git-branch-tags">
-        <rect x="92" y="54" width="72" height="34" rx="17" /><text x="128" y="77" text-anchor="middle">A</text>
-        <rect class="tag-b" x="92" y="260" width="72" height="34" rx="17" /><text x="128" y="283" text-anchor="middle">B</text>
-        <rect class="tag-main" x="78" y="158" width="108" height="34" rx="17" /><text x="132" y="181" text-anchor="middle">main</text>
-      </g>
+<!-- 12 -->
+<section class="slide" data-section="main">
+  <div class="section-label how">HOW · INTEGRATION</div>
+  <div class="title-wrap" data-fit-check><h2>Parallele Änderungen integrieren kontrolliert nach main</h2></div>
+  <div class="git-graph" data-fit-check>
+    <svg viewBox="0 0 1120 350" role="img" aria-label="Horizontaler Git-Graph mit zwei Arbeitssträngen und main">
+      <defs>
+        <marker id="arrowMain" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#0b1b31"/></marker>
+      </defs>
+      <path class="git-main" d="M70 178 H1045" marker-end="url(#arrowMain)"/>
+      <path class="git-a" d="M155 178 C185 178 183 78 230 78 H620 C665 78 670 178 710 178"/>
+      <path class="git-b" d="M155 178 C190 178 190 278 238 278 H702 C758 278 760 178 810 178"/>
+      <circle class="node main" cx="70" cy="178" r="10"/><circle class="node main" cx="155" cy="178" r="10"/>
+      <circle class="node a" cx="255" cy="78" r="10"/><circle class="node a" cx="410" cy="78" r="10"/><circle class="node a" cx="585" cy="78" r="10"/><circle class="node a" cx="710" cy="178" r="11"/>
+      <circle class="node b" cx="260" cy="278" r="10"/><circle class="node b" cx="430" cy="278" r="10"/><circle class="node b" cx="650" cy="278" r="10"/><circle class="node b" cx="810" cy="178" r="11"/>
+      <circle class="node main" cx="940" cy="178" r="10"/>
+      <text x="40" y="158" class="branch-label main-label">origin/main</text>
+      <text x="230" y="40" class="branch-label a-label">STREAM A</text>
+      <text x="230" y="335" class="branch-label b-label">STREAM B</text>
+      <text x="215" y="112" class="commit-label">Worktree</text><text x="370" y="112" class="commit-label">Umsetzen</text><text x="535" y="112" class="commit-label">Tests + Review</text><text x="662" y="150" class="commit-label">A integriert</text>
+      <text x="218" y="260" class="commit-label">Worktree</text><text x="386" y="260" class="commit-label">Umsetzen</text><text x="590" y="260" class="commit-label">Fetch + Rebase</text><text x="750" y="225" class="commit-label">erneut testen</text><text x="842" y="158" class="commit-label">B integriert</text>
+      <text x="900" y="210" class="commit-label">linearer Stand</text>
     </svg>
   </div>
-  <div class="takeaway violet">A integriert zuerst. B rebasiert auf den neuen main-Stand, testet erneut und folgt danach.</div>
+  <div class="git-rule">Eigener Worktree → Umsetzung → Tests → A integriert → B rebasiert → erneut getestet → Fast-forward</div>
+  <div class="source-note">Quelle: <code>AGENTS.md</code> · kein Direktcommit auf main, kein Force-Push auf main</div>
 </section>
 
-<section class="slide">
-  <div class="title-accent violet"></div><div class="eyebrow violet">Architektur</div><div class="slide-number">19</div>
-  <div class="title-wrap compact"><h2>Technischer Kontext verbindet Endgeräte, Worker und dauerhaften Zustand</h2></div>
-  <div class="mermaid-frame" style="margin-top:24px"><div class="mermaid-diagram" data-mermaid-diagram="technical-context"></div></div>
-  <div class="diagram-source">Original aus arc42, Kapitel 3.2 „Technischer Kontext“</div>
-  <div class="takeaway violet">D1 bleibt Source of Truth · Durable Object serialisiert · Realtime signalisiert bestätigte Versionen</div>
-</section>
-
-<section class="slide white">
-  <div class="title-accent violet"></div><div class="eyebrow violet">arc42 · Bausteinsicht</div><div class="slide-number">20</div>
-  <div class="title-wrap compact"><h2>Der Datenfluss bleibt vom Veranstaltungskontext bis zur Rollenansicht explizit</h2></div>
-  <div class="mermaid-frame web-component-flow" style="margin-top:24px"><div class="mermaid-diagram" data-mermaid-diagram="web-component-flow"></div></div>
-  <div class="diagram-source">Original aus arc42, Kapitel 5.1 „Web-interne Bausteingrenzen“</div>
-  <div class="takeaway violet">Identität, Live-Lage und rollenbezogene Bedienung bleiben getrennte Verantwortungen</div>
-</section>
-
-<section class="slide">
-  <div class="title-accent violet"></div><div class="eyebrow violet">Architecture Decision Records</div><div class="slide-number">21</div>
-  <div class="title-wrap"><h2>44 ADRs bewahren das Warum hinter dem Code</h2><p class="subtitle">Kontext, Entscheidung, Alternativen und Folgen verhindern, dass spätere Änderungen dieselben Debatten wiederholen.</p></div>
-  <div class="grid-3" style="margin-top:46px">
-    <div class="panel dark" style="min-height:280px"><div class="eyebrow">ADR-0002</div><h3 style="font-size:28px;margin-top:44px">D1 + Durable Object</h3><p class="small" style="margin-top:70px">Konsistenz unter paralleler Bedienung</p></div>
-    <div class="panel" style="min-height:280px"><div class="eyebrow">ADR-0032</div><h3 style="font-size:28px;margin-top:44px">Fairer Dispatch</h3><p class="small" style="margin-top:70px">Verpflichtungen und Fairness vor Durchsatz</p></div>
-    <div class="panel" style="min-height:280px"><div class="eyebrow violet">ADR-0042</div><h3 style="font-size:28px;margin-top:44px">Deterministische Simulation</h3><p class="small" style="margin-top:45px">Reproduzierbarkeit als Kompatibilitätsvertrag</p></div>
+<!-- 13 -->
+<section class="slide" data-section="main">
+  <div class="section-label what">WHAT · PRODUKT</div>
+  <div class="title-wrap" data-fit-check><h2>Ein Betriebssystem für den Rundflugtag</h2></div>
+  <div class="product-box" data-fit-check>
+    <div class="product-spine">
+      <div class="product-version">RUNDFLUG-LEITSTAND · V1.12</div>
+      <h3>Ein gemeinsames Lagebild<br>vom Verkauf bis zum Abschluss</h3>
+      <p>PWA · Echtzeit · Offline-Überbrückung</p>
+    </div>
+    <div class="product-capabilities">
+      <div><span>01</span><b>Verkauf</b><p>Tickets, Gruppen, QR-Druck und Storno</p></div>
+      <div><span>02</span><b>Operative Koordination</b><p>Queues, Flight Line, Dispatch und flexible Zuordnung</p></div>
+      <div><span>03</span><b>Prognose</b><p>Zeitfenster, Simulator und Tagesauswertung</p></div>
+      <div><span>04</span><b>Gästeinformation</b><p>FIDS, persönlicher QR-Status und freiwilliger Push</p></div>
+      <div><span>05</span><b>Nachweis</b><p>Audit, Rollen, Backup und Wiederanlauf</p></div>
+    </div>
   </div>
-  <div class="takeaway violet">ADRs verbinden Anforderungen ↔ Architektur ↔ Migrationen ↔ Tests.</div>
+  <div class="safety-line">Das System koordiniert Entscheidungen – es trifft keine flugbetriebliche oder sicherheitsrelevante Freigabe.</div>
 </section>
 
-<section class="slide white">
-  <div class="title-accent green"></div><div class="eyebrow green">Qualität</div><div class="slide-number">22</div>
-  <div class="title-wrap"><h2>Qualität entsteht bei jeder Änderung – nicht erst am Ende</h2></div>
-  <div class="panel dark" style="margin-top:35px;padding:30px 36px"><h3 style="font-size:28px">Schnelles Feedback lokal</h3><p class="subtitle" style="font-size:18px;margin-top:10px">Unit- und Komponententests prüfen Logik und Bedienung in Sekunden bis Minuten.</p></div>
-  <div class="grid-3" style="margin-top:26px">
-    <div class="panel" style="min-height:168px"><span class="tag green">01</span><h3 style="margin-top:20px">Früh</h3><p class="small" style="margin-top:10px">Fehler nahe an der Änderung finden</p></div>
-    <div class="panel" style="min-height:168px"><span class="tag green">02</span><h3 style="margin-top:20px">Breit</h3><p class="small" style="margin-top:10px">Fachlogik, UI, API, D1 und Laufzeit</p></div>
-    <div class="panel" style="min-height:168px"><span class="tag green">03</span><h3 style="margin-top:20px">Realistisch</h3><p class="small" style="margin-top:10px">kritische Workflows, Replay, Scale und Ausfälle</p></div>
+<!-- 14 -->
+<section class="slide screenshot-slide" data-section="main">
+  <div class="section-label what">WHAT · LIVE-SYSTEM</div>
+  <div class="title-wrap compact" data-fit-check><h2>Kasse, QR-Code und Audit in einem Bildschirm</h2></div>
+  <figure class="hero-shot"><div class="live-tag">LIVE-SYSTEM · DARK THEME</div><img src="assets/live/01-cashier-qr-live.png" alt="Aktuelle Kassenansicht mit Ticketverkauf, QR-Code und Auditinformationen"></figure>
+  <div class="shot-labels"><span>Verkauf</span><span>Buchungsgruppe & Teilflüge</span><span>QR-Beleg</span><span>Storno & Historie</span></div>
+  <div class="source-note">Quelle: aktueller Demonstrationsstand mit synthetischen Ticket- und Veranstaltungsdaten</div>
+</section>
+
+<!-- 15 -->
+<section class="slide screenshot-slide" data-section="main">
+  <div class="section-label what">WHAT · LIVE-SYSTEM</div>
+  <div class="title-wrap compact" data-fit-check><h2>Flight Line und Abflugtafel teilen denselben Betriebszustand</h2></div>
+  <div class="split-shots" data-fit-check>
+    <figure><div class="live-tag">LIVE · OPERATIVE SICHT</div><img src="assets/live/06-active-operations-live.png" alt="Aktuelle Flight-Line-Übersicht"><figcaption><b>Flight Line</b><span>Zuordnung, Aufruf, Boarding, Flug und Abschluss</span></figcaption></figure>
+    <figure><div class="live-tag">LIVE · ÖFFENTLICHE SICHT</div><img src="assets/live/11-fids-live.png" alt="Aktuelle öffentliche Abflugtafel"><figcaption><b>FIDS</b><span>öffentliche Projektion desselben bestätigten Zustands</span></figcaption></figure>
   </div>
-  <div class="takeaway green">Viele schnelle Tests geben Richtung; wenige teure Tests bestätigen das Gesamtsystem.</div>
+  <div class="source-note">Quelle: aktueller Demonstrationsstand · unterschiedliche Rollenansichten, eine bestätigte Ereigniskette</div>
 </section>
 
-<section class="slide">
-  <div class="title-accent green"></div><div class="eyebrow green">Qualität · SonarQube</div><div class="slide-number">23</div>
-  <div class="title-wrap compact"><h2>778 Findings wurden triagiert – am Ende stand null offen</h2></div>
-  <div class="step-line" style="grid-template-columns:repeat(3,1fr);margin-top:60px">
-    <div class="step"><div class="step-dot">12.8</div><h3>778 Findings</h3><p>Inventar nach Regel und Datei</p></div>
-    <div class="step"><div class="step-dot">13.8</div><h3>79 Refactor-Commits</h3><p>Ursachen + Regressionstests</p></div>
-    <div class="step"><div class="step-dot green">14.8</div><h3>A-Rating · 0 offen</h3><p>Server-Neuscan · Gate bestanden</p></div>
+<!-- 16 -->
+<section class="slide" data-section="main">
+  <div class="section-label what">WHAT · GÄSTE</div>
+  <div class="title-wrap compact" data-fit-check><h2>Der QR-Code wird zur persönlichen Abfluganzeige</h2></div>
+  <div class="phone-sequence" data-fit-check>
+    <figure><div class="phone-frame"><img src="assets/live/14-guest-waiting-live.png" alt="Persönlicher QR-Status Warten"></div><figcaption><span>1</span><b>Warten</b></figcaption></figure>
+    <figure><div class="phone-frame"><img src="assets/live/16-guest-gate-live.png" alt="Persönlicher QR-Status Bitte zum Gate"></div><figcaption><span>2</span><b>Bitte zum Gate</b></figcaption></figure>
+    <figure><div class="phone-frame"><img src="assets/live/17-guest-boarding-live.png" alt="Persönlicher QR-Status Boarding"></div><figcaption><span>3</span><b>Boarding</b></figcaption></figure>
+    <figure class="lock"><div class="phone-frame"><img src="assets/live/20-push-go-to-gate-live.png" alt="iPhone-Sperrbildschirm mit Push-Nachricht"></div><figcaption><span>4</span><b>Freiwilliger Push</b></figcaption></figure>
   </div>
-  <div class="grid-2" style="margin-top:42px"><div class="image-frame flat" style="height:205px"><img src="assets/sonarqube/maintainability-zero-issues.png" alt="SonarQube Maintainability null offene Issues"></div><div class="image-frame flat" style="height:205px"><img src="assets/sonarqube/quality-gate-passed.png" alt="SonarQube Quality Gate bestanden"></div></div>
-  <div class="takeaway green">Nicht Warnungen wegklicken: Inventar → Ursache → Refactoring → Regressionstest → Neuscan.</div>
+  <div class="privacy-strip">Anonymer Aufruf über QR · Push wird aktiv eingeschaltet · sichtbare Uhrzeiten bleiben Prognosen</div>
+  <div class="source-note">Quelle: aktuelle iPhone-Aufnahmen des Demonstrationssystems · synthetische Gruppennummer</div>
 </section>
 
-<section class="slide white">
-  <div class="title-accent amber"></div><div class="eyebrow amber">Grenzen · Frustmomente</div><div class="slide-number">24</div>
-  <div class="title-wrap compact"><h2>Die Frustmomente zeigten fehlenden Kontext am deutlichsten</h2></div>
-  <table class="matrix" style="margin-top:38px">
-    <thead><tr><th>Zeit</th><th>Moment</th><th>Was fehlte</th><th>Lernpunkt</th></tr></thead>
-    <tbody>
-      <tr><td>15.–19. Jul</td><td>Setup, Auth und iOS</td><td>„Server nicht verfügbar“ trotz plausiblen Codes</td><td><span class="tag amber">Reale Plattformzustände</span></td></tr>
-      <tr><td>18.–25. Jul</td><td>UI-Finish</td><td>Buttons, Scrollbereiche und Pop-ups wichen ab</td><td><span class="tag amber">Browser-QA & Viewports</span></td></tr>
-      <tr><td>22. Jul</td><td>74 % unsichere Prognosen</td><td>Lernwertalter fachlich falsch gedeutet</td><td><span class="tag amber">Simulation & Semantik</span></td></tr>
-      <tr><td>8.–12. Aug</td><td>CI und technische Schulden</td><td>lange Simulationen und große Dateien bremsten</td><td><span class="tag amber">Modularisierung</span></td></tr>
-    </tbody>
-  </table>
-  <div class="takeaway amber">Frust war ein Signal: Kontext, Umgebung oder Qualitätsmaßstab fehlten.</div>
-</section>
-
-<section class="slide">
-  <div class="title-accent amber"></div><div class="eyebrow amber">Bilanz</div><div class="slide-number">25</div>
-  <div class="title-wrap compact"><h2>34 Tage ersetzen nicht einfach 4.000 Stunden</h2><p class="subtitle">Kalenderzeit, menschliche Beteiligung und hypothetischer manueller Aufwand sind drei verschiedene Größen.</p></div>
-  <div class="grid-3" style="margin-top:36px">
-    <div class="panel soft-cyan" style="min-height:330px"><div class="eyebrow">Gemessen</div><div class="kpi blue" style="margin-top:64px">34 Tage</div><div class="label">Projektzeitraum</div><p class="small" style="margin-top:65px">11. Juli bis 14. August<br>34 aktive Projekttage</p></div>
-    <div class="panel" style="min-height:330px"><div class="eyebrow" style="color:var(--ink)">Geschätzt</div><div class="kpi" style="margin-top:64px">100–160 h</div><div class="label">aktiver menschlicher Aufwand</div><p class="small" style="margin-top:45px">Mitte ≈ 120 Stunden<br>≈ 3 Vollzeitwochen</p></div>
-    <div class="panel dark" style="min-height:330px"><div class="eyebrow">Geschätzt</div><div class="kpi" style="margin-top:64px;font-size:48px">2.900–4.500 h</div><div class="label">manuelle Entwicklung</div><p class="small" style="margin-top:45px">360–560 Personentage<br>1,7–2,7 Jahre für 1 Entwickler</p></div>
+<!-- 17 -->
+<section class="slide screenshot-slide" data-section="main">
+  <div class="section-label what">WHAT · PROGNOSE</div>
+  <div class="title-wrap compact" data-fit-check><h2>Live-Ereignisse erzeugen Prognosen und Tagesauswertungen</h2></div>
+  <div class="analytics-layout" data-fit-check>
+    <figure class="primary"><img src="assets/live/10-forecast-analytics-live.png" alt="Prognoseverlauf und Tagesauswertung"><figcaption><b>Prognoseverlauf</b><span>Annahmen, Veränderung und Datenbasis werden sichtbar.</span></figcaption></figure>
+    <figure><img src="assets/live/05-aircraft-overview-live.png" alt="Flottenlage im Live-System"><figcaption><b>Flottenlage</b><span>Ist-Ereignisse je Ressource</span></figcaption></figure>
+    <figure><img src="assets/live/04-aircraft-detail-live.png" alt="Ereignis- und Gruppenhistorie"><figcaption><b>Diagnose</b><span>Ereignis- und Gruppenhistorie</span></figcaption></figure>
   </div>
-  <div class="source-note">Schätzung, kein Angebot · Methodik und Annahmen im Anhang</div>
+  <div class="time-semantics"><span><b>Planzeit</b> Vorgabe</span><span><b>Prognosezeit</b> Entscheidungshilfe</span><span><b>Ist-Zeit</b> bestätigtes Ereignis</span></div>
 </section>
 
-<section class="slide dark">
-  <div class="eyebrow">Fazit</div><div class="slide-number">26</div><div class="route-dots"></div>
-  <div class="title-wrap" style="margin-top:100px"><div class="statement">KI beschleunigt Software.<br><em>Verantwortung bleibt menschlich.</em></div></div>
-  <div class="grid-3" style="position:absolute;left:66px;right:66px;bottom:95px">
-    <div style="border-top:2px solid #43627f;padding-top:20px"><div class="eyebrow" style="color:#90a5ba">Machbar</div><h3 style="margin-top:22px">Vollständige Full-Stack-Produkte in Wochen</h3></div>
-    <div style="border-top:2px solid #43627f;padding-top:20px"><div class="eyebrow" style="color:#90a5ba">Voraussetzung</div><h3 style="margin-top:22px">Klare Fachführung und kurze Feedbackwege</h3></div>
-    <div style="border-top:2px solid var(--cyan);padding-top:20px"><div class="eyebrow">Grenze</div><h3 style="margin-top:22px">Sicherheit, Freigaben und reale Betriebsverantwortung</h3></div>
+<!-- 18 -->
+<section class="slide screenshot-slide" data-section="main">
+  <div class="section-label what">WHAT · SIMULATION</div>
+  <div class="title-wrap compact" data-fit-check><h2>Der Simulator macht Ablauf, Fehler und Lernwirkung messbar</h2></div>
+  <div class="sim-layout" data-fit-check>
+    <figure class="primary"><img src="assets/simulator/simulator-start-dark.png" alt="Simulatorszenario mit virtueller Zeit"><figcaption><b>Szenario</b><span>Nachfrage, Ressourcen, Störungen und reproduzierbarer Seed</span></figcaption></figure>
+    <figure><img src="assets/simulator/simulator-history-dark.png" alt="Prognosehistorie im Simulator"><figcaption><b>Prognosehistorie</b></figcaption></figure>
+    <figure><img src="assets/simulator/simulator-metrics-dark.png" alt="Kennzahlen und Dispatch im Simulator"><figcaption><b>Kennzahlen & Dispatch</b></figcaption></figure>
+  </div>
+  <div class="sim-foot"><b>Vom Zwei-Stunden-Vertikalschnitt zum Prognoselabor:</b> deterministische Läufe machten semantische Fehler reproduzierbar.</div>
+</section>
+
+<!-- 19 -->
+<section class="slide" data-section="main">
+  <div class="section-label architecture">WHAT · ARCHITEKTUR</div>
+  <div class="title-wrap compact" data-fit-check><h2>Die Architektur trennt Bedienung, Koordination und dauerhaften Zustand</h2></div>
+  <div class="architecture-main" data-fit-check>
+    <div class="mermaid-host" data-mermaid-diagram="technical-context"></div>
+    <aside>
+      <div><b>React/Vite-PWA</b><span>rollenbezogene Bedienung</span></div>
+      <div><b>Cloudflare Worker</b><span>API, Auth und Adapter</span></div>
+      <div><b>Durable Object</b><span>serialisierte Kommandos & WebSockets</span></div>
+      <div><b>D1 + R2</b><span>Zustand, Audit, Backups und Analyse</span></div>
+    </aside>
+  </div>
+  <div class="source-note">Originaldiagramm „Technischer Kontext“ · beim Build unverändert aus <code>docs/arc42/03-kontextabgrenzung.md</code> geladen</div>
+</section>
+
+<!-- 20 -->
+<section class="slide" data-section="main">
+  <div class="section-label evidence">WHAT · ENGINEERING-EVIDENZ</div>
+  <div class="title-wrap" data-fit-check><h2>Engineering-Evidenz ist Teil des Produkts</h2></div>
+  <div class="evidence-matrix" data-fit-check>
+    <div class="evidence-lead">
+      <span class="metric">1.878</span>
+      <b>deklarierte Testfälle</b>
+      <small>gezählt im Repository</small>
+    </div>
+    <div><span>341</span><b>Anforderungen</b><small>fachlicher Vertrag</small></div>
+    <div><span>44</span><b>ADRs</b><small>Entscheidungen & Gründe</small></div>
+    <div><span>12 / 22</span><b>arc42-Kapitel / Diagramme</b><small>Struktur & Laufzeit</small></div>
+    <div><span>349</span><b>Testdateien</b><small>mehrere Testebenen</small></div>
+    <div><span>0</span><b>offene Sonar-Issues</b><small>nach Triage & Refactoring</small></div>
+    <div class="agents-cell"><span>AGENTS.md</span><b>überprüfbarer Engineering-Vertrag</b><small>Invarianten, Architektur, Tests und Integration</small></div>
+  </div>
+  <div class="source-note">Gezählt am 15. August 2026 auf <code>origin/main</code>; Testfälle = Deklarationen von <code>it(...)</code> und <code>test(...)</code></div>
+</section>
+
+<!-- 21 -->
+<section class="slide" data-section="main">
+  <div class="section-label conclusion">FAZIT · AUFWAND</div>
+  <div class="title-wrap" data-fit-check><h2>Kalenderzeit, menschlicher Aufwand und manuelle Vergleichsschätzung</h2></div>
+  <div class="effort-cards" data-fit-check>
+    <div class="measured"><div class="method">GEMESSEN</div><strong>34 Tage</strong><b>Projektzeitraum</b><p>11. Juli bis 14. August<br>Kalenderdifferenz</p></div>
+    <div><div class="method">GESCHÄTZT</div><strong>100–160 h</strong><b>aktive menschliche Beteiligung</b><p>Mitte ≈ 120 Stunden<br>keine Zeiterfassung</p></div>
+    <div class="manual"><div class="method">GESCHÄTZT</div><strong>2.900–4.500 h</strong><b>hypothetische manuelle Umsetzung</b><p>≈ 360–560 Personentage<br>Schätzung nach Arbeitsblöcken</p></div>
+  </div>
+  <div class="effort-note"><b>Keine Gleichsetzung:</b> 34 Tage ersetzten nicht automatisch 4.000 Stunden. Die Größen messen beziehungsweise schätzen Unterschiedliches.</div>
+  <div class="source-note">Herleitung und Unsicherheiten: Anhang A18 · Vergleichsschätzung, kein Angebot</div>
+</section>
+
+<!-- 22 -->
+<section class="slide dark closing" data-section="main">
+  <div class="kicker cyan">WAS DIE FALLSTUDIE ZEIGT</div>
+  <h2 data-fit-check>KI beschleunigt Entwicklung.<br>Verantwortung und fachliche Bewertung bleiben menschlich.</h2>
+  <div class="closing-grid">
+    <div><span>MACHBAR</span><b>Ein vollständiges Full-Stack-System in wenigen Wochen</b></div>
+    <div><span>VORAUSSETZUNG</span><b>Klare Fachführung, kurze Feedbackwege und überprüfbare Regeln</b></div>
+    <div><span>GRENZE</span><b>Implizite Fachsemantik, reale Plattformzustände, Geräte-Finish und Freigabe</b></div>
+  </div>
+  <div class="closing-foot">Der Rundflug-Leitstand ist kein Autopilot für Entscheidungen – sondern ein Werkzeug für koordinierte Entwicklung und Betrieb.</div>
+</section>
+
+<!-- A1 -->
+<section class="slide appendix-divider" data-section="appendix">
+  <div class="appendix-mark">ANHANG</div>
+  <h2>Evidenz und technische Vertiefung</h2>
+  <p>18 Folien zu Quellen, Architektur, Engineering-Prozess, Qualität und Aufwand.</p>
+  <div class="appendix-nav">
+    <span>A2–A5 · Quellen & Produkt</span><span>A6–A11 · Architektur</span><span>A12–A15 · Engineering & Tests</span><span>A16–A18 · Sonar & Aufwand</span>
   </div>
 </section>
 
-<!-- ANHANG -->
-<section class="slide appendix dark">
-  <div class="appendix-tab"></div><div class="eyebrow">Anhang · Detailtiefe</div><div class="slide-number">A1</div>
-  <div class="title-wrap" style="margin-top:125px"><h1>Die Evidenz hinter der Geschichte</h1><p class="subtitle" style="max-width:850px">Quellen, Metriken, Fachregeln, Architektur, ADRs, Testinventar, SonarQube-Vorgehen und Aufwandsschätzung.</p></div>
-  <div style="position:absolute;left:66px;bottom:80px;display:flex;gap:12px;flex-wrap:wrap;max-width:900px"><span class="tag violet">Repository</span><span class="tag violet">Chat-Historie</span><span class="tag violet">Live-Screenshots</span><span class="tag violet">Git-Historie</span><span class="tag violet">arc42</span></div>
-</section>
-
-<section class="slide appendix">
-  <div class="appendix-tab"></div><div class="title-accent"></div><div class="eyebrow">Anhang · Quellen & Methode</div><div class="slide-number">A2</div>
-  <div class="title-wrap compact"><h2>Belegt, gezählt, geschätzt – sauber getrennt</h2></div>
-  <div class="grid-3" style="margin-top:42px">
-    <div class="panel soft-green" style="min-height:345px"><div class="eyebrow green">Belegt</div><h3 style="font-size:29px;margin-top:35px">Artefakte & Verlauf</h3><p class="subtitle" style="font-size:18px">Requirements, ADRs, arc42, Tests, Git-Commits, Live-Screenshots, SonarQube und Simulator.</p></div>
-    <div class="panel soft-blue" style="min-height:345px"><div class="eyebrow">Gezählt</div><h3 style="font-size:29px;margin-top:35px">Repository-Metriken</h3><p class="subtitle" style="font-size:18px">Dateien, Deklarationen, aktive Tage, Migrationen und Commits am Stichtag 14.08.2026.</p></div>
-    <div class="panel soft-amber" style="min-height:345px"><div class="eyebrow amber">Geschätzt</div><h3 style="font-size:29px;margin-top:35px">Zeit & Vergleich</h3><p class="subtitle" style="font-size:18px">Aktiver menschlicher Aufwand und hypothetische manuelle Umsetzung als Bandbreite – keine Zeiterfassung, kein Angebot.</p></div>
+<!-- A2 -->
+<section class="slide appendix" data-section="appendix">
+  <div class="section-label appendix-label">A2 · QUELLENMETHODE</div>
+  <div class="title-wrap"><h2>Vier Evidenzarten halten Aussagen auseinander</h2></div>
+  <div class="method-grid" data-fit-check>
+    <div><span>01</span><b>Gemessen</b><p>Kalenderdifferenz und Zeitstempel aus Git oder Chat.</p><small>Beispiel: 11. Juli bis 14. August</small></div>
+    <div><span>02</span><b>Gezählt</b><p>Dateien, Deklarationen und Dokumente im Repository.</p><small>Beispiel: 349 Testdateien</small></div>
+    <div><span>03</span><b>Rekonstruiert</b><p>Projektrückblick, wenn Zeitstempel oder Logs fehlen.</p><small>Beispiel: Adblocker-Diagnose</small></div>
+    <div><span>04</span><b>Geschätzt</b><p>Bandbreiten mit expliziten Annahmen.</p><small>Beispiel: manueller Vergleichsaufwand</small></div>
   </div>
-  <div class="takeaway violet">Die Präsentation macht keine Laufzeitbehauptung aus bloßen Deklarationszahlen.</div>
+  <div class="appendix-foot">Wörtliche Zitate stehen nur dort in Anführungszeichen, wo der Wortlaut im Projektverlauf auffindbar ist.</div>
 </section>
 
-<section class="slide appendix white">
-  <div class="appendix-tab"></div><div class="title-accent"></div><div class="eyebrow">Anhang · Größenordnung</div><div class="slide-number">A3</div>
-  <div class="title-wrap compact"><h2>Die Größenordnung ist im Repository messbar</h2></div>
-  <div class="grid-3" style="margin-top:48px"><div><div class="kpi blue">759</div><div class="label">Commits auf origin/main</div></div><div><div class="kpi">154.513</div><div class="label">Zeilen TypeScript / TSX</div></div><div><div class="kpi cyan">1.800</div><div class="label">deklarierte Testfälle¹</div></div></div>
-  <div style="height:1px;background:#cfd9e3;margin:68px 0 48px"></div>
-  <div class="grid-4"><div><div class="kpi" style="font-size:44px">69</div><div class="label">Migrationen</div></div><div><div class="kpi" style="font-size:44px">44</div><div class="label">ADRs</div></div><div><div class="kpi blue" style="font-size:44px">341</div><div class="label">Anforderungen</div></div><div><div class="kpi" style="font-size:44px">349</div><div class="label">Testdateien</div></div></div>
-  <div class="source-note">¹ Deklarationen von it(…) und test(…) · 794 TypeScript-/TSX-Dateien · Stichtag 14.08.2026</div>
+<!-- A3 -->
+<section class="slide appendix" data-section="appendix">
+  <div class="section-label appendix-label">A3 · REPOSITORY</div>
+  <div class="title-wrap"><h2>Aktuelle Größenordnung am 15. August 2026</h2></div>
+  <div class="metric-board" data-fit-check>
+    <div class="major"><strong>764</strong><span>Commits auf origin/main</span></div>
+    <div class="major"><strong>163.424</strong><span>Zeilen TypeScript / TSX</span></div>
+    <div class="major accent"><strong>1.878</strong><span>deklarierte Testfälle</span></div>
+    <div><strong>341</strong><span>Anforderungen</span></div><div><strong>44</strong><span>ADRs</span></div><div><strong>69</strong><span>Migrationen</span></div><div><strong>349</strong><span>Testdateien</span></div><div><strong>22</strong><span>arc42-Diagramme</span></div>
+  </div>
+  <div class="source-note">Zählung auf <code>origin/main</code> vor dem Präsentationscommit · 794 TypeScript-/TSX-Dateien ohne Build- und Präsentationsartefakte</div>
 </section>
 
-<section class="slide appendix">
-  <div class="appendix-tab"></div><div class="title-accent"></div><div class="eyebrow">Anhang · Rollen & Funktionen</div><div class="slide-number">A4</div>
-  <div class="title-wrap compact"><h2>Produktumfang nach Rolle</h2></div>
-  <table class="matrix" style="margin-top:28px;font-size:14px">
-    <thead><tr><th>Rolle</th><th>Kernaufgabe</th><th>Besondere Funktionen</th><th>Schutzmechanismus</th></tr></thead>
-    <tbody>
-      <tr><td>Kasse</td><td>Verkauf & Gruppen</td><td>Split beim Verkauf, QR-Beleg, Storno, Kassenfilter</td><td>Idempotenz, erwartete Version, Audit</td></tr>
-      <tr><td>Flight Line</td><td>Flugzustände</td><td>Übernahme, Boarding, Flug, Landung, Abschluss</td><td>keine automatische Umbesetzung</td></tr>
-      <tr><td>Flight Director</td><td>Disposition</td><td>Queue, Recall, Ressourcen, Pilotencodes, Ausfälle</td><td>menschliche Bestätigung</td></tr>
-      <tr><td>Administration</td><td>Stammdaten & Betrieb</td><td>Events, Gates, Produkte, Flugzeuge, Konten, Backup</td><td>Rollenprüfung, Restore-Gates</td></tr>
-      <tr><td>Gäste / FIDS</td><td>Status</td><td>QR-PWA, Push, Zeitfenster, Abflugtafel</td><td>minimale DTOs, keine Gastnamen</td></tr>
-      <tr><td>Analyse</td><td>Prognose & Lernen</td><td>Snapshots, Simulator, Vergleich, CSV/PDF-Export</td><td>Entscheidungshilfe statt Garantie</td></tr>
-    </tbody>
-  </table>
-</section>
-
-<section class="slide appendix white">
-  <div class="appendix-tab"></div><div class="title-accent"></div><div class="eyebrow">Anhang · Fachliche Leitplanken</div><div class="slide-number">A5</div>
-  <div class="title-wrap compact"><h2>Die wichtigsten Invarianten sind explizit – und testbar</h2></div>
-  <div class="grid-2" style="margin-top:36px">
-    <div class="panel dark"><h3>Gruppen & Ressourcen</h3><p class="small" style="margin-top:18px">• Gruppen werden niemals automatisch getrennt.<br>• Ein Ticket gehört höchstens zu einem offenen Umlauf.<br>• Ein Flugzeug ist höchstens einer aktiven Ressourcengruppe zugeordnet.<br>• Zuordnung bleibt bis zur Bestätigung flexibel.</p></div>
-    <div class="panel soft-blue"><h3>Zeit & Ereignisse</h3><p class="small" style="margin-top:18px">• Ist-Ereignisse treiben die Prognose.<br>• Plan-, Prognose- und Ist-Zeit bleiben getrennt.<br>• GELANDET bedeutet nicht automatisch VERFÜGBAR.<br>• Öffentliche Zeitfenster sind keine Garantie.</p></div>
-    <div class="panel soft-green"><h3>Konsistenz & Audit</h3><p class="small" style="margin-top:18px">• Jeder Zustandswechsel erzeugt Audit.<br>• Schreibkommandos sind idempotent.<br>• expectedVersion schützt vor stale writes.<br>• Realtime folgt erst nach Persistenz.</p></div>
-    <div class="panel soft-amber"><h3>Verantwortung & Datenschutz</h3><p class="small" style="margin-top:18px">• Keine Gastnamen im Kernsystem.<br>• Keine Freigabesemantik für Gewicht oder Kraftstoff.<br>• Keine automatische flugbetriebliche oder rechtliche Entscheidung.</p></div>
+<!-- A4 -->
+<section class="slide appendix" data-section="appendix">
+  <div class="section-label appendix-label">A4 · PRODUKTFUNKTIONEN</div>
+  <div class="title-wrap"><h2>Funktionen folgen den Rollen des Rundflugtags</h2></div>
+  <div class="role-table" data-fit-check>
+    <div class="head"><span>Rolle</span><span>Arbeitsoberfläche</span><span>Zentrale Aufgaben</span></div>
+    <div><b>Kasse</b><span>Verkaufsbildschirm</span><span>Tickets, Gruppen, Druck, Storno</span></div>
+    <div><b>Flight Line</b><span>Assist- und Detailmodus</span><span>Zuordnung, Boarding, Ereignisse, Turnaround</span></div>
+    <div><b>Betriebsleitung</b><span>Flotten- und Tageslage</span><span>Prognose, Dispatch, Störungen, Abschluss</span></div>
+    <div><b>Gäste</b><span>FIDS und QR-PWA</span><span>Warten, Aufruf, Boarding, Flug, freiwilliger Push</span></div>
+    <div><b>Administration</b><span>Stammdaten und Audit</span><span>Veranstaltung, Ressourcen, Rollen, Backup, Reset</span></div>
   </div>
 </section>
 
-<section class="slide appendix">
-  <div class="appendix-tab"></div><div class="title-accent"></div><div class="eyebrow">Anhang · arc42</div><div class="slide-number">A6</div>
-  <div class="title-wrap compact"><h2>arc42 hält 12 Sichten konsistent</h2></div>
-  <div class="grid-3" style="margin-top:35px">
-    <div class="panel"><div class="kpi violet">01–04</div><h3 style="margin-top:15px">Ziele & Strategie</h3><p class="small" style="margin-top:12px">Einführung, Randbedingungen, Kontext, Lösungsstrategie</p></div>
-    <div class="panel"><div class="kpi violet">05–07</div><h3 style="margin-top:15px">Struktur & Laufzeit</h3><p class="small" style="margin-top:12px">Bausteine, Kommandoläufe, Verteilung und Deployment</p></div>
-    <div class="panel"><div class="kpi violet">08–12</div><h3 style="margin-top:15px">Qualität & Wissen</h3><p class="small" style="margin-top:12px">Querschnitt, Entscheidungen, Qualität, Risiken, Glossar</p></div>
+<!-- A5 -->
+<section class="slide appendix" data-section="appendix">
+  <div class="section-label appendix-label">A5 · FACHLOGIK</div>
+  <div class="title-wrap"><h2>Zentrale Invarianten begrenzen die Automatisierung</h2></div>
+  <div class="invariant-list" data-fit-check>
+    <div><span>01</span><p>Gruppen werden niemals automatisch getrennt.</p></div>
+    <div><span>02</span><p>Eine Slotnummer ist Kommunikationskennung – keine garantierte Uhrzeit.</p></div>
+    <div><span>03</span><p>Die konkrete Flugzeugzuordnung bleibt bis zur Bestätigung flexibel.</p></div>
+    <div><span>04</span><p>Ist-Ereignisse treiben die Prognose; Plan, Prognose und Ist bleiben getrennt.</p></div>
+    <div><span>05</span><p>Schreibkommandos sind idempotent und lehnen veraltete Versionen ab.</p></div>
+    <div><span>06</span><p>Jede operative Zustandsänderung erzeugt einen append-only Audit-Eintrag.</p></div>
+    <div class="warn"><span>07</span><p>Keine flugbetriebliche, sicherheitsrelevante oder luftrechtliche Entscheidung.</p></div>
   </div>
-  <div class="panel dark" style="margin-top:30px;display:grid;grid-template-columns:170px 1fr;align-items:center"><div class="kpi cyan">22</div><div><h3>Mermaid-Diagramme</h3><p class="small" style="margin-top:8px">Architektur- und Laufzeitdiagramme werden automatisiert gerendert; Links und Konsistenz werden geprüft.</p></div></div>
-  <div class="takeaway violet">arc42 ersetzt Anforderungen, ADRs und Tests nicht – es verbindet sie.</div>
+  <div class="source-note">Quelle: <code>AGENTS.md</code> und Anforderungen V1.12.0</div>
 </section>
 
-<section class="slide appendix white">
-  <div class="appendix-tab"></div><div class="title-accent"></div><div class="eyebrow">Anhang · Bausteinsicht</div><div class="slide-number">A7</div>
-  <div class="title-wrap compact"><h2>Architekturgrenzen schützen Fachlogik und Änderbarkeit</h2></div>
-  <div class="mermaid-frame appendix-diagram" style="margin-top:26px"><div class="mermaid-diagram" data-mermaid-diagram="workspace-overview"></div></div>
-  <div class="diagram-source">Original aus arc42, Kapitel 5.1 „Ebene 1 – Gesamtsystem“</div>
-  <div class="takeaway violet">UI führt keine Zustandsübergänge aus · Worker dupliziert keine Domänenregeln.</div>
-</section>
-
-<section class="slide appendix">
-  <div class="appendix-tab"></div><div class="title-accent"></div><div class="eyebrow">Anhang · Kommandolauf</div><div class="slide-number">A8</div>
-  <div class="title-wrap compact"><h2>SELL_TICKET_GROUP: positive und negative Pfade</h2></div>
-  <div class="mermaid-frame sequence-diagram" style="margin-top:22px"><div class="mermaid-diagram" data-mermaid-diagram="sell-ticket-sequence"></div></div>
-  <div class="diagram-source">Original aus arc42, Kapitel 6.1 „Schreibkommando: Verkauf an der Kasse“</div>
-</section>
-
-<section class="slide appendix white">
-  <div class="appendix-tab"></div><div class="title-accent"></div><div class="eyebrow">Anhang · ADR-Beispiel</div><div class="slide-number">A9</div>
-  <div class="title-wrap compact"><h2>ADR-0002: D1 als Source of Truth, Durable Object als serieller Koordinator</h2></div>
-  <div class="grid-2" style="margin-top:32px">
-    <div class="panel soft-amber"><div class="eyebrow amber">Kontext</div><p class="subtitle" style="font-size:18px">Mehrere Clients schreiben parallel. Zustand, Audit, Idempotenz und Realtime müssen konsistent bleiben.</p></div>
-    <div class="panel soft-violet"><div class="eyebrow violet">Entscheidung</div><p class="subtitle" style="font-size:18px">D1 speichert den dauerhaften Zustand; genau ein Durable Object je Veranstaltung serialisiert Schreibkommandos.</p></div>
-    <div class="panel"><div class="eyebrow" style="color:var(--muted)">Alternativen</div><p class="subtitle" style="font-size:18px">Nur D1: konkurrierende Writes schwer zu ordnen. Nur DO: relationaler Zustand nicht dauerhaft verfügbar.</p></div>
-    <div class="panel soft-green"><div class="eyebrow green">Folgen</div><p class="subtitle" style="font-size:18px">+ Idempotenz, Version und Realtime in klarer Reihenfolge.<br>− zusätzliche Koordination und Snapshot-Wiederaufbau.</p></div>
+<!-- A6 -->
+<section class="slide appendix" data-section="appendix">
+  <div class="section-label appendix-label">A6 · ARC42</div>
+  <div class="title-wrap"><h2>arc42 verbindet Systemgrenzen mit Laufzeit und Entscheidungen</h2></div>
+  <div class="arc42-map" data-fit-check>
+    <div class="arc-center"><strong>12</strong><span>Kapitel</span><small>22 Mermaid-Diagramme</small></div>
+    <div><b>Kontext</b><span>Akteure, Nachbarsysteme, Abgrenzung</span></div>
+    <div><b>Bausteine</b><span>Web, Worker, Domain, Verträge, Adapter</span></div>
+    <div><b>Laufzeit</b><span>Kommandos, Persistenz, Realtime, Fehlerpfade</span></div>
+    <div><b>Verteilung</b><span>PWA, Worker, D1, Durable Object, R2</span></div>
+    <div><b>Qualität</b><span>Ziele, Risiken, technische Schulden</span></div>
+    <div><b>Entscheidungen</b><span>ADRs als verlinkter Begründungsstand</span></div>
   </div>
-  <div class="takeaway violet">Realtime wird erst nach bestätigter Persistenz veröffentlicht.</div>
+  <div class="appendix-foot">Die Dokumentation wird automatisch auf Diagramme, Links und Konsistenz geprüft.</div>
 </section>
 
-<section class="slide appendix">
-  <div class="appendix-tab"></div><div class="title-accent"></div><div class="eyebrow">Anhang · AGENTS.md</div><div class="slide-number">A10</div>
-  <div class="title-wrap compact"><h2>Was der Agent vor, während und nach jeder Änderung nachweisen muss</h2></div>
-  <div class="grid-3" style="margin-top:38px">
-    <div class="panel"><span class="tag violet">Vorher</span><h3 style="margin-top:22px">Kontext sichern</h3><p class="small" style="margin-top:12px">Quellen prüfen<br>Worktree & Branch isolieren<br>fremde Änderungen schützen<br>Plan aktualisieren</p></div>
-    <div class="panel"><span class="tag violet">Während</span><h3 style="margin-top:22px">Grenzen einhalten</h3><p class="small" style="margin-top:12px">Invarianten bewahren<br>synthetische Daten<br>Architektur dokumentieren<br>gezielte Tests</p></div>
-    <div class="panel dark"><span class="tag cyan">Danach</span><h3 style="margin-top:22px">Evidenz liefern</h3><p class="small" style="margin-top:12px">Diff prüfen<br>rebase auf origin/main<br>Checks wiederholen<br>Fast-forward & Cleanup</p></div>
+<!-- A7 -->
+<section class="slide appendix diagram-slide" data-section="appendix">
+  <div class="section-label appendix-label">A7 · ARC42 · TECHNISCHER KONTEXT</div>
+  <div class="title-wrap compact"><h2>Originaldiagramm: Technischer Kontext</h2></div>
+  <div class="mermaid-full" data-mermaid-diagram="technical-context-appendix"></div>
+  <div class="source-note">Unverändert aus <code>docs/arc42/03-kontextabgrenzung.md</code></div>
+</section>
+
+<!-- A8 -->
+<section class="slide appendix diagram-slide" data-section="appendix">
+  <div class="section-label appendix-label">A8 · ARC42 · GESAMTSYSTEM</div>
+  <div class="title-wrap compact"><h2>Originaldiagramm: Gesamtsystem</h2></div>
+  <div class="mermaid-full" data-mermaid-diagram="workspace-overview"></div>
+  <div class="source-note">Unverändert aus <code>docs/arc42/05-bausteinsicht.md</code></div>
+</section>
+
+<!-- A9 -->
+<section class="slide appendix diagram-slide" data-section="appendix">
+  <div class="section-label appendix-label">A9 · ARC42 · WEB</div>
+  <div class="title-wrap compact"><h2>Originaldiagramm: Web-interne Bausteingrenzen</h2></div>
+  <div class="mermaid-full" data-mermaid-diagram="web-component-flow"></div>
+  <div class="source-note">Unverändert aus <code>docs/arc42/05-bausteinsicht.md</code></div>
+</section>
+
+<!-- A10 -->
+<section class="slide appendix diagram-slide" data-section="appendix">
+  <div class="section-label appendix-label">A10 · ARC42 · LAUFZEIT</div>
+  <div class="title-wrap compact"><h2>Originaldiagramm: SELL_TICKET_GROUP</h2></div>
+  <div class="mermaid-full sequence" data-mermaid-diagram="sell-ticket-sequence"></div>
+  <div class="sequence-key"><span class="conflict">409</span> stale write wird abgelehnt <span class="success">200</span> Antwort nach D1-Commit <span class="live">LIVE</span> Versionssignal an Clients</div>
+  <div class="source-note">Unverändert aus <code>docs/arc42/06-laufzeitsicht.md</code></div>
+</section>
+
+<!-- A11 -->
+<section class="slide appendix" data-section="appendix">
+  <div class="section-label appendix-label">A11 · ADR-BEISPIEL</div>
+  <div class="title-wrap compact"><h2>ADR-0002 bewahrt das Warum hinter der Koordinationsarchitektur</h2></div>
+  <div class="adr-header"><span>AKZEPTIERT · 11.07.2026</span><b>D1 als Source of Truth · Durable Object als serieller Koordinator</b></div>
+  <div class="adr-grid" data-fit-check>
+    <div><h3>Kontext</h3><p>Mehrere Clients schreiben parallel. Zustand, Audit, Idempotenz und Realtime müssen konsistent bleiben.</p></div>
+    <div class="decision"><h3>Entscheidung</h3><p>D1 speichert Zustand, Ledger, Idempotenz und Outbox. Genau ein Durable Object je Veranstaltung serialisiert Schreibkommandos.</p></div>
+    <div><h3>Regeln</h3><p>Jeder Client sendet <code>commandId</code> und <code>expectedVersion</code>. Kein Zustand existiert nur im Durable Object.</p></div>
+    <div class="consequence"><h3>Folgen</h3><p>Realtime erst nach bestätigter Persistenz; Snapshot-Rekonstruktion aus D1 nach Neustart.</p></div>
   </div>
-  <div class="panel soft-violet" style="margin-top:28px;text-align:center"><strong>Der Prompt beschreibt das Ziel. AGENTS.md beschreibt die zulässige Engineering-Methode.</strong></div>
+  <div class="source-note">Quelle: <code>docs/adr/0002-d1-und-durable-object.md</code></div>
 </section>
 
-<section class="slide appendix white">
-  <div class="appendix-tab"></div><div class="title-accent"></div><div class="eyebrow">Anhang · Testinventar</div><div class="slide-number">A11</div>
-  <div class="title-wrap compact"><h2>349 Testdateien bilden eine mehrschichtige Sicherheitslinie</h2></div>
-  <div class="grid-4" style="margin-top:38px"><div><div class="kpi blue">179</div><div class="label">Web & UI</div></div><div><div class="kpi">139</div><div class="label">Worker / API / D1</div></div><div><div class="kpi green">18</div><div class="label">Domain</div></div><div><div class="kpi amber">7</div><div class="label">Contracts</div></div></div>
-  <div class="bar-chart" style="margin-top:66px">
-    <div class="bar-row"><div class="bar-label">Web & UI</div><div class="bar-track"><div class="bar-fill" style="width:100%"></div></div><div class="bar-value">179</div></div>
-    <div class="bar-row"><div class="bar-label">Worker / API / D1</div><div class="bar-track"><div class="bar-fill navy" style="width:78%"></div></div><div class="bar-value">139</div></div>
-    <div class="bar-row"><div class="bar-label">Domain</div><div class="bar-track"><div class="bar-fill green" style="width:31%"></div></div><div class="bar-value">18</div></div>
-    <div class="bar-row"><div class="bar-label">Contracts</div><div class="bar-track"><div class="bar-fill amber" style="width:20%"></div></div><div class="bar-value">7</div></div>
+<!-- A12 -->
+<section class="slide appendix" data-section="appendix">
+  <div class="section-label appendix-label">A12 · AGENTS.MD</div>
+  <div class="title-wrap"><h2><code>AGENTS.md</code> macht aus Prompts einen überprüfbaren Engineering-Vertrag</h2></div>
+  <div class="agents-contract" data-fit-check>
+    <div><span>01</span><b>Quellen der Wahrheit</b><p>Requirements · ADRs · Tests · arc42</p><em>Konsistenz</em></div>
+    <div><span>02</span><b>Fachliche Invarianten</b><p>Gruppenschutz · Audit · Idempotenz · stale writes</p><em>Sicherheit</em></div>
+    <div><span>03</span><b>Architekturgrenzen</b><p>Domain rein · Verträge zentral · Cloudflare in Adaptern</p><em>Änderbarkeit</em></div>
+    <div><span>04</span><b>Qualitätsgates</b><p>Lint · Typen · Tests · Build · Doku · Browser</p><em>Nachweis</em></div>
+    <div><span>05</span><b>Git & Integration</b><p>Worktree · Rebase · Fast-forward · Cleanup</p><em>Parallelität</em></div>
   </div>
-  <div class="source-note">Weitere Testdateien betreffen Konfiguration, Skripte und übergreifende Abnahmen · 1.800 Testdeklarationen</div>
+  <div class="appendix-foot">Autonomie entsteht nicht durch weniger Regeln, sondern durch klare und überprüfbare Regeln.</div>
 </section>
 
-<section class="slide appendix">
-  <div class="appendix-tab"></div><div class="title-accent"></div><div class="eyebrow">Anhang · Qualitätspipeline</div><div class="slide-number">A12</div>
-  <div class="title-wrap compact"><h2>Jedes Betriebsrisiko bekommt die passende Absicherung</h2></div>
-  <table class="matrix" style="margin-top:28px">
-    <thead><tr><th>Risiko</th><th>Primärer Nachweis</th><th>Beispiel</th></tr></thead>
-    <tbody>
-      <tr><td>Berechnungs- oder Forecastfehler</td><td><span class="tag green">Unit Test</span></td><td>deterministische Domain-Logik</td></tr>
-      <tr><td>Schnittstelle zweier Komponenten</td><td><span class="tag blue">Integration Test</span></td><td>API, D1, Contracts</td></tr>
-      <tr><td>Gesamtworkflow funktioniert nicht</td><td><span class="tag violet">System / E2E</span></td><td>Replay, Browser, Abnahmetag</td></tr>
-      <tr><td>Regression durch Änderung</td><td><span class="tag cyan">automatisierte Regression</span></td><td>pro Commit, vor Integration</td></tr>
-      <tr><td>Wartbarkeit & Struktur</td><td><span class="tag amber">SonarQube + Guardrails</span></td><td>Komplexität, Duplikation, Imports</td></tr>
-    </tbody>
-  </table>
-  <div class="takeaway green">npm run check verbindet Lint, Typen, Tests, Builds, Replay, Scale, Runtime, Abnahme und Doku.</div>
-</section>
-
-<section class="slide appendix white">
-  <div class="appendix-tab"></div><div class="title-accent"></div><div class="eyebrow">Anhang · SonarQube</div><div class="slide-number">A13</div>
-  <div class="title-wrap compact"><h2>Statische Analyse ergänzt Verhaltenstests um Struktur und Wartbarkeit</h2></div>
-  <div class="grid-2" style="margin-top:35px"><div><div class="image-frame flat" style="height:280px"><img src="assets/sonarqube/complexity-and-coverage.png" alt="Komplexität und Coverage"></div><div class="caption"><strong>Komplexität × Coverage</strong><br>riskante Kombinationen werden sichtbar.</div></div><div><div class="image-frame flat" style="height:280px"><img src="assets/sonarqube/quality-gate-passed.png" alt="Quality Gate passed"></div><div class="caption"><strong>Quality Gate</strong><br>Security, Reliability, Maintainability, Coverage und Duplikation.</div></div></div>
-  <div class="panel soft-green" style="margin-top:26px"><strong>Vorgehen:</strong> Regel-/Dateiinventar → Cluster bilden → Ursache beheben → Regressionstest → Server-Neuscan → Gate prüfen</div>
-  <div class="source-note">Die Screenshots zeigen den dokumentierten Endstand des Projekts.</div>
-</section>
-
-<section class="slide appendix">
-  <div class="appendix-tab"></div><div class="title-accent"></div><div class="eyebrow">Anhang · Aufwandsschätzung</div><div class="slide-number">A14</div>
-  <div class="title-wrap compact"><h2>Wie die Bandbreite 2.900–4.500 Stunden zustande kommt</h2></div>
-  <div class="split-60" style="margin-top:34px">
-    <table class="matrix" style="background:#fff;border-radius:16px;overflow:hidden"><thead><tr><th>Arbeitsblock</th><th>Bandbreite</th></tr></thead><tbody><tr><td>Anforderungen & Fachklärung</td><td>260–420 h</td></tr><tr><td>UX/UI & Rollenabläufe</td><td>350–550 h</td></tr><tr><td>Full-Stack-Implementierung</td><td>1.150–1.700 h</td></tr><tr><td>Tests & Qualität</td><td>700–1.050 h</td></tr><tr><td>Architektur & Dokumentation</td><td>250–430 h</td></tr><tr><td>Integration, Betrieb & Puffer</td><td>190–350 h</td></tr></tbody></table>
-    <div class="panel dark"><div class="eyebrow">Annahmen</div><h3 style="font-size:30px;margin-top:32px">Ein guter Entwickler – ohne fertige Produktvorlage</h3><p class="small" style="margin-top:30px">inklusive Analyse, UX, Code, Migrationen, Tests, Dokumentation, iOS-/Browser-QA, Deploymentvorbereitung und Härtung.</p><div class="kpi cyan" style="margin-top:45px;font-size:44px">≈ 6–10 Monate</div><p class="small">für ein Team aus drei guten Entwicklern</p></div>
+<!-- A13 -->
+<section class="slide appendix" data-section="appendix">
+  <div class="section-label appendix-label">A13 · GIT & WORKTREES</div>
+  <div class="title-wrap compact"><h2>Detaillierter Integrationsprozess für parallele KI-Aufträge</h2></div>
+  <div class="git-detail" data-fit-check>
+    <svg viewBox="0 0 1120 250" role="img" aria-label="Git-Graph mit zwei parallelen Worktrees">
+      <path class="git-main" d="M55 125 H1060"/><path class="git-a" d="M130 125 C165 125 165 45 210 45 H590 C630 45 635 125 680 125"/><path class="git-b" d="M130 125 C165 125 165 210 215 210 H705 C755 210 760 125 810 125"/>
+      <g class="nodes"><circle class="node main" cx="55" cy="125" r="9"/><circle class="node main" cx="130" cy="125" r="9"/><circle class="node a" cx="230" cy="45" r="9"/><circle class="node a" cx="410" cy="45" r="9"/><circle class="node a" cx="575" cy="45" r="9"/><circle class="node a" cx="680" cy="125" r="10"/><circle class="node b" cx="235" cy="210" r="9"/><circle class="node b" cx="430" cy="210" r="9"/><circle class="node b" cx="650" cy="210" r="9"/><circle class="node b" cx="810" cy="125" r="10"/><circle class="node main" cx="980" cy="125" r="9"/></g>
+      <text x="200" y="25" class="branch-label a-label">WORKTREE A</text><text x="200" y="245" class="branch-label b-label">WORKTREE B</text><text x="28" y="105" class="branch-label main-label">MAIN</text>
+    </svg>
+    <div class="integration-steps"><span><b>1</b> Worktree aus aktuellem <code>origin/main</code></span><span><b>2</b> Änderung und gezielte Tests</span><span><b>3</b> Rebase vor finaler Validierung</span><span><b>4</b> normaler Fast-forward-Push</span><span><b>5</b> Integration nachweisen und aufräumen</span></div>
   </div>
-  <div class="source-note">Grobe Referenzschätzung, keine belastbare Projektkalkulation und kein Angebot.</div>
+  <div class="source-note">Quelle: Repository-<code>AGENTS.md</code></div>
 </section>
 
+<!-- A14 -->
+<section class="slide appendix" data-section="appendix">
+  <div class="section-label appendix-label">A14 · TESTINVENTAR</div>
+  <div class="title-wrap"><h2>349 Testdateien verteilen sich über Oberfläche, Worker und Fachlogik</h2></div>
+  <div class="test-inventory" data-fit-check>
+    <div class="test-kpis"><div><strong>1.878</strong><span>Testfalldeklarationen</span></div><div><strong>349</strong><span>Testdateien</span></div><div><strong>69</strong><span>D1-Migrationen</span></div></div>
+    <div class="bar-row"><b>Web & UI</b><div><i style="width:100%"></i></div><span>179</span></div>
+    <div class="bar-row"><b>Worker / API / D1</b><div><i style="width:78%"></i></div><span>139</span></div>
+    <div class="bar-row"><b>Domain</b><div><i style="width:10%"></i></div><span>18</span></div>
+    <div class="bar-row"><b>Simulation</b><div><i style="width:3%"></i></div><span>2</span></div>
+    <div class="bar-row"><b>Contracts & weitere</b><div><i style="width:7%"></i></div><span>11</span></div>
+  </div>
+  <div class="source-note">Gezählt am 15. August 2026 · Testdateien nach Repository-Pfad gruppiert, keine Laufzeitbehauptung</div>
+</section>
+
+<!-- A15 -->
+<section class="slide appendix" data-section="appendix">
+  <div class="section-label appendix-label">A15 · RISIKEN & TESTEBENEN</div>
+  <div class="title-wrap"><h2>Jedes Betriebsrisiko bekommt die passende Absicherung</h2></div>
+  <div class="risk-map" data-fit-check>
+    <div><span>1</span><b>Berechnungs- oder Forecastfehler</b><i>→</i><em>Unit Test</em></div>
+    <div><span>2</span><b>Schnittstelle zweier Komponenten</b><i>→</i><em>Integrationstest</em></div>
+    <div><span>3</span><b>Gesamtworkflow funktioniert nicht</b><i>→</i><em>System / E2E</em></div>
+    <div><span>4</span><b>Regression durch Änderung</b><i>→</i><em>automatisierte Regression</em></div>
+    <div><span>5</span><b>Wartbarkeit oder strukturelle Qualität</b><i>→</i><em>SonarQube</em></div>
+  </div>
+  <div class="appendix-foot">Tests prüfen Verhalten; statische Analyse prüft zusätzlich Struktur und Wartbarkeit.</div>
+</section>
+
+<!-- A16 -->
+<section class="slide appendix screenshot-slide" data-section="appendix">
+  <div class="section-label appendix-label">A16 · SONARQUBE</div>
+  <div class="title-wrap compact"><h2>Quality Gate, Coverage und strukturelle Analyse ergänzen Verhaltenstests</h2></div>
+  <div class="sonar-pair" data-fit-check>
+    <figure><img src="assets/sonarqube/complexity-and-coverage.png" alt="SonarQube-Diagramm Komplexität und Coverage"><figcaption><b>Komplexität & Coverage</b><span>Risikokombinationen in komplexem, unzureichend getestetem Code</span></figcaption></figure>
+    <figure><img src="assets/sonarqube/quality-gate-passed.png" alt="Bestandenes SonarQube Quality Gate"><figcaption><b>Quality Gate</b><span>0 offene Security-, Reliability- und Maintainability-Issues</span></figcaption></figure>
+  </div>
+  <div class="source-note">Quelle: SonarQube-Screenshots aus dem Projektarchiv</div>
+</section>
+
+<!-- A17 -->
+<section class="slide appendix" data-section="appendix">
+  <div class="section-label appendix-label">A17 · SONARQUBE · TRIAGE</div>
+  <div class="title-wrap"><h2>778 Findings wurden triagiert – am Ende stand null offen</h2></div>
+  <div class="sonar-timeline" data-fit-check>
+    <div><time>12. AUG</time><span></span><b>778 Findings</b><p>Inventar nach Regel und Datei</p></div>
+    <div><time>13. AUG</time><span></span><b>79 Refactor-Commits</b><p>Ursachen, Umbau und Regressionstests</p></div>
+    <div class="done"><time>14. AUG</time><span></span><b>A-Rating · 0 offen</b><p>Server-Neuscan und Gate bestanden</p></div>
+  </div>
+  <div class="sonar-proof">
+    <figure><img src="assets/sonarqube/maintainability-zero-issues.png" alt="Maintainability mit null offenen Issues"></figure>
+    <figure><img src="assets/sonarqube/reliability-zero-issues.png" alt="Reliability mit null offenen Issues"></figure>
+  </div>
+  <div class="appendix-foot">Inventar → Ursache → Refactoring → Regressionstest → Neuscan</div>
+</section>
+
+<!-- A18 -->
+<section class="slide appendix" data-section="appendix">
+  <div class="section-label appendix-label">A18 · AUFWANDSMETHODE</div>
+  <div class="title-wrap compact"><h2>Die manuelle Vergleichsschätzung ist eine Bandbreite – kein Ersatzversprechen</h2></div>
+  <div class="estimate-table" data-fit-check>
+    <div class="head"><span>Arbeitsblock</span><span>Untergrenze</span><span>Obergrenze</span><span>Annahme</span></div>
+    <div><b>Discovery & Anforderungen</b><span>180 h</span><span>280 h</span><p>Konsolidierung, Klärung, Traceability</p></div>
+    <div><b>UX & Produktdesign</b><span>240 h</span><span>380 h</span><p>Rollen, Viewports, Iterationen und Abnahme</p></div>
+    <div><b>Architektur & Plattform</b><span>420 h</span><span>650 h</span><p>Cloudflare, D1, Durable Object, Realtime, Backup</p></div>
+    <div><b>Produktimplementierung</b><span>1.200 h</span><span>1.900 h</span><p>Kasse, Betrieb, Gäste, Prognose und Simulator</p></div>
+    <div><b>Tests & Qualität</b><span>650 h</span><span>950 h</span><p>mehrere Ebenen, Browser-QA, Sonar und Refactoring</p></div>
+    <div><b>Doku, Betrieb & Finish</b><span>210 h</span><span>340 h</span><p>arc42, ADRs, Guides, Diagnose und Finish</p></div>
+    <div class="sum"><b>Summe</b><span>2.900 h</span><span>4.500 h</span><p>≈ 360–560 Personentage à 8 Stunden</p></div>
+  </div>
+  <div class="estimate-foot"><b>Einordnung:</b> für drei gute Entwickler grob 6–10 Monate – ohne Beschaffungs-, Abstimmungs- und Kalendereffekte. Unsicherheit bleibt hoch.</div>
+</section>
+
+</main>
 </body>
 </html>

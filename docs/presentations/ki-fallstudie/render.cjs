@@ -6,6 +6,11 @@ const { chromium } = require("playwright");
 
 const canonicalDiagrams = [
   {
+    id: "technical-context-appendix",
+    file: "docs/arc42/03-kontextabgrenzung.md",
+    heading: "## 3.2 Technischer Kontext",
+  },
+  {
     id: "technical-context",
     file: "docs/arc42/03-kontextabgrenzung.md",
     heading: "## 3.2 Technischer Kontext",
@@ -26,6 +31,12 @@ const canonicalDiagrams = [
     heading: "## 6.1 Schreibkommando: Verkauf an der Kasse",
   },
 ];
+
+const expectedSlides = {
+  main: 22,
+  appendix: 18,
+  total: 40,
+};
 
 function extractMermaidSource(markdown, heading, file) {
   const headingOffset = markdown.indexOf(heading);
@@ -71,6 +82,58 @@ async function renderCanonicalDiagrams(page, repositoryRoot) {
       host.innerHTML = svg;
     }
   }, definitions);
+}
+
+async function verifyLayout(page) {
+  const findings = await page.evaluate(() => {
+    const tolerance = 1.5;
+    const issues = [];
+    const describe = (element) => {
+      const classes = Array.from(element.classList).join(".");
+      return `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ""}${classes ? `.${classes}` : ""}`;
+    };
+
+    document.querySelectorAll(".slide").forEach((slide, slideIndex) => {
+      const slideRect = slide.getBoundingClientRect();
+      const elements = slide.querySelectorAll(
+        "[data-fit-check], .source-note, .mermaid-host, .mermaid-full",
+      );
+      elements.forEach((element) => {
+        const rect = element.getBoundingClientRect();
+        if (
+          rect.left < slideRect.left - tolerance ||
+          rect.top < slideRect.top - tolerance ||
+          rect.right > slideRect.right + tolerance ||
+          rect.bottom > slideRect.bottom + tolerance
+        ) {
+          issues.push(
+            `slide ${slideIndex + 1}: ${describe(element)} lies outside the slide (${Math.round(rect.left - slideRect.left)}, ${Math.round(rect.top - slideRect.top)}, ${Math.round(rect.right - slideRect.left)}, ${Math.round(rect.bottom - slideRect.top)})`,
+          );
+        }
+        if (element.clientWidth > 0 && element.scrollWidth > element.clientWidth + 2) {
+          issues.push(
+            `slide ${slideIndex + 1}: ${describe(element)} overflows horizontally (${element.scrollWidth}px in ${element.clientWidth}px)`,
+          );
+        }
+      });
+
+      const textContainers = slide.querySelectorAll(
+        ".title-wrap, .wish-layout blockquote, .debug-lane, .friction-card, .product-copy, .effort-cards > div, .method-grid > div, .adr-grid > div, .estimate-table > div",
+      );
+      textContainers.forEach((element) => {
+        if (element.clientHeight > 0 && element.scrollHeight > element.clientHeight + 2) {
+          issues.push(
+            `slide ${slideIndex + 1}: ${describe(element)} overflows vertically (${element.scrollHeight}px in ${element.clientHeight}px)`,
+          );
+        }
+      });
+    });
+    return issues;
+  });
+
+  if (findings.length > 0) {
+    throw new Error(`Layout verification failed:\n${findings.join("\n")}`);
+  }
 }
 
 async function main() {
@@ -144,7 +207,20 @@ async function main() {
 
   const slides = page.locator(".slide");
   const slideCount = await slides.count();
-  if (slideCount !== 40) throw new Error(`Expected 40 slides, found ${slideCount}`);
+  const mainSlideCount = await page.locator('.slide[data-section="main"]').count();
+  const appendixSlideCount = await page.locator('.slide[data-section="appendix"]').count();
+  if (
+    slideCount !== expectedSlides.total ||
+    mainSlideCount !== expectedSlides.main ||
+    appendixSlideCount !== expectedSlides.appendix
+  ) {
+    throw new Error(
+      `Expected ${expectedSlides.main} main + ${expectedSlides.appendix} appendix = ${expectedSlides.total} slides, found ${mainSlideCount} + ${appendixSlideCount} = ${slideCount}`,
+    );
+  }
+
+  reportStatus("Checking slide bounds and text overflow…");
+  await verifyLayout(page);
 
   if (previewDirectory) {
     for (let index = 0; index < slideCount; index += 1) {
@@ -165,7 +241,13 @@ async function main() {
   });
 
   reportStatus("PDF written successfully.");
-  console.log(JSON.stringify({ outputPath, slideCount, previewDirectory, statusPath }, null, 2));
+  console.log(
+    JSON.stringify(
+      { outputPath, slideCount, mainSlideCount, appendixSlideCount, previewDirectory, statusPath },
+      null,
+      2,
+    ),
+  );
   await browser.close();
 }
 
