@@ -48,10 +48,14 @@ export function cashierCapacityGuidance(products: CashierProduct[] | undefined):
       tone: "warning",
     };
   }
-  const limitingProduct = saleProducts.reduce((current, product) =>
-    capacityPriority[product.capacityStatus] > capacityPriority[current.capacityStatus]
-      ? product
-      : current,
+  const firstSaleProduct = saleProducts.at(0);
+  if (!firstSaleProduct) throw new Error("Sale product collection is unexpectedly empty");
+  const limitingProduct = saleProducts.reduce(
+    (current, product) =>
+      capacityPriority[product.capacityStatus] > capacityPriority[current.capacityStatus]
+        ? product
+        : current,
+    firstSaleProduct,
   );
   const saleRecommended = saleProducts.every((product) => product.saleRecommended);
   return {
@@ -67,12 +71,9 @@ export function CashierCapacityGuidance({
   products,
 }: Readonly<{ products: CashierProduct[] | undefined }>) {
   const guidance = cashierCapacityGuidance(products);
-  const Icon =
-    guidance.tone === "positive"
-      ? CircleCheck
-      : guidance.tone === "warning"
-        ? AlertTriangle
-        : Gauge;
+  let Icon = Gauge;
+  if (guidance.tone === "positive") Icon = CircleCheck;
+  if (guidance.tone === "warning") Icon = AlertTriangle;
   return (
     <output
       aria-live="polite"

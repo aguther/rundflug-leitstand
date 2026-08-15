@@ -27,51 +27,52 @@ export function createMigratedTestDatabase(): DatabaseSync {
   return database;
 }
 
+function createD1PreparedStatement(
+  database: DatabaseSync,
+  sql: string,
+  bindings: readonly unknown[] = [],
+): D1PreparedStatement {
+  const statement = database.prepare(sql);
+  const rows = () => plainRows(statement.all(...bindings) as SqliteRow[]);
+
+  return {
+    bind: (...values: unknown[]) => createD1PreparedStatement(database, sql, values),
+    first: async <T = SqliteRow>(column?: string) => {
+      const row = statement.get(...bindings) as SqliteRow | undefined;
+      if (!row) return null;
+      return (column ? row[column] : { ...row }) as T;
+    },
+    all: async <T = SqliteRow>() => {
+      const results = rows() as T[];
+      return { success: true, results, meta: {} } as D1Result<T>;
+    },
+    raw: async <T = unknown[]>(options?: { columnNames?: boolean }) => {
+      const resultRows = rows();
+      const columnNames = resultRows.length > 0 ? Object.keys(resultRows[0] ?? {}) : [];
+      const values = resultRows.map((row) => columnNames.map((name) => row[name])) as T[];
+      return (options?.columnNames ? [columnNames, ...values] : values) as T[];
+    },
+    run: async () => {
+      const result = statement.run(...bindings);
+      return {
+        success: true,
+        results: [],
+        meta: {
+          changes: Number(result.changes),
+          last_row_id: Number(result.lastInsertRowid),
+        },
+      } as unknown as D1Result;
+    },
+  } as D1PreparedStatement;
+}
+
 export function createD1TestDatabase(): {
   database: DatabaseSync;
   d1: D1Database;
   close: () => void;
 } {
   const database = createMigratedTestDatabase();
-
-  const prepare = (sql: string): D1PreparedStatement => {
-    const createStatement = (bindings: readonly unknown[] = []): D1PreparedStatement => {
-      const statement = database.prepare(sql);
-      const rows = () => plainRows(statement.all(...bindings) as SqliteRow[]);
-
-      return {
-        bind: (...values: unknown[]) => createStatement(values),
-        first: async <T = SqliteRow>(column?: string) => {
-          const row = statement.get(...bindings) as SqliteRow | undefined;
-          if (!row) return null;
-          return (column ? row[column] : { ...row }) as T;
-        },
-        all: async <T = SqliteRow>() => {
-          const results = rows() as T[];
-          return { success: true, results, meta: {} } as D1Result<T>;
-        },
-        raw: async <T = unknown[]>(options?: { columnNames?: boolean }) => {
-          const resultRows = rows();
-          const columnNames = resultRows.length > 0 ? Object.keys(resultRows[0] ?? {}) : [];
-          const values = resultRows.map((row) => columnNames.map((name) => row[name])) as T[];
-          return (options?.columnNames ? [columnNames, ...values] : values) as T[];
-        },
-        run: async () => {
-          const result = statement.run(...bindings);
-          return {
-            success: true,
-            results: [],
-            meta: {
-              changes: Number(result.changes),
-              last_row_id: Number(result.lastInsertRowid),
-            },
-          } as unknown as D1Result;
-        },
-      } as D1PreparedStatement;
-    };
-
-    return createStatement();
-  };
+  const prepare = (sql: string) => createD1PreparedStatement(database, sql);
 
   const d1 = {
     prepare,

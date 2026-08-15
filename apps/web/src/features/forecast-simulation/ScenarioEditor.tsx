@@ -447,15 +447,11 @@ function DemandProfileChart({
           {ticks.map((at, index) => {
             const offset = Math.round((at - salesFrom) / MINUTE_MS);
             const ratio = timeToPercent(at, visibleDomain) / 100;
+            let anchoredRatio = ratio;
+            if (index === 0) anchoredRatio = 0;
+            if (index === ticks.length - 1) anchoredRatio = 1;
             return (
-              <text
-                key={at}
-                textAnchor={tickTextAnchor(
-                  index === 0 ? 0 : index === ticks.length - 1 ? 1 : ratio,
-                )}
-                x={xAt(at)}
-                y={height - 7}
-              >
+              <text key={at} textAnchor={tickTextAnchor(anchoredRatio)} x={xAt(at)} y={height - 7}>
                 {timeAtDemandOffset(config, offset)}
               </text>
             );
