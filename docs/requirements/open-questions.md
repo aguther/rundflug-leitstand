@@ -11,6 +11,7 @@ Produktionsfreigaben.
 | OQ-13 | Nutzungsrecht, endgültiger Projektlizenztext und unterschriebenes Übergabeprotokoll. | Berechtigte Parteien | Betreiberübergabe bleibt formal offen. |
 | OQ-14 | Konkrete Hardwareliste und unterstützte Browserstände vier Wochen vor Generalprobe einfrieren. | Auftraggeber und IT-Betrieb | Generalprobe bleibt offen. |
 | OQ-18 | Produktionswert für `ANALYSIS_RETENTION_DAYS` innerhalb `14..365` festlegen; Empfehlung: Entwicklung und Abnahme 30 Tage, Produktion nur mit ausdrücklich freigegebenem Wert. | Auftraggeber, Datenschutz und Betreiber | Produktive Archivierung bleibt gesperrt; Entwicklung darf mit 30 Tagen erfolgen. |
+| OQ-20 | Freigeben, dass verifizierte technische Planungshistorie nach tagesbezogenem R2-Archiv und erfolgreicher Replay-Probe eventweise aus der operativen D1 kompaktiert wird; Segmentintervall sowie Zeilen- und Byte-Schwellen für mehrtägige und parallele Veranstaltungen festlegen. | Auftraggeber, Datenschutz und Betreiber | Automatische D1-Kompaktierung bleibt bis zur Festlegung deaktiviert; Werksreset und Veranstaltungslöschung bleiben davon unberührt. |
 
 Datenschutz-, Hardware-, Helfer- und Produktionsabnahme bleiben manuelle Gates. Sie dürfen nicht
 durch technische Tests oder ein erfolgreiches Deployment ersetzt werden.

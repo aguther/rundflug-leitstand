@@ -2,6 +2,8 @@ import type { FactoryResetRequest, FactoryResetResponse } from "@rundflug/contra
 import { sha256Hex } from "./crypto";
 import type { Env } from "./types";
 
+const FACTORY_RESET_PLANNING_RUN_CHUNK_SIZE = 2_000;
+
 export const FACTORY_RESET_BULK_DELETE_PHASES = [
   {
     name: "support-history",
@@ -130,6 +132,40 @@ function deletePhaseStatements(
   ];
 }
 
+function deletePlanningRunChunkStatements(env: Env): D1PreparedStatement[] {
+  return [
+    env.DB.prepare("PRAGMA defer_foreign_keys = ON"),
+    env.DB.prepare("UPDATE system_reset_control SET active = 1 WHERE singleton = 1"),
+    env.DB.prepare(
+      `DELETE FROM planning_runs
+        WHERE id IN (
+          SELECT candidate.id
+            FROM planning_runs candidate
+           ORDER BY candidate.operation_day_id,
+                    candidate.operation_day_version DESC,
+                    candidate.calculation_now DESC,
+                    candidate.id
+           LIMIT ?1
+        )`,
+    ).bind(FACTORY_RESET_PLANNING_RUN_CHUNK_SIZE),
+    env.DB.prepare("UPDATE system_reset_control SET active = 0 WHERE singleton = 1"),
+  ];
+}
+
+async function deletePlanningRunsInChunks(env: Env): Promise<void> {
+  while (true) {
+    const results = await env.DB.batch(deletePlanningRunChunkStatements(env));
+    const deletedRows = results[2]?.meta.changes ?? 0;
+    if (deletedRows > 0) continue;
+
+    const remaining = await env.DB.prepare(
+      "SELECT 1 AS present FROM planning_runs LIMIT 1",
+    ).first();
+    if (remaining) throw new Error("Planning run history cannot be drained.");
+    return;
+  }
+}
+
 function finalFactoryResetStatements(
   env: Env,
   input: FactoryResetDatabaseInput,
@@ -165,11 +201,15 @@ export async function executeFactoryResetDatabase(
 ): Promise<void> {
   // A production installation can accumulate tens of thousands of indexed planning rows. Keeping
   // every table in one D1 transaction can exceed the database request duration. The large history
-  // tables remain isolated while adjacent small tables share bounded child-to-parent phases. The
-  // identity and root tables stay in the final transaction so the same admin can retry an interruption.
+  // tables remain isolated while planning runs are drained in dependency-safe chunks and adjacent
+  // small tables share bounded phases. Identity and root data stay until the same admin can retry.
   for (const phase of FACTORY_RESET_BULK_DELETE_PHASES) {
     try {
-      await env.DB.batch(deletePhaseStatements(env, phase.tables));
+      if (phase.name === "planning-runs") {
+        await deletePlanningRunsInChunks(env);
+      } else {
+        await env.DB.batch(deletePhaseStatements(env, phase.tables));
+      }
     } catch (cause) {
       throw new FactoryResetDatabaseError(`delete:${phase.name}`, cause);
     }

@@ -19,10 +19,12 @@ Gerätebindung nicht bereits verschwunden sein, solange noch eine große Löschp
 
 Der D1-Anteil wird in Kind-zu-Eltern-Reihenfolge ausgeführt:
 
-1. Die großen Historientabellen werden jeweils in einer eigenen D1-Transaktion gelöscht. Kleine,
-   benachbarte Tabellen teilen sich begrenzte Löschphasen in Kind-zu-Eltern-Reihenfolge.
-   Fremdschlüssel werden innerhalb jeder Transaktion aufgeschoben; die technische Reset-Freigabe
-   für Append-only-Trigger wird in derselben Transaktion gesetzt und wieder entfernt.
+1. Große Historienbereiche werden in eigenen D1-Phasen gelöscht. Die selbstreferenzierenden
+   Planläufe werden entsprechend ihrer fachlichen Referenzrichtung in 2.000er-Chunks von den neuesten
+   Versionen zu den früheren Ankerläufen geleert. Kleine, benachbarte Tabellen teilen sich begrenzte Löschphasen in
+   Kind-zu-Eltern-Reihenfolge. Fremdschlüssel werden innerhalb jeder Transaktion aufgeschoben; die
+   technische Reset-Freigabe für Append-only-Trigger wird in derselben Transaktion gesetzt und
+   wieder entfernt.
 2. Konten, Sitzungen, Gerätebindungen, Bootstrap- und Wurzeltabellen bleiben bis zum Schluss
    erhalten. Sie werden gemeinsam mit dem neuen idempotenten Reset-Beleg in einer kleinen finalen
    Transaktion gelöscht beziehungsweise geschrieben.
@@ -45,7 +47,10 @@ Der D1-Anteil wird in Kind-zu-Eltern-Reihenfolge ausgeführt:
 - Die finalen Identitäts- und Wurzeldaten bleiben bei einem Bulk-Fehler erhalten. Scheitert die
   finale Transaktion, wird sie vollständig zurückgerollt und der Administrator kann ebenfalls
   wiederholen.
-- Der verpflichtende Integrationsnachweis erzeugt ungefähr 18.000 Planläufe und 14.000
+- Die Chunk-Löschung macht den destruktiven Reset linear skalierbar, ersetzt aber keine reguläre
+  Aufbewahrungsstrategie. Die event- und tagesbezogene Verlagerung verifizierter Planungshistorie
+  nach R2 mit anschließender D1-Kompaktierung bleibt als OQ-20 getrennt zu entscheiden.
+- Der verpflichtende Integrationsnachweis erzeugt ungefähr 12.000 Planläufe und 8.000
   Prognose-Snapshots und prüft Reset, Setup-Fortsetzung und Idempotenz über die lokale
   Worker-/D1-Grenze innerhalb der dortigen Verbindungsgrenze. Der zusätzliche manuelle
   Produktionsmaßstab mit ungefähr 29.000 Planläufen und 24.000 Prognose-Snapshots wird über
