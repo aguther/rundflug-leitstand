@@ -219,6 +219,11 @@
       "targetLines": 300
     },
     {
+      "path": "apps/web/src/features/flight-line/FlightLineAttendanceDecisionSection.tsx",
+      "maxLines": 86,
+      "targetLines": 300
+    },
+    {
       "path": "apps/web/src/features/flight-line/FlightLineLegacyQueue.tsx",
       "maxLines": 191,
       "targetLines": 300

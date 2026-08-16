@@ -255,13 +255,10 @@ export function useFlightLineRotationCommands(options: RotationCommandOptions) {
       confirmEvent(result.event);
       await refresh(result.event.version);
     } catch (reason) {
-      setMessage(
-        reason instanceof Error
-          ? reason.message
-          : recallId
-            ? "Nachruf konnte nicht beendet werden."
-            : "Nachruf konnte nicht gestartet werden.",
-      );
+      const fallbackMessage = recallId
+        ? "Nachruf konnte nicht beendet werden."
+        : "Nachruf konnte nicht gestartet werden.";
+      setMessage(reason instanceof Error ? reason.message : fallbackMessage);
     }
   }
 

@@ -145,8 +145,8 @@ export function FlightLineLegacyQueue({
         </section>
       ) : null}
       {aircraft ? (
-        rotations.length > 0 ? (
-          rotations.map((rotation) => {
+        <>
+          {rotations.map((rotation) => {
             const segmentLabel = sharedGroupSegmentLabel(rotation, allRotations);
             return (
               <div className="queue-row-wrap" key={rotation.id}>
@@ -175,10 +175,11 @@ export function FlightLineLegacyQueue({
                 </button>
               </div>
             );
-          })
-        ) : (
-          <p>Für dieses Flugzeug ist aktuell keine passende Fluggruppe offen.</p>
-        )
+          })}
+          {rotations.length === 0 ? (
+            <p>Für dieses Flugzeug ist aktuell keine passende Fluggruppe offen.</p>
+          ) : null}
+        </>
       ) : (
         <p>Kein aktives Flugzeug verfügbar.</p>
       )}
