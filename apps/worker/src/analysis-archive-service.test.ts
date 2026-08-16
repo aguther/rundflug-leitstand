@@ -129,7 +129,7 @@ describe("analysis archive service", () => {
       JSON.stringify({
         eventId: "event-one",
         eventVersion: 7,
-        formatVersion: 1,
+        formatVersion: 2,
         privacyProfile: "SUPPORT_SAFE",
       }),
     );

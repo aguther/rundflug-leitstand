@@ -20,7 +20,8 @@ flowchart TB
         D1[("D1 rundflug-leitstand<br/>V1.12-Baseline + Migrationen")]
         R2[("R2 rundflug-leitstand<br/>jurisdiction eu")]
         RL["Rate-Limiting-Bindings<br/>30/60 s öffentlich, 5/60 s Adminwiederherstellung"]
-        CRON["Cron Trigger 15 2 * * *"]
+        CRON["Cron Trigger<br/>0 * * * * und 15 2 * * *"]
+        WF["Cloudflare Workflow<br/>PlanningHistoryCompactionWorkflow"]
     end
 
     GH["GitHub Actions<br/>CI und manuelles Deployment"]
@@ -32,6 +33,8 @@ flowchart TB
     WK --> R2
     WK --> RL
     CRON --> WK
+    WK --> WF --> D1
+    WF --> R2
     WK --> PUSH
     GH -->|"wrangler deploy"| WK
     GH -->|"d1 migrations apply"| D1
@@ -45,6 +48,7 @@ flowchart TB
 | D1 | Cloudflare-verwaltetes SQLite, Bindung `DB` | Source of Truth; Time Travel als kurzfristiger Wiederherstellungspfad |
 | R2 | Bucket mit `jurisdiction: eu`, Bindung `BACKUPS` | portable ZIP-/NDJSON-Sicherungen als Multipart-Archiv plus SHA-256-Sidecar, Veranstaltungslogos und Analysepakete; keine öffentlichen Bucket-URLs |
 | Cron | Cloudflare Cron Trigger | täglicher Wartungslauf, siehe Kapitel 6.6 |
+| Workflow | Cloudflare Workflows, Bindung `PLANNING_HISTORY_COMPACTION` | eine langlebige, wiederaufnehmbare Kompaktion je Planungshistoriensegment |
 
 ## 7.2 Umgebungen
 
@@ -63,6 +67,8 @@ flowchart TB
 | Variable | `DATA_JURISDICTION` | dokumentiert und meldet die EU-Verarbeitung über `/api/meta` |
 | Variable | `PUSH_RETENTION_DAYS` (7) | Löschfrist für Push-Abonnements nach Veranstaltungsende |
 | Variable | `ANALYSIS_RETENTION_DAYS` (30) | Ablauf der Tagesanalysepakete in R2 |
+| Variable | `PLANNING_DETAIL_RETENTION_HOURS` (24) | heißes Detailfenster; zulässig 24 bis 168 Stunden, in Produktion explizit |
+| Variable | `PLANNING_HISTORY_RETENTION_YEARS` (5) | kalte Planungshistorie; zulässig fünf bis zehn Kalenderjahre, in Produktion explizit |
 | Variable | `SOURCE_REVISION` | im Deployment gesetzter Commit; Grundlage für Replay-Vergleiche |
 | Secret | `ADMIN_PIN_HASH` | langsamer, gesalzener Hash der Administrator-PIN |
 | Secret | `BOOTSTRAP_TOKEN` | einmalige Ersteinrichtung; niemals in Rollenunterlagen oder Logs |

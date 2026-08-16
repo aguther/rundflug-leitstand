@@ -48,3 +48,23 @@ Bei einem fehlgeschlagenen oder inkonsistenten Indexaufbau werden beide Indizes 
 EXISTS` entfernt und die korrigierte Migration erneut angewendet. Vor dem Rückbau wird der
 Werksreset angehalten; ein bereits laufender Reset wird anschließend mit demselben autorisierten
 Vorgang fortgesetzt.
+
+## 0003 – Planning-history compaction
+
+`0003_planning_history_compaction.sql` ergänzt den Kompaktionskatalog, das append-only
+Lebenszyklusprotokoll und einen standardmäßig inaktiven Maintenance-Control-Wächter. Die vorhandenen
+Append-only-Trigger werden so neu aufgebaut, dass ausschließlich eine exakt katalogisierte
+Boundary-Reparatur und begrenztes Pruning möglich sind. Außerdem akzeptiert der bestehende
+Analysearchivkatalog die kompatiblen Formate 1 und 2.
+
+Die Migration verändert weder operative Auditereignisse noch Idempotenzbelege, Outbox oder
+Veranstaltungsversionen. Portable Backups enthalten Katalog und Kompaktionsereignisse, aber niemals
+den transienten Maintenance-Control-Zustand.
+
+### Wiederherstellung und Forward-Repair
+
+Ein SQL-Rückbau in einer laufenden D1 ist ausgeschlossen, weil bereits verifizierte R2-Segmente und
+gelöste Boundary-Links nicht durch ein Schema-Downgrade wieder heiß werden. Bei einem Fehler bleibt
+Pruning angehalten. Der zulässige Pfad ist eine korrigierte Vorwärtsmigration oder der geprüfte
+Restore aus portablem Backup und chronologisch verifizierten Planungshistorienpaketen in eine neue,
+isolierte D1 gemäß `docs/operations/planning-history-compaction.md`.

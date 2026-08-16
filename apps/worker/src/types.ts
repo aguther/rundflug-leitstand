@@ -12,6 +12,8 @@ export type Env = Omit<
   | "PUSH_RETENTION_DAYS"
   | "SOURCE_REVISION"
   | "ANALYSIS_RETENTION_DAYS"
+  | "PLANNING_DETAIL_RETENTION_HOURS"
+  | "PLANNING_HISTORY_RETENTION_YEARS"
 > & {
   APP_ENV: "development" | "acceptance" | "production";
   DATA_JURISDICTION: "eu";
@@ -27,6 +29,8 @@ export type Env = Omit<
   PUSH_RETENTION_DAYS?: string;
   SOURCE_REVISION?: string;
   ANALYSIS_RETENTION_DAYS?: string;
+  PLANNING_DETAIL_RETENTION_HOURS?: string;
+  PLANNING_HISTORY_RETENTION_YEARS?: string;
 };
 
 export interface StoredEventRow {

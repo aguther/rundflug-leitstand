@@ -130,6 +130,8 @@ export function createTargetWranglerConfig(baseConfig, profile, databaseId) {
       result.vars?.SOURCE_REVISION ??
       "unknown",
     ANALYSIS_RETENTION_DAYS: result.vars?.ANALYSIS_RETENTION_DAYS ?? "30",
+    PLANNING_DETAIL_RETENTION_HOURS: result.vars?.PLANNING_DETAIL_RETENTION_HOURS ?? "24",
+    PLANNING_HISTORY_RETENTION_YEARS: result.vars?.PLANNING_HISTORY_RETENTION_YEARS ?? "5",
   };
   result.d1_databases = [
     {

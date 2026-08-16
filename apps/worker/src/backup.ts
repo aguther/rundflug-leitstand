@@ -31,6 +31,8 @@ export const BACKUP_TABLES = [
   "planning_chunks",
   "planning_contexts",
   "planning_runs",
+  "planning_history_compactions",
+  "planning_history_compaction_events",
   "analysis_archives",
   "analysis_archive_events",
   "forecast_snapshots",

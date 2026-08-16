@@ -1069,7 +1069,7 @@ export const analysisArchiveSchema = z
     eventId: z.string().min(1),
     eventVersion: z.number().int().nonnegative(),
     privacyProfile: analysisPrivacyProfileSchema,
-    formatVersion: z.literal(1),
+    formatVersion: z.union([z.literal(1), z.literal(2)]),
     status: analysisArchiveStatusSchema,
     requestedAt: z.string().datetime(),
     startedAt: z.string().datetime().nullable(),

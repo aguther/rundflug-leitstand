@@ -4,6 +4,7 @@
 - Datum: 2026-08-16
 - Ersetzt: ADR-0016 hinsichtlich des Verzichts auf Archivierung
 - Betroffene Anforderungen: F-ADM-080, D-100, V1120-EXP-010, V1120-OPS-010
+- Ergänzt durch: ADR-0053 für ausgelagerte Planungshistoriensegmente
 
 ## Kontext
 
@@ -31,3 +32,9 @@ Alternativen desselben Lebenszyklus behandelt werden.
 Archivieren, Löschen und Zurücksetzen besitzen getrennte Berechtigungen, Audit- und
 Wiederherstellungspfade. Künftige Mandanten- oder Langzeitarchitektur darf diese Semantik erweitern,
 aber nicht still vereinheitlichen.
+
+ADR-0053 erweitert seit 2026-08-16 alle drei Pfade um den Präfix
+`planning-history/<event-id>/`, den Kompaktionskatalog und dessen append-only Ereignisse.
+Analysearchivierung bewahrt verifizierte Kaltpakete, Veranstaltungslöschung entfernt den exakt
+zugehörigen Präfix, und ein bestätigter Werksreset berücksichtigt Katalog sowie optionale
+R2-Bereinigung. Ein Bucket-Lifecycle ersetzt keinen dieser Anwendungspfade.

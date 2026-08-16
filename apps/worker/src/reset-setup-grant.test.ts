@@ -21,6 +21,7 @@ function envWith(overrides: Partial<Env> = {}): Env {
     PUBLIC_TICKET_RATE_LIMITER: {} as RateLimit,
     ADMIN_RECOVERY_RATE_LIMITER: {} as RateLimit,
     EVENT_COORDINATOR: {} as Env["EVENT_COORDINATOR"],
+    PLANNING_HISTORY_COMPACTION: {} as Env["PLANNING_HISTORY_COMPACTION"],
     ASSETS: {} as Fetcher,
     ...overrides,
   };

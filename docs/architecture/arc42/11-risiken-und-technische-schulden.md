@@ -18,6 +18,7 @@ Das vollständige, bewertete Register mit 21 Einträgen, Gegenmaßnahmen und Nac
 | R-11 | Verbindungsausfall stoppt den Betrieb, Nacherfassung erzeugt Dubletten | hoch / hoch | letzter bestätigter Snapshot, Papierprozess, Vier-Augen-Nacherfassung mit Konfliktprüfung |
 | R-13 | Nicht hibernierende WebSockets verursachen Kosten- und Stabilitätsprobleme | mittel / mittel | Hibernation-API, Versionssignal statt Datenverteilung, Polling-Fallback |
 | R-17 | Analyseexporte legen Codes, Push-Ziele oder Credentials offen | mittel / kritisch | typisierte `SUPPORT_SAFE`-Allowlist, ereignistypspezifische Redaktion, private R2-Objekte |
+| R-12 | D1-Abfragen skalieren nicht für mehrtägige und fünfjährige Planungshistorie | mittel / hoch | 24-Stunden-Heißfenster, verifizierte R2-Segmente, begrenztes Pruning, vollständiger Restore- und Lastnachweis |
 
 Produktionsblockierend bleiben R-06 (OQ-06) und die vollständige V1-Abnahme gemäß ADR-0007.
 

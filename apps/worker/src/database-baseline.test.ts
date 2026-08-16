@@ -36,7 +36,7 @@ describe("V1.12 database baseline", () => {
       name: string;
     }[];
 
-    expect(schema.objectCounts).toEqual({ tables: 42, namedIndexes: 75, triggers: 20 });
+    expect(schema.objectCounts).toEqual({ tables: 45, namedIndexes: 79, triggers: 23 });
     expect(planningRunIndexes.map((index) => String(index.name))).toEqual(
       expect.arrayContaining(["idx_planning_runs_anchor_run", "idx_planning_runs_previous_run"]),
     );

@@ -74,6 +74,13 @@ describe("Cloudflare target configuration", () => {
       vars: { APP_ENV: "acceptance", DATA_JURISDICTION: "eu" },
       d1_databases: [{ binding: "DB", database_id: "old" }],
       r2_buckets: [{ binding: "BACKUPS", bucket_name: "old" }],
+      workflows: [
+        {
+          name: "planning-history-compaction",
+          binding: "PLANNING_HISTORY_COMPACTION",
+          class_name: "PlanningHistoryCompactionWorkflow",
+        },
+      ],
     };
     const profile = parseCloudflareTargetArguments(["--target", "verein-abnahme"]);
     const generated = createTargetWranglerConfig(base, profile, "new-database-id");
@@ -87,6 +94,11 @@ describe("Cloudflare target configuration", () => {
       jurisdiction: "eu",
     });
     expect(generated.secrets).toEqual({ required: cloudflareTarget.requiredCloudflareSecrets });
+    expect(generated.vars).toMatchObject({
+      PLANNING_DETAIL_RETENTION_HOURS: "24",
+      PLANNING_HISTORY_RETENTION_YEARS: "5",
+    });
+    expect(generated.workflows).toEqual(base.workflows);
     expect(base.d1_databases[0]?.database_id).toBe("old");
   });
 

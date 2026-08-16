@@ -2,7 +2,7 @@
 
 Status: WP1 bis WP4 umgesetzt; Produktionsaktivierung bleibt vom vollständigen Abnahmelauf abhängig
 
-Architektur: ADR-0034
+Architektur: ADR-0034 und ADR-0053
 
 UI: `docs/ui/analysis-export-concept.md`
 
@@ -21,8 +21,9 @@ Das System bietet nach Freigabe zwei getrennte Arbeitsmittel:
 | Diagnose-Momentaufnahme | während Vorbereitung, Betrieb oder Nachlauf | einzelne JSON-Datei | aktueller konsistenter Board-, Planungs- und optionaler UI-Zustand |
 | Tagesanalysepaket | ausschließlich `CLOSED` oder `ARCHIVED` | serverseitiges ZIP in R2 | vollständige sichere Tagesanalyse und Offline-Replay |
 
-Beide Formate verwenden ausschließlich das Datenschutzprofil `SUPPORT_SAFE`. Ein Restore oder
-Import in eine produktive Datenbank ist ausdrücklich ausgeschlossen.
+Beide Formate verwenden ausschließlich das Datenschutzprofil `SUPPORT_SAFE`. Ein direkter Restore
+oder Import in eine produktive Datenbank ist ausdrücklich ausgeschlossen. Verifizierte eingebettete
+Planungshistoriensegmente dürfen nur im isolierten Recovery-Pfad aus ADR-0053 geladen werden.
 
 ## Rollen
 
@@ -126,10 +127,18 @@ Konto-, Geräte-, Token-, Push-, Freitext- oder Netzwerkdaten werden als R2-Meta
 
 ### Paketstruktur
 
+Neue Pakete besitzen `formatVersion: 2`. Sie ergänzen die folgende Struktur um
+`planning-history/<compaction-id>.zip` für jedes bereits verifizierte kalte Segment; das Manifest
+bindet Paket-ID, SHA-256 und Zeilenmengen ein. Die regulären `planning/*`- und
+`history/forecast-snapshots.ndjson`-Einträge enthalten nur den heißen D1-Rest. Der Replay vereinigt
+beide Quellen anhand stabiler IDs und rekonstruiert die katalogisierten Boundary-Links. Bestehende
+Pakete mit `formatVersion: 1` bleiben vollständig lesbar.
+
 ```text
 manifest.json
 README.md
 snapshot/event.json
+planning-history/<compaction-id>.zip  # nur Format 2, null bis viele
 planning/runs.ndjson
 planning/contexts.ndjson
 planning/chunks.ndjson

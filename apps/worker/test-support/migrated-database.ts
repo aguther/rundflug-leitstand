@@ -54,6 +54,20 @@ function createD1PreparedStatement(
   const statement = database.prepare(sql);
   const rows = () => plainRows(statement.all(...bindings) as SqliteRow[]);
 
+  const executeForBatch = async () => {
+    if (/^\s*(?:SELECT|PRAGMA)\b/i.test(sql)) {
+      return { success: true, results: rows(), meta: {} } as D1Result;
+    }
+    const result = statement.run(...bindings);
+    return {
+      success: true,
+      results: [],
+      meta: {
+        changes: Number(result.changes),
+        last_row_id: Number(result.lastInsertRowid),
+      },
+    } as unknown as D1Result;
+  };
   return {
     bind: (...values: unknown[]) => createD1PreparedStatement(database, sql, values),
     first: async <T = SqliteRow>(column?: string) => {
@@ -82,7 +96,8 @@ function createD1PreparedStatement(
         },
       } as unknown as D1Result;
     },
-  } as D1PreparedStatement;
+    executeForBatch,
+  } as unknown as D1PreparedStatement;
 }
 
 export function createD1TestDatabase(): {
@@ -95,8 +110,26 @@ export function createD1TestDatabase(): {
 
   const d1 = {
     prepare,
-    batch: async <T = unknown>(statements: D1PreparedStatement[]) =>
-      Promise.all(statements.map((statement) => statement.all<T>())),
+    batch: async <T = unknown>(statements: D1PreparedStatement[]) => {
+      database.exec("BEGIN");
+      try {
+        const results: D1Result<T>[] = [];
+        for (const statement of statements) {
+          results.push(
+            await (
+              statement as D1PreparedStatement & {
+                executeForBatch(): Promise<D1Result<T>>;
+              }
+            ).executeForBatch(),
+          );
+        }
+        database.exec("COMMIT");
+        return results;
+      } catch (error) {
+        database.exec("ROLLBACK");
+        throw error;
+      }
+    },
     exec: async (sql: string) => {
       database.exec(sql);
       return { count: 1, duration: 0 };

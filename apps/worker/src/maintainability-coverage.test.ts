@@ -105,7 +105,7 @@ describe("V1 maintainability and portability boundaries", () => {
     const defaultNodeVersion = nodeVersion.trim();
     expect(defaultNodeVersion).toBe("24.18.0");
     expect(rootManifest.scripts?.["check:ci"]).toBe(
-      "npm run lint && npm run refactor:guardrails && npm run cloudflare:maintenance && npm run typecheck && npm run test:ci && npm run build:web && npm run build:worker && npm run requirements:verify",
+      "npm run lint && npm run refactor:guardrails && npm run cloudflare:maintenance && npm run typecheck && npm run test:ci && npm run build:web && npm run build:worker && npm run test:planning-history-restore && npm run test:planning-history-scale && npm run requirements:verify",
     );
     expect(rootManifest.scripts?.["test:ci"]).toBe(
       "vitest run apps/worker/src/maintainability-coverage.test.ts packages/contracts/src/index.test.ts packages/domain/src/index.test.ts apps/web/src/api.test.ts",

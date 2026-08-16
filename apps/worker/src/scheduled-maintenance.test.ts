@@ -24,6 +24,9 @@ function createHarness(upcomingOperationCount = 1) {
   const processPendingAnalysisArchives = vi.fn(
     async (_env: Env, _limit?: number): Promise<number> => 1,
   );
+  const expirePlanningHistoryPackages = vi.fn(
+    async (_env: Env, _now?: Date, _limit?: number): Promise<number> => 4,
+  );
   const createPortableBackup = vi.fn(async (_env: Env, _now?: Date, _reason?: BackupReason) => ({
     key: "backups/2026-08-11/backup.json",
     checksum: "backup-checksum",
@@ -32,6 +35,7 @@ function createHarness(upcomingOperationCount = 1) {
   const dependencies = {
     createPortableBackup,
     expireAnalysisArchives,
+    expirePlanningHistoryPackages,
     logger,
     operationDateInTimeZone,
     processPendingAnalysisArchives,
@@ -43,6 +47,7 @@ function createHarness(upcomingOperationCount = 1) {
     dependencies,
     env,
     expireAnalysisArchives,
+    expirePlanningHistoryPackages,
     first,
     logger,
     processPendingAnalysisArchives,
@@ -63,6 +68,7 @@ describe("runScheduledMaintenance", () => {
     expect(harness.purgeExpiredPushSubscriptions).toHaveBeenCalledWith(harness.env, NOW);
     expect(harness.expireAnalysisArchives).toHaveBeenCalledWith(harness.env, NOW);
     expect(harness.processPendingAnalysisArchives).toHaveBeenCalledWith(harness.env);
+    expect(harness.expirePlanningHistoryPackages).toHaveBeenCalledWith(harness.env, NOW);
     expect(harness.createPortableBackup).toHaveBeenCalledWith(harness.env, NOW, "PRE_EVENT");
     expect(harness.logger.error).not.toHaveBeenCalled();
     expect(loggedEvents(harness.logger.log)).toContainEqual(
@@ -73,6 +79,7 @@ describe("runScheduledMaintenance", () => {
         purgedPushSubscriptions: 3,
         expiredAnalysisArchives: 2,
         builtAnalysisArchives: 1,
+        expiredPlanningHistoryPackages: 4,
         backupReason: "PRE_EVENT",
       }),
     );
@@ -82,6 +89,11 @@ describe("runScheduledMaintenance", () => {
     ["push cleanup", "purgeExpiredPushSubscriptions", "PURGE_EXPIRED_PUSH_SUBSCRIPTIONS"],
     ["archive expiry", "expireAnalysisArchives", "EXPIRE_ANALYSIS_ARCHIVES"],
     ["archive building", "processPendingAnalysisArchives", "BUILD_ANALYSIS_ARCHIVES"],
+    [
+      "planning history expiry",
+      "expirePlanningHistoryPackages",
+      "EXPIRE_PLANNING_HISTORY_PACKAGES",
+    ],
   ] as const)(
     "attempts the portable backup after a failed %s step",
     async (_label, dependencyName, expectedStep) => {

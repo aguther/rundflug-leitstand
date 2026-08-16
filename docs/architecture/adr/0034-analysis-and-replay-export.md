@@ -8,6 +8,7 @@
 - Fortgeltende Grundlagen: F-PRG-010 bis F-PRG-130, F-HIS-020 bis F-HIS-070,
   Q-ZUV-020, Q-ZUV-040, Q-PER-020, Q-PER-030, Q-SIC-020, Q-DSG-010 bis
   Q-DSG-040, T-050 und T-100
+- Ergänzt durch: ADR-0053 für rollierende Kompaktion, Analysearchivformat 2 und isolierten Restore
 
 ## Kontext
 
@@ -300,3 +301,11 @@ Vor Produktion zusätzlich:
 - `SOURCE_REVISION` belegt,
 - EU-, Datenschutz- und R2-Lifecycle-Nachweis aktualisiert,
 - Secret-/Token-Canaries, Restore-/Reset- und vollständiger Replay erfolgreich.
+
+## Ergänzung durch ADR-0053
+
+Seit 2026-08-16 erzeugt ein neues Tagesarchiv Format 2: Es bettet bereits verifizierte
+`rundflug-planning-history`-Pakete ein und ergänzt ausschließlich den noch heißen D1-Rest. Der
+Replay prüft äußeren Paket-Hash, innere Datei-Hashes, Mengen und Fortsetzungsbelege. Format 1 bleibt
+kompatibel. Das in dieser ADR ausgeschlossene direkte Produktions-Restore bleibt ausgeschlossen;
+ADR-0053 definiert stattdessen einen ausschließlich isolierten, vollständig geprüften Recovery-Pfad.

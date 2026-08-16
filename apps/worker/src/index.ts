@@ -18,11 +18,13 @@ import { registerControlTransportRoutes } from "./control-transport-routes";
 import { registerDeviceRoutes } from "./device-routes";
 
 export { EventCoordinator } from "./event-coordinator";
+export { PlanningHistoryCompactionWorkflow } from "./planning-history-workflow";
 
 import { registerFactoryResetRoutes } from "./factory-reset-routes";
 import { registerFidsControlRoutes } from "./fids-control-routes";
 import { registerHistoryRoutes } from "./history-routes";
 import { registerOperationsRoutes } from "./operations-routes";
+import { startPlanningHistoryWorkflows } from "./planning-history-workflow";
 import { allowUnknownTicketAttempt } from "./public-access";
 import { registerPublicBoardRoutes } from "./public-board-routes";
 import { registerPublicInstallRoutes } from "./public-install-routes";
@@ -186,10 +188,15 @@ app.onError((error, context) => {
 export default {
   fetch: app.fetch,
   async scheduled(
-    _controller: ScheduledController,
+    controller: ScheduledController,
     env: Env,
     _ctx: ExecutionContext,
   ): Promise<void> {
+    if (controller.cron === "0 * * * *") {
+      await startPlanningHistoryWorkflows(env, new Date(controller.scheduledTime));
+      return;
+    }
     await runScheduledMaintenance(env);
+    await startPlanningHistoryWorkflows(env, new Date(controller.scheduledTime));
   },
 };

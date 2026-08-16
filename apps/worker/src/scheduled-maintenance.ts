@@ -1,5 +1,6 @@
 import { expireAnalysisArchives, processPendingAnalysisArchives } from "./analysis-archive";
 import { createPortableBackup, operationDateInTimeZone } from "./backup";
+import { expirePlanningHistoryPackages } from "./planning-history-compaction";
 import type { Env } from "./types";
 import { purgeExpiredPushSubscriptions } from "./web-push";
 
@@ -9,6 +10,7 @@ type MaintenanceStep =
   | "PURGE_EXPIRED_PUSH_SUBSCRIPTIONS"
   | "EXPIRE_ANALYSIS_ARCHIVES"
   | "BUILD_ANALYSIS_ARCHIVES"
+  | "EXPIRE_PLANNING_HISTORY_PACKAGES"
   | "RESOLVE_BACKUP_REASON"
   | "CREATE_PORTABLE_BACKUP";
 
@@ -20,6 +22,7 @@ interface MaintenanceLogger {
 export interface ScheduledMaintenanceDependencies {
   createPortableBackup: typeof createPortableBackup;
   expireAnalysisArchives: typeof expireAnalysisArchives;
+  expirePlanningHistoryPackages: typeof expirePlanningHistoryPackages;
   logger: MaintenanceLogger;
   operationDateInTimeZone: typeof operationDateInTimeZone;
   processPendingAnalysisArchives: typeof processPendingAnalysisArchives;
@@ -29,6 +32,7 @@ export interface ScheduledMaintenanceDependencies {
 const defaultDependencies: ScheduledMaintenanceDependencies = {
   createPortableBackup,
   expireAnalysisArchives,
+  expirePlanningHistoryPackages,
   logger: console,
   operationDateInTimeZone,
   processPendingAnalysisArchives,
@@ -104,6 +108,14 @@ export async function runScheduledMaintenance(
     () => dependencies.processPendingAnalysisArchives(env),
     (count) => ({ count }),
   );
+  const expiredPlanningHistoryPackages = await runMaintenanceStep(
+    "EXPIRE_PLANNING_HISTORY_PACKAGES",
+    timestamp,
+    failedSteps,
+    dependencies.logger,
+    () => dependencies.expirePlanningHistoryPackages(env, now),
+    (count) => ({ count }),
+  );
 
   const backupReasonResult = await runMaintenanceStep(
     "RESOLVE_BACKUP_REASON",
@@ -146,6 +158,10 @@ export async function runScheduledMaintenance(
       expiredAnalysisArchives.status === "fulfilled" ? expiredAnalysisArchives.value : null,
     builtAnalysisArchives:
       builtAnalysisArchives.status === "fulfilled" ? builtAnalysisArchives.value : null,
+    expiredPlanningHistoryPackages:
+      expiredPlanningHistoryPackages.status === "fulfilled"
+        ? expiredPlanningHistoryPackages.value
+        : null,
     backupKey: portableBackup.status === "fulfilled" ? portableBackup.value.key : null,
     backupReason,
     timestamp,

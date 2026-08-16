@@ -18,13 +18,17 @@ ADR-0045.
 Nach Einführung der zugehörigen Migrationen werden `planning_chunks`, `planning_contexts`,
 `planning_runs`, `analysis_archives` und `analysis_archive_events` in das portable D1-Backupregister
 aufgenommen. Planungschunks, -kontexte und -läufe sind Replaygrundlage; Archivmetadaten und das getrennte
-Zugriffsprotokoll sichern Lebenszyklus und Nachvollziehbarkeit. Die großen R2-Tagesarchive selbst
+Zugriffsprotokoll sichern Lebenszyklus und Nachvollziehbarkeit. Seit Migration `0003` enthält die
+portable Sicherung außerdem `planning_history_compactions` und
+`planning_history_compaction_events`, niemals aber `planning_history_maintenance_control`. Die großen R2-Tagesarchive selbst
 werden nicht in das portable JSON eingebettet.
 
 Ein Restore erfolgt weiterhin ausschließlich in eine isolierte D1-Instanz. Danach werden alle als
 `READY` markierten Archivmetadaten gegen das private R2-Objekt geprüft; ein fehlendes oder
 abweichendes Objekt bleibt ein Integritätsfehler und wird nicht als leerer Download behandelt.
-Tagesanalysepakete sind niemals Restore- oder Produktionsimportquellen. Details und offene
+Tagesanalysepakete sind niemals direkte Restore- oder Produktionsimportquellen. Bereits darin
+eingebettete, separat verifizierte `rundflug-planning-history`-Pakete dürfen nach ADR-0053 nur im
+isolierten Restore geladen werden. Details und offene
 Freigaben stehen in [`analysis-packages.md`](analysis-packages.md) und ADR-0034.
 
 ## Migrationsnotiz 0067 – bestätigte Dispatch-Überholungen

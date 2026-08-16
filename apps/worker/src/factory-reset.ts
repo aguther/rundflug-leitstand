@@ -17,6 +17,8 @@ export const FACTORY_RESET_BULK_DELETE_PHASES = [
       "outage_recovery_batches",
       "analysis_archive_events",
       "analysis_archives",
+      "planning_history_compaction_events",
+      "planning_history_compactions",
     ],
   },
   { name: "forecast-snapshots", tables: ["forecast_snapshots"] },

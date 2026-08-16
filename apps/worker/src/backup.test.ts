@@ -203,6 +203,8 @@ describe("portable backup format", () => {
         "planning_chunks",
         "planning_contexts",
         "planning_runs",
+        "planning_history_compactions",
+        "planning_history_compaction_events",
         "analysis_archives",
         "analysis_archive_events",
         "outage_recovery_batches",
@@ -215,6 +217,7 @@ describe("portable backup format", () => {
       ]),
     );
     expect(BACKUP_TABLES).not.toContain("web_push_subscriptions");
+    expect(BACKUP_TABLES).not.toContain("planning_history_maintenance_control");
   });
 
   it("preserves gate travel lead and dispatch planning columns without reinterpretation", () => {

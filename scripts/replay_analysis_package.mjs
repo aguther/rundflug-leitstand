@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { createReadStream, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { strFromU8, Unzip, UnzipInflate } from "fflate";
+import { strFromU8, Unzip, UnzipInflate, unzipSync } from "fflate";
 import { createServer } from "vite";
 import { compareTechnicalStrings } from "./lib/technical-order.mjs";
 import { GIT_EXECUTABLE } from "./lib/tool-executables.mjs";
@@ -217,6 +217,83 @@ function normalizeArchiveRun(row) {
   };
 }
 
+function nestedEntries(bytes) {
+  return new Map(Object.entries(unzipSync(bytes)));
+}
+
+function mergeById(...collections) {
+  return [...new Map(collections.flat().map((entry) => [entry.id, entry])).values()];
+}
+
+function planningHistoryModel(archiveEntries, packageDescriptor) {
+  const bytes = archiveEntries.get(packageDescriptor.path);
+  if (!bytes) {
+    throw new ReplayError(
+      "ANALYSIS_PLANNING_HISTORY_MISSING",
+      `Eingebettetes Planungshistorienpaket fehlt: ${packageDescriptor.path}`,
+    );
+  }
+  if (sha256(bytes) !== packageDescriptor.sha256) {
+    throw new ReplayError(
+      "ANALYSIS_PLANNING_HISTORY_HASH_MISMATCH",
+      `Hash des Planungshistorienpakets weicht ab: ${packageDescriptor.path}`,
+    );
+  }
+  const entries = nestedEntries(bytes);
+  const manifest = parseJson(
+    entryText(entries, "manifest.json"),
+    "ANALYSIS_PLANNING_HISTORY_MANIFEST_INVALID",
+    `${packageDescriptor.path}:manifest.json`,
+  );
+  if (manifest.format !== "rundflug-planning-history" || manifest.formatVersion !== 1) {
+    throw new ReplayError(
+      "ANALYSIS_PLANNING_HISTORY_FORMAT_UNSUPPORTED",
+      `Planungshistorienformat wird nicht unterstützt: ${packageDescriptor.path}`,
+    );
+  }
+  for (const descriptor of manifest.entries ?? []) {
+    const entry = entries.get(descriptor.path);
+    if (!entry || sha256(entry) !== descriptor.sha256) {
+      throw new ReplayError(
+        "ANALYSIS_PLANNING_HISTORY_ENTRY_HASH_MISMATCH",
+        `${packageDescriptor.path}:${descriptor.path}`,
+      );
+    }
+    const rows = strFromU8(entry).split(/\r?\n/).filter(Boolean);
+    if (rows.length !== descriptor.rowCount || entry.byteLength !== descriptor.byteCount) {
+      throw new ReplayError(
+        "ANALYSIS_PLANNING_HISTORY_ENTRY_COUNT_MISMATCH",
+        `${packageDescriptor.path}:${descriptor.path}`,
+      );
+    }
+  }
+  const continuationBytes = entries.get("continuation.json");
+  const continuationReceipt = manifest.continuationReceipt;
+  if (
+    !continuationBytes ||
+    continuationReceipt?.path !== "continuation.json" ||
+    continuationReceipt.rowCount !== 1 ||
+    continuationBytes.byteLength !== continuationReceipt.byteCount ||
+    sha256(continuationBytes) !== continuationReceipt.sha256
+  ) {
+    throw new ReplayError(
+      "ANALYSIS_PLANNING_HISTORY_CONTINUATION_HASH_MISMATCH",
+      `${packageDescriptor.path}:continuation.json`,
+    );
+  }
+  return {
+    chunks: parseNdjson(entries, "planning/chunks.ndjson"),
+    contexts: parseNdjson(entries, "planning/contexts.ndjson"),
+    runs: parseNdjson(entries, "planning/runs.ndjson"),
+    snapshots: parseNdjson(entries, "history/forecast-snapshots.ndjson"),
+    continuation: parseJson(
+      strFromU8(continuationBytes),
+      "ANALYSIS_PLANNING_HISTORY_CONTINUATION_INVALID",
+      `${packageDescriptor.path}:continuation.json`,
+    ),
+  };
+}
+
 function archiveModel(entries) {
   const allowedRoots = new Set([
     "manifest.json",
@@ -226,6 +303,7 @@ function archiveModel(entries) {
     "history",
     "state",
     "reports",
+    "planning-history",
   ]);
   for (const path of entries.keys()) {
     const root = path.includes("/") ? path.slice(0, path.indexOf("/")) : path;
@@ -240,7 +318,10 @@ function archiveModel(entries) {
     "ANALYSIS_MANIFEST_INVALID",
     "manifest.json",
   );
-  if (manifest.format !== "rundflug-analysis-day-archive" || manifest.formatVersion !== 1) {
+  if (
+    manifest.format !== "rundflug-analysis-day-archive" ||
+    ![1, 2].includes(manifest.formatVersion)
+  ) {
     throw new ReplayError(
       "ANALYSIS_FORMAT_UNSUPPORTED",
       "Tagesarchivformat wird nicht unterstützt.",
@@ -256,7 +337,38 @@ function archiveModel(entries) {
   ]) {
     entryText(entries, required);
   }
-  const chunks = parseNdjson(entries, "planning/chunks.ndjson").map((row) => ({
+  const cold =
+    manifest.formatVersion === 2
+      ? (manifest.planningHistory?.packages ?? []).map((descriptor) =>
+          planningHistoryModel(entries, descriptor),
+        )
+      : [];
+  const rawChunks = mergeById(
+    ...cold.map((model) => model.chunks),
+    parseNdjson(entries, "planning/chunks.ndjson"),
+  );
+  const rawContexts = mergeById(
+    ...cold.map((model) => model.contexts),
+    parseNdjson(entries, "planning/contexts.ndjson"),
+  );
+  const rawRuns = mergeById(
+    ...cold.map((model) => model.runs),
+    parseNdjson(entries, "planning/runs.ndjson"),
+  );
+  for (const model of cold) {
+    const continuationRun = rawRuns.find((run) => run.id === model.continuation.continuationRunId);
+    if (continuationRun) {
+      continuationRun.previous_run_id = model.continuation.previousRunId;
+      continuationRun.anchor_run_id = model.continuation.anchorRunId;
+    }
+    const continuationContext = rawContexts.find(
+      (context) => context.id === model.continuation.continuationContextId,
+    );
+    if (continuationContext) {
+      continuationContext.previous_context_id = model.continuation.previousContextId;
+    }
+  }
+  const chunks = rawChunks.map((row) => ({
     id: row.id,
     kind: row.chunk_kind,
     schemaVersion: row.schema_version,
@@ -264,7 +376,7 @@ function archiveModel(entries) {
     byteSize: row.byte_size,
     payload: parseJson(row.payload_json, "ANALYSIS_CHUNK_JSON_INVALID", row.id),
   }));
-  const contexts = parseNdjson(entries, "planning/contexts.ndjson").map((row) => ({
+  const contexts = rawContexts.map((row) => ({
     id: row.id,
     eventVersion: row.operation_day_version,
     schemaVersion: row.schema_version,
@@ -278,8 +390,11 @@ function archiveModel(entries) {
     applicationVersion: manifest.applicationVersion,
     chunks,
     contexts,
-    runs: parseNdjson(entries, "planning/runs.ndjson").map(normalizeArchiveRun),
-    snapshots: parseNdjson(entries, "history/forecast-snapshots.ndjson"),
+    runs: rawRuns.map(normalizeArchiveRun),
+    snapshots: mergeById(
+      ...cold.map((model) => model.snapshots),
+      parseNdjson(entries, "history/forecast-snapshots.ndjson"),
+    ),
   };
 }
 
@@ -770,4 +885,4 @@ if (resolve(process.argv[1] ?? "") === resolve(fileURLToPath(import.meta.url))) 
   await main();
 }
 
-export { canonicalJson, firstDifference, parseArguments, verifyIntegrity };
+export { archiveModel, canonicalJson, firstDifference, parseArguments, verifyIntegrity };

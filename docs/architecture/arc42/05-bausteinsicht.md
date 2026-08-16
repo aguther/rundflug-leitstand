@@ -88,7 +88,7 @@ flowchart TB
     subgraph Entry["Einstieg – apps/worker/src/index.ts"]
         MW["Middleware:<br/>HTTPS-Redirect, Secure Headers/CSP,<br/>Body-Limits, Cache-Policy, Sitzungskontext"]
         ROUTES["Routenregistrierung"]
-        CRONH["scheduled(): Sicherung, Push-Löschung,<br/>Analysearchive"]
+        CRONH["scheduled(): Sicherung, Push-Löschung,<br/>Analysearchive, Historien-Claims"]
     end
 
     subgraph RouteGroups["Routengruppen"]
@@ -110,6 +110,7 @@ flowchart TB
     subgraph Adapters["Adapter"]
         D1A["D1: Batch, Read-Scheduler, Migrationen"]
         R2A["R2: streaming backup v2, Logos,<br/>Analysearchive und Multipart-Writer"]
+        PH["PlanningHistoryCompactionWorkflow<br/>Paket, Verifikation, bounded pruning"]
         REPORT["Berichte: daily-report.ts, report.ts,<br/>report-export-service.ts"]
         PUSHA["web-push*.ts: aes128gcm, VAPID"]
         AUTHA["auth.ts, crypto.ts, device-authorization.ts"]
@@ -125,6 +126,8 @@ flowchart TB
     EXP --> R2A
     EXP --> REPORT
     CRONH --> R2A
+    CRONH --> PH --> D1A
+    PH --> R2A
     CRONH --> PUSHA
     DO --> PUSHA
     AUTHR --> AUTHA
@@ -144,6 +147,7 @@ flowchart TB
 | `forecast-timeline-loader.ts`, `forecast-timeline-projector.ts`, `forecast-timeline-projector-support.ts` | laden Forecast-Grundlagen aus D1 und normalisieren sie anschließend über reine Projektionshelfer zu Domain-Eingaben |
 | `forecast-timeline-repository.ts`, `forecast-precall-evaluator.ts`, `forecast-publication-service.ts` | persistieren Prognose/Snapshots/Voraufruf atomar beziehungsweise wählen Voraufrufe rein aus und veröffentlichen erst nach erfolgreicher Persistenz |
 | `backup.ts`, `analysis-archive-writer.ts`, `admin-event-logo-service.ts`, `analysis-archive*.ts` | portable seitenweise ZIP-/NDJSON-Sicherungen mit inkrementeller Prüfsumme, Veranstaltungslogos und Analysepakete in R2 |
+| `planning-history-compaction.ts`, `planning-history-workflow.ts` | wählen 24-Stunden-Segmente fair aus, streamen und verifizieren unveränderliche R2-Pakete und reduzieren D1 in wiederaufnehmbaren begrenzten Transaktionen |
 | `daily-report.ts`, `report.ts`, `report-export-service.ts` | erzeugen CSV- und PDF-Tagesberichte bei Abruf aus dem bestätigten D1-Zustand |
 | `web-push*.ts` | Verschlüsselung, VAPID-Signatur, Zustellwarteschlange, Löschfristen |
 | `auth.ts`, `auth-login-attempts.ts`, `crypto.ts`, `device-authorization.ts` | Sitzungen, PIN-Hash, fehlgeschlagene Anmeldeversuche, Gerätekopplung, Ratenbegrenzung sensibler Pfade |

@@ -29,9 +29,9 @@ describe("arc42 bundle builder", () => {
 
   it("keeps all ADRs in technical order", async () => {
     const files = await adrFiles();
-    expect(files).toHaveLength(52);
+    expect(files).toHaveLength(53);
     expect(files[0]).toBe("0001-cloudflare-worker-static-assets.md");
-    expect(files.at(-1)).toBe("0052-event-archive-delete-reset-lifecycle.md");
+    expect(files.at(-1)).toBe("0053-planning-history-compaction.md");
   });
 
   it("rewrites repository links while preserving external links and anchors", () => {

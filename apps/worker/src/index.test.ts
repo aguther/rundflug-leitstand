@@ -4,9 +4,14 @@ import type { Env } from "./types";
 const maintenance = vi.hoisted(() => ({
   run: vi.fn(),
 }));
+const planningHistory = vi.hoisted(() => ({ start: vi.fn() }));
 
 vi.mock("./scheduled-maintenance", () => ({
   runScheduledMaintenance: maintenance.run,
+}));
+vi.mock("./planning-history-workflow", () => ({
+  PlanningHistoryCompactionWorkflow: class {},
+  startPlanningHistoryWorkflows: planningHistory.start,
 }));
 vi.mock("cloudflare:workers", () => ({
   DurableObject: class<Environment> {
@@ -44,6 +49,7 @@ async function fetchWorker(request: Request, env = environment()): Promise<Respo
 describe("worker entry routing", () => {
   beforeEach(() => {
     maintenance.run.mockReset().mockResolvedValue(undefined);
+    planningHistory.start.mockReset().mockResolvedValue(0);
   });
 
   it("serves health and metadata with security and cache boundaries", async () => {
@@ -126,8 +132,32 @@ describe("worker entry routing", () => {
   it("delegates scheduled execution to the maintenance boundary", async () => {
     const env = environment();
 
-    await worker.scheduled({} as ScheduledController, env, {} as ExecutionContext);
+    await worker.scheduled(
+      {
+        cron: "15 2 * * *",
+        scheduledTime: Date.parse("2026-08-16T02:15:00Z"),
+      } as ScheduledController,
+      env,
+      {} as ExecutionContext,
+    );
 
     expect(maintenance.run).toHaveBeenCalledWith(env);
+    expect(planningHistory.start).toHaveBeenCalledWith(env, new Date("2026-08-16T02:15:00Z"));
+  });
+
+  it("starts only compaction discovery on the hourly trigger", async () => {
+    const env = environment();
+
+    await worker.scheduled(
+      {
+        cron: "0 * * * *",
+        scheduledTime: Date.parse("2026-08-16T03:00:00Z"),
+      } as ScheduledController,
+      env,
+      {} as ExecutionContext,
+    );
+
+    expect(maintenance.run).not.toHaveBeenCalled();
+    expect(planningHistory.start).toHaveBeenCalledWith(env, new Date("2026-08-16T03:00:00Z"));
   });
 });

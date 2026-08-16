@@ -64,6 +64,7 @@ verlinkt bleiben.
 | [0050](../adr/0050-wiederaufnehmbarer-d1-werksreset.md) | Wiederaufnehmbarer D1-Werksreset in begrenzten Transaktionen | große Historientabellen phasenweise löschen; Identität und Wurzeln bis zum finalen Beleg erhalten |
 | [0051](../adr/0051-online-only-operational-commands.md) | Onlinepflicht für operative Kommandos und lokale reversible Entwürfe | kein unbestätigter Parallelzustand; Offlineentwürfe werden bewusst gegen den aktuellen Serverstand bestätigt |
 | [0052](../adr/0052-event-archive-delete-reset-lifecycle.md) | Koexistenz von Veranstaltungsarchiv, Löschung und Werksreset | getrennte fachliche, destruktive und Wiederherstellungssemantik für drei unterschiedliche Lebenszykluspfade |
+| [0053](../adr/0053-planning-history-compaction.md) | Verifizierte Kompaktion der Planungshistorie in R2 | 24-Stunden-Heißfenster in D1, autoritative verifizierte Kaltsegmente in R2, Workflows und isolierter Restore |
 
 ## Entscheidungsstatus und Nachfolger
 

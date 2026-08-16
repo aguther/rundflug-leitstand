@@ -3,8 +3,10 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { strToU8, zipSync } from "fflate";
 import { createServer } from "vite";
 import {
+  archiveModel,
   canonicalJson,
   replayAnalysisPackage,
   verifyIntegrity,
@@ -56,6 +58,145 @@ const run = {
 const verified = verifyIntegrity({ chunks: [chunk], contexts: [context], runs: [run] });
 assert.equal(verified.chunkById.size, 1);
 assert.equal(verified.runById.size, 1);
+
+const rawChunk = {
+  id: chunk.id,
+  chunk_kind: chunk.kind,
+  schema_version: chunk.schemaVersion,
+  payload_hash: chunk.hash,
+  byte_size: chunk.byteSize,
+  payload_json: JSON.stringify(chunk.payload),
+};
+const rawContext = {
+  id: context.id,
+  operation_day_version: context.eventVersion,
+  schema_version: context.schemaVersion,
+  manifest_hash: context.manifestHash,
+  manifest_json: JSON.stringify(context.manifest),
+};
+const rawRun = {
+  id: run.id,
+  previous_run_id: run.previousRunId,
+  anchor_run_id: run.anchorRunId,
+  context_id: run.contextId,
+  operation_day_version: run.eventVersion,
+  replay_distance: run.replayDistance,
+  calculation_now: run.calculationNow,
+  captured_at: run.capturedAt,
+  trigger_event_type: run.trigger,
+  capture_mode: run.mode,
+  source_revision: run.sourceRevision,
+  dispatch_plan_revision: run.dispatchPlanRevision,
+  forecast_digest: run.forecastDigest,
+  precall_digest: run.precallDigest,
+  previous_forecast_state_chunk_id: run.previousForecastStateChunkId,
+  previous_dispatch_state_chunk_id: run.previousDispatchStateChunkId,
+  dispatch_result_chunk_id: run.dispatchResultChunkId,
+  precall_result_chunk_id: run.precallResultChunkId,
+  status: run.status,
+};
+const coldFiles = {
+  "planning/chunks.ndjson": `${JSON.stringify(rawChunk)}\n`,
+  "planning/contexts.ndjson": `${JSON.stringify(rawContext)}\n`,
+  "planning/runs.ndjson": `${JSON.stringify(rawRun)}\n`,
+  "history/forecast-snapshots.ndjson": "",
+};
+const coldEntryDescriptors = Object.entries(coldFiles).map(([path, text]) => ({
+  path,
+  encoding: "ndjson",
+  rowCount: text ? 1 : 0,
+  byteCount: Buffer.byteLength(text),
+  sha256: sha256(text),
+}));
+const coldContinuation = {
+  terminal: true,
+  continuationRunId: null,
+  continuationContextId: null,
+  previousRunId: null,
+  anchorRunId: null,
+  previousContextId: null,
+};
+const coldContinuationBytes = strToU8(JSON.stringify(coldContinuation));
+const coldPackage = zipSync({
+  ...Object.fromEntries(Object.entries(coldFiles).map(([path, text]) => [path, strToU8(text)])),
+  "continuation.json": coldContinuationBytes,
+  "manifest.json": strToU8(
+    JSON.stringify({
+      format: "rundflug-planning-history",
+      formatVersion: 1,
+      continuation: coldContinuation,
+      continuationReceipt: {
+        path: "continuation.json",
+        encoding: "json",
+        rowCount: 1,
+        byteCount: coldContinuationBytes.byteLength,
+        sha256: sha256(coldContinuationBytes),
+      },
+      entries: coldEntryDescriptors,
+    }),
+  ),
+});
+const outerEntries = new Map([
+  [
+    "manifest.json",
+    strToU8(
+      JSON.stringify({
+        format: "rundflug-analysis-day-archive",
+        formatVersion: 2,
+        sourceRevision: "synthetic",
+        applicationVersion: "1.12.0",
+        planningHistory: {
+          packages: [
+            {
+              path: "planning-history/cold.zip",
+              compactionId: "cold",
+              sha256: sha256(coldPackage),
+              rowCounts: Object.fromEntries(
+                coldEntryDescriptors.map((entry) => [entry.path, entry.rowCount]),
+              ),
+            },
+          ],
+        },
+      }),
+    ),
+  ],
+  ["README.md", strToU8("synthetic")],
+  ["snapshot/event.json", strToU8('{"id":"synthetic-event"}')],
+  ["planning/chunks.ndjson", new Uint8Array()],
+  ["planning/contexts.ndjson", new Uint8Array()],
+  ["planning/runs.ndjson", new Uint8Array()],
+  ["history/forecast-snapshots.ndjson", new Uint8Array()],
+  ["planning-history/cold.zip", coldPackage],
+]);
+const v2Archive = archiveModel(outerEntries);
+const verifiedV2 = verifyIntegrity(v2Archive);
+assert.equal(verifiedV2.runById.size, 1);
+const v1Archive = archiveModel(
+  new Map(
+    [...outerEntries]
+      .filter(([path]) => path !== "planning-history/cold.zip")
+      .map(([path, bytes]) => [
+        path,
+        path === "manifest.json"
+          ? strToU8(
+              JSON.stringify({
+                format: "rundflug-analysis-day-archive",
+                formatVersion: 1,
+                sourceRevision: "synthetic",
+                applicationVersion: "1.12.0",
+              }),
+            )
+          : path === "planning/chunks.ndjson"
+            ? strToU8(`${JSON.stringify(rawChunk)}\n`)
+            : path === "planning/contexts.ndjson"
+              ? strToU8(`${JSON.stringify(rawContext)}\n`)
+              : path === "planning/runs.ndjson"
+                ? strToU8(`${JSON.stringify(rawRun)}\n`)
+                : bytes,
+      ]),
+  ),
+);
+assert.equal(verifyIntegrity(v1Archive).runById.size, 1);
 
 assert.throws(
   () =>

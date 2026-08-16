@@ -9,11 +9,24 @@ import {
   pagedNdjson,
 } from "./analysis-export-projections";
 import { sha256Hex } from "./crypto";
+import { listVerifiedPlanningHistoryPackages } from "./planning-history-compaction";
 import type { Env } from "./types";
 
 const ARCHIVE_FORMAT = "rundflug-analysis-day-archive";
 const ARCHIVE_CONTENT_TYPE = "application/zip";
 const SYSTEM_ACTOR_ALIAS = "system";
+const CURRENT_ARCHIVE_FORMAT_VERSION = 2;
+
+function bytesToHex(bytes: ArrayBuffer): string {
+  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function streamSha256Hex(stream: ReadableStream<Uint8Array>): Promise<string> {
+  const workerCrypto = crypto as Crypto & { DigestStream: typeof DigestStream };
+  const digest = new workerCrypto.DigestStream("SHA-256");
+  await stream.pipeTo(digest);
+  return bytesToHex(await digest.digest);
+}
 
 type ArchiveStatus = AnalysisArchive["status"];
 
@@ -24,7 +37,7 @@ interface ArchiveRow {
   request_id: string;
   request_hash: string;
   privacy_profile: "SUPPORT_SAFE";
-  format_version: 1;
+  format_version: 1 | 2;
   status: ArchiveStatus;
   object_key: string | null;
   object_etag: string | null;
@@ -95,7 +108,7 @@ async function requestHash(eventId: string, eventVersion: number): Promise<strin
     JSON.stringify({
       eventId,
       eventVersion,
-      formatVersion: 1,
+      formatVersion: CURRENT_ARCHIVE_FORMAT_VERSION,
       privacyProfile: "SUPPORT_SAFE",
     }),
   );
@@ -160,7 +173,7 @@ export async function automaticArchiveRequestStatements(input: {
         (id, operation_day_id, operation_day_version, request_id, request_hash,
          privacy_profile, format_version, status, source_revision, application_version,
          requirements_version, entry_counts_json, requested_at, expires_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, 'SUPPORT_SAFE', 1, 'PENDING', ?6, ?7, ?8, '{}', ?9, ?10)`,
+       VALUES (?1, ?2, ?3, ?4, ?5, 'SUPPORT_SAFE', 2, 'PENDING', ?6, ?7, ?8, '{}', ?9, ?10)`,
     ).bind(
       archiveId,
       input.eventId,
@@ -196,9 +209,9 @@ async function findArchiveForVersion(
   return env.DB.prepare(
     `SELECT * FROM analysis_archives
       WHERE operation_day_id = ?1 AND operation_day_version = ?2
-        AND format_version = 1 AND privacy_profile = 'SUPPORT_SAFE'`,
+        AND format_version = ?3 AND privacy_profile = 'SUPPORT_SAFE'`,
   )
-    .bind(eventId, eventVersion)
+    .bind(eventId, eventVersion, CURRENT_ARCHIVE_FORMAT_VERSION)
     .first<ArchiveRow>();
 }
 
@@ -279,7 +292,7 @@ export async function requestAnalysisArchive(
           (id, operation_day_id, operation_day_version, request_id, request_hash,
            privacy_profile, format_version, status, source_revision, application_version,
            requirements_version, entry_counts_json, requested_at, expires_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, 'SUPPORT_SAFE', 1, 'PENDING', ?6, ?7, ?8, '{}', ?9, ?10)`,
+         VALUES (?1, ?2, ?3, ?4, ?5, 'SUPPORT_SAFE', 2, 'PENDING', ?6, ?7, ?8, '{}', ?9, ?10)`,
       ).bind(
         archiveId,
         input.eventId,
@@ -335,10 +348,16 @@ async function buildAnalysisArchiveManifest(input: {
   event: ArchiveEventRow;
   entryCounts: Record<string, number>;
   createdAt: string;
+  planningHistoryPackages: Array<{
+    path: string;
+    compactionId: string;
+    sha256: string;
+    rowCounts: Record<string, number>;
+  }>;
 }): Promise<Record<string, unknown>> {
   return {
     format: ARCHIVE_FORMAT,
-    formatVersion: 1,
+    formatVersion: input.archive.format_version,
     createdAt: input.createdAt,
     privacyProfile: "SUPPORT_SAFE",
     applicationVersion: input.archive.application_version,
@@ -354,6 +373,14 @@ async function buildAnalysisArchiveManifest(input: {
     },
     schemaVersions: { manifest: 1, planningContext: 1, planningRun: 1 },
     entries: input.entryCounts,
+    planningHistory:
+      input.archive.format_version === 2
+        ? {
+            packageFormat: "rundflug-planning-history",
+            packageFormatVersion: 1,
+            packages: input.planningHistoryPackages,
+          }
+        : undefined,
     redaction: {
       profile: "SUPPORT_SAFE",
       freeTextIncluded: false,
@@ -428,7 +455,7 @@ export async function buildAnalysisArchive(env: Env, archiveId: string): Promise
     stream: writer.readable,
     customMetadata: {
       format: ARCHIVE_FORMAT,
-      formatVersion: "1",
+      formatVersion: String(archive.format_version),
       applicationVersion: archive.application_version,
       requirementsVersion: archive.requirements_version,
       sourceRevision: archive.source_revision,
@@ -439,13 +466,30 @@ export async function buildAnalysisArchive(env: Env, archiveId: string): Promise
     },
   });
   try {
-    const entryCounts = await loadArchiveEntryCounts(env.DB, archive.operation_day_id);
+    const coldPackages =
+      archive.format_version === 2
+        ? await listVerifiedPlanningHistoryPackages(env, archive.operation_day_id)
+        : [];
+    const planningHistoryPackages = coldPackages.map((entry) => ({
+      path: `planning-history/${entry.id}.zip`,
+      compactionId: entry.id,
+      sha256: entry.object_sha256 ?? "",
+      rowCounts: JSON.parse(entry.entry_counts_json) as Record<string, number>,
+    }));
+    if (planningHistoryPackages.some((entry) => !/^[a-f0-9]{64}$/.test(entry.sha256))) {
+      throw new Error("ANALYSIS_ARCHIVE_COLD_HISTORY_UNVERIFIED");
+    }
+    const entryCounts = {
+      ...(await loadArchiveEntryCounts(env.DB, archive.operation_day_id)),
+      planningHistoryPackages: planningHistoryPackages.length,
+    };
     const manifest = await buildAnalysisArchiveManifest({
       env,
       archive,
       event,
       entryCounts,
       createdAt: startedAt,
+      planningHistoryPackages,
     });
     await writer.addTextEntry("manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);
     await writer.addTextEntry("README.md", archiveReadme());
@@ -459,6 +503,19 @@ export async function buildAnalysisArchive(env: Env, archiveId: string): Promise
         version: event.version,
       })}\n`,
     );
+    for (const [index, coldPackage] of coldPackages.entries()) {
+      const packageObject = await env.BACKUPS.get(coldPackage.object_key);
+      if (!packageObject?.body) throw new Error("ANALYSIS_ARCHIVE_COLD_HISTORY_MISSING");
+      const [archiveStream, digestStream] = packageObject.body.tee();
+      const digestPromise = streamSha256Hex(digestStream);
+      await writer.addBinaryEntry(
+        planningHistoryPackages[index]?.path ?? `planning-history/${coldPackage.id}.zip`,
+        archiveStream,
+      );
+      if ((await digestPromise) !== coldPackage.object_sha256) {
+        throw new Error("ANALYSIS_ARCHIVE_COLD_HISTORY_HASH_MISMATCH");
+      }
+    }
     for (const projection of analysisExportProjections) {
       await writer.addTextEntry(
         projection.path,

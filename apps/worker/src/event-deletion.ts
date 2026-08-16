@@ -18,6 +18,8 @@ export const EVENT_DELETION_SQL = [
   "DELETE FROM outage_recovery_batches WHERE operation_day_id = ?1",
   "DELETE FROM analysis_archive_events WHERE operation_day_id = ?1",
   "DELETE FROM analysis_archives WHERE operation_day_id = ?1",
+  "DELETE FROM planning_history_compaction_events WHERE operation_day_id = ?1",
+  "DELETE FROM planning_history_compactions WHERE operation_day_id = ?1",
   "DELETE FROM forecast_snapshots WHERE operation_day_id = ?1",
   "DELETE FROM planning_runs WHERE operation_day_id = ?1",
   "DELETE FROM planning_contexts WHERE operation_day_id = ?1",
@@ -60,17 +62,16 @@ export async function finishEventDeletionAssetCleanup(
   response: EventDeletionResponse,
 ): Promise<EventDeletionResponse> {
   if (logoObjectKeys.length > 0) await env.BACKUPS.delete([...logoObjectKeys]);
-  let cursor: string | undefined;
-  do {
-    const listed = await env.BACKUPS.list({
-      prefix: `analysis/${response.eventId}/`,
-      ...(cursor ? { cursor } : {}),
-    });
-    if (listed.objects.length > 0) {
-      await env.BACKUPS.delete(listed.objects.map((object) => object.key));
-    }
-    cursor = listed.truncated ? listed.cursor : undefined;
-  } while (cursor);
+  for (const prefix of [`analysis/${response.eventId}/`, `planning-history/${response.eventId}/`]) {
+    let cursor: string | undefined;
+    do {
+      const listed = await env.BACKUPS.list({ prefix, ...(cursor ? { cursor } : {}) });
+      if (listed.objects.length > 0) {
+        await env.BACKUPS.delete(listed.objects.map((object) => object.key));
+      }
+      cursor = listed.truncated ? listed.cursor : undefined;
+    } while (cursor);
+  }
   const completedResponse = { ...response, assetCleanupPending: false };
   await env.DB.prepare(
     `UPDATE event_deletion_receipts

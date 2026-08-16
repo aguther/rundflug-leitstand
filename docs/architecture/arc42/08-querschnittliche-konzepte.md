@@ -116,6 +116,9 @@ keinen neueren bestätigten Stand ersetzen.
 - `0002_planning_run_lineage_indexes.sql` ergänzt zwei direkte Fremdschlüsselindizes für die
   begrenzte Werksreset-Löschung. Der gemeinsame Testbuilder führt immer die vollständige aktive
   Migrationsfolge aus; ein separater Baseline-Test hält die 42/73/20-Identität von `0001` fest.
+- `0003_planning_history_compaction.sql` ergänzt Katalog, append-only Lebenszyklusereignisse und
+  den standardmäßig inaktiven Wächter für exakt begrenzte Boundary-Updates und Löschungen. Der
+  aktive Gesamtstand besitzt 45 Tabellen, 79 benannte Indizes und 23 Trigger.
 - Tabellen sind `STRICT`; fachliche Invarianten werden zusätzlich durch `CHECK`-Bedingungen,
   Fremdschlüssel und partielle Unique-Indizes abgesichert.
 - `operational_events` und `forecast_snapshots` sind append-only; D1-Trigger verbieten `UPDATE` und
@@ -133,6 +136,9 @@ keinen neueren bestätigten Stand ersetzen.
   höchstens ein 5-MiB-R2-Multipart-Teil begrenzen den Speicherbedarf. SHA-256 entsteht inkrementell
   über die übertragenen Archivbytes; das getrennte Sidecar ist zwingende Restore-Voraussetzung.
   Der isolierte Restore akzeptiert während der dokumentierten Übergangsfrist weiterhin Format 1.
+- Planungsläufe und Forecast-Snapshots wechseln nach 24 bis 168 Stunden in verifizierte
+  `rundflug-planning-history`-Pakete. D1 bleibt für heiße Daten und Katalog autoritativ, R2 für
+  verifizierte kalte Segmente. Shared Contexts und Chunks werden erst ohne heiße Referenz gelöscht.
 
 ## 8.4 Echtzeit, Offline und degradierter Betrieb
 
@@ -334,7 +340,10 @@ Domainmodule ändert. ADR-0046 begründet Auswahl, Schwellen und Ratchet-Verfahr
 - D1 Time Travel ergänzt die Sicherung als kurzfristiger Wiederherstellungspfad; ein Restore erfolgt
   ausschließlich in eine isolierte Datenbank.
 - Tagesberichte (CSV und PDF) werden bei Abruf aus D1 erzeugt. Portable Sicherungen,
-  Veranstaltungslogos und Analysepakete liegen in R2; der Bucket besitzt keine öffentliche URL.
+  Veranstaltungslogos, Analysepakete und fünf bis zehn Jahre aufbewahrte Planungshistorienpakete
+  liegen in R2; der Bucket besitzt keine öffentliche URL. Analysearchivformat 2 vereinigt kalte
+  Pakete und heißen D1-Rest, Format 1 bleibt lesbar.
 - Betriebsanleitungen: `docs/operations/betriebsstart-und-neustart.md`,
   `docs/operations/backup-restore.md`, `docs/operations/paper-fallback.md` und
-  `docs/operations/operator-handover-v1.md`.
+  `docs/operations/operator-handover-v1.md`; die Kompaktion besitzt zusätzlich das Runbook
+  `docs/operations/planning-history-compaction.md`.

@@ -2,9 +2,9 @@ import { Zip, ZipDeflate } from "fflate";
 
 const MULTIPART_PART_BYTES = 5 * 1024 * 1024;
 
-type TextSource = string | ReadableStream<Uint8Array> | AsyncIterable<Uint8Array>;
+export type ArchiveEntrySource = string | ReadableStream<Uint8Array> | AsyncIterable<Uint8Array>;
 
-function asAsyncIterable(source: TextSource): AsyncIterable<Uint8Array> {
+function asAsyncIterable(source: ArchiveEntrySource): AsyncIterable<Uint8Array> {
   if (typeof source === "string") {
     const bytes = new TextEncoder().encode(source);
     return (async function* () {
@@ -54,7 +54,7 @@ export class StreamingZipWriter {
     });
   }
 
-  async addTextEntry(path: string, source: TextSource): Promise<void> {
+  async addTextEntry(path: string, source: ArchiveEntrySource): Promise<void> {
     if (this.finalized) throw new Error("ANALYSIS_ARCHIVE_ALREADY_FINALIZED");
     if (!path || path.startsWith("/") || path.includes("..")) {
       throw new Error("ANALYSIS_ARCHIVE_ENTRY_PATH_INVALID");
@@ -69,6 +69,10 @@ export class StreamingZipWriter {
     entry.push(new Uint8Array(), true);
     await this.outputTail;
     if (this.failure) throw this.failure;
+  }
+
+  async addBinaryEntry(path: string, source: Exclude<ArchiveEntrySource, string>): Promise<void> {
+    await this.addTextEntry(path, source);
   }
 
   async finalize(): Promise<void> {

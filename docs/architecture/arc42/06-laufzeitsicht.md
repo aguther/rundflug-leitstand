@@ -183,7 +183,34 @@ sequenceDiagram
     W->>W: strukturierte Logzeile mit Schlüssel und Prüfsumme (ohne Tokens)
 ```
 
-## 6.7 Ausfall und Papier-Nacherfassung
+## 6.7 Rollierende Planungshistorien-Kompaktion (Cron `0 * * * *`)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Cloudflare Cron
+    participant D as D1
+    participant W as PlanningHistoryCompactionWorkflow
+    participant R as R2 (EU)
+
+    C->>D: faire, idempotente Segment-Claims
+    C->>W: eine Instanz je Kompaktions-ID
+    W->>D: PENDING → BUILDING, Grenzen und Mengen einfrieren
+    W->>R: SUPPORT_SAFE ZIP + SHA-256-Sidecar streamen
+    W->>R: Objekt erneut lesen und Hash prüfen
+    W->>D: BUILDING → VERIFIED
+    loop begrenzte Transaktionen
+        W->>D: ≤10.000 Snapshots / 500 Runs / 250 Contexts / 500 Chunks löschen
+    end
+    W->>D: PRUNING → COMPLETED
+```
+
+Bei aktiven Veranstaltungen bleibt der erste mindestens 24 Stunden alte `ANCHOR` als Boundary mit
+allen neueren Läufen heiß. `CAPTURING` blockiert ein Segment. Geschlossene oder archivierte
+Veranstaltungen werden nach dem Detailfenster terminal nachgezogen. Vor erfolgreichem R2-Download
+und Hashvergleich ist kein Pruning zulässig.
+
+## 6.8 Ausfall und Papier-Nacherfassung
 
 Bei einem Totalausfall der Verbindung arbeitet die Veranstaltung nach der dokumentierten
 Papier-Rückfallebene weiter. Nach dem Wiederanlauf wird ein Nacherfassungsbatch angelegt und
@@ -192,7 +219,7 @@ Anwendung prüfen erneut die Veranstaltungsversion; doppelte Belegfolgen, doppel
 zukünftige Zeitpunkte, fehlende Referenzen und ungültige Umlaufübergänge blockieren den gesamten
 Batch, statt Teilzustände zu erzeugen.
 
-## 6.8 Lesen und Projizieren des Operations-Boards
+## 6.9 Lesen und Projizieren des Operations-Boards
 
 ```mermaid
 sequenceDiagram
@@ -220,7 +247,7 @@ kompatiblen Leerprojektion wiederholt; andere Fehler werden nicht verschluckt. D
 vor der DTO-Erzeugung Lookup- und Gruppierungsindizes auf und verändert weder Fachregeln noch den
 bestätigten D1-Zustand.
 
-## 6.9 Vollständiger Werksreset
+## 6.10 Vollständiger Werksreset
 
 ```mermaid
 sequenceDiagram
