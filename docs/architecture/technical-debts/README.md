@@ -15,6 +15,7 @@ bewusste Architekturentscheidung ein.
 | --- | --- | --- |
 | [Legacy-Prognosepfad](forecast-legacy-comparison-path.md) | Mittel | privater Vergleichspfad bleibt bis zum Freigabe- und Replay-Nachweis erhalten |
 | [Mutationstest-Aussagekraft](mutation-test-effectiveness.md) | Mittel | fokussiertes Gate ist etabliert, einzelne Module und überlebende Mutanten bleiben schwach |
+| [Worker-SQL-Testorakel](worker-sql-test-oracles.md) | Mittel | elf priorisierte Historien-, Read- und Command-Service-Familien besitzen noch reine SQL-Shape-Orakel |
 | [Worker-Orchestrierung](worker-orchestration-complexity.md) | Mittel | Stammdaten- und Operationspfade bündeln weiterhin viele Entscheidungen |
 | [Web-Asset-Spielraum](web-asset-budget-headroom.md) | Mittel | mehrere ausgelieferte Assetgrenzen liegen nahe ihren harten Budgets |
 

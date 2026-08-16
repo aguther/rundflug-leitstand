@@ -319,7 +319,7 @@ werden dadurch nicht in Familiendienste dupliziert; deren D1-Batches bleiben die
 | Coverage | expliziter Produktionscode-Nenner für `apps` und `packages`; Ratchets 81 % Statements, 71 % Branches, 80 % Functions und 84 % Lines; zehn kritische Domainmodule jeweils mindestens 90 % Lines und 85 % Branches; 80 % SonarQube-Ziel für neuen Code |
 | Mutation | Stryker mit offiziellem Vitest-Runner für neun fokussierte Module aus Queue, Kapazität, Prognose, Turnaround, Nachruf und Outage Recovery; Schwellen `break: 73`, `low: 80`, `high: 90` |
 | Dokumentation | `npm run docs:verify` prüft Architektur-, Datenschutz-, Lizenz-, Link-, Rollen- und Releasekonsistenz |
-| Refactoring-Ratchets | `npm run refactor:guardrails` scannt ausschließlich Tests unter den expliziten Quellwurzeln `apps` und `packages`; zulässige Artefakttests validieren JSON, YAML, Konfiguration, generierte Dokumente und Datenschutz, während ausführbares Verhalten nicht über SQL-Fragmente, JSX, CSS-Klassen oder interne Funktionsnamen belegt wird |
+| Refactoring-Ratchets | `npm run refactor:guardrails` hält Rohimporte und Dateilesezugriffe auf Produktionslogik in `.ts`, `.tsx`, `.js` und `.mjs` sowie literale Python-Zugriffe bei null; zulässige Artefakttests validieren JSON, YAML, Konfiguration, Manifeste, generierte Dokumente und Datenschutz. Ein getrennter Audit klassifiziert 36 Worker-SQL-Orakel-Familien, verlangt Behavior-Evidence für ergänzende SQL-Assertions und verhindert neue unklassifizierte Familien |
 | Anforderungen | `npm run requirements:verify` und Traceability-CSV |
 | Statische Analyse | Biome sowie nachgelagerter SonarQube-Scan, der den LCOV-Bericht des Basisjobs übernimmt und auf das Quality Gate wartet |
 

@@ -30,11 +30,19 @@ Tests werden an der kleinsten geeigneten beobachtbaren Grenze ausgeführt:
   Interaktionen mit Testing Library,
 - geschäftskritische Gesamtflüsse und Layoutinvarianten über die Browser-Verifier.
 
-Tests dürfen produktive `.ts`- und `.tsx`-Dateien weder mit `?raw` importieren noch mit
-`readFile`/`readFileSync` als Text lesen. `npm run refactor:guardrails` hält beide Mengen auf null
-und schützt außerdem die Adapterfreiheit des Domain-Pakets. Zulässige Artefakttests parsen und
-validieren JSON, YAML, Wrangler-Konfiguration, Manifeste, generierte Dokumente und
-Datenschutz-Exports. Sie ersetzen keine ausführbare Verhaltensprüfung.
+Tests dürfen produktive `.ts`-, `.tsx`-, `.js`- und `.mjs`-Dateien weder mit `?raw` importieren noch
+mit `readFile`/`readFileSync` als Text lesen. Literale Python-Pfade dürfen Produktionslogik ebenfalls
+nicht als Textvertrag verwenden. `npm run refactor:guardrails` hält diese Mengen auf null und schützt
+außerdem die Adapterfreiheit des Domain-Pakets. Zulässige Artefakttests parsen und validieren JSON,
+YAML, Wrangler-Konfiguration, Manifeste, generierte Dokumente und Datenschutz-Exports. Sie ersetzen
+keine ausführbare Verhaltensprüfung.
+
+SQL-Shape-Assertions an D1-Mocks gelten nur als ergänzende Diagnose. Dieselbe Invariante muss
+zusätzlich an ausgeführtem SQLite-, Worker-Runtime-, HTTP- oder E2E-Verhalten geprüft werden. Der
+versionierte Audit `scripts/worker-sql-test-oracles.json` klassifiziert 36 betroffene
+Worker-Testfamilien, dokumentiert die Behavior-Evidence für 25 davon und führt elf noch zu
+migrierende Priorität-A-Familien als getrennte technische Schuld. Das Ratchet verhindert neue
+unklassifizierte SQL-Orakel-Familien.
 
 Die globale Coverage besitzt einen vollständigen Produktionscode-Nenner und Ratchets von 81 %
 Statements, 71 % Branches, 80 % Functions und 84 % Lines. Zusätzlich erzwingt
@@ -64,6 +72,8 @@ aufbewahrt.
   ist nicht zulässig, nur eine begründete Präzisierung der Mutationsfläche oder zusätzliche Tests.
 - Gelöschte Quelltexttests dürfen nicht als vermeintlicher Qualitätsverlust wieder eingeführt
   werden. Neue Nachweise wählen DOM-, HTTP-, Runtime-, SQLite- oder Domainverhalten.
+- Coverage, SQL-Orakel und Mutation Score bleiben getrennte Messgrößen: Ausführung allein belegt
+  keine wirksame Assertion, und ein SQL-Stringvergleich belegt keine Datenbankwirkung.
 
 ## Verworfene Alternativen
 

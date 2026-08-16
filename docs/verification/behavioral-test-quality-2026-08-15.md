@@ -5,10 +5,17 @@ Stand: 15. August 2026
 ## Ziel und Prüfpolitik
 
 Tests belegen beobachtbares Verhalten an fachlichen und technischen Grenzen. Sie dürfen produktive
-TypeScript- oder TSX-Dateien nicht als Text importieren oder über das Dateisystem lesen, um interne
-Funktionsnamen, SQL-Fragmente, JSX-Strukturen oder CSS-Klassen zu behaupten. Zulässig bleiben
-Parser- und Validatorprüfungen für JSON, YAML, Wrangler-Konfiguration, generierte Dokumente sowie
-Datenschutz- und Lizenzscans, weil dort das Artefakt selbst der Vertrag ist.
+TypeScript-, TSX-, JavaScript- oder MJS-Dateien nicht als Text importieren oder über das Dateisystem
+lesen, um interne Funktionsnamen, SQL-Fragmente, JSX-Strukturen oder CSS-Klassen zu behaupten.
+Dasselbe gilt für literale Python-Zugriffe. Zulässig bleiben Parser- und Validatorprüfungen für JSON,
+YAML, Wrangler-Konfiguration, generierte Dokumente sowie Datenschutz- und Lizenzscans, weil dort das
+Artefakt selbst der Vertrag ist.
+
+Fortschreibung am 16. August 2026: Availability, Soak und Remote-Performance führen importierbare
+Policy-/Szenariomodule mit injizierten Uhr-, Prozess-, HTTP-, Probe- und WebSocket-Adaptern aus. Der
+Python-Restore und der Worker-Exporter lesen denselben validierten JSON-Tabellenvertrag. Release-
+Versionen werden über importierte Konstanten, die tatsächliche Health-Response und ein erzeugtes
+Backupmanifest geprüft; der Requirements-Verifier liest keine Produktionsimplementierung mehr.
 
 Der gemeinsame Datenbank-Testbuilder führt die lückenlose aktive Migrationsfolge ab
 `0001_v1_12_baseline.sql` in einer echten In-Memory-SQLite-Datenbank aus, aktiviert Fremdschlüssel
@@ -66,8 +73,12 @@ technische Schuld in Arc42 Kapitel 11 erfasst und werden anhand der überlebende
 
 ## Automatisierung und Integrationsregel
 
-- `npm run refactor:guardrails` verhindert produktive `.ts`-/`.tsx`-Quelltextimporte und entsprechende
-  Dateisystemzugriffe in Tests.
+- `npm run refactor:guardrails` verhindert Rohimporte und Dateisystemzugriffe auf produktive `.ts`-,
+  `.tsx`-, `.js`- und `.mjs`-Logik sowie literale Python-Pfade und hält alle
+  Produktions-Quelltextorakel bei null.
+- Derselbe Befehl klassifiziert 36 Worker-SQL-Orakel-Familien reproduzierbar: 25 besitzen
+  zusätzliche Behavior-Evidence, elf Priorität-A-Familien bleiben geratcheted offen. Details stehen
+  in `docs/architecture/technical-debts/worker-sql-test-oracles.md`.
 - `npm run test:coverage` prüft globale Coverage und anschließend die zehn kritischen Domainmodule.
 - `npm run test:mutation` führt den vollständigen fokussierten Stryker-Lauf aus.
 - `npm run test:mutation:dry` validiert Konfiguration und Testauswahl ohne Mutation.

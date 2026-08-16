@@ -31,7 +31,7 @@ hat die früher dominierenden Monolithen aufgelöst:
 | Kennzahl | Ausgangsstand | Stand 1.12.0 |
 | --- | ---: | ---: |
 | `apps/worker/src/event-coordinator.ts` | 12.571 Zeilen | 721 Zeilen |
-| `apps/worker/src/index.ts` | 8.277 Zeilen | 195 Zeilen |
+| `apps/worker/src/index.ts` | 8.277 Zeilen | 202 Zeilen |
 | `apps/web/src/admin-view.tsx` | 5.546 Zeilen | 656 Zeilen |
 | `packages/contracts/src/index.ts` | 3.793 Zeilen | 8 Zeilen |
 | `packages/contracts/src/operations-dispatch.ts` | 1.293 Zeilen | 65 Zeilen; Fassade vor Familienmodulen mit höchstens 440 Zeilen |
@@ -45,6 +45,7 @@ Verbleibende, bewusst priorisierte Schulden:
 | --- | --- | --- |
 | Mittel | [Legacy-Prognosepfad](../technical-debts/forecast-legacy-comparison-path.md) | Abschaltkriterien aus ADR-0041 erfüllen; keine neuen Fachregeln im Legacy-Pfad ergänzen |
 | Mittel | [Mutationstest-Aussagekraft](../technical-debts/mutation-test-effectiveness.md) | überlebende Mutanten nach fachlichem Risiko priorisieren und Ratchets ausschließlich anheben |
+| Mittel | [Worker-SQL-Testorakel](../technical-debts/worker-sql-test-oracles.md) | elf Priorität-A-Familien auf ausgeführtes SQLite-, Runtime-, HTTP- oder E2E-Verhalten migrieren |
 | Mittel | [Worker-Orchestrierung](../technical-debts/worker-orchestration-complexity.md) | entitätsspezifische Entscheidungs- und Persistenzpläne isolieren |
 | Mittel | [Web-Asset-Spielraum](../technical-debts/web-asset-budget-headroom.md) | rollenbezogene Grenzen weiter absenken und keine globale Rückverlagerung zulassen |
 
@@ -70,11 +71,15 @@ zerlegt; Exhaustiveness- und Subpath-Tests schützen die kompatible Fassade. Pro
 besitzen keine Rückimporte aus dem eigenen Barrel. Die neun zuvor fest verdrahteten lokalen
 Worker-Verifier verwenden einen gemeinsamen, pro Lauf isolierten Port-, D1- und Assets-Lebenszyklus.
 
-Die frühere Kopplung von Tests an produktive TypeScript-Quelltexte ist vollständig entfernt. Guardrails
-halten rohe Importe und Dateisystem-Lesezugriffe auf `.ts`/`.tsx` bei null. Datenbanktests führen die
-produktive Baseline in SQLite aus; globale und kritische Domain-Coverage-Ratchets sowie der fokussierte
-Stryker-Lauf sichern die Verhaltensaussage zusätzlich ab. Details dokumentieren ADR-0046 und der
-Nachweis `docs/verification/behavioral-test-quality-2026-08-15.md`.
+Die frühere Kopplung von Tests an produktive Quelltexte ist vollständig entfernt. Guardrails halten
+Rohimporte, Dateisystem-Lesezugriffe auf `.ts`, `.tsx`, `.js` und `.mjs` sowie literale Python-Zugriffe
+bei null. Availability-, Soak- und Remote-Performance-Harness führen injizierbare Szenariomodule aus;
+Backup-Exporter und Python-Restore teilen einen validierten JSON-Tabellenvertrag. Datenbanktests führen
+die produktive Baseline in SQLite aus. Der getrennte SQL-Audit klassifiziert 36 Worker-Testfamilien:
+25 besitzen zusätzliche Behavior-Evidence, elf Priorität-A-Familien bleiben offen. Coverage belegt
+Ausführung, der fokussierte Stryker-Lauf die Wirksamkeit ausgewählter Assertions; beide ersetzen den
+SQL-Verhaltensnachweis nicht. Details dokumentieren ADR-0046 und der Nachweis
+`docs/verification/behavioral-test-quality-2026-08-15.md`.
 
 ## 11.3 Leitplanken für weitere Umbauten
 
