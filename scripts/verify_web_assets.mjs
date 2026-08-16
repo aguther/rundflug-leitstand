@@ -112,9 +112,8 @@ function collectEntryCssFiles(manifest, key) {
   return collectManifestFiles(manifest, [key]).filter((file) => file.endsWith(".css"));
 }
 
-export function verifyPrecachePolicy(manifest, precacheFiles) {
+function findMissingRequiredPrecacheFiles(manifest, precache) {
   const failures = [];
-  const precache = new Set(precacheFiles);
   for (const [label, key] of Object.entries(REQUIRED_PRECACHE_ENTRIES)) {
     const entry = requireManifestEntry(manifest, key);
     const requiredFiles = [entry.file, ...collectEntryCssFiles(manifest, key)];
@@ -124,6 +123,11 @@ export function verifyPrecachePolicy(manifest, precacheFiles) {
       }
     }
   }
+  return failures;
+}
+
+function findExcludedPrecacheEntries(manifest, precache) {
+  const failures = [];
   for (const [label, key] of Object.entries(EXCLUDED_PRECACHE_ENTRIES)) {
     const entry = requireManifestEntry(manifest, key);
     for (const file of [entry.file, ...(entry.css ?? [])]) {
@@ -132,6 +136,11 @@ export function verifyPrecachePolicy(manifest, precacheFiles) {
       }
     }
   }
+  return failures;
+}
+
+function findExcludedPrecachePatterns(precacheFiles) {
+  const failures = [];
   for (const [label, pattern] of Object.entries(EXCLUDED_PRECACHE_FILE_PATTERNS)) {
     for (const file of precacheFiles) {
       if (pattern.test(file)) {
@@ -140,6 +149,15 @@ export function verifyPrecachePolicy(manifest, precacheFiles) {
     }
   }
   return failures;
+}
+
+export function verifyPrecachePolicy(manifest, precacheFiles) {
+  const precache = new Set(precacheFiles);
+  return [
+    ...findMissingRequiredPrecacheFiles(manifest, precache),
+    ...findExcludedPrecacheEntries(manifest, precache),
+    ...findExcludedPrecachePatterns(precacheFiles),
+  ];
 }
 
 async function readSourceRevision() {

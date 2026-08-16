@@ -341,7 +341,9 @@ export function createLongRangeReplayReservation(args: {
       .filter((lane) => laneSupportsDispatchGroup(lane, anchorGroup, args.dispatchLaneById))
       .map((lane) => lane.laneId),
   );
-  const firstEligibleLaneId = [...eligibleLaneIds].sort()[0];
+  const firstEligibleLaneId = [...eligibleLaneIds].sort((left, right) =>
+    left.localeCompare(right),
+  )[0];
   const initialDurationBasis = firstEligibleLaneId
     ? args.durationBasisByLaneAndProduct.get(
         forecastLaneDurationKey(firstEligibleLaneId, anchorGroup.productId),

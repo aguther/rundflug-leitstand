@@ -111,6 +111,8 @@ describe("time series SVG chart", () => {
     expect(container.querySelectorAll(".svg-chart-active-point")).toHaveLength(1);
     expect(container.querySelectorAll(".svg-chart-reference")).toHaveLength(2);
     expect(container.textContent).toContain("Marker");
+    expect(container.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    expect(container.querySelector("svg")?.getAttribute("role")).toBeNull();
     expect(container.querySelector("svg")?.getAttribute("tabindex")).toBeNull();
   });
 });

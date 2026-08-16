@@ -4,6 +4,10 @@ import type {
   PersistableAutomaticPrecallCandidate,
 } from "./forecast-precall-evaluator";
 import type { ForecastTimelineLoader } from "./forecast-timeline-loader";
+import {
+  isForecastSnapshotEligible,
+  mapForecastPrecallReasons,
+} from "./forecast-timeline-persistence-policy";
 import type { Env } from "./types";
 import { sendRotationPushNotifications } from "./web-push";
 
@@ -101,11 +105,7 @@ export class ForecastTimelineRepository {
           rotation.id,
         ),
       );
-      if (
-        projection.capacityStatus === "AVAILABLE" &&
-        projection.predictionLowerMinutes !== null &&
-        projection.predictionUpperMinutes !== null
-      ) {
+      if (isForecastSnapshotEligible(projection)) {
         statements.push(
           this.env.DB.prepare(
             `INSERT INTO forecast_snapshots
@@ -178,18 +178,7 @@ export class ForecastTimelineRepository {
       const candidate = precallCandidateByRotationId.get(decision.id);
       const projection = projectionByRotationId.get(decision.id);
       if (!candidate || !projection) continue;
-      const legacyReasons = new Set([
-        "ELIGIBLE",
-        "DISABLED",
-        "OPERATIONS_BLOCKED",
-        "NOT_QUEUE_FRONT",
-        "ALREADY_PRECALLED",
-        "NO_FORECAST_CAPACITY",
-        "NO_FITTING_AIRCRAFT",
-        "TOO_EARLY",
-      ]);
-      const legacyReason = legacyReasons.has(decision.reason) ? decision.reason : "TOO_EARLY";
-      const dispatchReason = legacyReasons.has(decision.reason) ? null : decision.reason;
+      const { legacyReason, dispatchReason } = mapForecastPrecallReasons(decision.reason);
       statements.push(
         this.env.DB.prepare(
           `UPDATE flight_groups

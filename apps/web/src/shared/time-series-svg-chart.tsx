@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 export interface SvgChartPoint {
   x: number;
   y: number;
@@ -54,7 +52,6 @@ interface TimeSeriesSvgChartProps {
   height: number;
   horizontalReferences?: readonly SvgChartReferenceLine[];
   insets: SvgChartInsets;
-  label?: ReactNode;
   series: readonly SvgChartSeries[];
   verticalReferences?: readonly SvgChartReferenceLine[];
   width: number;
@@ -210,7 +207,6 @@ export function TimeSeriesSvgChart({
   height,
   horizontalReferences = [],
   insets,
-  label,
   series,
   verticalReferences = [],
   width,
@@ -233,12 +229,10 @@ export function TimeSeriesSvgChart({
 
   return (
     <svg
-      aria-hidden={label ? undefined : true}
-      aria-label={typeof label === "string" ? label : undefined}
+      aria-hidden="true"
       className={className}
       height="100%"
       preserveAspectRatio="none"
-      role={label ? "img" : undefined}
       viewBox={`0 0 ${safeWidth} ${safeHeight}`}
       width="100%"
     >
