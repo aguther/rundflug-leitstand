@@ -31,6 +31,10 @@ Die zentrale, nach arc42 gegliederte Architekturdokumentation mit Kontext-, Baus
 Verteilungssicht sowie Mermaid-Diagrammen steht unter
 [docs/arc42/](docs/arc42/README.md). Ein druckfertiges PDF erzeugt
 `npm run docs:arc42:pdf`.
+Das unverbindliche Zukunftskonzept für Multi-Tenancy, mehrere Veranstaltungen,
+Subdomain-Routing, Plattformadministration und eine versionierte Stammdatenbibliothek liegt unter
+[docs/architecture/multi-tenant-multi-event-plan.md](docs/architecture/multi-tenant-multi-event-plan.md).
+Es ändert den aktuellen Architekturstand nicht.
 Ein datierter Vergleich mit kostengünstigen Alternativen liegt unter `docs/operations/provider-comparison.md`.
 Fachmodell, Zustandsautomaten, Invarianten und Prognoseverfahren sind unter
 `docs/architecture/domain-state-and-forecast-v1.md` zusammenhängend beschrieben.
