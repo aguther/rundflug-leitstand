@@ -1,3 +1,5 @@
+import { APP_VERSION, REQUIREMENTS_VERSION } from "@rundflug/config";
+import { PORTABLE_BACKUP_TABLE_CONTRACT } from "@rundflug/contracts/portable-backup-table-contract";
 import { strFromU8, unzipSync } from "fflate";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -195,6 +197,7 @@ describe("portable backup format", () => {
   });
 
   it("includes every operational V1 table but excludes ephemeral push credentials", () => {
+    expect(BACKUP_TABLES).toEqual(PORTABLE_BACKUP_TABLE_CONTRACT.tables);
     expect(BACKUP_TABLES).toEqual(
       expect.arrayContaining([
         "gates",
@@ -263,10 +266,14 @@ describe("portable backup format", () => {
     expect(await sha256Hex(archive)).toBe(result.checksum);
     const files = unzipSync(archive);
     const manifest = JSON.parse(strFromU8(files["manifest.json"] ?? new Uint8Array())) as {
+      applicationVersion: string;
       formatVersion: number;
+      requirementsVersion: string;
       tables: Array<{ name: string; path: string; rowCount: number }>;
     };
     expect(manifest.formatVersion).toBe(2);
+    expect(manifest.applicationVersion).toBe(APP_VERSION);
+    expect(manifest.requirementsVersion).toBe(REQUIREMENTS_VERSION);
     expect(manifest.tables).toHaveLength(BACKUP_TABLES.length);
     expect(manifest.tables.find((table) => table.name === "operational_events")).toMatchObject({
       path: "tables/operational_events.ndjson",

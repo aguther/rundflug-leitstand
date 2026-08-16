@@ -5,13 +5,14 @@ import { compareTechnicalStrings } from "./lib/technical-order.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const configPath = resolve(root, "scripts/refactor-guardrails.json");
-const productionSourceRoots = ["apps", "packages"];
 const testFilePattern = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
-const productionTypeScriptPattern = /\.(?:ts|tsx)$/;
+const productionSourcePattern = /\.(?:ts|tsx|js|mjs)$/;
 const rawImportPattern = /(?:\bfrom\s+|\bimport\s*)["']([^"']+\?raw)["']/g;
 const moduleImportPattern = /(?:\bfrom\s+|\bimport\s*)["']([^"']+)["']/g;
 const productionSourceReadPattern =
-  /\breadFile(?:Sync)?\s*\(\s*new URL\(\s*["']([^"']+\.(?:ts|tsx))["']\s*,\s*import\.meta\.url\s*\)/g;
+  /\breadFile(?:Sync)?\s*\(\s*new URL\(\s*["']([^"']+\.(?:ts|tsx|js|mjs))["']\s*,\s*import\.meta\.url\s*\)/g;
+const pythonPathChainPattern = /\bROOT\s*((?:\/\s*["'][^"']+["']\s*)+)/g;
+const pythonPathPartPattern = /["']([^"']+)["']/g;
 const forbiddenProductionRawImportTargets = new Set([
   "apps/web/src/admin-view.tsx",
   "apps/worker/src/event-coordinator.ts",
@@ -21,6 +22,15 @@ const forbiddenProductionRawImportTargets = new Set([
 
 function normalizePath(path) {
   return path.replaceAll("\\", "/");
+}
+
+function isProductionSource(relativeSource) {
+  return (
+    productionSourcePattern.test(relativeSource) &&
+    /^(?:apps|packages)\/[^/]+\/src\//.test(relativeSource) &&
+    !testFilePattern.test(relativeSource) &&
+    !relativeSource.endsWith(".d.ts")
+  );
 }
 
 function countLines(content) {
@@ -34,7 +44,8 @@ async function collectFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
-    if (entry.name === ".git" || entry.name === "node_modules" || entry.name === "dist") continue;
+    if ([".git", ".wrangler", "coverage", "dist", "node_modules", "output"].includes(entry.name))
+      continue;
     const path = resolve(directory, entry.name);
     if (entry.isDirectory()) files.push(...(await collectFiles(path)));
     else files.push(path);
@@ -42,15 +53,8 @@ async function collectFiles(directory) {
   return files;
 }
 
-export async function collectProductionRawImports(
-  repositoryRoot = root,
-  sourceRoots = productionSourceRoots,
-) {
-  const files = (
-    await Promise.all(
-      sourceRoots.map((sourceRoot) => collectFiles(resolve(repositoryRoot, sourceRoot))),
-    )
-  ).flat();
+export async function collectProductionRawImports(repositoryRoot = root) {
+  const files = await collectFiles(repositoryRoot);
   const testFiles = files.filter((path) => testFilePattern.test(path));
   const imports = [];
   for (const testFile of testFiles) {
@@ -59,12 +63,7 @@ export async function collectProductionRawImports(
       const specifier = match[1];
       const sourcePath = resolve(dirname(testFile), specifier.slice(0, -"?raw".length));
       const relativeSource = normalizePath(relative(repositoryRoot, sourcePath));
-      if (
-        relativeSource.startsWith("../") ||
-        !productionTypeScriptPattern.test(relativeSource) ||
-        testFilePattern.test(relativeSource) ||
-        relativeSource.endsWith(".d.ts")
-      ) {
+      if (relativeSource.startsWith("../") || !isProductionSource(relativeSource)) {
         continue;
       }
       imports.push(`${normalizePath(relative(repositoryRoot, testFile))} -> ${relativeSource}`);
@@ -73,29 +72,34 @@ export async function collectProductionRawImports(
   return [...new Set(imports)].sort(compareTechnicalStrings);
 }
 
-export async function collectProductionSourceReads(
-  repositoryRoot = root,
-  sourceRoots = productionSourceRoots,
-) {
-  const files = (
-    await Promise.all(
-      sourceRoots.map((sourceRoot) => collectFiles(resolve(repositoryRoot, sourceRoot))),
-    )
-  ).flat();
+export async function collectProductionSourceReads(repositoryRoot = root) {
+  const files = await collectFiles(repositoryRoot);
   const reads = [];
   for (const testFile of files.filter((path) => testFilePattern.test(path))) {
     const content = await readFile(testFile, "utf8");
     for (const match of content.matchAll(productionSourceReadPattern)) {
       const sourcePath = resolve(dirname(testFile), match[1]);
       const relativeSource = normalizePath(relative(repositoryRoot, sourcePath));
-      if (
-        relativeSource.startsWith("../") ||
-        testFilePattern.test(relativeSource) ||
-        relativeSource.endsWith(".d.ts")
-      ) {
+      if (relativeSource.startsWith("../") || !isProductionSource(relativeSource)) {
         continue;
       }
       reads.push(`${normalizePath(relative(repositoryRoot, testFile))} -> ${relativeSource}`);
+    }
+  }
+  return [...new Set(reads)].sort(compareTechnicalStrings);
+}
+
+export async function collectPythonProductionSourceReads(repositoryRoot = root) {
+  const files = (await collectFiles(repositoryRoot)).filter((path) => path.endsWith(".py"));
+  const reads = [];
+  for (const pythonFile of files) {
+    const content = await readFile(pythonFile, "utf8");
+    for (const match of content.matchAll(pythonPathChainPattern)) {
+      const parts = [...match[1].matchAll(pythonPathPartPattern)].map((part) => part[1]);
+      const relativeSource = normalizePath(parts.join("/"));
+      if (isProductionSource(relativeSource)) {
+        reads.push(`${normalizePath(relative(repositoryRoot, pythonFile))} -> ${relativeSource}`);
+      }
     }
   }
   return [...new Set(reads)].sort(compareTechnicalStrings);
@@ -105,9 +109,7 @@ export async function collectDomainExternalImports(repositoryRoot = root) {
   const domainSourceRoot = resolve(repositoryRoot, "packages", "domain", "src");
   const files = (await collectFiles(domainSourceRoot)).filter(
     (path) =>
-      productionTypeScriptPattern.test(path) &&
-      !testFilePattern.test(path) &&
-      !path.endsWith(".d.ts"),
+      productionSourcePattern.test(path) && !testFilePattern.test(path) && !path.endsWith(".d.ts"),
   );
   const imports = [];
   for (const file of files) {
@@ -127,7 +129,7 @@ export async function collectInternalDomainBarrelImports(repositoryRoot = root) 
   const domainBarrel = resolve(domainSourceRoot, "index.ts");
   const files = (await collectFiles(domainSourceRoot)).filter(
     (path) =>
-      productionTypeScriptPattern.test(path) &&
+      productionSourcePattern.test(path) &&
       !testFilePattern.test(path) &&
       !path.endsWith(".d.ts") &&
       path !== domainBarrel,
@@ -168,6 +170,7 @@ async function run() {
   const config = JSON.parse(await readFile(configPath, "utf8"));
   const currentRawImports = await collectProductionRawImports();
   const productionSourceReads = await collectProductionSourceReads();
+  const pythonProductionSourceReads = await collectPythonProductionSourceReads();
   const domainExternalImports = await collectDomainExternalImports();
   const internalDomainBarrelImports = await collectInternalDomainBarrelImports();
   if (process.argv.includes("--write-baseline")) {
@@ -200,6 +203,12 @@ async function run() {
     );
   }
 
+  if (pythonProductionSourceReads.length > 0) {
+    failures.push(
+      `Python scripts reading production source as text:\n${pythonProductionSourceReads.join("\n")}`,
+    );
+  }
+
   if (domainExternalImports.length > 0) {
     failures.push(
       `production domain modules importing external adapters:\n${domainExternalImports.join("\n")}`,
@@ -221,7 +230,7 @@ async function run() {
     throw new Error(`Refactor guardrails failed:\n\n${failures.join("\n\n")}`);
   }
 
-  console.log(`OK: ${currentRawImports.length} production TypeScript source-text imports`);
+  console.log(`OK: ${currentRawImports.length} production source-text imports`);
   for (const observation of observations) console.log(observation);
 }
 

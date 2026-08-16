@@ -15,16 +15,29 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS = ROOT / "apps" / "worker" / "migrations"
-BACKUP_SOURCE = ROOT / "apps" / "worker" / "src" / "backup.ts"
+BACKUP_TABLE_CONTRACT = (
+    ROOT / "packages" / "contracts" / "src" / "portable-backup-table-contract.json"
+)
 MEMORY_DATABASE = ":memory:"
 
 
 def backup_tables() -> list[str]:
-    source = BACKUP_SOURCE.read_text(encoding="utf-8")
-    match = re.search(r"BACKUP_TABLES = \[(.*?)\] as const", source, re.DOTALL)
-    if not match:
-        raise AssertionError("BACKUP_TABLES konnte nicht gelesen werden")
-    return re.findall(r'"([a-z_]+)"', match.group(1))
+    contract = json.loads(BACKUP_TABLE_CONTRACT.read_text(encoding="utf-8"))
+    if contract.get("format") != "rundflug-portable-backup-table-contract":
+        raise AssertionError("Portable-Backup-Tabellenvertrag besitzt ein unbekanntes Format")
+    if contract.get("version") != 1:
+        raise AssertionError("Portable-Backup-Tabellenvertrag besitzt eine unbekannte Version")
+    tables = contract.get("tables")
+    excluded = contract.get("excludedTables")
+    if not isinstance(tables, list) or not tables:
+        raise AssertionError("Portable-Backup-Tabellenvertrag enthält keine Tabellen")
+    if not isinstance(excluded, list):
+        raise AssertionError("Portable-Backup-Tabellenvertrag enthält keine Ausschlussliste")
+    if any(not isinstance(table, str) or re.fullmatch(r"[a-z][a-z0-9_]*", table) is None for table in tables):
+        raise AssertionError("Portable-Backup-Tabellenvertrag enthält ungültige Tabellennamen")
+    if len(set(tables)) != len(tables) or set(tables).intersection(excluded):
+        raise AssertionError("Portable-Backup-Tabellenvertrag ist nicht überschneidungsfrei")
+    return tables
 
 
 def apply_schema(connection: sqlite3.Connection, through: str | None = None) -> None:

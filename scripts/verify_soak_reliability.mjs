@@ -3,21 +3,16 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  requestJson as executeJsonRequest,
+  runSoakReliabilityScenario,
+  soakConfigFromEnvironment,
+} from "./lib/soak-reliability-scenario.mjs";
 import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const durationSeconds = Number(process.env.SOAK_DURATION_SECONDS ?? 12 * 60 * 60);
-const intervalSeconds = Number(process.env.SOAK_INTERVAL_SECONDS ?? 60);
-const port = Number(process.env.SOAK_PORT ?? 8_797);
-if (!Number.isFinite(durationSeconds) || durationSeconds < 20) {
-  throw new Error("SOAK_DURATION_SECONDS muss mindestens 20 Sekunden betragen.");
-}
-if (!Number.isFinite(intervalSeconds) || intervalSeconds < 1 || intervalSeconds > durationSeconds) {
-  throw new Error("SOAK_INTERVAL_SECONDS muss zwischen 1 und der Laufzeit liegen.");
-}
-if (!Number.isInteger(port) || port < 1_024 || port > 55_000) {
-  throw new Error("SOAK_PORT muss eine freie Portnummer zwischen 1024 und 55000 sein.");
-}
+const soakConfig = soakConfigFromEnvironment();
+const { port } = soakConfig;
 
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
 const persistPath = resolve(root, process.env.SOAK_PERSIST_TO ?? ".wrangler/soak-state");
@@ -168,26 +163,16 @@ const waitForWorker = async () => {
   throw new Error("Lokaler Worker wurde nicht rechtzeitig für den Langlauf bereit.");
 };
 const requestJson = async (url, init, maximumMilliseconds = 2_000) => {
-  const started = performance.now();
-  const response = await fetch(url, {
-    ...init,
-    signal: AbortSignal.timeout(maximumMilliseconds),
-  });
-  const elapsedMilliseconds = performance.now() - started;
-  const body = await response.json();
-  if (!response.ok) {
-    await sleep(100);
-    const diagnosticSuffix = workerDiagnostic ? ` · ${workerDiagnostic}` : "";
-    throw new Error(
-      `Langlauf-Request ${response.status}: ${body?.error?.code ?? "UNKNOWN_ERROR"}${diagnosticSuffix}`,
-    );
-  }
-  if (elapsedMilliseconds >= maximumMilliseconds) {
-    throw new Error(
-      `Langlauf-Request überschritt ${maximumMilliseconds} ms: ${elapsedMilliseconds.toFixed(1)} ms`,
-    );
-  }
-  return { body, elapsedMilliseconds };
+  return executeJsonRequest(
+    { url, init, maximumMilliseconds },
+    {
+      diagnostic: () => workerDiagnostic,
+      fetch,
+      performanceNow: () => performance.now(),
+      sleep,
+      timeoutSignal: AbortSignal.timeout,
+    },
+  );
 };
 const headers = {
   "content-type": "application/json",
@@ -212,10 +197,6 @@ const command = (version, type, payload) =>
       payload,
     }),
   });
-const percentile = (values, fraction) => {
-  const sorted = [...values].sort((left, right) => left - right);
-  return sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)] ?? 0;
-};
 const waitForRealtimeIncrease = async (
   previousCount,
   readCount,
@@ -300,91 +281,36 @@ try {
   };
   await openRealtimeSocket(false);
 
-  const startedAt = Date.now();
-  const deadline = startedAt + durationSeconds * 1_000;
-  const latencies = [];
-  let cycles = 0;
-  while (Date.now() < deadline) {
-    if (server.exitCode !== null)
-      throw new Error("Worker-Prozess wurde während des Langlaufs beendet.");
-    const cycleStartedAt = Date.now();
-    await ensureRealtimeHealthy();
-    const previousRealtimeStateChanges = realtimeStateChanges;
-    const health = await requestJson(`${base}/api/health`);
-    const current = await board();
-    const sale = await command(current.body.event.version, "SELL_TICKET_GROUP", {
-      productId: "panorama-20",
-      ticketCount: 1,
-      standby: false,
-      paymentStatus: "PAID",
-      paymentMethod: "CASH",
-      oversizeSplitAcknowledged: false,
-    });
-    const cancellation = await command(sale.body.event.version, "CANCEL_TICKET_GROUP", {
-      ticketGroupId: sale.body.aggregate.id,
-      reason: "Synthetischer Langlaufzyklus",
-      adminPin: pin,
-    });
-    const confirmed = await board();
-    if (confirmed.body.event.version !== cancellation.body.event.version) {
-      throw new Error("Bestätigter Langlaufstand stimmt nicht mit der Kommando-Version überein.");
-    }
-    latencies.push(
-      health.elapsedMilliseconds,
-      current.elapsedMilliseconds,
-      sale.elapsedMilliseconds,
-      cancellation.elapsedMilliseconds,
-      confirmed.elapsedMilliseconds,
-    );
-    cycles += 1;
-    await waitForRealtimeIncrease(
-      previousRealtimeStateChanges,
-      () => realtimeStateChanges,
-      `Im Langlauf wurde nach Zustandsänderungen kein Realtime-Ereignis empfangen: ${JSON.stringify({ readyState: socket?.readyState, realtimeCloses, lastRealtimeClose })}`,
-    );
-    if (cycles === 1 || cycles % 60 === 0) {
-      console.log(
-        JSON.stringify({
-          progress: true,
-          cycles,
-          elapsedMinutes: Number(((Date.now() - startedAt) / 60_000).toFixed(1)),
-          p95Milliseconds: Number(percentile(latencies, 0.95).toFixed(1)),
-          realtimeMessages,
-          realtimeStateChanges,
-          realtimeReconnects,
-        }),
-      );
-    }
-    const remainingCycleDelay = intervalSeconds * 1_000 - (Date.now() - cycleStartedAt);
-    const remainingRunTime = deadline - Date.now();
-    if (remainingCycleDelay > 0 && remainingRunTime > 0) {
-      await sleep(Math.min(remainingCycleDelay, remainingRunTime));
-    }
-  }
-
-  if (cycles < 1) throw new Error("Langlauf hat keinen vollständigen Zyklus ausgeführt.");
-  console.log(
-    JSON.stringify({
-      ok: true,
-      requirement: "Q-ZUV-050",
-      configuredDurationSeconds: durationSeconds,
-      actualDurationSeconds: Number(((Date.now() - startedAt) / 1_000).toFixed(1)),
-      intervalSeconds,
-      port,
-      cycles,
-      requests: latencies.length,
-      medianMilliseconds: Number(percentile(latencies, 0.5).toFixed(1)),
-      p95Milliseconds: Number(percentile(latencies, 0.95).toFixed(1)),
-      maximumMilliseconds: Number(Math.max(...latencies).toFixed(1)),
-      realtimeMessages,
-      realtimeStateChanges,
-      realtimePongs,
-      realtimeReconnects,
-      realtimeCloses,
-      workerRestarted: false,
-      anonymousSyntheticDataOnly: true,
-    }),
-  );
+  const report = await runSoakReliabilityScenario(soakConfig, {
+    adminPin: pin,
+    http: {
+      board,
+      command,
+      health: () => requestJson(`${base}/api/health`),
+    },
+    now: Date.now,
+    onProgress: (progress) => console.log(JSON.stringify(progress)),
+    process: { isAlive: () => server.exitCode === null },
+    realtime: {
+      ensureHealthy: ensureRealtimeHealthy,
+      metrics: () => ({
+        realtimeMessages,
+        realtimeStateChanges,
+        realtimePongs,
+        realtimeReconnects,
+        realtimeCloses,
+      }),
+      stateChanges: () => realtimeStateChanges,
+      waitForStateChange: (previousCount) =>
+        waitForRealtimeIncrease(
+          previousCount,
+          () => realtimeStateChanges,
+          `Im Langlauf wurde nach Zustandsänderungen kein Realtime-Ereignis empfangen: ${JSON.stringify({ readyState: socket?.readyState, realtimeCloses, lastRealtimeClose })}`,
+        ),
+    },
+    sleep,
+  });
+  console.log(JSON.stringify(report));
 } finally {
   socket?.close();
   stopServer();

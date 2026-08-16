@@ -1,4 +1,8 @@
 import { APP_VERSION, REQUIREMENTS_VERSION } from "@rundflug/config";
+import {
+  BACKUP_TABLES,
+  type PortableBackupTable,
+} from "@rundflug/contracts/portable-backup-table-contract";
 import { StreamingZipWriter, uploadMultipartStream } from "./analysis-archive-writer";
 import type { Env } from "./types";
 
@@ -7,42 +11,7 @@ const BACKUP_FORMAT_VERSION = 2;
 const BACKUP_PAGE_SIZE = 500;
 const BACKUP_RETENTION_DAYS = 14;
 
-export const BACKUP_TABLES = [
-  "operation_days",
-  "gates",
-  "resource_groups",
-  "aircraft",
-  "pilots",
-  "paired_devices",
-  "resource_group_memberships",
-  "products",
-  "aircraft_product_turnaround_overrides",
-  "ticket_groups",
-  "ticket_group_recalls",
-  "tickets",
-  "flight_groups",
-  "rotations",
-  "rotation_tickets",
-  "rotation_manifest_corrections",
-  "app_bootstrap",
-  "recurring_operational_rules",
-  "planned_operational_constraints",
-  "operational_blocks",
-  "planning_chunks",
-  "planning_contexts",
-  "planning_runs",
-  "planning_history_compactions",
-  "planning_history_compaction_events",
-  "analysis_archives",
-  "analysis_archive_events",
-  "forecast_snapshots",
-  "outage_recovery_batches",
-  "operational_events",
-  "outage_recovery_entries",
-  "outage_recovery_references",
-  "idempotency_receipts",
-  "outbox",
-] as const;
+export { BACKUP_TABLES };
 
 export interface PortableBackup {
   format: typeof BACKUP_FORMAT;
@@ -55,8 +24,8 @@ export interface PortableBackup {
 }
 
 export interface PortableBackupTableManifest {
-  name: (typeof BACKUP_TABLES)[number];
-  path: `tables/${(typeof BACKUP_TABLES)[number]}.ndjson`;
+  name: PortableBackupTable;
+  path: `tables/${PortableBackupTable}.ndjson`;
   rowCount: number;
   encoding: "ndjson";
 }
@@ -111,7 +80,7 @@ async function tableRowCount(db: D1Database, table: string): Promise<number> {
 
 async function* pagedTableNdjson(input: {
   db: D1Database;
-  table: (typeof BACKUP_TABLES)[number];
+  table: PortableBackupTable;
   expectedRowCount: number;
 }): AsyncIterable<Uint8Array> {
   const encoder = new TextEncoder();

@@ -8,6 +8,7 @@ import {
   collectInternalDomainBarrelImports,
   collectProductionRawImports,
   collectProductionSourceReads,
+  collectPythonProductionSourceReads,
 } from "./verify_refactor_guardrails.mjs";
 
 const temporaryDirectories: string[] = [];
@@ -82,6 +83,36 @@ describe("refactor guardrail source scope", () => {
 
     await expect(collectProductionSourceReads(repositoryRoot)).resolves.toEqual([
       "apps/worker/src/service.test.ts -> apps/worker/src/service.ts",
+    ]);
+  });
+
+  it("covers JavaScript production logic and literal Python source reads", async () => {
+    const repositoryRoot = await mkdtemp(join(tmpdir(), "source-language-guardrail-"));
+    temporaryDirectories.push(repositoryRoot);
+    const sourceDirectory = join(repositoryRoot, "apps", "worker", "src");
+    const scriptDirectory = join(repositoryRoot, "scripts");
+    await Promise.all([
+      mkdir(sourceDirectory, { recursive: true }),
+      mkdir(join(repositoryRoot, "packages"), { recursive: true }),
+      mkdir(scriptDirectory, { recursive: true }),
+    ]);
+    await Promise.all([
+      writeFile(join(sourceDirectory, "runtime.mjs"), "export const value = 1;\n"),
+      writeFile(
+        join(sourceDirectory, "runtime.test.ts"),
+        'import runtime from "./runtime.mjs?raw";\nvoid runtime;\n',
+      ),
+      writeFile(
+        join(scriptDirectory, "verify.py"),
+        '(ROOT / "apps/worker/src/runtime.mjs").read_text(encoding="utf-8")\n',
+      ),
+    ]);
+
+    await expect(collectProductionRawImports(repositoryRoot)).resolves.toEqual([
+      "apps/worker/src/runtime.test.ts -> apps/worker/src/runtime.mjs",
+    ]);
+    await expect(collectPythonProductionSourceReads(repositoryRoot)).resolves.toEqual([
+      "scripts/verify.py -> apps/worker/src/runtime.mjs",
     ]);
   });
 

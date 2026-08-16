@@ -16,6 +16,7 @@
     "./operation-command-ticketing": "./src/operation-command-ticketing.ts",
     "./operations-dispatch": "./src/operations-dispatch.ts",
     "./planning-history": "./src/planning-history.ts",
+    "./portable-backup-table-contract": "./src/portable-backup-table-contract.ts",
     "./reports-recovery": "./src/reports-recovery.ts",
     "./shared": "./src/shared.ts",
     "./tickets-public-status": "./src/tickets-public-status.ts"

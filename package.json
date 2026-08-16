@@ -69,7 +69,7 @@
     "test:watch": "vitest",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "refactor:guardrails": "node scripts/verify_refactor_guardrails.mjs",
+    "refactor:guardrails": "node scripts/verify_refactor_guardrails.mjs && node scripts/verify_worker_sql_test_oracles.mjs",
     "check:ci": "npm run lint && npm run refactor:guardrails && npm run cloudflare:maintenance && npm run typecheck && npm run test:ci && npm run build:web && npm run build:worker && npm run test:planning-history-restore && npm run test:planning-history-scale && npm run requirements:verify",
     "check": "npm run lint && npm run refactor:guardrails && npm run cloudflare:maintenance && npm run typecheck && npm run test && npm run build:web:bundle && npm run build:worker && npm run test:analysis-replay && npm run test:analysis-scale && npm run test:planning-history-restore && npm run test:planning-history-scale && npm run test:worker-runtime && npm run test:v1-integrations && npm run test:v1-acceptance-day && npm run backup:restore:test && npm run docs:verify && npm run requirements:verify",
     "backup:restore:test": "python3 scripts/verify_backup_restore.py",

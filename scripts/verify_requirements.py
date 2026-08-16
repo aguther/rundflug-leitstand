@@ -56,19 +56,6 @@ def verify_release_version() -> str:
     if release_ids != trace_ids:
         fail(f"release {version} requirements and traceability IDs differ")
 
-    config_source = (ROOT / "packages/config/src/index.ts").read_text(encoding="utf-8")
-    worker_source = (ROOT / "apps/worker/src/index.ts").read_text(encoding="utf-8")
-    backup_source = (ROOT / "apps/worker/src/backup.ts").read_text(encoding="utf-8")
-    if 'APP_VERSION = rootPackage.version' not in config_source:
-        fail("runtime application version is not derived from the root package")
-    if "REQUIREMENTS_VERSION = APP_VERSION" not in config_source:
-        fail("runtime requirements version is not aligned with the application version")
-    if "applicationVersion: APP_VERSION" not in worker_source:
-        fail("health endpoint does not expose the application version")
-    if "applicationVersion: APP_VERSION" not in backup_source:
-        fail("portable backups do not use the aligned application version")
-    if "requirementsVersion: REQUIREMENTS_VERSION" not in backup_source:
-        fail("portable backups do not use the aligned requirements version")
     return version
 
 

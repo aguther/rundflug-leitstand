@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "auditedAt": "2026-08-16",
+  "definition": "Worker *service, *history and *routes test families with assertions against prepared SQL text or helper-selected statements.",
+  "priorityAFiles": [
+    "apps/worker/src/analysis-archive-service.test.ts",
+    "apps/worker/src/analysis-snapshot-capture-service.test.ts",
+    "apps/worker/src/event-administration-command-service.test.ts",
+    "apps/worker/src/forecast-history.test.ts",
+    "apps/worker/src/history-routes.test.ts",
+    "apps/worker/src/master-data-command-service.test.ts",
+    "apps/worker/src/operational-control-command-service.test.ts",
+    "apps/worker/src/operational-history.test.ts",
+    "apps/worker/src/operations-read-service.test.ts",
+    "apps/worker/src/resource-day-history.test.ts",
+    "apps/worker/src/ticket-read-routes.test.ts"
+  ],
+  "behaviorBackedFiles": {
+    "apps/worker/src/admin-account-routes.test.ts": [
+      "HTTP response and authorization behavior in the same suite"
+    ],
+    "apps/worker/src/admin-event-routes.test.ts": [
+      "HTTP response and filtering behavior in the same suite"
+    ],
+    "apps/worker/src/admin-security-routes.test.ts": [
+      "HTTP authorization, recovery and conflict behavior in the same suite"
+    ],
+    "apps/worker/src/assist-claim-service.test.ts": [
+      "apps/worker/src/flight-line-assist-claims.test.ts"
+    ],
+    "apps/worker/src/attendance-command-service.test.ts": ["scripts/verify_v1_integrations.mjs"],
+    "apps/worker/src/auth-routes.test.ts": [
+      "HTTP authentication and rejection behavior in the same suite"
+    ],
+    "apps/worker/src/command-preflight-service.test.ts": [
+      "apps/worker/src/command-preflight.test.ts",
+      "apps/worker/src/event-coordinator.test.ts"
+    ],
+    "apps/worker/src/device-routes.test.ts": [
+      "HTTP enrollment and authorization behavior in the same suite"
+    ],
+    "apps/worker/src/fids-preferences-command-service.test.ts": [
+      "apps/worker/src/fids-control-routes.test.ts"
+    ],
+    "apps/worker/src/fleet-administration-command-service.test.ts": [
+      "scripts/verify_fleet_operations.mjs"
+    ],
+    "apps/worker/src/outage-recovery-command-service.test.ts": [
+      "scripts/verify_outage_recovery.mjs"
+    ],
+    "apps/worker/src/pilot-assignment-command-service.test.ts": [
+      "scripts/verify_pilot_conflict.mjs"
+    ],
+    "apps/worker/src/planned-operation-command-service.test.ts": [
+      "apps/worker/src/operational-planning.test.ts"
+    ],
+    "apps/worker/src/product-sales-command-service.test.ts": ["scripts/verify_sale_guards.mjs"],
+    "apps/worker/src/public-push-routes.test.ts": [
+      "HTTP subscription lifecycle behavior in the same suite"
+    ],
+    "apps/worker/src/public-status-routes.test.ts": [
+      "HTTP public projection behavior in the same suite"
+    ],
+    "apps/worker/src/recurring-operational-rule-command-service.test.ts": [
+      "scripts/verify_recurring_operational_rules.mjs"
+    ],
+    "apps/worker/src/report-export-routes.test.ts": [
+      "HTTP report authorization and payload behavior in the same suite"
+    ],
+    "apps/worker/src/rotation-correction-command-service.test.ts": [
+      "scripts/verify_ticket_corrections.mjs"
+    ],
+    "apps/worker/src/rotation-note-command-service.test.ts": [
+      "apps/worker/src/operational-note-permission.test.ts"
+    ],
+    "apps/worker/src/rotation-recovery-command-service.test.ts": [
+      "scripts/verify_outage_recovery.mjs"
+    ],
+    "apps/worker/src/rotation-transition-command-service.test.ts": [
+      "scripts/verify_v1_integrations.mjs"
+    ],
+    "apps/worker/src/ticket-group-mutation-command-service.test.ts": [
+      "scripts/verify_ticket_corrections.mjs"
+    ],
+    "apps/worker/src/ticket-group-recall-persistence-service.test.ts": [
+      "scripts/verify_ticket_group_recall.mjs"
+    ],
+    "apps/worker/src/ticket-sales-command-service.test.ts": [
+      "scripts/verify_sale_guards.mjs",
+      "scripts/verify_ticket_assignment_concurrency.mjs"
+    ]
+  }
+}

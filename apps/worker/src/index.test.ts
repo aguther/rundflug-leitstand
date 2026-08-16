@@ -1,3 +1,4 @@
+import { APP_NAME, APP_VERSION, REQUIREMENTS_VERSION } from "@rundflug/config";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "./types";
 
@@ -58,9 +59,11 @@ describe("worker entry routing", () => {
 
     expect(health.status).toBe(200);
     expect(healthBody).toMatchObject({
+      applicationVersion: APP_VERSION,
       environment: "development",
       ok: true,
-      service: "Rundflug-Leitstand",
+      requirementsVersion: REQUIREMENTS_VERSION,
+      service: APP_NAME,
     });
     expect(health.headers.get("content-security-policy")).toContain("default-src 'self'");
     expect(health.headers.get("x-content-type-options")).toBe("nosniff");
