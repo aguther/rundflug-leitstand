@@ -24,7 +24,7 @@ export function useCashierTicketList({
 }) {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
-  const [tab, setTabState] = useState<TicketListTab>("ACTIVE");
+  const [tab, setTab] = useState<TicketListTab>("ACTIVE");
   const [accounts, setAccounts] = useState<LoginAccount[]>([]);
   const [accountFilter, setAccountFilter] = useState("");
   const [onlyOwnTickets, setOnlyOwnTickets] = useState(false);
@@ -174,9 +174,9 @@ export function useCashierTicketList({
     }
   }
 
-  function setTab(nextTab: TicketListTab) {
+  function changeTab(nextTab: TicketListTab) {
     data.reset();
-    setTabState(nextTab);
+    setTab(nextTab);
   }
 
   return {
@@ -197,7 +197,7 @@ export function useCashierTicketList({
     selectedRotations,
     selectedTicketGroup,
     setSearch,
-    setTab,
+    setTab: changeTab,
     tab,
     visibleGroups,
   };

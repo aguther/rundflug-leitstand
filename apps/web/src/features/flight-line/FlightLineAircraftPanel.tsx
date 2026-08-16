@@ -21,7 +21,7 @@ export function FlightLineAircraftSelector({
   onSelect,
   rotations,
   selectedAircraft,
-}: FlightLineAircraftSelectorProps) {
+}: Readonly<FlightLineAircraftSelectorProps>) {
   return (
     <nav className="aircraft-selector" aria-label="Flugzeug auswählen">
       <div className="aircraft-selector-heading">
@@ -65,7 +65,7 @@ export function FlightLineAircraftSummary({
   onPause,
   onSetState,
   timeZone,
-}: FlightLineAircraftSummaryProps) {
+}: Readonly<FlightLineAircraftSummaryProps>) {
   if (!aircraft) return null;
   return (
     <section className="supervisor-aircraft-summary">

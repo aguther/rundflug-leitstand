@@ -53,7 +53,7 @@ interface FlightLineOperationalConsoleProps {
   turnaroundNextState: TurnaroundNextState;
 }
 
-export function FlightLineOperationalConsole(props: FlightLineOperationalConsoleProps) {
+export function FlightLineOperationalConsole(props: Readonly<FlightLineOperationalConsoleProps>) {
   const {
     assistMode,
     board,

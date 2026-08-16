@@ -50,7 +50,7 @@ export function FlightLineLegacyQueue({
   selectedSeatCount,
   skippedEarlierGroupCount,
   timeZone,
-}: FlightLineLegacyQueueProps) {
+}: Readonly<FlightLineLegacyQueueProps>) {
   return (
     <>
       {aircraft && compatibleGroups.length > 0 ? (

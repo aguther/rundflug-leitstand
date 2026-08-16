@@ -58,6 +58,26 @@ describe("arc42 documentation verifier", () => {
     });
   });
 
+  it("accepts an ADR status section with Windows line endings", async () => {
+    await write(
+      "docs/architecture/adr/0001-test.md",
+      "# ADR-0001: Test decision\r\n\r\n## Status\r\n\r\nFreigegeben, Release 1.2.3.\r\n",
+    );
+
+    await expect(verifyArc42Documentation(root)).resolves.toMatchObject({ adrs: 1 });
+  });
+
+  it("rejects an unknown successor in a replacement status", async () => {
+    await write(
+      "docs/architecture/adr/0001-test.md",
+      "# ADR-0001: Test decision\n\n- Status: Ersetzt durch ADR-9999\n",
+    );
+
+    await expect(verifyArc42Documentation(root)).rejects.toThrow(
+      "verweist auf unbekannten Nachfolger ADR-9999",
+    );
+  });
+
   it("rejects a missing chapter", async () => {
     await rm(resolve(root, "docs/architecture/arc42/06-laufzeitsicht.md"));
     await expect(verifyArc42Documentation(root)).rejects.toThrow("Kapitel fehlt");

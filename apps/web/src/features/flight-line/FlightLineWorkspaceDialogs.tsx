@@ -53,7 +53,7 @@ export function FlightLineWorkspaceDialogs({
   selectedAircraft,
   technicalAbortOpen,
   technicalAbortReason,
-}: FlightLineWorkspaceDialogsProps) {
+}: Readonly<FlightLineWorkspaceDialogsProps>) {
   return (
     <>
       {board ? (

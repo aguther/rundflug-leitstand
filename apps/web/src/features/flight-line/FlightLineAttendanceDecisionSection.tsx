@@ -26,7 +26,7 @@ export function FlightLineAttendanceDecisionSection({
   presentCount,
   replacement,
   selected,
-}: FlightLineAttendanceDecisionSectionProps) {
+}: Readonly<FlightLineAttendanceDecisionSectionProps>) {
   if (selected.status !== "CALLED") return null;
   return (
     <section className="attendance-decision">

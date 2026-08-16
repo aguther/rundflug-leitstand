@@ -136,14 +136,61 @@ function validateAdrLinks(adrFiles, documents, failures) {
 }
 
 function adrStatus(markdown) {
-  const bullet = markdown.match(/^- Status:\s*(.+)$/m)?.[1]?.trim();
+  const lines = markdown.split("\n").map((line) => line.replace(/\r$/, ""));
+  const bulletPrefix = "- Status:";
+  const bullet = lines
+    .find((line) => line.startsWith(bulletPrefix))
+    ?.slice(bulletPrefix.length)
+    .trim();
   if (bullet) return bullet;
-  return markdown.match(/^## Status\s*\r?\n\s*([^\r\n]+)$/m)?.[1]?.trim() ?? null;
+  const headingIndex = lines.findIndex((line) => line.trim() === "## Status");
+  if (headingIndex < 0) return null;
+  return (
+    lines
+      .slice(headingIndex + 1)
+      .find((line) => line.trim().length > 0)
+      ?.trim() ?? null
+  );
+}
+
+const validAdrStatusPrefixes = [
+  "akzeptiert",
+  "angenommen",
+  "freigegeben",
+  "teilweise ersetzt",
+  "ersetzt",
+  "veraltet",
+  "vorgeschlagen",
+];
+const adrStatusSeparators = new Set([" ", ",", ";", ".", ":", "-", "–", "—", "("]);
+
+function statusStartsWith(status, prefix) {
+  const normalizedStatus = status.toLocaleLowerCase("de-DE");
+  if (!normalizedStatus.startsWith(prefix)) return false;
+  const separator = normalizedStatus.at(prefix.length);
+  return separator === undefined || adrStatusSeparators.has(separator);
+}
+
+function isValidAdrStatus(status) {
+  return validAdrStatusPrefixes.some((prefix) => statusStartsWith(status, prefix));
+}
+
+function validateAdrSuccessors(name, status, knownIds, failures) {
+  if (!statusStartsWith(status, "teilweise ersetzt") && !statusStartsWith(status, "ersetzt")) {
+    return;
+  }
+  const successors = [...status.matchAll(/ADR-(\d{4})/g)].map((match) => match[1]);
+  if (successors.length === 0) {
+    failures.push(`ADR ${name} nennt trotz Ersetzungsstatus keinen ADR-Nachfolger.`);
+  }
+  for (const successor of successors) {
+    if (!knownIds.has(successor)) {
+      failures.push(`ADR ${name} verweist auf unbekannten Nachfolger ADR-${successor}.`);
+    }
+  }
 }
 
 function validateAdrLifecycle(adrDocuments, adrNames, failures) {
-  const validStatus =
-    /^(?:akzeptiert|angenommen|freigegeben|teilweise ersetzt|ersetzt|veraltet|vorgeschlagen)\b/i;
   const knownIds = new Set(adrNames.map((name) => name.slice(0, 4)));
   for (const [name, markdown] of adrDocuments) {
     const expectedHeading = `# ADR-${name.slice(0, 4)}:`;
@@ -151,21 +198,11 @@ function validateAdrLifecycle(adrDocuments, adrNames, failures) {
       failures.push(`ADR ${name} beginnt nicht mit "${expectedHeading}".`);
     }
     const status = adrStatus(markdown);
-    if (!status || !validStatus.test(status)) {
+    if (!status || !isValidAdrStatus(status)) {
       failures.push(`ADR ${name} besitzt keinen gültigen Lebenszyklusstatus.`);
       continue;
     }
-    if (/^teilweise ersetzt|^ersetzt/i.test(status)) {
-      const successors = [...status.matchAll(/ADR-(\d{4})/g)].map((match) => match[1]);
-      if (successors.length === 0) {
-        failures.push(`ADR ${name} nennt trotz Ersetzungsstatus keinen ADR-Nachfolger.`);
-      }
-      for (const successor of successors) {
-        if (!knownIds.has(successor)) {
-          failures.push(`ADR ${name} verweist auf unbekannten Nachfolger ADR-${successor}.`);
-        }
-      }
-    }
+    validateAdrSuccessors(name, status, knownIds, failures);
   }
 }
 

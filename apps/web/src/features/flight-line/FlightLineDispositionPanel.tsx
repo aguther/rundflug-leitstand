@@ -48,7 +48,7 @@ export function FlightLineDispositionPanel({
   presentCount,
   replacement,
   selected,
-}: FlightLineDispositionPanelProps) {
+}: Readonly<FlightLineDispositionPanelProps>) {
   return (
     <aside className="disposition-panel" aria-labelledby="disposition-title">
       <div className="disposition-heading">

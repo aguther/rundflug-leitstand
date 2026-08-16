@@ -48,7 +48,7 @@ export function FlightLineRotationDetails({
   selected,
   selectedAircraftHasPilot,
   turnaroundNextState,
-}: FlightLineRotationDetailsProps) {
+}: Readonly<FlightLineRotationDetailsProps>) {
   if (!selected) return <p>Noch keine Fluggruppe vorhanden.</p>;
   const timeZone = event?.timeZone ?? "Europe/Berlin";
   const segmentLabel = sharedGroupSegmentLabel(selected, rotations);
