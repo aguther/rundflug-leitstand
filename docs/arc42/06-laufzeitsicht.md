@@ -231,7 +231,7 @@ sequenceDiagram
     participant D as D1
     participant R as R2 (EU)
 
-    A->>W: Werksreset mit Sitzung, Gerät, aktueller PIN und commandId
+    A->>W: Werksreset mit Begründung, Sitzung, Gerät, aktueller PIN und commandId
     W->>R: optionale portable Wiederherstellungssicherung
     W->>DO: Alarm, Storage und Live-Verbindungen je Veranstaltung leeren
     loop begrenzte Löschphasen, Planläufe in abhängigkeitssicheren Chunks
@@ -249,3 +249,6 @@ noch nicht den Administratorzugang. Der zulässige Forward-Repair ist die Wieder
 Werksresets; die finale Transaktion erzeugt den idempotenten Beleg erst nach vollständigem
 D1-Abschluss. ADR-0050 begründet diese Abweichung von einem einzigen, bei großen Historien nicht
 ausführbaren D1-Batch.
+
+Begründung und aktuelle Administrator-PIN genügen als bewusste Autorisierung des Reset-Kommandos;
+ein zusätzliches Codewort gehört weder zum Transportvertrag noch zum idempotenten Request-Hash.

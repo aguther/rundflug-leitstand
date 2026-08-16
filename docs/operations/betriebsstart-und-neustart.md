@@ -116,7 +116,8 @@ ausschließlich dieser letzte Schritt unterbrochen wurde. Dieser Beleg enthält 
 Gerätetoken und keine personenbezogenen Daten. Die Entscheidung und der Forward-Repair sind in
 [ADR-0050](../adr/0050-wiederaufnehmbarer-d1-werksreset.md) dokumentiert.
 
-Der Reset verlangt immer die aktuelle PIN des angemeldeten Administratorkontos. Nach einem
+Der Reset verlangt eine Begründung und die aktuelle PIN des angemeldeten Administratorkontos. Eine
+zusätzliche Texteingabe oder ein Codewort ist nicht erforderlich. Nach einem
 erfolgreichen Reset löscht der Browser Geräteschlüssel und Offline-Snapshots und wechselt zu
 `/setup`. Im selben Browser erkennt der Worker eine einmal verwendbare, 30 Minuten gültige
 Fortsetzungsfreigabe in einem nicht per JavaScript lesbaren, hostgebundenen Cookie. Das Codefeld ist

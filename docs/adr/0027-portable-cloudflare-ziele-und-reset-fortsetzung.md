@@ -12,9 +12,11 @@ Ressourcen werden nie automatisch ersetzt, geleert oder gelöscht. Acceptance-Re
 ihre Namen. Produktion ist ein getrenntes Ziel mit zusätzlicher Bestätigung und manuellem Gate.
 
 Ein Werksreset verlangt immer eine gültige Administrationssitzung, Gerätebindung und die aktuelle
-Konto-PIN. Der idempotente Reset-Beleg bindet die 30 Minuten gültige Setup-Fortsetzung an den
-ursprünglichen Browser. Der Grant liegt nur gehasht in D1 und wird als `Secure`, `HttpOnly`,
-`SameSite=Strict` und hostgebundenes Cookie übertragen und beim Setup atomar verbraucht.
+Konto-PIN. Eine mindestens dreistellige Begründung dokumentiert den Anlass; ein zusätzliches
+Codewort ist nicht erforderlich. Der idempotente Reset-Beleg bindet die 30 Minuten gültige
+Setup-Fortsetzung an den ursprünglichen Browser. Der Grant liegt nur gehasht in D1 und wird als
+`Secure`, `HttpOnly`, `SameSite=Strict` und hostgebundenes Cookie übertragen und beim Setup atomar
+verbraucht.
 
 Für den Verlust von Browser und Grant existiert ausschließlich der beim Neuaufbau erzeugte starke
 Installations-Notfallcode. Er liegt als Worker-Secret und im betreiberseitigen Passwortsafe,

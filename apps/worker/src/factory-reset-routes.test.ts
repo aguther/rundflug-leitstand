@@ -43,7 +43,6 @@ function resetBody(overrides?: Record<string, unknown>) {
     eventId: EVENT_ID,
     reason: "Synthetic reset for route verification",
     adminPin: "123456",
-    confirmation: "WERKSZUSTAND",
     retainRecoveryBackup: false,
     deleteAllBackups: false,
     ...overrides,
@@ -214,7 +213,7 @@ describe("factory reset route", () => {
   it("rejects invalid input and a mismatched path event before hashing", async () => {
     const { app, env, factoryResetRequestHash, prepare } = createApp();
 
-    const invalid = await requestReset(app, env, { confirmation: "RESET" });
+    const invalid = await requestReset(app, env, resetBody({ adminPin: "123" }));
     const mismatch = await requestReset(app, env, resetBody(), "different-event");
 
     expect([invalid.status, mismatch.status]).toEqual([400, 400]);

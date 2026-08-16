@@ -9,7 +9,6 @@ export const factoryResetRequestSchema = z
       .regex(/^[a-z0-9][a-z0-9-]{2,63}$/),
     reason: z.string().trim().min(3).max(240),
     adminPin: z.string().regex(/^\d{6,12}$/),
-    confirmation: z.literal("WERKSZUSTAND"),
     retainRecoveryBackup: z.boolean().default(true),
     deleteAllBackups: z.boolean().default(false),
   })

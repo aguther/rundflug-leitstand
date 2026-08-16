@@ -44,7 +44,6 @@ export function useAdminFactoryReset({
   const [error, setError] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [pin, setPin] = useState("");
-  const [confirmation, setConfirmation] = useState("");
   const [retainRecoveryBackup, setRetainRecoveryBackup] = useState(true);
   const [deleteAllBackups, setDeleteAllBackups] = useState(false);
   const [commandId, setCommandId] = useState(() => crypto.randomUUID());
@@ -55,19 +54,13 @@ export function useAdminFactoryReset({
     onMessage(null);
     setReason("");
     setPin("");
-    setConfirmation("");
     setRetainRecoveryBackup(true);
     setDeleteAllBackups(false);
     setOpen(true);
   }
 
   async function performReset() {
-    if (
-      busy ||
-      reason.trim().length < 3 ||
-      !/^\d{6,12}$/.test(pin) ||
-      confirmation !== "WERKSZUSTAND"
-    ) {
+    if (busy || reason.trim().length < 3 || !/^\d{6,12}$/.test(pin)) {
       return;
     }
     setBusy(true);
@@ -78,7 +71,6 @@ export function useAdminFactoryReset({
         eventId: EVENT_ID,
         reason: reason.trim(),
         adminPin: pin,
-        confirmation: "WERKSZUSTAND",
         retainRecoveryBackup,
         deleteAllBackups,
       });
@@ -94,7 +86,6 @@ export function useAdminFactoryReset({
   return {
     busy,
     closeDialog: () => setOpen(false),
-    confirmation,
     deleteAllBackups,
     error,
     open,
@@ -103,7 +94,6 @@ export function useAdminFactoryReset({
     pin,
     reason,
     retainRecoveryBackup,
-    setConfirmation,
     setDeleteAllBackups: (checked: boolean) => {
       setDeleteAllBackups(checked);
       if (checked) setRetainRecoveryBackup(false);

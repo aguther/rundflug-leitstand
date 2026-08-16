@@ -74,7 +74,6 @@ export async function factoryResetRequestHash(input: FactoryResetRequest): Promi
       commandId: input.commandId,
       eventId: input.eventId,
       reason: input.reason,
-      confirmation: input.confirmation,
       retainRecoveryBackup: input.retainRecoveryBackup,
       deleteAllBackups: input.deleteAllBackups,
     }),

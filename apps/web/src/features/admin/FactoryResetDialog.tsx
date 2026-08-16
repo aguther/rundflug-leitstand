@@ -4,7 +4,6 @@ import { FieldLabel } from "../../operation-workspace";
 
 export interface FactoryResetDialogProps {
   busy: boolean;
-  confirmation: string;
   deleteAllBackups: boolean;
   error: string | null;
   open: boolean;
@@ -12,7 +11,6 @@ export interface FactoryResetDialogProps {
   reason: string;
   retainRecoveryBackup: boolean;
   onClose: () => void;
-  onConfirmationChange: (value: string) => void;
   onDeleteAllBackupsChange: (value: boolean) => void;
   onPinChange: (value: string) => void;
   onReasonChange: (value: string) => void;
@@ -22,7 +20,6 @@ export interface FactoryResetDialogProps {
 
 export function FactoryResetDialog({
   busy,
-  confirmation,
   deleteAllBackups,
   error,
   open,
@@ -30,7 +27,6 @@ export function FactoryResetDialog({
   reason,
   retainRecoveryBackup,
   onClose,
-  onConfirmationChange,
   onDeleteAllBackupsChange,
   onPinChange,
   onReasonChange,
@@ -39,8 +35,7 @@ export function FactoryResetDialog({
 }: Readonly<FactoryResetDialogProps>) {
   if (!open) return null;
 
-  const submitDisabled =
-    reason.trim().length < 3 || !/^\d{6,12}$/.test(pin) || confirmation !== "WERKSZUSTAND";
+  const submitDisabled = reason.trim().length < 3 || !/^\d{6,12}$/.test(pin);
 
   return (
     <div className="modal-backdrop factory-reset-backdrop">
@@ -109,19 +104,6 @@ export function FactoryResetDialog({
               onChange={(event) => onPinChange(event.target.value.replace(/\D/g, ""))}
               type="password"
               value={pin}
-            />
-          </div>
-          <div className="field-control">
-            <FieldLabel
-              help="Zum Schutz vor versehentlicher Ausführung muss WERKSZUSTAND vollständig eingegeben werden."
-              htmlFor="factory-reset-confirmation"
-              label="Sicherheitsbestätigung"
-            />
-            <input
-              autoComplete="off"
-              id="factory-reset-confirmation"
-              onChange={(event) => onConfirmationChange(event.target.value)}
-              value={confirmation}
             />
           </div>
           <label className="reset-checkbox">

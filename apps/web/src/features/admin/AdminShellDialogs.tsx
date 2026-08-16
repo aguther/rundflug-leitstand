@@ -307,11 +307,9 @@ export function AdminShellDialogs({
       />
       <FactoryResetDialog
         busy={factoryReset.busy}
-        confirmation={factoryReset.confirmation}
         deleteAllBackups={factoryReset.deleteAllBackups}
         error={factoryReset.error}
         onClose={factoryReset.closeDialog}
-        onConfirmationChange={factoryReset.setConfirmation}
         onDeleteAllBackupsChange={factoryReset.setDeleteAllBackups}
         onPinChange={factoryReset.setPin}
         onReasonChange={factoryReset.setReason}

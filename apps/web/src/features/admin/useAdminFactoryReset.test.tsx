@@ -28,11 +28,10 @@ function renderFactoryReset() {
   return { ...hook, onMessage, onResetComplete };
 }
 
-function enterValidConfirmation(result: ReturnType<typeof renderFactoryReset>["result"]) {
+function enterValidAuthorization(result: ReturnType<typeof renderFactoryReset>["result"]) {
   act(() => {
     result.current.setReason("  Synthetic factory reset  ");
     result.current.setPin("123456");
-    result.current.setConfirmation("WERKSZUSTAND");
   });
 }
 
@@ -61,7 +60,7 @@ describe("admin factory reset state", () => {
     mocks.factoryReset.mockResolvedValue({ resetComplete: true });
     const { result, onResetComplete } = renderFactoryReset();
     act(() => result.current.openDialog());
-    enterValidConfirmation(result);
+    enterValidAuthorization(result);
 
     await act(() => result.current.performReset());
 
@@ -71,7 +70,6 @@ describe("admin factory reset state", () => {
       expect.any(String),
       expect.objectContaining({
         adminPin: "123456",
-        confirmation: "WERKSZUSTAND",
         deleteAllBackups: false,
         reason: "Synthetic factory reset",
         retainRecoveryBackup: true,
@@ -83,7 +81,7 @@ describe("admin factory reset state", () => {
   it("retains reset failures and releases the busy state", async () => {
     mocks.factoryReset.mockRejectedValue(new Error("Synthetic reset failure"));
     const { result } = renderFactoryReset();
-    enterValidConfirmation(result);
+    enterValidAuthorization(result);
 
     await act(() => result.current.performReset());
 
@@ -91,7 +89,7 @@ describe("admin factory reset state", () => {
     expect(result.current.busy).toBe(false);
   });
 
-  it("does not submit incomplete confirmation", async () => {
+  it("does not submit incomplete authorization", async () => {
     const { result } = renderFactoryReset();
 
     await act(() => result.current.performReset());

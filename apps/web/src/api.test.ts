@@ -267,7 +267,6 @@ describe("session-only browser transport", () => {
         eventId: "synthetic-event",
         reason: "Entwicklungsstand neu aufbauen",
         adminPin: "0000",
-        confirmation: "WERKSZUSTAND",
         retainRecoveryBackup: true,
         deleteAllBackups: false,
       }),

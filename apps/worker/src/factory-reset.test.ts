@@ -96,7 +96,6 @@ describe("factory reset", () => {
       eventId: "synthetic-event",
       reason: "Entwicklungsstand neu aufbauen",
       adminPin: "123456",
-      confirmation: "WERKSZUSTAND",
       retainRecoveryBackup: true,
       deleteAllBackups: false,
     });

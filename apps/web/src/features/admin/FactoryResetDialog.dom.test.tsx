@@ -15,11 +15,9 @@ describe("factory reset dialog", () => {
     render(
       <FactoryResetDialog
         busy={false}
-        confirmation=""
         deleteAllBackups={false}
         error={null}
         onClose={vi.fn()}
-        onConfirmationChange={vi.fn()}
         onDeleteAllBackupsChange={onDeleteAllBackupsChange}
         onPinChange={vi.fn()}
         onReasonChange={vi.fn()}
@@ -40,10 +38,39 @@ describe("factory reset dialog", () => {
     });
     expect((retainedBackup as HTMLInputElement).checked).toBe(true);
     expect((allBackups as HTMLInputElement).checked).toBe(false);
+    expect(screen.queryByLabelText("Sicherheitsbestätigung")).toBeNull();
 
     await user.click(retainedBackup);
     await user.click(allBackups);
     expect(onRetainRecoveryBackupChange).toHaveBeenCalledWith(false);
     expect(onDeleteAllBackupsChange).toHaveBeenCalledWith(true);
+  });
+
+  it("enables the reset with only a reason and the current administrator PIN", () => {
+    render(
+      <FactoryResetDialog
+        busy={false}
+        deleteAllBackups={false}
+        error={null}
+        onClose={vi.fn()}
+        onDeleteAllBackupsChange={vi.fn()}
+        onPinChange={vi.fn()}
+        onReasonChange={vi.fn()}
+        onRetainRecoveryBackupChange={vi.fn()}
+        onSubmit={vi.fn()}
+        open
+        pin="123456"
+        reason="Synthetic factory reset"
+        retainRecoveryBackup
+      />,
+    );
+
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Alles löschen und neu starten",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
   });
 });

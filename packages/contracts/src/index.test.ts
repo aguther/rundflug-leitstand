@@ -290,18 +290,22 @@ describe("commandEnvelopeSchema", () => {
     ).toThrow();
   });
 
-  it("requires explicit, anonymous confirmation for a factory reset", () => {
+  it("requires the current PIN and a reason for a factory reset", () => {
     const parsed = factoryResetRequestSchema.parse({
       commandId: "550e8400-e29b-41d4-a716-446655440500",
       eventId: "synthetic-event",
       reason: "Entwicklungsstand neu aufbauen",
       adminPin: "000000",
-      confirmation: "WERKSZUSTAND",
       retainRecoveryBackup: true,
       deleteAllBackups: false,
     });
-    expect(parsed.confirmation).toBe("WERKSZUSTAND");
-    expect(() => factoryResetRequestSchema.parse({ ...parsed, confirmation: "RESET" })).toThrow();
+    expect(parsed.adminPin).toBe("000000");
+    expect(parsed.reason).toBe("Entwicklungsstand neu aufbauen");
+    expect(
+      factoryResetRequestSchema.parse({ ...parsed, confirmation: "WERKSZUSTAND" }),
+    ).not.toHaveProperty("confirmation");
+    expect(() => factoryResetRequestSchema.parse({ ...parsed, adminPin: "0000" })).toThrow();
+    expect(() => factoryResetRequestSchema.parse({ ...parsed, reason: "" })).toThrow();
     expect(() =>
       factoryResetRequestSchema.parse({
         ...parsed,

@@ -138,7 +138,6 @@ try {
       eventId: "demo-2026",
       reason: "Synthetischer Test einer falschen PIN",
       adminPin: "654321",
-      confirmation: "WERKSZUSTAND",
       retainRecoveryBackup: true,
       deleteAllBackups: false,
     }),
@@ -154,7 +153,6 @@ try {
     eventId: "demo-2026",
     reason: "Synthetischer vollständiger Entwicklungsreset",
     adminPin: pin,
-    confirmation: "WERKSZUSTAND",
     retainRecoveryBackup: true,
     deleteAllBackups: false,
   };
