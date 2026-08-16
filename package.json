@@ -28,7 +28,7 @@
     "test:ci": "vitest run apps/worker/src/maintainability-coverage.test.ts packages/contracts/src/index.test.ts packages/domain/src/index.test.ts apps/web/src/api.test.ts",
     "test:coverage": "vitest run --coverage --testNamePattern=\"^(?!.*projects all 300 eligible groups beyond the bounded dispatch horizon).*$\" && node scripts/verify_domain_coverage.mjs",
     "test:forecast-comparison-baseline": "vitest run --config vitest.forecast-baseline.config.ts",
-    "test:mutation": "stryker run",
+    "test:mutation": "stryker run && node scripts/verify_mutation_report.mjs",
     "test:mutation:dry": "stryker run --dryRunOnly",
     "test:outage-recovery": "node scripts/verify_outage_recovery.mjs",
     "test:emergency-mode": "node scripts/verify_emergency_mode.mjs",

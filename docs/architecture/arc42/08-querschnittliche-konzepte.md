@@ -328,7 +328,7 @@ werden dadurch nicht in Familiendienste dupliziert; deren D1-Batches bleiben die
 | Integration | zahlreiche `scripts/verify_*.mjs`-Läufe; lokale Worker-Verifier erhalten über `scripts/lib/worker-test-harness.mjs` je Instanz freien Port, temporären D1-Zustand und Assets; 18 V1-Kernsuiten und die deterministische 25-Seed-Forecast-Vergleichsbaseline laufen als eigene parallele PR-CI-Jobs, Soak und Abnahmetag als getrennte Langzeitabnahmen |
 | Architekturregeln | `apps/worker/src/maintainability-coverage.test.ts`, `npm run refactor:guardrails` (Dateibudgets, Importverbote, keine Quelltextimporte oder Dateisystem-Lesezugriffe auf produktive `.ts`-/`.tsx`-Dateien in Tests, reine Domain-Abhängigkeiten) |
 | Coverage | expliziter Produktionscode-Nenner für `apps` und `packages`; Ratchets 81 % Statements, 71 % Branches, 80 % Functions und 84 % Lines; zehn kritische Domainmodule jeweils mindestens 90 % Lines und 85 % Branches; 80 % SonarQube-Ziel für neuen Code |
-| Mutation | Stryker mit offiziellem Vitest-Runner für neun fokussierte Module aus Queue, Kapazität, Prognose, Turnaround, Nachruf und Outage Recovery; Schwellen `break: 73`, `low: 80`, `high: 90` |
+| Mutation | Stryker mit offiziellem Vitest-Runner für neun fokussierte Module aus Queue, Kapazität, Prognose, Turnaround, Nachruf und Outage Recovery; globales Ratchet `break: 87`, `low: 80`, `high: 90` sowie mindestens 80 Prozent je Modul |
 | Dokumentation | `npm run docs:verify` prüft Architektur-, Datenschutz-, Lizenz-, Link-, Rollen- und Releasekonsistenz |
 | Refactoring-Ratchets | `npm run refactor:guardrails` hält Rohimporte und Dateilesezugriffe auf Produktionslogik in `.ts`, `.tsx`, `.js` und `.mjs` sowie literale Python-Zugriffe bei null; zulässige Artefakttests validieren JSON, YAML, Konfiguration, Manifeste, generierte Dokumente und Datenschutz. Ein getrennter Audit klassifiziert 36 Worker-SQL-Orakel-Familien, verlangt Behavior-Evidence für ergänzende SQL-Assertions und verhindert neue unklassifizierte Familien |
 | Anforderungen | `npm run requirements:verify` und Traceability-CSV |
@@ -338,9 +338,10 @@ Der vollständige Gesamtnachweis ist `npm run check`. Die PR-CI führt Basisprü
 Worker-Runtime, V1-Kernintegration, Forecast-Vergleichsbaseline, Backup-Restore und Dokumentation
 parallel aus; der Sonar-Job
 folgt abhängig vom erfolgreichen Basisjob und der Verfügbarkeit des geschützten Tokens.
-Der getrennte Mutationstest läuft wöchentlich und manuell, veröffentlicht HTML- und JSON-Berichte
-als CI-Artefakte und ist vor der Integration eines Branches verpflichtend, der eines der ausgewählten
-Domainmodule ändert. ADR-0046 begründet Auswahl, Schwellen und Ratchet-Verfahren.
+Der Mutationstest läuft für jeden Pull Request, jeden Push nach `main`, wöchentlich und manuell.
+HTML-, JSON- und Incremental-Berichte werden als CI-Artefakte veröffentlicht. ADR-0046 begründet
+Auswahl und verhaltensbasierte Grenzen; ADR-0056 begründet das Standard-Gate sowie die globalen und
+modulbezogenen Ratchets.
 
 ## 8.13 Betrieb, Sicherung und Wiederherstellung
 

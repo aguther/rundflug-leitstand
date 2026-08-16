@@ -16,7 +16,6 @@ gültige Themen werden ausschließlich in den verlinkten eigenständigen Schulde
 | --- | --- |
 | Geringer Abstand einzelner Web-Assets zu den Budgets | [fortgeltend](web-asset-budget-headroom.md); die manifestbasierten Zwei-Prozent-Ratchets bleiben notwendig |
 | Paralleler Forecast-Legacy-Pfad | behoben durch ADR-0054; `calculateLegacyForecastTimelines` und sein DRAFT-Overlay sind entfernt |
-| Unzureichende Aussagekraft einzelner Tests | [Mutationstest-Aussagekraft](mutation-test-effectiveness.md) bleibt als eigenständige Schuld offen |
 
 ## Behobene oder nicht fortgeführte Befunde
 

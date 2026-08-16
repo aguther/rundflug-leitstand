@@ -1,6 +1,6 @@
 # ADR-0046: Verhaltensbasierte Testarchitektur und Qualitätsratchets
 
-- Status: Akzeptiert
+- Status: Teilweise ersetzt durch ADR-0056
 - Datum: 2026-08-15
 - Entscheidung: Auftraggeber
 - Betroffene Anforderungen: V1120-QA-010, V1110-QA-010, Q-WAR-050, Q-ZUV-020
@@ -56,10 +56,9 @@ ersten Mutation-Gates: Seine ausführbaren Zustands- und Skalenszenarien bleiben
 Test-/Coverage-Nachweis, während die mutierten Forecast-Phasen eine fokussierte und reviewbare
 Fehlerlokalisierung ermöglichen.
 
-Mutationstests laufen wöchentlich und manuell. Vor Integration eines Branches, der eines der neun
-ausgewählten Module ändert, ist `npm run test:mutation` zusätzlich verpflichtend. Der normale
-PR-Basischeck bleibt davon getrennt; HTML-, JSON- und Incremental-Berichte werden als CI-Artefakt
-aufbewahrt.
+Die hier zunächst beschlossene Trennung des Mutationstests vom allgemeinen PR-Lauf wird durch
+ADR-0056 ersetzt. Auswahl der neun Module, verhaltensbasierte Testgrenzen und das Verbot einer
+Ratchet-Absenkung gelten fort.
 
 Die deterministische Forecast-Vergleichsbaseline über 25 Seeds bleibt ein verpflichtendes PR- und
 `main`-Gate, läuft wegen ihrer Laufzeit jedoch parallel in einem eigenen CI-Job. Der normale

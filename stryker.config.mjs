@@ -24,7 +24,7 @@ export default {
     fileName: "reports/mutation/mutation.json",
   },
   thresholds: {
-    break: 73,
+    break: 87,
     low: 80,
     high: 90,
   },

@@ -2,6 +2,9 @@ name: Mutation tests
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
   schedule:
     - cron: "30 3 * * 1"
 

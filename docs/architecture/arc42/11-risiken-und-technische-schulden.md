@@ -39,11 +39,8 @@ hat die früher dominierenden Monolithen aufgelöst:
 | `apps/web/.../forecast-simulation/operational-engine.ts` | 1.490 Zeilen | 338 Zeilen |
 | Dependency-Audit | 13 High, 2 Moderate | 0 Findings |
 
-Verbleibende, bewusst priorisierte Schulden:
-
-| Priorität | Thema | Nächster geplanter Schnitt |
-| --- | --- | --- |
-| Mittel | [Mutationstest-Aussagekraft](../technical-debts/mutation-test-effectiveness.md) | überlebende Mutanten nach fachlichem Risiko priorisieren und Ratchets ausschließlich anheben |
+Der aktuelle Implementierungsstand enthält keine bestätigte technische Schuld. Neue Befunde werden
+erst nach reproduzierbarer Evidenz in das aktive Register aufgenommen.
 
 Die Online-Pflicht der Administration und der inkompatible V1.12-Baseline-Neuaufbau sind bewusste
 Architektur- beziehungsweise Rolloutentscheidungen und werden nicht als technische Schulden geführt.

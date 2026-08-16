@@ -53,38 +53,40 @@ die initiale Auswahl für ein regelmäßig ausführbares Gate zu breit und nicht
 war. Das zusammengesetzte Modul bleibt vollständig in Unit- und Coverage-Prüfungen enthalten; seine
 fachlichen Teilregeln werden im initialen Mutation-Gate über fokussierte Module geprüft.
 
-Der reproduzierbare Gate-Lauf umfasst neun Module aus Queue, Kapazität, Prognose, Turnaround,
-Nachruf und Outage Recovery. Er bestand mit folgendem Ergebnis:
+Der am 16. August fortgeschriebene reproduzierbare Gate-Lauf umfasst weiterhin neun Module aus
+Queue, Kapazität, Prognose, Turnaround, Nachruf und Outage Recovery. Direkte Grenzwerttests für
+Kapazität, Verfügbarkeit, Diagnostik, Dispatch-Replay und robuste Stichproben stärken die
+beobachtbaren Regeln ohne Mutator-Ausschlüsse. Der vollständige Lauf bestand mit folgendem Ergebnis:
 
 | Ergebnis | Anzahl / Wert |
 | --- | ---: |
-| Mutanten gesamt | 1.401 |
-| Getötet | 1.024 |
+| Mutanten gesamt | 1.447 |
+| Getötet | 1.255 |
 | Timeout | 7 |
-| Überlebt | 352 |
-| Ohne Coverage | 18 |
-| Mutation Score gesamt | 73,59 % |
-| Mutation Score abgedeckter Code | 74,55 % |
+| Überlebt | 178 |
+| Ohne Coverage | 7 |
+| Mutation Score gesamt | 87,21 % |
+| Mutation Score abgedeckter Code | 87,64 % |
 
-Der erreichte Wert wird mit `break: 73`, `low: 80` und `high: 90` als Ratchet festgehalten. Ein
-späterer höherer reproduzierbarer Wert wird nach oben übernommen; eine Absenkung erfordert eine
-ausdrückliche Architekturentscheidung. Die niedrigeren Werte einzelner Forecast-Module sind als
-technische Schuld in Arc42 Kapitel 11 erfasst und werden anhand der überlebenden Mutanten verbessert.
+Der erreichte Wert wird mit `break: 87`, `low: 80` und `high: 90` als globales Ratchet festgehalten.
+Das zusätzliche Report-Gate verlangt mindestens 80 Prozent je ausgewähltem Modul; gemessen wurden
+81,47 bis 98,15 Prozent. Ein späterer höherer reproduzierbarer Wert wird nach oben übernommen; eine
+Absenkung erfordert eine ausdrückliche Architekturentscheidung.
 
 ## Automatisierung und Integrationsregel
 
 - `npm run refactor:guardrails` verhindert Rohimporte und Dateisystemzugriffe auf produktive `.ts`-,
   `.tsx`-, `.js`- und `.mjs`-Logik sowie literale Python-Pfade und hält alle
   Produktions-Quelltextorakel bei null.
-- Derselbe Befehl klassifiziert 36 Worker-SQL-Orakel-Familien reproduzierbar: 25 besitzen
-  zusätzliche Behavior-Evidence, elf Priorität-A-Familien bleiben geratcheted offen. Details stehen
-  in `docs/architecture/technical-debts/worker-sql-test-oracles.md`.
+- Derselbe Befehl klassifiziert 36 Worker-SQL-Orakel-Familien reproduzierbar; alle 36 besitzen
+  zusätzliche Behavior-Evidence und die Priorität-A-Liste bleibt bei null.
 - `npm run test:coverage` prüft globale Coverage und anschließend die zehn kritischen Domainmodule.
-- `npm run test:mutation` führt den vollständigen fokussierten Stryker-Lauf aus.
+- `npm run test:mutation` führt den vollständigen fokussierten Stryker-Lauf und anschließend das
+  globale sowie modulbezogene Report-Ratchet aus.
 - `npm run test:mutation:dry` validiert Konfiguration und Testauswahl ohne Mutation.
-- `.github/workflows/mutation-tests.yml` läuft wöchentlich und manuell und veröffentlicht HTML- sowie
-  JSON-Berichte als CI-Artefakte.
+- `.github/workflows/mutation-tests.yml` läuft für jeden Pull Request, jeden Push nach `main`,
+  wöchentlich und manuell und veröffentlicht HTML-, JSON- sowie Incremental-Berichte als
+  CI-Artefakte.
 
-Vor Integration eines Branches, der eines der neun ausgewählten Module ändert, ist der vollständige
-Mutationstest auf dem zu integrierenden Stand verpflichtend. Für andere Änderungen bleibt er vom
-allgemeinen PR-Check getrennt, damit die reguläre Rückmeldung schnell bleibt.
+Der Mutationstest ist damit ein allgemeines Integrationsgate und läuft parallel zu den übrigen
+PR-Prüfungen. ADR-0056 dokumentiert die Fortschreibung der ursprünglichen Entscheidung aus ADR-0046.

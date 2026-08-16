@@ -11,9 +11,7 @@ Die [Neubewertung vom 16. August 2026](assessment-2026-08-16.md) ordnet außerde
 drei entfernten historischen Schuldenberichte nachvollziehbar als fortgeltend, behoben oder als
 bewusste Architekturentscheidung ein.
 
-| Thema | Priorität | Aktueller Befund |
-| --- | --- | --- |
-| [Mutationstest-Aussagekraft](mutation-test-effectiveness.md) | Mittel | fokussiertes Gate ist etabliert, einzelne Module und überlebende Mutanten bleiben schwach |
+Der aktuelle Implementierungsstand enthält keine bestätigten offenen technischen Schulden.
 
 Bewusste Architekturentscheidungen wie die Online-Pflicht der Administration oder der inkompatible
 V1.12-D1-Baseline-Neuaufbau sind keine technischen Schulden. Sie werden als Randbedingungen,

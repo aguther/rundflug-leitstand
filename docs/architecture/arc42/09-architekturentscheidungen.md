@@ -67,6 +67,7 @@ verlinkt bleiben.
 | [0053](../adr/0053-planning-history-compaction.md) | Verifizierte Kompaktion der Planungshistorie in R2 | 24-Stunden-Heißfenster in D1, autoritative verifizierte Kaltsegmente in R2, Workflows und isolierter Restore |
 | [0054](../adr/0054-einheitliche-forecast-und-dispatch-pipeline.md) | Einheitliche Forecast- und Dispatch-Pipeline | aktive Ressourcenprojektion und DRAFT-Scheduler in einem Lauf, eine Dauerbasis, korrigierte Zielordnung und eine operative Simulationsengine |
 | [0055](../adr/0055-web-asset-headroom-and-native-svg.md) | Dauerhafter Web-Asset-Spielraum und native SVG-Diagramme | zehn Prozent Pflichtreserve, rollenbezogene CSS-/Precache-Grenzen und dependency-freie Zeitreihen |
+| [0056](../adr/0056-mutationstests-als-standard-integrationsgate.md) | Mutationstests als Standard-Integrationsgate | 87-Prozent-Gesamtratchet, mindestens 80 Prozent je Modul und vollständiger PR-/Main-Lauf ohne Mutator-Ausschlüsse |
 
 ## Entscheidungsstatus und Nachfolger
 
@@ -83,6 +84,7 @@ verlinkt bleiben.
 | 0032 | teilweise ersetzt | ADR-0036 ersetzt ausschließlich die abweichende FIDS-Sortierung; ADR-0054 präzisiert die gemeinsame Zielordnung und Diagnose |
 | 0041 | ersetzt | ADR-0054 schaltet den Legacy-Vergleichspfad und die Worker-Konvergenz ab |
 | 0042 | teilweise ersetzt | ADR-0054 ersetzt die Zwei-Engine-Entscheidung; deterministische Primitive, Tick-Reihenfolge und modulare operative Phasen gelten fort |
+| 0046 | teilweise ersetzt | ADR-0056 ersetzt ausschließlich die Trennung der Mutationstests vom allgemeinen PR-Gate und hebt die Ratchets an |
 
 Historische Begriffe wie „Supervisor“ oder „Assist“ bleiben in den ursprünglichen ADR-Texten
 erhalten. Die aktuelle Architektur verwendet die Rollen und Oberflächen „Flight Director“ und
