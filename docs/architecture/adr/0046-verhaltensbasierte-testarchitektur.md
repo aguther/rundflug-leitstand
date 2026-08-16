@@ -40,9 +40,8 @@ keine ausführbare Verhaltensprüfung.
 SQL-Shape-Assertions an D1-Mocks gelten nur als ergänzende Diagnose. Dieselbe Invariante muss
 zusätzlich an ausgeführtem SQLite-, Worker-Runtime-, HTTP- oder E2E-Verhalten geprüft werden. Der
 versionierte Audit `scripts/worker-sql-test-oracles.json` klassifiziert 36 betroffene
-Worker-Testfamilien, dokumentiert die Behavior-Evidence für 25 davon und führt elf noch zu
-migrierende Priorität-A-Familien als getrennte technische Schuld. Das Ratchet verhindert neue
-unklassifizierte SQL-Orakel-Familien.
+Worker-Testfamilien und dokumentiert für alle 36 die zusätzliche Behavior-Evidence. Das Ratchet
+hält die Priorität-A-Liste bei null und verhindert neue unklassifizierte SQL-Orakel-Familien.
 
 Die globale Coverage besitzt einen vollständigen Produktionscode-Nenner und Ratchets von 81 %
 Statements, 71 % Branches, 80 % Functions und 84 % Lines. Zusätzlich erzwingt

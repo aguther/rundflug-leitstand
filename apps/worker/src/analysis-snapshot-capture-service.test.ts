@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { applyDemoSeed, createD1TestDatabase } from "../test-support/migrated-database";
 import {
   type AnalysisSnapshotCaptureInput,
   AnalysisSnapshotCaptureService,
@@ -57,6 +58,57 @@ function createService(
 }
 
 describe("analysis snapshot capture service", () => {
+  it("persists and replays a manual capture receipt in migrated SQLite", async () => {
+    const testDatabase = createD1TestDatabase();
+    try {
+      applyDemoSeed(testDatabase.database);
+      const recalculate = vi.fn(async () => ({
+        planningRunId: "550e8400-e29b-41d4-a716-446655440081",
+        eventVersion: 0,
+        dispatchPlanRevision: "dispatch-revision-0",
+      }));
+      const service = createService(testDatabase.d1, recalculate);
+      const input = captureInput({
+        eventId: "demo-2026",
+        requestId: "550e8400-e29b-41d4-a716-446655440081",
+        expectedEventVersion: 0,
+        deviceId: "technical-scaffold",
+      });
+
+      await expect(service.capture(input)).resolves.toEqual({
+        ok: true,
+        planningRunId: input.requestId,
+        eventVersion: 0,
+        dispatchPlanRevision: "dispatch-revision-0",
+      });
+      await expect(service.capture(input)).resolves.toEqual({
+        ok: true,
+        planningRunId: input.requestId,
+        eventVersion: 0,
+        dispatchPlanRevision: "dispatch-revision-0",
+      });
+
+      expect(recalculate).toHaveBeenCalledOnce();
+      const receipt = testDatabase.database
+        .prepare(
+          `SELECT operation_day_id, device_id, command_type, response_json
+             FROM idempotency_receipts WHERE command_id = ?1`,
+        )
+        .get(input.requestId) as Record<string, unknown>;
+      expect(receipt).toMatchObject({
+        operation_day_id: "demo-2026",
+        device_id: "technical-scaffold",
+        command_type: "CAPTURE_ANALYSIS_SNAPSHOT",
+      });
+      expect(JSON.parse(String(receipt.response_json))).toMatchObject({
+        expectedEventVersion: 0,
+        planningRunId: input.requestId,
+      });
+    } finally {
+      testDatabase.close();
+    }
+  });
+
   it("rejects unauthorized sessions before reading persistence", async () => {
     const { db, prepare } = createDatabase([]);
     const recalculate = vi.fn();

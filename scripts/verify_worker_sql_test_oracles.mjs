@@ -47,9 +47,9 @@ export async function verifyWorkerSqlTestOracles(
     throw new Error(
       `Worker SQL oracle audit must classify exactly 36 unique files; found ${new Set(audited).size}.`,
     );
-  if (priorityA.length !== 11)
+  if (priorityA.length !== 0)
     throw new Error(
-      `Worker SQL oracle audit must identify exactly 11 priority-A files; found ${priorityA.length}.`,
+      `Worker SQL oracle audit must keep the priority-A backlog empty; found ${priorityA.length}.`,
     );
   for (const [file, evidence] of Object.entries(audit.behaviorBackedFiles)) {
     if (!Array.isArray(evidence) || evidence.length === 0)

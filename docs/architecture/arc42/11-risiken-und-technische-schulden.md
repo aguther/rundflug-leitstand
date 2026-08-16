@@ -44,7 +44,6 @@ Verbleibende, bewusst priorisierte Schulden:
 | Priorität | Thema | Nächster geplanter Schnitt |
 | --- | --- | --- |
 | Mittel | [Mutationstest-Aussagekraft](../technical-debts/mutation-test-effectiveness.md) | überlebende Mutanten nach fachlichem Risiko priorisieren und Ratchets ausschließlich anheben |
-| Mittel | [Worker-SQL-Testorakel](../technical-debts/worker-sql-test-oracles.md) | elf Priorität-A-Familien auf ausgeführtes SQLite-, Runtime-, HTTP- oder E2E-Verhalten migrieren |
 | Mittel | [Worker-Orchestrierung](../technical-debts/worker-orchestration-complexity.md) | entitätsspezifische Entscheidungs- und Persistenzpläne isolieren |
 
 Die Online-Pflicht der Administration und der inkompatible V1.12-Baseline-Neuaufbau sind bewusste
@@ -74,9 +73,9 @@ Rohimporte, Dateisystem-Lesezugriffe auf `.ts`, `.tsx`, `.js` und `.mjs` sowie l
 bei null. Availability-, Soak- und Remote-Performance-Harness führen injizierbare Szenariomodule aus;
 Backup-Exporter und Python-Restore teilen einen validierten JSON-Tabellenvertrag. Datenbanktests führen
 die produktive Baseline in SQLite aus. Der getrennte SQL-Audit klassifiziert 36 Worker-Testfamilien:
-25 besitzen zusätzliche Behavior-Evidence, elf Priorität-A-Familien bleiben offen. Coverage belegt
-Ausführung, der fokussierte Stryker-Lauf die Wirksamkeit ausgewählter Assertions; beide ersetzen den
-SQL-Verhaltensnachweis nicht. Details dokumentieren ADR-0046 und der Nachweis
+Alle 36 besitzen zusätzliche Behavior-Evidence; die Priorität-A-Liste ist leer. Coverage belegt
+Ausführung, der fokussierte Stryker-Lauf die Wirksamkeit ausgewählter Assertions; beide bleiben
+getrennte Messgrößen. Details dokumentieren ADR-0046 und der Nachweis
 `docs/verification/behavioral-test-quality-2026-08-15.md`.
 
 ## 11.3 Leitplanken für weitere Umbauten

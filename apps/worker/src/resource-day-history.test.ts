@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { applyDemoSeed, createD1TestDatabase } from "../test-support/migrated-database";
+import { loadResourceDayHistory } from "./history-service";
 import {
   buildAircraftBlockStatement,
   buildPilotPauseEventStatement,
@@ -7,6 +9,69 @@ import {
 } from "./resource-day-history";
 
 describe("resource day history queries", () => {
+  it("executes the bounded aircraft projection against migrated SQLite", async () => {
+    const testDatabase = createD1TestDatabase();
+    try {
+      applyDemoSeed(testDatabase.database);
+      testDatabase.database.exec(`
+        INSERT INTO flight_groups
+          (id, operation_day_id, resource_group_id, communication_number, status,
+           created_at, updated_at, product_id)
+        VALUES
+          ('history-group', 'demo-2026', 'rg-panorama', 42, 'COMPLETED',
+           '2026-07-11T08:30:00.000Z', '2026-07-11T09:40:00.000Z', 'panorama-20');
+        INSERT INTO rotations
+          (id, operation_day_id, flight_group_id, aircraft_id, pilot_id, status,
+           called_at, departed_at, landed_at, completed_at, created_at, updated_at,
+           usable_capacity)
+        VALUES
+          ('history-rotation', 'demo-2026', 'history-group', 'aircraft-a',
+           '550e8400-e29b-41d4-a716-446655440100', 'COMPLETED',
+           '2026-07-11T09:00:00.000Z', '2026-07-11T09:10:00.000Z',
+           '2026-07-11T09:30:00.000Z', '2026-07-11T09:40:00.000Z',
+           '2026-07-11T08:30:00.000Z', '2026-07-11T09:40:00.000Z', 4);
+        INSERT INTO operational_blocks
+          (id, operation_day_id, scope_type, scope_id, block_type, status, reason,
+           started_at, cleared_at, device_id)
+        VALUES
+          ('history-block', 'demo-2026', 'AIRCRAFT', 'aircraft-a', 'REFUELING',
+           'CLEARED', 'synthetic verification', '2026-07-11T09:45:00.000Z',
+           '2026-07-11T10:00:00.000Z', 'technical-scaffold');
+      `);
+
+      const result = await loadResourceDayHistory(
+        testDatabase.d1,
+        "demo-2026",
+        { scopeType: "AIRCRAFT", scopeId: "aircraft-a" },
+        "2026-07-11T12:00:00.000Z",
+      );
+
+      expect(result).toMatchObject({
+        status: "READY",
+        history: {
+          rotations: [
+            {
+              rotationId: "history-rotation",
+              communicationLabel: "F-PA-042",
+              aircraftRegistration: "D-EDEM",
+              pilotOperationalCode: "P-01",
+            },
+          ],
+          blocks: [
+            {
+              id: "history-block",
+              type: "REFUELING",
+              active: false,
+            },
+          ],
+        },
+      });
+      expect(JSON.stringify(result)).not.toContain("synthetic verification");
+    } finally {
+      testDatabase.close();
+    }
+  });
+
   it("selects the allowed resource identifier without interpolating its value", () => {
     const hostileId = "pilot' OR 1=1 --";
     const statement = buildResourceDayRotationStatement(

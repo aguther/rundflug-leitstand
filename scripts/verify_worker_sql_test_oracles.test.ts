@@ -18,11 +18,11 @@ afterEach(async () => {
 });
 
 describe("Worker SQL test oracle audit", () => {
-  it("keeps all 36 families classified with an eleven-family priority-A backlog", async () => {
+  it("keeps all 36 families behavior-backed with an empty priority-A backlog", async () => {
     await expect(verifyWorkerSqlTestOracles()).resolves.toEqual({
       auditedFiles: 36,
-      behaviorBackedFiles: 25,
-      priorityAFiles: 11,
+      behaviorBackedFiles: 36,
+      priorityAFiles: 0,
     });
   });
 

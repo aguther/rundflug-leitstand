@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { applyDemoSeed, createD1TestDatabase } from "../test-support/migrated-database";
 import {
   analysisActorAlias,
   analysisArchiveDownload,
@@ -102,6 +103,63 @@ function eventRow(overrides: Record<string, unknown> = {}) {
 }
 
 describe("analysis archive service", () => {
+  it("persists an archive request and its ledger event atomically in migrated SQLite", async () => {
+    const testDatabase = createD1TestDatabase();
+    try {
+      applyDemoSeed(testDatabase.database);
+      testDatabase.database
+        .prepare("UPDATE operation_days SET status = 'CLOSED', version = 7 WHERE id = ?1")
+        .run("demo-2026");
+      const env = {
+        APP_ENV: "development",
+        DATA_JURISDICTION: "eu",
+        DB: testDatabase.d1,
+        BACKUPS: {} as R2Bucket,
+      } as Env;
+
+      const result = await requestAnalysisArchive({
+        env,
+        eventId: "demo-2026",
+        expectedEventVersion: 7,
+        requestId: "550e8400-e29b-41d4-a716-446655440071",
+        actorAlias: "synthetic-actor",
+        now: new Date("2026-08-08T09:00:00.000Z"),
+      });
+
+      expect(result).toMatchObject({ created: true, archive: { status: "PENDING" } });
+      expect(
+        testDatabase.database
+          .prepare(
+            `SELECT a.status, a.operation_day_version, e.event_type, e.actor_alias
+               FROM analysis_archives a
+               JOIN analysis_archive_events e ON e.archive_id = a.id
+              WHERE a.request_id = ?1`,
+          )
+          .get("550e8400-e29b-41d4-a716-446655440071"),
+      ).toEqual({
+        status: "PENDING",
+        operation_day_version: 7,
+        event_type: "ARCHIVE_REQUESTED",
+        actor_alias: "synthetic-actor",
+      });
+
+      await expect(
+        requestAnalysisArchive({
+          env,
+          eventId: "demo-2026",
+          expectedEventVersion: 7,
+          requestId: "550e8400-e29b-41d4-a716-446655440071",
+          actorAlias: "synthetic-actor",
+        }),
+      ).resolves.toMatchObject({ created: false, archive: { id: result.archive.id } });
+      expect(
+        testDatabase.database.prepare("SELECT COUNT(*) AS count FROM analysis_archives").get(),
+      ).toEqual({ count: 1 });
+    } finally {
+      testDatabase.close();
+    }
+  });
+
   it("derives privacy-safe stable actor aliases", async () => {
     await expect(analysisActorAlias(null)).resolves.toBe("development-admin");
     const alias = await analysisActorAlias("synthetic-admin-account");

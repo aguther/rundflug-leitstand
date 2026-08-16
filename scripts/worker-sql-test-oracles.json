@@ -2,19 +2,7 @@
   "version": 1,
   "auditedAt": "2026-08-16",
   "definition": "Worker *service, *history and *routes test families with assertions against prepared SQL text or helper-selected statements.",
-  "priorityAFiles": [
-    "apps/worker/src/analysis-archive-service.test.ts",
-    "apps/worker/src/analysis-snapshot-capture-service.test.ts",
-    "apps/worker/src/event-administration-command-service.test.ts",
-    "apps/worker/src/forecast-history.test.ts",
-    "apps/worker/src/history-routes.test.ts",
-    "apps/worker/src/master-data-command-service.test.ts",
-    "apps/worker/src/operational-control-command-service.test.ts",
-    "apps/worker/src/operational-history.test.ts",
-    "apps/worker/src/operations-read-service.test.ts",
-    "apps/worker/src/resource-day-history.test.ts",
-    "apps/worker/src/ticket-read-routes.test.ts"
-  ],
+  "priorityAFiles": [],
   "behaviorBackedFiles": {
     "apps/worker/src/admin-account-routes.test.ts": [
       "HTTP response and authorization behavior in the same suite"
@@ -88,6 +76,42 @@
     "apps/worker/src/ticket-sales-command-service.test.ts": [
       "scripts/verify_sale_guards.mjs",
       "scripts/verify_ticket_assignment_concurrency.mjs"
+    ],
+    "apps/worker/src/analysis-archive-service.test.ts": [
+      "Migrated SQLite archive and ledger persistence in the same suite"
+    ],
+    "apps/worker/src/analysis-snapshot-capture-service.test.ts": [
+      "Migrated SQLite idempotency persistence in the same suite",
+      "scripts/verify_analysis_capture_scale.mjs"
+    ],
+    "apps/worker/src/event-administration-command-service.test.ts": [
+      "scripts/verify_master_data.mjs",
+      "scripts/verify_emergency_mode.mjs"
+    ],
+    "apps/worker/src/forecast-history.test.ts": ["scripts/verify_vertical_slice.mjs"],
+    "apps/worker/src/history-routes.test.ts": [
+      "scripts/verify_vertical_slice.mjs",
+      "scripts/verify_ticket_corrections.mjs"
+    ],
+    "apps/worker/src/master-data-command-service.test.ts": ["scripts/verify_master_data.mjs"],
+    "apps/worker/src/operational-control-command-service.test.ts": [
+      "scripts/verify_emergency_mode.mjs",
+      "scripts/verify_master_data.mjs"
+    ],
+    "apps/worker/src/operational-history.test.ts": [
+      "scripts/verify_ticket_corrections.mjs",
+      "scripts/verify_scale_performance.mjs"
+    ],
+    "apps/worker/src/operations-read-service.test.ts": [
+      "scripts/verify_fleet_operations.mjs",
+      "scripts/verify_scale_performance.mjs"
+    ],
+    "apps/worker/src/resource-day-history.test.ts": [
+      "Migrated SQLite projection and privacy boundary in the same suite"
+    ],
+    "apps/worker/src/ticket-read-routes.test.ts": [
+      "scripts/verify_ticket_corrections.mjs",
+      "scripts/verify_scale_performance.mjs"
     ]
   }
 }
