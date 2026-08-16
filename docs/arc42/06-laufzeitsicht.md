@@ -219,3 +219,33 @@ Assist-Claims-Abfrage bleibt bis zum Ende ihres Kompatibilitätsfensters getrenn
 kompatiblen Leerprojektion wiederholt; andere Fehler werden nicht verschluckt. Die Projektion baut
 vor der DTO-Erzeugung Lookup- und Gruppierungsindizes auf und verändert weder Fachregeln noch den
 bestätigten D1-Zustand.
+
+## 6.9 Vollständiger Werksreset
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as Administration
+    participant W as Worker
+    participant DO as EventCoordinatoren
+    participant D as D1
+    participant R as R2 (EU)
+
+    A->>W: Werksreset mit Sitzung, Gerät, aktueller PIN und commandId
+    W->>R: optionale portable Wiederherstellungssicherung
+    W->>DO: Alarm, Storage und Live-Verbindungen je Veranstaltung leeren
+    loop operative und historische Tabellen, Kind vor Eltern
+        W->>D: begrenzte Löschtransaktion mit aufgeschobenen Fremdschlüsseln
+    end
+    W->>D: finale Transaktion: Identität und Wurzeln löschen, Reset-Beleg schreiben
+    opt alle R2-Inhalte löschen
+        W->>R: Bucket seitenweise leeren
+    end
+    W-->>A: Setup-Fortsetzungsgrant und Reset-Beleg
+```
+
+Eine fehlgeschlagene Bulk-Phase kann bereits geleerte Nutzdatentabellen hinterlassen, löscht aber
+noch nicht den Administratorzugang. Der zulässige Forward-Repair ist die Wiederholung des
+Werksresets; die finale Transaktion erzeugt den idempotenten Beleg erst nach vollständigem
+D1-Abschluss. ADR-0050 begründet diese Abweichung von einem einzigen, bei großen Historien nicht
+ausführbaren D1-Batch.

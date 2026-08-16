@@ -2,7 +2,7 @@ import type { FactoryResetRequest, FactoryResetResponse } from "@rundflug/contra
 import { sha256Hex } from "./crypto";
 import type { Env } from "./types";
 
-export const FACTORY_RESET_DELETE_TABLES = [
+export const FACTORY_RESET_BULK_DELETE_TABLES = [
   "dispatch_recommendation_leases",
   "flight_line_assist_claims",
   "web_push_deliveries",
@@ -34,6 +34,9 @@ export const FACTORY_RESET_DELETE_TABLES = [
   "pilots",
   "operational_events",
   "event_deletion_receipts",
+] as const;
+
+export const FACTORY_RESET_FINAL_DELETE_TABLES = [
   "app_bootstrap",
   "operator_sessions",
   "fids_preferences",
@@ -43,6 +46,11 @@ export const FACTORY_RESET_DELETE_TABLES = [
   "paired_devices",
   "operation_days",
   "aircraft",
+] as const;
+
+export const FACTORY_RESET_DELETE_TABLES = [
+  ...FACTORY_RESET_BULK_DELETE_TABLES,
+  ...FACTORY_RESET_FINAL_DELETE_TABLES,
 ] as const;
 
 export async function factoryResetRequestHash(input: FactoryResetRequest): Promise<string> {
@@ -74,7 +82,7 @@ export async function clearFactoryResetCoordinators(
   }
 }
 
-interface FactoryResetStatementInput {
+export interface FactoryResetDatabaseInput {
   commandId: string;
   completedAt: string;
   r2CleanupPending: boolean;
@@ -85,19 +93,37 @@ interface FactoryResetStatementInput {
   setupGrantHash: string;
 }
 
-export function factoryResetStatements(
-  env: Env,
-  input: FactoryResetStatementInput,
-): D1PreparedStatement[] {
+export class FactoryResetDatabaseError extends Error {
+  constructor(
+    readonly stage: string,
+    cause: unknown,
+  ) {
+    super(`Factory reset database stage failed: ${stage}`, { cause });
+    this.name = "FactoryResetDatabaseError";
+  }
+}
+
+function deleteTableStatements(env: Env, table: (typeof FACTORY_RESET_DELETE_TABLES)[number]) {
   return [
-    // Planning captures contain self-referencing lineage (anchor_run_id and previous_*_id).
-    // D1 batches are transactional, so defer those checks until every application row is gone.
+    // The reset control only relaxes append-only deletion triggers inside this transaction.
+    // A failed table phase therefore rolls the control flag back together with its deletion.
     env.DB.prepare("PRAGMA defer_foreign_keys = ON"),
     env.DB.prepare("UPDATE system_reset_control SET active = 1 WHERE singleton = 1"),
-    ...FACTORY_RESET_DELETE_TABLES.map((table) => env.DB.prepare(`DELETE FROM ${table}`)),
+    env.DB.prepare(`DELETE FROM ${table}`),
+    env.DB.prepare("UPDATE system_reset_control SET active = 0 WHERE singleton = 1"),
+  ];
+}
+
+function finalFactoryResetStatements(
+  env: Env,
+  input: FactoryResetDatabaseInput,
+): D1PreparedStatement[] {
+  return [
+    env.DB.prepare("PRAGMA defer_foreign_keys = ON"),
+    env.DB.prepare("UPDATE system_reset_control SET active = 1 WHERE singleton = 1"),
+    ...FACTORY_RESET_FINAL_DELETE_TABLES.map((table) => env.DB.prepare(`DELETE FROM ${table}`)),
     env.DB.prepare("DELETE FROM system_reset_receipts"),
     env.DB.prepare("UPDATE system_reset_control SET active = 0 WHERE singleton = 1"),
-    env.DB.prepare("PRAGMA defer_foreign_keys = OFF"),
     env.DB.prepare(
       `INSERT INTO system_reset_receipts
         (command_id, request_hash, completed_at, r2_cleanup_pending, response_json,
@@ -115,6 +141,29 @@ export function factoryResetStatements(
       input.setupBrowserBindingHash,
     ),
   ];
+}
+
+export async function executeFactoryResetDatabase(
+  env: Env,
+  input: FactoryResetDatabaseInput,
+): Promise<void> {
+  // A production installation can accumulate tens of thousands of indexed planning rows. Keeping
+  // every table in one D1 transaction can exceed the database request duration. Each bulk table is
+  // therefore its own bounded transaction in child-to-parent order. The identity and root tables
+  // remain in the final transaction so an interrupted reset can still be retried by the same admin.
+  for (const table of FACTORY_RESET_BULK_DELETE_TABLES) {
+    try {
+      await env.DB.batch(deleteTableStatements(env, table));
+    } catch (cause) {
+      throw new FactoryResetDatabaseError(`delete:${table}`, cause);
+    }
+  }
+
+  try {
+    await env.DB.batch(finalFactoryResetStatements(env, input));
+  } catch (cause) {
+    throw new FactoryResetDatabaseError("finalize", cause);
+  }
 }
 
 export async function emptyBackupBucket(bucket: R2Bucket): Promise<void> {

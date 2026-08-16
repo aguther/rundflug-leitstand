@@ -6,8 +6,9 @@ import { sha256Hex, verifyPin } from "./crypto";
 import { authorizeDevice } from "./device-authorization";
 import {
   clearFactoryResetCoordinators,
+  executeFactoryResetDatabase,
+  FactoryResetDatabaseError,
   factoryResetRequestHash,
-  factoryResetStatements,
   finishR2Cleanup,
 } from "./factory-reset";
 import {
@@ -17,12 +18,17 @@ import {
 } from "./factory-reset-route-support";
 import { allowLoginAttempt } from "./public-access";
 import { resetSetupCookie, resetSetupGrantExpiry, resetSetupToken } from "./reset-setup-grant";
+import { safeErrorMessage } from "./snapshot";
 import type { Env } from "./types";
 
 type WorkerApp = Hono<{
   Bindings: Env;
   Variables: { sessionActor: SessionActor | null };
 }>;
+
+interface FactoryResetLogger {
+  error(event: Record<string, unknown>): void;
+}
 
 function eventCoordinatorNamespace(env: Env): Env["EVENT_COORDINATOR"] {
   return env.APP_ENV === "development"
@@ -36,10 +42,11 @@ const defaultDependencies = {
   authorizeSession,
   clearFactoryResetCoordinators,
   createPortableBackup,
+  executeFactoryResetDatabase,
   eventCoordinatorNamespace,
   factoryResetRequestHash,
-  factoryResetStatements,
   finishR2Cleanup,
+  logger: console as FactoryResetLogger,
   now: () => new Date(),
   resetSetupCookie,
   resetSetupGrantExpiry,
@@ -190,19 +197,24 @@ export function registerFactoryResetRoutes(
       r2BackupsDeleted: false,
     };
     try {
-      await context.env.DB.batch(
-        dependencies.factoryResetStatements(context.env, {
-          commandId: input.commandId,
-          completedAt: completedAt.toISOString(),
-          r2CleanupPending: input.deleteAllBackups,
-          requestHash,
-          response,
-          setupBrowserBindingHash: browserBindingHash,
-          setupGrantExpiresAt: grantExpiresAt,
-          setupGrantHash: grantHash,
-        }),
-      );
-    } catch {
+      await dependencies.executeFactoryResetDatabase(context.env, {
+        commandId: input.commandId,
+        completedAt: completedAt.toISOString(),
+        r2CleanupPending: input.deleteAllBackups,
+        requestHash,
+        response,
+        setupBrowserBindingHash: browserBindingHash,
+        setupGrantExpiresAt: grantExpiresAt,
+        setupGrantHash: grantHash,
+      });
+    } catch (reason) {
+      const databaseError = reason instanceof FactoryResetDatabaseError ? reason : undefined;
+      dependencies.logger.error({
+        level: "error",
+        code: "FACTORY_RESET_DATABASE_FAILED",
+        stage: databaseError?.stage ?? "unknown",
+        errorType: safeErrorMessage(databaseError?.cause ?? reason),
+      });
       return context.json(
         {
           error: {

@@ -58,12 +58,48 @@ const forecastFixtureSql = `INSERT INTO flight_groups
              '1111111111111111111111111111111111111111111111111111111111111111',
              '2222222222222222222222222222222222222222222222222222222222222222',
              NULL, NULL, NULL, NULL, 1, 1, 'SUCCEEDED', NULL);
+     WITH RECURSIVE sequence(value) AS (
+       VALUES (1)
+       UNION ALL
+       SELECT value + 1 FROM sequence WHERE value < 29000
+     )
+     INSERT INTO planning_runs
+      (id, operation_day_id, operation_day_version, context_id, previous_run_id, anchor_run_id,
+       replay_distance, calculation_now, captured_at, trigger_event_type, capture_mode,
+       anchor_reason, application_version, requirements_version, source_revision,
+       dispatch_plan_revision, forecast_digest, forecast_semantic_digest, precall_digest,
+       previous_forecast_state_chunk_id, previous_dispatch_state_chunk_id,
+       dispatch_result_chunk_id, precall_result_chunk_id, duration_ms, capture_duration_ms,
+       status, failure_code)
+     SELECT printf('factory-reset-scale-run-%05d', value), 'demo-2026', 901,
+            'factory-reset-child-context', 'factory-reset-child-run',
+            'factory-reset-parent-run', 1, printf('2026-07-11T10:00:%05dZ', value),
+            printf('2026-07-11T10:00:%05dZ', value), 'FACTORY_RESET_SCALE', 'REFERENCE',
+            NULL, '1.12.0', '1.12.0', 'synthetic-reset-scale',
+            printf('factory-reset-scale-revision-%05d', value),
+            '3333333333333333333333333333333333333333333333333333333333333333',
+            '4444444444444444444444444444444444444444444444444444444444444444',
+            '5555555555555555555555555555555555555555555555555555555555555555',
+            NULL, NULL, NULL, NULL, 1, 1, 'SUCCEEDED', NULL
+       FROM sequence;
      INSERT INTO forecast_snapshots
       (id, operation_day_id, rotation_id, operation_day_version, captured_at, quality,
        lower_minutes, upper_minutes, planning_run_id)
      VALUES ('factory-reset-forecast', 'demo-2026', 'factory-reset-rotation', 0,
              '2026-07-11T09:00:00.000Z', 'STABLE', 10, 20,
-             'factory-reset-child-run');`;
+             'factory-reset-child-run');
+     WITH RECURSIVE sequence(value) AS (
+       VALUES (1)
+       UNION ALL
+       SELECT value + 1 FROM sequence WHERE value < 24000
+     )
+     INSERT INTO forecast_snapshots
+      (id, operation_day_id, rotation_id, operation_day_version, captured_at, quality,
+       lower_minutes, upper_minutes, planning_run_id)
+     SELECT printf('factory-reset-scale-forecast-%05d', value), 'demo-2026',
+            'factory-reset-rotation', 901, printf('2026-07-11T11:00:%05dZ', value),
+            'STABLE', 10, 20, 'factory-reset-child-run'
+       FROM sequence;`;
 const harness = await createWorkerTestHarness({
   name: "factory-reset",
   adminPin: pin,

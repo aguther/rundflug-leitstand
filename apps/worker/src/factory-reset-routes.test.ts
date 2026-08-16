@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import type { SessionActor } from "./auth";
 import type { AuthorizedDevice } from "./device-authorization";
+import { FactoryResetDatabaseError } from "./factory-reset";
 import { registerFactoryResetRoutes } from "./factory-reset-routes";
 import type { Env } from "./types";
 
@@ -101,10 +102,7 @@ function createApp(input?: {
     },
     all: async () => ({ results: (input?.eventIds ?? [EVENT_ID]).map((id) => ({ id })) }),
   }));
-  const batch = vi.fn(async (_statements: unknown[]) => {
-    if (input?.batchFails) throw new Error("synthetic D1 batch failure");
-    return [];
-  });
+  const batch = vi.fn(async () => []);
   const actor = input && "actor" in input ? (input.actor ?? null) : adminActor();
   const device = input && "device" in input ? (input.device ?? null) : adminDevice();
   const authorizeSession = vi.fn(async () => actor);
@@ -130,7 +128,14 @@ function createApp(input?: {
   const clearFactoryResetCoordinators = vi.fn(async () => {
     if (input?.coordinatorFails) throw new Error("synthetic coordinator failure");
   });
-  const factoryResetStatements = vi.fn(() => []);
+  const executeFactoryResetDatabase = vi.fn(async () => {
+    if (input?.batchFails) {
+      throw new FactoryResetDatabaseError(
+        "delete:forecast_snapshots",
+        new Error("synthetic D1 batch failure"),
+      );
+    }
+  });
   const finishR2Cleanup = vi.fn(
     async (_env: Env, _commandId: string, response: FactoryResetResponse) => {
       if (input?.cleanupFails) throw new Error("synthetic cleanup failure");
@@ -138,6 +143,7 @@ function createApp(input?: {
     },
   );
   const coordinatorNamespace = { synthetic: "namespace" };
+  const logger = { error: vi.fn(), log: vi.fn() };
   const env: Env = Object.assign(Object.create(null), {
     APP_ENV: "development",
     ADMIN_RECOVERY_RATE_LIMITER: { limit: vi.fn() },
@@ -154,9 +160,10 @@ function createApp(input?: {
     authorizeSession,
     clearFactoryResetCoordinators,
     createPortableBackup,
+    executeFactoryResetDatabase,
     factoryResetRequestHash,
-    factoryResetStatements,
     finishR2Cleanup,
+    logger,
     now: () => NOW,
     resetSetupCookie,
     resetSetupGrantExpiry,
@@ -184,8 +191,9 @@ function createApp(input?: {
     resetSetupGrantExpiry,
     createPortableBackup,
     clearFactoryResetCoordinators,
-    factoryResetStatements,
+    executeFactoryResetDatabase,
     finishR2Cleanup,
+    logger,
   };
 }
 
@@ -318,12 +326,12 @@ describe("factory reset route", () => {
   });
 
   it("rejects an incorrect active account PIN", async () => {
-    const { app, env, batch } = createApp({ pinValid: false });
+    const { app, env, executeFactoryResetDatabase } = createApp({ pinValid: false });
 
     const response = await requestReset(app, env);
 
     expect(response.status).toBe(403);
-    expect(batch).not.toHaveBeenCalled();
+    expect(executeFactoryResetDatabase).not.toHaveBeenCalled();
   });
 
   it("requires a configured reset-to-setup grant", async () => {
@@ -351,7 +359,7 @@ describe("factory reset route", () => {
   });
 
   it("fails before D1 deletion when a coordinator cannot be cleared", async () => {
-    const { app, env, batch } = createApp({ coordinatorFails: true });
+    const { app, env, executeFactoryResetDatabase } = createApp({ coordinatorFails: true });
 
     const response = await requestReset(app, env);
 
@@ -359,11 +367,11 @@ describe("factory reset route", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "FACTORY_RESET_COORDINATOR_FAILED" },
     });
-    expect(batch).not.toHaveBeenCalled();
+    expect(executeFactoryResetDatabase).not.toHaveBeenCalled();
   });
 
   it("maps reset-batch failure without starting R2 deletion", async () => {
-    const { app, env, finishR2Cleanup } = createApp({ batchFails: true });
+    const { app, env, finishR2Cleanup, logger } = createApp({ batchFails: true });
 
     const response = await requestReset(app, env);
 
@@ -372,17 +380,23 @@ describe("factory reset route", () => {
       error: { code: "FACTORY_RESET_DATABASE_FAILED" },
     });
     expect(finishR2Cleanup).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "FACTORY_RESET_DATABASE_FAILED",
+        stage: "delete:forecast_snapshots",
+        errorType: "Error",
+      }),
+    );
   });
 
   it("creates a recovery backup and commits the reset context", async () => {
     const {
       app,
       env,
-      batch,
       coordinatorNamespace,
       createPortableBackup,
       clearFactoryResetCoordinators,
-      factoryResetStatements,
+      executeFactoryResetDatabase,
       resetSetupCookie,
     } = createApp({ eventIds: [EVENT_ID, "historical-event"] });
 
@@ -400,7 +414,7 @@ describe("factory reset route", () => {
       EVENT_ID,
       "historical-event",
     ]);
-    expect(factoryResetStatements).toHaveBeenCalledWith(
+    expect(executeFactoryResetDatabase).toHaveBeenCalledWith(
       env,
       expect.objectContaining({
         commandId: COMMAND_ID,
@@ -413,9 +427,8 @@ describe("factory reset route", () => {
         setupGrantHash: GRANT_HASH,
       }),
     );
-    expect(batch).toHaveBeenCalledOnce();
     expect(resetSetupCookie).toHaveBeenCalledWith(GRANT_TOKEN, expect.any(Request));
-    expect(factoryResetStatements.mock.calls.flat()).not.toContain("123456");
+    expect(JSON.stringify(executeFactoryResetDatabase.mock.calls)).not.toContain("123456");
   });
 
   it("returns completed R2 deletion after the reset batch", async () => {

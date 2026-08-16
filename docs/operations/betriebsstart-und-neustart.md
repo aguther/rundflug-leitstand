@@ -106,11 +106,15 @@ ausgeführt wurde. Die zusätzliche Option **Auch alle R2-Sicherungen endgültig
 gesamten gebundenen Bucket und darf nur verwendet werden, wenn ausdrücklich keine Wiederherstellung
 mehr möglich sein soll.
 
-Der D1-Anteil läuft als atomarer Batch. Ein fehlerhafter Löschschritt rollt den gesamten D1-Reset
-zurück. Durable-Object-Speicher und offene WebSockets werden vor dem D1-Commit geleert. Die R2-
-Leerung ist wiederholbar; ein technischer Reset-Beleg erlaubt das Fortsetzen, wenn ausschließlich
-dieser letzte Schritt unterbrochen wurde. Dieser Beleg enthält keine PIN, keinen Gerätetoken und
-keine personenbezogenen Daten.
+Der D1-Anteil löscht große operative und historische Tabellen in begrenzten Transaktionen und hält
+Konten, Sitzung, Gerätebindung und Wurzeldaten bis zu einer kleinen finalen Transaktion zurück. Ein
+Abbruch kann deshalb bereits gelöschte Nutzdaten hinterlassen, aber der angemeldete Administrator
+kann denselben Werksreset wiederholen. Der Zustand ist bis zum erfolgreichen Abschluss nicht für
+den operativen Weiterbetrieb bestimmt. Durable-Object-Speicher und offene WebSockets werden vor D1
+geleert. Die R2-Leerung ist wiederholbar; ein technischer Reset-Beleg erlaubt das Fortsetzen, wenn
+ausschließlich dieser letzte Schritt unterbrochen wurde. Dieser Beleg enthält keine PIN, keinen
+Gerätetoken und keine personenbezogenen Daten. Die Entscheidung und der Forward-Repair sind in
+[ADR-0050](../adr/0050-wiederaufnehmbarer-d1-werksreset.md) dokumentiert.
 
 Der Reset verlangt immer die aktuelle PIN des angemeldeten Administratorkontos. Nach einem
 erfolgreichen Reset löscht der Browser Geräteschlüssel und Offline-Snapshots und wechselt zu

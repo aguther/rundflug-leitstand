@@ -54,6 +54,7 @@ ist die Übersicht; verbindlich ist jeweils der ADR-Text mit Kontext, Alternativ
 | [0047](../adr/0047-operative-ui-shell-und-bewusste-pwa-updates.md) | Operative UI-Shell und bewusste PWA-Updates | persistente Inline-Hinweise, mobile Sticky-Geometrie, expliziter Update-Reload und sicherer Routing-Fallback |
 | [0048](../adr/0048-rollenbezogene-web-chunks-und-precache.md) | Rollenbezogene Web-Chunks und begrenzter PWA-Precache | dünne Route-Shells, getrennte Flight-Line-/Flight-Director-Styles und Online-only-Administration im Precache |
 | [0049](../adr/0049-cloudflare-runtime-wartung-und-d1-neuaufbau.md) | Cloudflare-Runtime-Wartung und abgesicherter D1-Neuaufbau | monatliches 45-Tage-Ratchet, abgestimmte Runtime-Artefakte und manifestgesicherter Baseline-Neuaufbau |
+| [0050](../adr/0050-wiederaufnehmbarer-d1-werksreset.md) | Wiederaufnehmbarer D1-Werksreset in begrenzten Transaktionen | große Historientabellen phasenweise löschen; Identität und Wurzeln bis zum finalen Beleg erhalten |
 
 ## Offene Entscheidungen
 

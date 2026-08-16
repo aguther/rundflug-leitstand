@@ -1,10 +1,29 @@
 import { describe, expect, it, vi } from "vitest";
+import { applyDemoSeed, createD1TestDatabase } from "../test-support/migrated-database";
 import {
   clearFactoryResetCoordinators,
   emptyBackupBucket,
+  executeFactoryResetDatabase,
   FACTORY_RESET_DELETE_TABLES,
   factoryResetRequestHash,
 } from "./factory-reset";
+import type { Env } from "./types";
+
+const RESET_DATABASE_INPUT = {
+  commandId: "550e8400-e29b-41d4-a716-446655440502",
+  completedAt: "2026-08-16T10:00:00.000Z",
+  r2CleanupPending: false,
+  requestHash: "a".repeat(64),
+  response: {
+    resetComplete: true,
+    setupRequired: true,
+    recoveryBackupKey: null,
+    r2BackupsDeleted: false,
+  },
+  setupBrowserBindingHash: "b".repeat(64),
+  setupGrantExpiresAt: "2026-08-16T10:30:00.000Z",
+  setupGrantHash: "c".repeat(64),
+} as const;
 
 describe("factory reset", () => {
   it("covers operational, master, identity and bootstrap data without deleting reset receipts", () => {
@@ -83,6 +102,77 @@ describe("factory reset", () => {
     });
     expect(hash).toMatch(/^[a-f0-9]{64}$/);
     expect(hash).not.toContain("123456");
+  });
+
+  it("executes the baseline reset and leaves only its technical receipt", async () => {
+    const testDatabase = createD1TestDatabase();
+    try {
+      applyDemoSeed(testDatabase.database);
+      const env = { DB: testDatabase.d1 } as Env;
+
+      await executeFactoryResetDatabase(env, RESET_DATABASE_INPUT);
+
+      for (const table of FACTORY_RESET_DELETE_TABLES) {
+        const remaining = testDatabase.database
+          .prepare(`SELECT COUNT(*) AS count FROM ${table}`)
+          .get() as { count: number };
+        expect(remaining.count, table).toBe(0);
+      }
+      expect(
+        testDatabase.database.prepare("SELECT command_id FROM system_reset_receipts").get(),
+      ).toEqual({ command_id: RESET_DATABASE_INPUT.commandId });
+      expect(
+        testDatabase.database
+          .prepare("SELECT active FROM system_reset_control WHERE singleton = 1")
+          .get(),
+      ).toEqual({ active: 0 });
+      expect(testDatabase.database.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    } finally {
+      testDatabase.close();
+    }
+  });
+
+  it("preserves administrator access after an interrupted bulk phase and succeeds on retry", async () => {
+    const testDatabase = createD1TestDatabase();
+    try {
+      applyDemoSeed(testDatabase.database);
+      let batchCalls = 0;
+      let failAtCall: number | null = 11;
+      const database = {
+        prepare: (sql: string) => testDatabase.d1.prepare(sql),
+        batch: async (statements: D1PreparedStatement[]) => {
+          batchCalls += 1;
+          if (batchCalls === failAtCall) throw new Error("synthetic interrupted D1 phase");
+          return testDatabase.d1.batch(statements);
+        },
+      } as D1Database;
+
+      await expect(
+        executeFactoryResetDatabase({ DB: database } as Env, RESET_DATABASE_INPUT),
+      ).rejects.toMatchObject({
+        name: "FactoryResetDatabaseError",
+        stage: "delete:planning_runs",
+      });
+      const activeAdministrators = testDatabase.database
+        .prepare("SELECT COUNT(*) AS count FROM operator_accounts")
+        .get() as { count: number };
+      expect(activeAdministrators.count).toBeGreaterThan(0);
+      expect(
+        testDatabase.database
+          .prepare("SELECT active FROM system_reset_control WHERE singleton = 1")
+          .get(),
+      ).toEqual({ active: 0 });
+
+      failAtCall = null;
+      await executeFactoryResetDatabase({ DB: database } as Env, RESET_DATABASE_INPUT);
+
+      expect(
+        testDatabase.database.prepare("SELECT COUNT(*) AS count FROM operator_accounts").get(),
+      ).toEqual({ count: 0 });
+      expect(testDatabase.database.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    } finally {
+      testDatabase.close();
+    }
   });
 
   it("empties every R2 page in bounded batches", async () => {
