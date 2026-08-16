@@ -1158,6 +1158,16 @@ describe("event-driven forecast", () => {
         {
           resourceGroupId: "rg-1",
           activeAircraft: 1,
+          sharedConstraints: [
+            {
+              id: "shared-later-id",
+              earliestStartAt: "2026-07-22T10:30:00.000Z",
+              latestStartAt: "2026-07-22T10:30:00.000Z",
+              minimumDurationMinutes: 5,
+              typicalDurationMinutes: 5,
+              maximumDurationMinutes: 5,
+            },
+          ],
           availabilityLanes: [
             {
               laneId: "aircraft-a:pilot-a",
@@ -1166,6 +1176,16 @@ describe("event-driven forecast", () => {
               availableLowerAt: "2026-07-22T10:00:00.000Z",
               availableExpectedAt: "2026-07-22T10:00:00.000Z",
               availableUpperAt: "2026-07-22T10:00:00.000Z",
+              constraints: [
+                {
+                  id: "lane-earlier-id",
+                  earliestStartAt: "2026-07-22T10:30:00.000Z",
+                  latestStartAt: "2026-07-22T10:30:00.000Z",
+                  minimumDurationMinutes: 5,
+                  typicalDurationMinutes: 5,
+                  maximumDurationMinutes: 5,
+                },
+              ],
             },
           ],
         },
@@ -1195,9 +1215,21 @@ describe("event-driven forecast", () => {
       ],
       operationStartMinutes: 0,
       offsetMinutes: (value) => (Date.parse(value) - Date.parse(input.event.now)) / 60_000,
-      convertConstraint: () => {
-        throw new Error("No constraints expected in this scenario.");
-      },
+      convertConstraint: (constraint) => ({
+        id: constraint.id,
+        earliestStartMinutes:
+          (Date.parse(constraint.earliestStartAt) - Date.parse(input.event.now)) / 60_000,
+        expectedStartMinutes:
+          (Date.parse(constraint.earliestStartAt) - Date.parse(input.event.now)) / 60_000,
+        latestStartMinutes:
+          (Date.parse(constraint.latestStartAt) - Date.parse(input.event.now)) / 60_000,
+        minimumDurationMinutes: constraint.minimumDurationMinutes,
+        typicalDurationMinutes: constraint.typicalDurationMinutes,
+        maximumDurationMinutes: constraint.maximumDurationMinutes,
+        effectMode: constraint.effectMode ?? "BLOCKING",
+        durationMultiplierPercent: constraint.durationMultiplierPercent ?? null,
+        active: constraint.active ?? true,
+      }),
     }).availabilityByResourceGroup.get("rg-1");
 
     expect(availability?.lanes[0]).toMatchObject({
@@ -1205,6 +1237,10 @@ describe("event-driven forecast", () => {
       expectedMinutes: 20,
       upperMinutes: 22,
     });
+    expect(availability?.lanes[0]?.constraints.map((constraint) => constraint.id)).toEqual([
+      "lane-earlier-id",
+      "shared-later-id",
+    ]);
   });
 
   it("anchors sales forecasts to the planned operating start", () => {

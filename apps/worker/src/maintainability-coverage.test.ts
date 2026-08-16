@@ -124,7 +124,7 @@ describe("V1 maintainability and portability boundaries", () => {
     expect(ciWorkflow).toContain("python -m pip install --disable-pip-version-check pypdf==6.10.0");
     const workerRuntimeJob = ciWorkflow.slice(
       ciWorkflow.indexOf("  worker-runtime:"),
-      ciWorkflow.indexOf("  v1-core:"),
+      ciWorkflow.indexOf("  forecast-comparison-baseline:"),
     );
     expect(workerRuntimeJob.indexOf("npm run build:web")).toBeLessThan(
       workerRuntimeJob.indexOf("npm run test:worker-runtime"),
@@ -137,7 +137,8 @@ describe("V1 maintainability and portability boundaries", () => {
     expect(rootManifest.scripts).toMatchObject({
       sonar: "npm run test:coverage && sonar-scanner-npm",
       "test:coverage":
-        'vitest run --coverage --exclude=apps/web/src/features/forecast-simulation/comparison.test.ts --testNamePattern="^(?!.*projects all 300 eligible groups beyond the bounded dispatch horizon).*$" && node scripts/verify_domain_coverage.mjs',
+        'vitest run --coverage --testNamePattern="^(?!.*projects all 300 eligible groups beyond the bounded dispatch horizon).*$" && node scripts/verify_domain_coverage.mjs',
+      "test:forecast-comparison-baseline": "vitest run --config vitest.forecast-baseline.config.ts",
     });
     expect(rootManifest.scripts?.build).not.toContain("sonar");
     expect(rootManifest.scripts?.check).not.toContain("sonar");
@@ -154,6 +155,7 @@ describe("V1 maintainability and portability boundaries", () => {
     expect(ciWorkflow).toContain("actions/upload-artifact@v7");
     expect(ciWorkflow).toContain("actions/download-artifact@v8");
     expect(ciWorkflow).toContain("npm run test:worker-runtime");
+    expect(ciWorkflow).toContain("npm run test:forecast-comparison-baseline");
     expect(ciWorkflow).toContain("npm run test:v1-integrations");
     expect(ciWorkflow).toContain("npm run backup:restore:test");
     expect(ciWorkflow).toContain("npm run docs:verify");

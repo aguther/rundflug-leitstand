@@ -325,7 +325,7 @@ werden dadurch nicht in Familiendienste dupliziert; deren D1-Batches bleiben die
 | Datenbank | Gemeinsamer In-Memory-SQLite-Builder führt die produktive Baseline aus, aktiviert Fremdschlüssel und stellt synthetische Fixtures sowie eine D1-kompatible Testbindung bereit |
 | Worker-Laufzeit | `@cloudflare/vitest-pool-workers` über `vitest.worker.config.ts` und echte D1-Testbindungen; Mocks bleiben auf gezielte Fehlerpfade beschränkt; eigener PR-CI-Job |
 | Oberfläche | Testing Library und jsdom für DOM-Tests, Playwright für Browserläufe |
-| Integration | zahlreiche `scripts/verify_*.mjs`-Läufe; lokale Worker-Verifier erhalten über `scripts/lib/worker-test-harness.mjs` je Instanz freien Port, temporären D1-Zustand und Assets; 18 V1-Kernsuiten als eigener PR-CI-Job, Soak und Abnahmetag als getrennte Langzeitabnahmen |
+| Integration | zahlreiche `scripts/verify_*.mjs`-Läufe; lokale Worker-Verifier erhalten über `scripts/lib/worker-test-harness.mjs` je Instanz freien Port, temporären D1-Zustand und Assets; 18 V1-Kernsuiten und die deterministische 25-Seed-Forecast-Vergleichsbaseline laufen als eigene parallele PR-CI-Jobs, Soak und Abnahmetag als getrennte Langzeitabnahmen |
 | Architekturregeln | `apps/worker/src/maintainability-coverage.test.ts`, `npm run refactor:guardrails` (Dateibudgets, Importverbote, keine Quelltextimporte oder Dateisystem-Lesezugriffe auf produktive `.ts`-/`.tsx`-Dateien in Tests, reine Domain-Abhängigkeiten) |
 | Coverage | expliziter Produktionscode-Nenner für `apps` und `packages`; Ratchets 81 % Statements, 71 % Branches, 80 % Functions und 84 % Lines; zehn kritische Domainmodule jeweils mindestens 90 % Lines und 85 % Branches; 80 % SonarQube-Ziel für neuen Code |
 | Mutation | Stryker mit offiziellem Vitest-Runner für neun fokussierte Module aus Queue, Kapazität, Prognose, Turnaround, Nachruf und Outage Recovery; Schwellen `break: 73`, `low: 80`, `high: 90` |
@@ -335,7 +335,8 @@ werden dadurch nicht in Familiendienste dupliziert; deren D1-Batches bleiben die
 | Statische Analyse | Biome sowie nachgelagerter SonarQube-Scan, der den LCOV-Bericht des Basisjobs übernimmt und auf das Quality Gate wartet |
 
 Der vollständige Gesamtnachweis ist `npm run check`. Die PR-CI führt Basisprüfung/Coverage,
-Worker-Runtime, V1-Kernintegration, Backup-Restore und Dokumentation parallel aus; der Sonar-Job
+Worker-Runtime, V1-Kernintegration, Forecast-Vergleichsbaseline, Backup-Restore und Dokumentation
+parallel aus; der Sonar-Job
 folgt abhängig vom erfolgreichen Basisjob und der Verfügbarkeit des geschützten Tokens.
 Der getrennte Mutationstest läuft wöchentlich und manuell, veröffentlicht HTML- und JSON-Berichte
 als CI-Artefakte und ist vor der Integration eines Branches verpflichtend, der eines der ausgewählten

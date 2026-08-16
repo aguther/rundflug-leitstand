@@ -62,6 +62,13 @@ ausgewählten Module ändert, ist `npm run test:mutation` zusätzlich verpflicht
 PR-Basischeck bleibt davon getrennt; HTML-, JSON- und Incremental-Berichte werden als CI-Artefakt
 aufbewahrt.
 
+Die deterministische Forecast-Vergleichsbaseline über 25 Seeds bleibt ein verpflichtendes PR- und
+`main`-Gate, läuft wegen ihrer Laufzeit jedoch parallel in einem eigenen CI-Job. Der normale
+Vitest- und Coverage-Lauf enthält weiterhin kurze Forecast-Vergleichsszenarien für Verdrahtung,
+Fortschritt, Seed-Folge und Metrikaggregation, schließt den schweren Golden-Baseline-Test aber aus.
+Damit bleiben sowohl die fachliche Baseline als auch schnelle, stabile Basis- und Cloudflare-Builds
+erhalten.
+
 ## Folgen
 
 - Refactorings können interne Namen, JSX-Struktur, CSS-Klassen oder Query-Formulierungen ändern,

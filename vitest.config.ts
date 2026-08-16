@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
@@ -7,6 +7,10 @@ export default defineConfig({
       "apps/worker/**/*.test.ts",
       "apps/web/**/*.test.{ts,tsx}",
       "scripts/**/*.test.ts",
+    ],
+    exclude: [
+      ...configDefaults.exclude,
+      "apps/web/src/features/forecast-simulation/comparison.baseline.test.ts",
     ],
     coverage: {
       include: [

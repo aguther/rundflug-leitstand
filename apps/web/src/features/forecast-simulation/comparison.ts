@@ -30,6 +30,11 @@ export interface BatchComparisonResult {
   rows: ComparisonMetricResult[];
 }
 
+export type ComparisonSimulationRunner = (
+  config: SimulationConfig,
+  manualIncidents?: readonly ManualIncident[],
+) => { metrics: SimulationMetrics };
+
 const METRIC_DEFINITIONS: readonly (ComparisonMetricDefinition & {
   read: (metrics: SimulationMetrics) => number | null;
 })[] = [
@@ -438,6 +443,15 @@ export function runBatchComparison(
   manualIncidents: readonly ManualIncident[] = [],
   onProgress?: (completedRuns: number, totalRuns: number) => void,
 ): BatchComparisonResult {
+  return runBatchComparisonWithRunner(config, manualIncidents, onProgress, runSimulation);
+}
+
+export function runBatchComparisonWithRunner(
+  config: SimulationConfig,
+  manualIncidents: readonly ManualIncident[] = [],
+  onProgress?: (completedRuns: number, totalRuns: number) => void,
+  simulationRunner: ComparisonSimulationRunner = runSimulation,
+): BatchComparisonResult {
   const baselineValues = new Map<string, number[]>();
   const candidateValues = new Map<string, number[]>();
   const baselineConfig = productionBaselineConfig(config);
@@ -450,12 +464,12 @@ export function runBatchComparison(
   for (let index = 0; index < runCount; index += 1) {
     const seed = nextSeed(config.seed, index);
     baselineConfig.seed = seed;
-    const baselineMetrics = runSimulation(baselineConfig, manualIncidents).metrics;
+    const baselineMetrics = simulationRunner(baselineConfig, manualIncidents).metrics;
     let candidateMetrics = baselineMetrics;
     if (!candidateUsesProductionTuning) {
       const candidateConfig = structuredClone(config);
       candidateConfig.seed = seed;
-      candidateMetrics = runSimulation(candidateConfig, manualIncidents).metrics;
+      candidateMetrics = simulationRunner(candidateConfig, manualIncidents).metrics;
     }
     for (const definition of METRIC_DEFINITIONS) {
       const baselineValue = definition.read(baselineMetrics);

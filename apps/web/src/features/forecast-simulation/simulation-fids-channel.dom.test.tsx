@@ -97,7 +97,13 @@ describe("simulation FIDS publisher", () => {
   it("publishes a full state for result changes and matching state requests", () => {
     const rendered = render(<PublisherProbe clockMs={1} />);
     const channel = MockBroadcastChannel.instances[0];
-    const changed = runSimulation({ ...simulationConfigForPreset("NORMAL"), seed: 20260813 });
+    const changed = {
+      ...baseline,
+      config: {
+        ...baseline.config,
+        seed: 20260813,
+      },
+    };
 
     rendered.rerender(<PublisherProbe clockMs={2} result={changed} />);
     expect(channel?.sent.at(-1)).toMatchObject({ type: "STATE", result: changed });
