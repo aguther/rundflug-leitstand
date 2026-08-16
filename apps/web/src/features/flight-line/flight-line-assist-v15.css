@@ -430,12 +430,18 @@
 }
 
 .flight-assist-v15 .assist-v15-primary-label {
-  display: -webkit-box;
+  display: block;
   overflow: hidden;
-  line-height: 1.05;
+  line-height: 1.25;
   text-align: center;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flight-assist-v15 .assist-v15-primary-action svg {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
 }
 
 .flight-assist-v15 .assist-v15-secondary-actions {
@@ -1042,14 +1048,14 @@
   }
 
   .flight-assist-v15 .assist-v15-action-bar {
-    grid-template-columns: 160px auto;
+    grid-template-columns: minmax(176px, 220px) auto;
   }
 
   .flight-assist-v15 .assist-v15-primary-action {
-    width: 160px;
-    min-width: 160px;
-    padding-inline: 8px;
-    font-size: 0.72rem;
+    width: 100%;
+    min-width: 0;
+    padding-inline: 10px;
+    font-size: clamp(0.76rem, 3.2vw, 0.82rem);
   }
 
   .flight-assist-v15 .flight-director-current-timeline {

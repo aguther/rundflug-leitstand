@@ -23,6 +23,11 @@
   gap: 16px;
 }
 
+.operational-plan-header > .ds-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .operational-plan-header h3,
 .operational-plan-header p {
   margin: 0;

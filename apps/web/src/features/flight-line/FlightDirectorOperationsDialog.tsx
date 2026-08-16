@@ -1,6 +1,6 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import { useEffect, useRef, useState } from "react";
-import { Button, ModalDialog, Tabs, TextAreaField } from "../../design-system/components";
+import { Button, ModalDialog, TextAreaField } from "../../design-system/components";
 import {
   OperationalPlanPanel,
   type PlannedOperation,
@@ -9,16 +9,10 @@ import {
   type UpsertRecurringOperationalRulePayload,
 } from "../operations/OperationalPlanPanel";
 
-type OperationsTab = "operations" | "plan" | "resources";
+export type FlightDirectorOperationsSection = "operations" | "plan" | "resources";
 type ResourceGroup = OperationBoard["resourceGroups"][number];
 type ResourceGroupStatus = "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
 type NoticeEditorTarget = { kind: "event" } | { kind: "resource"; resourceGroupId: string };
-
-const operationsTabs: Array<{ value: OperationsTab; label: string }> = [
-  { value: "operations", label: "Betrieb" },
-  { value: "plan", label: "Betriebsplan" },
-  { value: "resources", label: "Ressourcengruppen" },
-];
 
 const resourceStatusActions: Array<{ status: ResourceGroupStatus; label: string }> = [
   { status: "ACTIVE", label: "Aktiv" },
@@ -34,13 +28,13 @@ export interface FlightDirectorOperationsDialogProps {
   eventId: string;
   eventNotice: string;
   eventTimeZone: string;
-  open: boolean;
   aircraft: OperationBoard["aircraft"];
   pilots: OperationBoard["pilots"];
   plannedOperations: OperationBoard["plannedOperations"];
   recurringOperationalRules: OperationBoard["recurringOperationalRules"];
   rotations: OperationBoard["rotations"];
   resourceGroups: ResourceGroup[];
+  section: FlightDirectorOperationsSection | null;
   onCancelPlannedOperation: (plan: PlannedOperation) => Promise<void>;
   onClose: () => void;
   onConfirmPlannedOperation: (plan: PlannedOperation, activate: boolean) => Promise<void>;
@@ -114,20 +108,30 @@ function OperationalNoticeEditor({
 function dialogDescription(
   noticeTarget: NoticeEditorTarget | null,
   selectedResourceGroup: ResourceGroup | null,
+  section: FlightDirectorOperationsSection,
 ): string {
   if (noticeTarget?.kind === "event") {
     return "Der Hinweis gilt veranstaltungsweit und hat Vorrang vor Hinweisen einzelner Ressourcengruppen.";
   }
   if (selectedResourceGroup) return "Der Hinweis gilt ausschließlich für diese Ressourcengruppe.";
+  if (section === "plan") {
+    return "Geplante Einschränkungen und wiederkehrende Regeln für den Veranstaltungstag pflegen.";
+  }
+  if (section === "resources") {
+    return "Status und Hinweise der Ressourcengruppen organisatorisch steuern.";
+  }
   return "Organisatorische Betriebslage steuern. Keine Aktion besitzt flugbetriebliche oder sicherheitsbezogene Freigabewirkung.";
 }
 
 function dialogTitle(
   noticeTarget: NoticeEditorTarget | null,
   selectedResourceGroup: ResourceGroup | null,
+  section: FlightDirectorOperationsSection,
 ): string {
   if (noticeTarget?.kind === "event") return "Veranstaltungsweiter Hinweis";
   if (selectedResourceGroup) return `Hinweis für ${selectedResourceGroup.name}`;
+  if (section === "plan") return "Betriebsplan";
+  if (section === "resources") return "Ressourcengruppen";
   return "Betrieb steuern";
 }
 
@@ -156,7 +160,7 @@ function OperationsOverview({
   const interruptionAction = eventInterrupted ? "Betrieb fortsetzen" : "Betrieb unterbrechen";
   const interruptionVariant = eventInterrupted ? "primary" : "danger";
   return (
-    <div className="flight-director-operation-panel" role="tabpanel">
+    <div className="flight-director-operation-panel">
       <section className="flight-director-event-notice-summary">
         <div>
           <h3>Veranstaltungsweiter Hinweis</h3>
@@ -219,7 +223,7 @@ function ResourceGroupsOverview({
   resourceGroups: ResourceGroup[];
 }>) {
   return (
-    <div className="flight-director-operation-list" role="tabpanel">
+    <div className="flight-director-operation-list">
       {resourceGroups.map((group) => {
         const noticeAction = group.operationalNote
           ? "Hinweis bearbeiten"
@@ -277,7 +281,7 @@ function ResourceGroupsOverview({
   );
 }
 
-interface OperationsTabContentProps {
+interface OperationsSectionContentProps {
   aircraft: OperationBoard["aircraft"];
   busy: boolean;
   emergencyMode: boolean;
@@ -300,11 +304,11 @@ interface OperationsTabContentProps {
   recurringOperationalRules: OperationBoard["recurringOperationalRules"];
   resourceGroups: ResourceGroup[];
   rotations: OperationBoard["rotations"];
-  tab: OperationsTab;
+  section: FlightDirectorOperationsSection;
 }
 
-function OperationsTabContent(props: Readonly<OperationsTabContentProps>) {
-  if (props.tab === "operations") {
+function OperationsSectionContent(props: Readonly<OperationsSectionContentProps>) {
+  if (props.section === "operations") {
     return (
       <OperationsOverview
         busy={props.busy}
@@ -317,7 +321,7 @@ function OperationsTabContent(props: Readonly<OperationsTabContentProps>) {
       />
     );
   }
-  if (props.tab === "resources") {
+  if (props.section === "resources") {
     return (
       <ResourceGroupsOverview
         busy={props.busy}
@@ -328,7 +332,7 @@ function OperationsTabContent(props: Readonly<OperationsTabContentProps>) {
     );
   }
   return (
-    <div role="tabpanel">
+    <div>
       <OperationalPlanPanel
         aircraft={props.aircraft}
         busy={props.busy}
@@ -358,12 +362,12 @@ export function FlightDirectorOperationsDialog({
   eventInterrupted,
   eventNotice,
   eventTimeZone,
-  open,
   pilots,
   plannedOperations,
   recurringOperationalRules,
   resourceGroups,
   rotations,
+  section,
   onCancelPlannedOperation,
   onClose,
   onConfirmPlannedOperation,
@@ -376,7 +380,8 @@ export function FlightDirectorOperationsDialog({
   onUpsertPlannedOperation,
   onUpsertRecurringRule,
 }: Readonly<FlightDirectorOperationsDialogProps>) {
-  const [tab, setTab] = useState<OperationsTab>("operations");
+  const open = section !== null;
+  const activeSection = section ?? "operations";
   const [noticeTarget, setNoticeTarget] = useState<NoticeEditorTarget | null>(null);
   const [noticeDraft, setNoticeDraft] = useState("");
   const openedRef = useRef(false);
@@ -392,7 +397,6 @@ export function FlightDirectorOperationsDialog({
       : (selectedResourceGroup?.operationalNote?.trim() ?? "");
   useEffect(() => {
     if (open && !openedRef.current) {
-      setTab("operations");
       setNoticeTarget(null);
       setNoticeDraft("");
     }
@@ -410,10 +414,8 @@ export function FlightDirectorOperationsDialog({
   }
 
   function returnFromNoticeEditor() {
-    const nextTab = noticeTarget?.kind === "resource" ? "resources" : "operations";
     setNoticeTarget(null);
     setNoticeDraft("");
-    setTab(nextTab);
   }
 
   async function saveNotice() {
@@ -443,8 +445,7 @@ export function FlightDirectorOperationsDialog({
       : "Maximal 240 Zeichen. Der Hinweis wird in den operativen Ansichten dieser Ressourcengruppe angezeigt.";
   let dialogContent = (
     <div className="flight-director-operations-dialog">
-      <Tabs items={operationsTabs} label="Betriebssteuerung" onChange={setTab} value={tab} />
-      <OperationsTabContent
+      <OperationsSectionContent
         aircraft={aircraft}
         busy={busy}
         emergencyMode={emergencyMode}
@@ -467,7 +468,7 @@ export function FlightDirectorOperationsDialog({
         recurringOperationalRules={recurringOperationalRules}
         resourceGroups={resourceGroups}
         rotations={rotations}
-        tab={tab}
+        section={activeSection}
       />
     </div>
   );
@@ -488,7 +489,7 @@ export function FlightDirectorOperationsDialog({
 
   return (
     <ModalDialog
-      description={dialogDescription(noticeTarget, selectedResourceGroup)}
+      description={dialogDescription(noticeTarget, selectedResourceGroup, activeSection)}
       footer={
         <Button
           onClick={noticeEditorOpen ? returnFromNoticeEditor : onClose}
@@ -501,7 +502,7 @@ export function FlightDirectorOperationsDialog({
       onClose={onClose}
       open={open}
       size="wide"
-      title={dialogTitle(noticeTarget, selectedResourceGroup)}
+      title={dialogTitle(noticeTarget, selectedResourceGroup, activeSection)}
     >
       {dialogContent}
     </ModalDialog>

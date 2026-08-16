@@ -62,7 +62,7 @@ const actionForState = {
   LANDED: { label: "Umlauf abschließen", command: "COMPLETE_TURNAROUND" },
   COMPLETED: null,
 } as const;
-
+type OperationsSection = "operations" | "plan" | "resources";
 type Rotation = OperationBoard["rotations"][number];
 type Aircraft = OperationBoard["aircraft"][number];
 type QueueGroup = OperationBoard["queueGroups"][number];
@@ -92,7 +92,7 @@ export function FlightLineWorkspace() {
   useActionMessageBridge(message, setMessage);
   const [queueReason, setQueueReason] = useState("");
   const [callDeviationReason, setCallDeviationReason] = useState("");
-  const [operationsOpen, setOperationsOpen] = useState(false);
+  const [operationsSection, setOperationsSection] = useState<OperationsSection | null>(null);
   const [operationsBusy, setOperationsBusy] = useState(false);
   const [filteredResourceGroupId, setFilteredResourceGroupId] = useState("");
   const [nextAircraftId, setNextAircraftId] = useState("");
@@ -587,9 +587,9 @@ export function FlightLineWorkspace() {
     }
   }
 
-  function openOperationsDialog() {
+  function openOperationsDialog(section: OperationsSection) {
     if (!board || !canManageAircraft) return;
-    setOperationsOpen(true);
+    setOperationsSection(section);
   }
 
   async function setEventNotice(note: string): Promise<boolean> {
@@ -2057,7 +2057,7 @@ export function FlightLineWorkspace() {
             recurringOperationalRules={board.recurringOperationalRules}
             rotations={board.rotations}
             onCancelPlannedOperation={cancelPlannedOperation}
-            onClose={() => setOperationsOpen(false)}
+            onClose={() => setOperationsSection(null)}
             onConfirmPlannedOperation={confirmPlannedOperation}
             onDisableRecurringRule={disableRecurringRule}
             onPublishEventNotice={setEventNotice}
@@ -2067,8 +2067,8 @@ export function FlightLineWorkspace() {
             onTriggerEmergency={triggerEmergency}
             onUpsertPlannedOperation={upsertPlannedOperation}
             onUpsertRecurringRule={upsertRecurringRule}
-            open={operationsOpen && canManageAircraft}
             resourceGroups={board.resourceGroups}
+            section={canManageAircraft ? operationsSection : null}
           />
         ) : null}
         <ModalDialog

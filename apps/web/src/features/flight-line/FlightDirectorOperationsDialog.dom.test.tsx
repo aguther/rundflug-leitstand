@@ -53,12 +53,12 @@ function createProps(
     onTriggerEmergency: vi.fn(),
     onUpsertPlannedOperation: vi.fn(),
     onUpsertRecurringRule: vi.fn(),
-    open: true,
     pilots: [],
     plannedOperations: [],
     recurringOperationalRules: [],
     resourceGroups: [resourceGroup()],
     rotations: [],
+    section: "operations",
     ...overrides,
   };
 }
@@ -111,10 +111,10 @@ describe("Flight Director operations dialog", () => {
 
   it("controls resource groups and edits their scoped notices", async () => {
     const user = userEvent.setup();
-    const props = createProps();
+    const props = createProps({ section: "resources" });
     const { rerender } = render(<FlightDirectorOperationsDialog {...props} />);
 
-    await user.click(screen.getByRole("tab", { name: "Ressourcengruppen" }));
+    expect(screen.getByRole("dialog", { name: "Ressourcengruppen" })).toBeTruthy();
     expect(screen.getByText("Oldtimer")).toBeTruthy();
     expect(screen.getByText("1 Flugzeuge")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Aktiv" }) as HTMLButtonElement).disabled).toBe(
@@ -145,12 +145,10 @@ describe("Flight Director operations dialog", () => {
       "Bestehender Gruppenhinweis",
     );
     await user.click(screen.getByRole("button", { name: "Zurück" }));
-    expect(
-      screen.getByRole("tab", { name: "Ressourcengruppen" }).getAttribute("aria-selected"),
-    ).toBe("true");
+    expect(screen.getByRole("dialog", { name: "Ressourcengruppen" })).toBeTruthy();
   });
 
-  it("keeps a rejected notice open and resets the active tab after reopening", async () => {
+  it("keeps a rejected notice open and renders the section selected by the direct action", async () => {
     const user = userEvent.setup();
     const onPublishEventNotice = vi.fn().mockResolvedValue(false);
     const props = createProps({ onPublishEventNotice });
@@ -168,11 +166,12 @@ describe("Flight Director operations dialog", () => {
     expect(screen.getByRole("textbox", { name: /^Hinweis/ })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Zurück" }));
 
-    await user.click(screen.getByRole("tab", { name: "Betriebsplan" }));
+    rerender(<FlightDirectorOperationsDialog {...props} section="plan" />);
     expect(screen.getByTestId("operational-plan").textContent).toContain("event-one");
-    rerender(<FlightDirectorOperationsDialog {...props} open={false} />);
+    rerender(<FlightDirectorOperationsDialog {...props} section={null} />);
     expect(screen.queryByRole("dialog")).toBeNull();
-    rerender(<FlightDirectorOperationsDialog {...props} open />);
-    expect(screen.getByRole("tab", { name: "Betrieb" }).getAttribute("aria-selected")).toBe("true");
+    rerender(<FlightDirectorOperationsDialog {...props} section="operations" />);
+    expect(screen.getByRole("dialog", { name: "Betrieb steuern" })).toBeTruthy();
+    expect(screen.queryByRole("tab")).toBeNull();
   });
 });

@@ -58,6 +58,20 @@
   gap: 8px;
 }
 
+.flight-director-operation-shortcuts {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.flight-director-operation-shortcuts > .ds-button {
+  min-height: var(--control-default);
+  white-space: nowrap;
+}
+
 .flight-director-header-actions .flight-director-resource-filter {
   align-self: center;
   margin: 0;
@@ -69,7 +83,8 @@
   min-height: var(--control-default);
 }
 
-.flight-director-header-actions > .flight-director-analysis-action {
+.flight-director-header-actions > .flight-director-analysis-action,
+.flight-director-header-actions > .flight-director-analytics-action {
   flex: 0 0 var(--control-default);
   width: var(--control-default);
   height: var(--control-default);
@@ -815,6 +830,28 @@
   color: var(--ui-muted);
   font-size: 0.68rem;
   font-weight: 500;
+}
+
+.flight-director-ticket-heading,
+.flight-director-ticket-size-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.flight-director-ticket-heading {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.flight-director-ticket-size-actions {
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.flight-director-ticket-overview.is-collapsed > header {
+  min-height: 56px;
+  grid-template-columns: minmax(0, 1fr);
 }
 .flight-director-ticket-overview .flight-director-compact-table {
   height: auto;

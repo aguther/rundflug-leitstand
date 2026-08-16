@@ -184,6 +184,10 @@
     flex: 1 1 100%;
   }
 
+  .flight-director-operation-shortcuts {
+    flex: 1 1 auto;
+  }
+
   .flight-director-operation-panel {
     grid-template-columns: 1fr;
   }
@@ -209,8 +213,16 @@
 }
 
 @media (max-width: 480px) {
-  .flight-director-header-actions > .ds-button {
-    flex: 1 1 auto;
+  .flight-director-operation-shortcuts {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .flight-director-operation-shortcuts > .ds-button {
+    min-width: 0;
+    padding-inline: 6px;
+    font-size: 0.72rem;
   }
 
   .flight-director-operation-list > article {

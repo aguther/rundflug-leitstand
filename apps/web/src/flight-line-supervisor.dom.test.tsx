@@ -374,7 +374,9 @@ describe("Flight Director operational coordination", () => {
     renderConsole({ canManageOperations: true, onOpenOperations, onResourceGroupChange });
 
     await user.click(screen.getByRole("button", { name: "Betrieb" }));
-    expect(onOpenOperations).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole("button", { name: "Betriebsplan" }));
+    await user.click(screen.getByRole("button", { name: "Ressourcengruppen" }));
+    expect(onOpenOperations.mock.calls).toEqual([["operations"], ["plan"], ["resources"]]);
 
     await user.selectOptions(
       screen.getByRole("combobox", { name: "Ressourcengruppe filtern" }),
@@ -473,5 +475,26 @@ describe("Flight Director operational coordination", () => {
     expect(
       await screen.findByRole("button", { name: /Tagesauswertung für G-PN-0017 anzeigen/ }),
     ).toBeTruthy();
+  });
+
+  it("collapses and resizes the sold-ticket overview without losing its controls", async () => {
+    const user = userEvent.setup();
+    renderConsole();
+    const ticketPanel = screen.getByRole("region", { name: "Verkaufte Tickets" });
+    const bottomGrid = ticketPanel.parentElement;
+
+    expect(bottomGrid?.classList.contains("size-balanced")).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Verkaufte Tickets vergrößern" }));
+    expect(bottomGrid?.classList.contains("size-expanded")).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Verkaufte Tickets verkleinern" }));
+    expect(bottomGrid?.classList.contains("size-balanced")).toBe(true);
+
+    await user.click(screen.getByRole("button", { name: "Verkaufte Tickets einklappen" }));
+    expect(bottomGrid?.classList.contains("is-collapsed")).toBe(true);
+    expect(screen.queryByRole("searchbox", { name: "Verkaufte Tickets suchen" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Verkaufte Tickets ausklappen" }));
+    expect(bottomGrid?.classList.contains("is-collapsed")).toBe(false);
+    expect(screen.getByRole("searchbox", { name: "Verkaufte Tickets suchen" })).toBeTruthy();
   });
 });

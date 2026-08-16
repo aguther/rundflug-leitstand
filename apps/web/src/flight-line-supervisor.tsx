@@ -51,6 +51,7 @@ import {
   FlightDirectorAnalyticsDialog,
   type FlightDirectorAnalyticsSelection,
 } from "./features/flight-line/FlightDirectorAnalyticsDialog";
+import type { FlightDirectorOperationsSection } from "./features/flight-line/FlightDirectorOperationsDialog";
 import {
   activeRotationForAircraft,
   BookingGroupAssignmentDialog,
@@ -70,6 +71,15 @@ type Aircraft = OperationBoard["aircraft"][number];
 type Rotation = OperationBoard["rotations"][number];
 type QueueGroup = OperationBoard["queueGroups"][number];
 type TurnaroundNextState = "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE";
+type TicketPanelSize = "compact" | "balanced" | "expanded";
+
+const ticketPanelSizes: TicketPanelSize[] = ["compact", "balanced", "expanded"];
+
+function adjacentTicketPanelSize(current: TicketPanelSize, direction: -1 | 1): TicketPanelSize {
+  const currentIndex = ticketPanelSizes.indexOf(current);
+  const nextIndex = Math.max(0, Math.min(ticketPanelSizes.length - 1, currentIndex + direction));
+  return ticketPanelSizes[nextIndex] ?? current;
+}
 
 function queuedSegmentTicketCount(group: QueueGroup): number {
   return group.nextSegmentTicketCount ?? group.ticketCount;
@@ -280,7 +290,7 @@ export function FlightLineSupervisorConsole({
   operationalSummaryTone: "critical" | "warning" | "notice" | "normal";
   canManageOperations: boolean;
   dispatchLease: DispatchRecommendationLeaseController;
-  onOpenOperations: () => void;
+  onOpenOperations: (section: FlightDirectorOperationsSection) => void;
   onResourceGroupChange: (resourceGroupId: string) => void;
   onAssignPilot: (aircraftId: string, pilotId: string, reassign: boolean) => Promise<void>;
   busyRotationIds?: ReadonlySet<string>;
@@ -304,6 +314,8 @@ export function FlightLineSupervisorConsole({
   const [ticketSearch, setTicketSearch] = useState("");
   const [onlyOpenTickets, setOnlyOpenTickets] = useState(true);
   const [ticketSort, setTicketSort] = useState<TicketSort>(null);
+  const [ticketPanelCollapsed, setTicketPanelCollapsed] = useState(false);
+  const [ticketPanelSize, setTicketPanelSize] = useState<TicketPanelSize>("balanced");
   const [assignmentOpen, setAssignmentOpen] = useState(false);
   const [pilotOpen, setPilotOpen] = useState(false);
   const [analysisBusy, setAnalysisBusy] = useState(false);
@@ -552,22 +564,45 @@ export function FlightLineSupervisorConsole({
             >
               {operationalSummary}
             </StatusPill>
-            <Button
-              disabled={!canManageOperations}
-              onClick={onOpenOperations}
-              type="button"
-              variant="secondary"
-            >
-              Betrieb
-            </Button>
-            <Button
+            <fieldset className="flight-director-operation-shortcuts">
+              <legend className="visually-hidden">Betriebssteuerung</legend>
+              <Button
+                disabled={!canManageOperations}
+                onClick={() => onOpenOperations("operations")}
+                size="compact"
+                type="button"
+                variant="secondary"
+              >
+                Betrieb
+              </Button>
+              <Button
+                disabled={!canManageOperations}
+                onClick={() => onOpenOperations("plan")}
+                size="compact"
+                type="button"
+                variant="secondary"
+              >
+                Betriebsplan
+              </Button>
+              <Button
+                disabled={!canManageOperations}
+                onClick={() => onOpenOperations("resources")}
+                size="compact"
+                type="button"
+                variant="secondary"
+              >
+                Ressourcengruppen
+              </Button>
+            </fieldset>
+            <IconButton
+              className="flight-director-analytics-action"
+              label="Auswertungen"
               onClick={() => setAnalyticsSelection(initialAnalyticsSelection(aircraft, board))}
+              size="compact"
               type="button"
-              variant="secondary"
             >
               <ChartNoAxesCombined aria-hidden="true" />
-              Auswertungen
-            </Button>
+            </IconButton>
             <IconButton
               busy={analysisBusy}
               className="flight-director-analysis-action"
@@ -781,37 +816,97 @@ export function FlightLineSupervisorConsole({
         </section>
       </Panel>
 
-      <div className="flight-director-bottom-grid is-ticket-only">
-        <Panel className="flight-director-ticket-overview" padding="none">
+      <div
+        className={`flight-director-bottom-grid is-ticket-only size-${ticketPanelSize}${
+          ticketPanelCollapsed ? " is-collapsed" : ""
+        }`}
+      >
+        <Panel
+          aria-label="Verkaufte Tickets"
+          className={`flight-director-ticket-overview${
+            ticketPanelCollapsed ? " is-collapsed" : ""
+          }`}
+          padding="none"
+        >
           <header>
-            <h2>
-              Verkaufte Tickets <small>alle Flugzeuge</small>
-            </h2>
-            <SearchField
-              className="flight-director-ticket-search"
-              label="Verkaufte Tickets suchen"
-              onChange={(event) => setTicketSearch(event.target.value)}
-              placeholder="Nach Ticket-ID oder Produkt suchen"
-              value={ticketSearch}
-            />
-            <label className="flight-director-open-filter">
-              <input
-                checked={onlyOpenTickets}
-                onChange={(event) => setOnlyOpenTickets(event.target.checked)}
-                type="checkbox"
-              />
-              <span>Nur offene Tickets</span>
-            </label>
+            <div className="flight-director-ticket-heading">
+              <h2>
+                Verkaufte Tickets <small>alle Flugzeuge</small>
+              </h2>
+              <div className="flight-director-ticket-size-actions">
+                {!ticketPanelCollapsed ? (
+                  <>
+                    <IconButton
+                      disabled={ticketPanelSize === "compact"}
+                      label="Verkaufte Tickets verkleinern"
+                      onClick={() =>
+                        setTicketPanelSize((current) => adjacentTicketPanelSize(current, -1))
+                      }
+                      size="compact"
+                    >
+                      <span aria-hidden="true">−</span>
+                    </IconButton>
+                    <IconButton
+                      disabled={ticketPanelSize === "expanded"}
+                      label="Verkaufte Tickets vergrößern"
+                      onClick={() =>
+                        setTicketPanelSize((current) => adjacentTicketPanelSize(current, 1))
+                      }
+                      size="compact"
+                    >
+                      <span aria-hidden="true">+</span>
+                    </IconButton>
+                  </>
+                ) : null}
+                <IconButton
+                  aria-expanded={!ticketPanelCollapsed}
+                  label={
+                    ticketPanelCollapsed
+                      ? "Verkaufte Tickets ausklappen"
+                      : "Verkaufte Tickets einklappen"
+                  }
+                  onClick={() => setTicketPanelCollapsed((collapsed) => !collapsed)}
+                  size="compact"
+                >
+                  {ticketPanelCollapsed ? (
+                    <ArrowDown aria-hidden="true" />
+                  ) : (
+                    <ArrowUp aria-hidden="true" />
+                  )}
+                </IconButton>
+              </div>
+            </div>
+            {!ticketPanelCollapsed ? (
+              <>
+                <SearchField
+                  className="flight-director-ticket-search"
+                  label="Verkaufte Tickets suchen"
+                  onChange={(event) => setTicketSearch(event.target.value)}
+                  placeholder="Nach Ticket-ID oder Produkt suchen"
+                  value={ticketSearch}
+                />
+                <label className="flight-director-open-filter">
+                  <input
+                    checked={onlyOpenTickets}
+                    onChange={(event) => setOnlyOpenTickets(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>Nur offene Tickets</span>
+                </label>
+              </>
+            ) : null}
           </header>
-          <CompactTickets
-            onOpenAnalytics={(ticketGroupId, rotationId) =>
-              setAnalyticsSelection({ tab: "groups", id: ticketGroupId, rotationId })
-            }
-            onSort={(key) => setTicketSort((current) => nextTicketSort(current, key))}
-            rows={ticketRows}
-            sort={ticketSort}
-            timeZone={board.event.timeZone}
-          />
+          {!ticketPanelCollapsed ? (
+            <CompactTickets
+              onOpenAnalytics={(ticketGroupId, rotationId) =>
+                setAnalyticsSelection({ tab: "groups", id: ticketGroupId, rotationId })
+              }
+              onSort={(key) => setTicketSort((current) => nextTicketSort(current, key))}
+              rows={ticketRows}
+              sort={ticketSort}
+              timeZone={board.event.timeZone}
+            />
+          ) : null}
         </Panel>
       </div>
 

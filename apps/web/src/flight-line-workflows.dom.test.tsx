@@ -144,7 +144,6 @@ vi.mock("./dispatch-recommendation-lease", () => ({
 
 vi.mock("./features/flight-line/FlightDirectorOperationsDialog", () => ({
   FlightDirectorOperationsDialog: (props: {
-    open: boolean;
     onCancelPlannedOperation: (plan: { id: string; version: number }) => Promise<void>;
     onConfirmPlannedOperation: (
       plan: {
@@ -176,8 +175,9 @@ vi.mock("./features/flight-line/FlightDirectorOperationsDialog", () => ({
     onTriggerEmergency: () => Promise<void>;
     onUpsertPlannedOperation: (payload: { planId: string }) => Promise<void>;
     onUpsertRecurringRule: (payload: { ruleId: string }) => Promise<void>;
+    section: "operations" | "plan" | "resources" | null;
   }) =>
-    props.open ? (
+    props.section ? (
       <section aria-label="Operations-Testdialog">
         <button onClick={() => void props.onPublishEventNotice(" Testhinweis ")} type="button">
           Veranstaltungshinweis senden
@@ -369,7 +369,7 @@ vi.mock("./flight-line-supervisor", () => ({
     onGroupDefer: (ticketGroupId: string) => Promise<void>;
     onGroupRecall: (ticketGroupId: string) => Promise<boolean>;
     onGroupRecallClear: (ticketGroupId: string, recallId: string) => Promise<boolean>;
-    onOpenOperations: () => void;
+    onOpenOperations: (section: "operations" | "plan" | "resources") => void;
     onPauseAircraft: (aircraftId: string) => void;
     onReserveAssignment: (aircraftId: string) => Promise<unknown>;
     onResourceGroupChange: (resourceGroupId: string) => void;
@@ -386,7 +386,7 @@ vi.mock("./flight-line-supervisor", () => ({
       <section aria-label="Flight-Director-Testkonsole">
         <p data-tone={props.operationalSummaryTone}>{props.operationalSummary}</p>
         <p>{props.board.aircraft[0]?.registration}</p>
-        <button onClick={props.onOpenOperations} type="button">
+        <button onClick={() => props.onOpenOperations("operations")} type="button">
           Operations öffnen
         </button>
         <button
