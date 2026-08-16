@@ -19,6 +19,7 @@ export const compatibilityProfileSecrets = [
 ];
 
 const NAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
+const EU_LOCATION_CODES = new Set(["eeur", "weur"]);
 
 function readOption(argumentsList, index, name) {
   const value = argumentsList[index + 1];
@@ -196,6 +197,12 @@ export function d1DatabaseId(entry) {
 export function findJurisdiction(payload) {
   if (!payload || typeof payload !== "object") return null;
   if (typeof payload.jurisdiction === "string") return payload.jurisdiction.toLowerCase();
+  if (
+    typeof payload.location === "string" &&
+    EU_LOCATION_CODES.has(payload.location.toLowerCase())
+  ) {
+    return "eu";
+  }
   for (const value of Object.values(payload)) {
     const nested = findJurisdiction(value);
     if (nested) return nested;

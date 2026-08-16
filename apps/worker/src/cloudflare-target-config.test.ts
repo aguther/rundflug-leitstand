@@ -8,6 +8,7 @@ const {
   cloudflareAccountId,
   createTargetWranglerConfig,
   deploymentUrl,
+  findJurisdiction,
   parseCloudflareTargetArguments,
   rateLimitNamespaceId,
 } = cloudflareTarget;
@@ -105,5 +106,12 @@ describe("Cloudflare target configuration", () => {
     expect(deploymentUrl("Deployed to https://leitstand.example.workers.dev")).toBe(
       "https://leitstand.example.workers.dev",
     );
+  });
+
+  it("normalizes explicit jurisdictions and Cloudflare's European R2 locations", () => {
+    expect(findJurisdiction({ jurisdiction: "EU" })).toBe("eu");
+    expect(findJurisdiction({ result: { location: "EEUR" } })).toBe("eu");
+    expect(findJurisdiction({ location: "WEUR" })).toBe("eu");
+    expect(findJurisdiction({ location: "ENAM" })).toBeNull();
   });
 });

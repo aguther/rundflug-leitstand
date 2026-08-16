@@ -50,7 +50,15 @@ describe("guarded Cloudflare D1 recreation", () => {
         manifest,
         databaseList,
         { jurisdiction: "eu" },
+        { location: "EEUR" },
+      ),
+    ).not.toThrow();
+    expect(() =>
+      recreation.verifyRemoteInventory(
+        manifest,
+        databaseList,
         { jurisdiction: "eu" },
+        { location: "WEUR" },
       ),
     ).not.toThrow();
     expect(() =>
@@ -66,7 +74,7 @@ describe("guarded Cloudflare D1 recreation", () => {
         manifest,
         databaseList,
         { jurisdiction: "eu" },
-        { jurisdiction: "us" },
+        { location: "ENAM" },
       ),
     ).toThrow(/EU-Jurisdiktion/);
   });
