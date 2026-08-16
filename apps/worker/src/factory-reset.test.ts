@@ -137,7 +137,7 @@ describe("factory reset", () => {
     try {
       applyDemoSeed(testDatabase.database);
       let batchCalls = 0;
-      let failAtCall: number | null = 11;
+      let failAtCall: number | null = 3;
       const database = {
         prepare: (sql: string) => testDatabase.d1.prepare(sql),
         batch: async (statements: D1PreparedStatement[]) => {
@@ -151,7 +151,7 @@ describe("factory reset", () => {
         executeFactoryResetDatabase({ DB: database } as Env, RESET_DATABASE_INPUT),
       ).rejects.toMatchObject({
         name: "FactoryResetDatabaseError",
-        stage: "delete:planning_runs",
+        stage: "delete:planning-runs",
       });
       const activeAdministrators = testDatabase.database
         .prepare("SELECT COUNT(*) AS count FROM operator_accounts")

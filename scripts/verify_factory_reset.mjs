@@ -3,6 +3,9 @@ import { createWorkerTestHarness } from "./lib/worker-test-harness.mjs";
 
 const pin = "123456";
 const setupCode = ["synthetic", "factory", "reset", "setup", "code"].join("-");
+const productionScale = process.argv.includes("--production-scale");
+const planningRunCount = productionScale ? 29000 : 18000;
+const forecastSnapshotCount = productionScale ? 24000 : 14000;
 const forecastFixtureSql = `INSERT INTO flight_groups
       (id, operation_day_id, resource_group_id, product_id, communication_number, status, version, created_at, updated_at)
      VALUES ('factory-reset-flight-group', 'demo-2026', 'rg-panorama', 'panorama-20', 999, 'PLANNED', 0,
@@ -61,7 +64,7 @@ const forecastFixtureSql = `INSERT INTO flight_groups
      WITH RECURSIVE sequence(value) AS (
        VALUES (1)
        UNION ALL
-       SELECT value + 1 FROM sequence WHERE value < 29000
+       SELECT value + 1 FROM sequence WHERE value < ${planningRunCount}
      )
      INSERT INTO planning_runs
       (id, operation_day_id, operation_day_version, context_id, previous_run_id, anchor_run_id,
@@ -91,7 +94,7 @@ const forecastFixtureSql = `INSERT INTO flight_groups
      WITH RECURSIVE sequence(value) AS (
        VALUES (1)
        UNION ALL
-       SELECT value + 1 FROM sequence WHERE value < 24000
+       SELECT value + 1 FROM sequence WHERE value < ${forecastSnapshotCount}
      )
      INSERT INTO forecast_snapshots
       (id, operation_day_id, rotation_id, operation_day_version, captured_at, quality,

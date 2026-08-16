@@ -44,6 +44,7 @@
     "test:automatic-precall": "node scripts/verify_automatic_precall.mjs",
     "test:first-run-setup": "node scripts/verify_first_run_setup.mjs",
     "test:factory-reset": "node scripts/verify_factory_reset.mjs",
+    "test:factory-reset:production-scale": "node scripts/verify_factory_reset.mjs --production-scale",
     "test:public-monitors": "node scripts/verify_public_monitors.mjs",
     "test:vertical-slice": "node scripts/verify_vertical_slice.mjs",
     "test:v1-acceptance-day": "node scripts/verify_v1_acceptance_day.mjs",

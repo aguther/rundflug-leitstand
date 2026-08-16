@@ -131,7 +131,7 @@ function createApp(input?: {
   const executeFactoryResetDatabase = vi.fn(async () => {
     if (input?.batchFails) {
       throw new FactoryResetDatabaseError(
-        "delete:forecast_snapshots",
+        "delete:forecast-snapshots",
         new Error("synthetic D1 batch failure"),
       );
     }
@@ -383,7 +383,7 @@ describe("factory reset route", () => {
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         code: "FACTORY_RESET_DATABASE_FAILED",
-        stage: "delete:forecast_snapshots",
+        stage: "delete:forecast-snapshots",
         errorType: "Error",
       }),
     );

@@ -2,39 +2,52 @@ import type { FactoryResetRequest, FactoryResetResponse } from "@rundflug/contra
 import { sha256Hex } from "./crypto";
 import type { Env } from "./types";
 
-export const FACTORY_RESET_BULK_DELETE_TABLES = [
-  "dispatch_recommendation_leases",
-  "flight_line_assist_claims",
-  "web_push_deliveries",
-  "web_push_subscriptions",
-  "outage_recovery_references",
-  "outage_recovery_entries",
-  "outage_recovery_batches",
-  "analysis_archive_events",
-  "analysis_archives",
-  "forecast_snapshots",
-  "planning_runs",
-  "planning_contexts",
-  "planning_chunks",
-  "rotation_manifest_corrections",
-  "rotation_tickets",
-  "ticket_group_recalls",
-  "operational_blocks",
-  "planned_operational_constraints",
-  "recurring_operational_rules",
-  "rotations",
-  "flight_groups",
-  "tickets",
-  "ticket_groups",
-  "outbox",
-  "idempotency_receipts",
-  "resource_group_memberships",
-  "aircraft_product_turnaround_overrides",
-  "products",
-  "pilots",
-  "operational_events",
-  "event_deletion_receipts",
+export const FACTORY_RESET_BULK_DELETE_PHASES = [
+  {
+    name: "support-history",
+    tables: [
+      "dispatch_recommendation_leases",
+      "flight_line_assist_claims",
+      "web_push_deliveries",
+      "web_push_subscriptions",
+      "outage_recovery_references",
+      "outage_recovery_entries",
+      "outage_recovery_batches",
+      "analysis_archive_events",
+      "analysis_archives",
+    ],
+  },
+  { name: "forecast-snapshots", tables: ["forecast_snapshots"] },
+  { name: "planning-runs", tables: ["planning_runs"] },
+  { name: "planning-storage", tables: ["planning_contexts", "planning_chunks"] },
+  {
+    name: "operational-data",
+    tables: [
+      "rotation_manifest_corrections",
+      "rotation_tickets",
+      "ticket_group_recalls",
+      "operational_blocks",
+      "planned_operational_constraints",
+      "recurring_operational_rules",
+      "rotations",
+      "flight_groups",
+      "tickets",
+      "ticket_groups",
+      "outbox",
+      "idempotency_receipts",
+      "resource_group_memberships",
+      "aircraft_product_turnaround_overrides",
+      "products",
+      "pilots",
+      "operational_events",
+      "event_deletion_receipts",
+    ],
+  },
 ] as const;
+
+export const FACTORY_RESET_BULK_DELETE_TABLES = FACTORY_RESET_BULK_DELETE_PHASES.flatMap(
+  (phase) => phase.tables,
+);
 
 export const FACTORY_RESET_FINAL_DELETE_TABLES = [
   "app_bootstrap",
@@ -103,13 +116,16 @@ export class FactoryResetDatabaseError extends Error {
   }
 }
 
-function deleteTableStatements(env: Env, table: (typeof FACTORY_RESET_DELETE_TABLES)[number]) {
+function deletePhaseStatements(
+  env: Env,
+  tables: readonly (typeof FACTORY_RESET_BULK_DELETE_TABLES)[number][],
+) {
   return [
     // The reset control only relaxes append-only deletion triggers inside this transaction.
     // A failed table phase therefore rolls the control flag back together with its deletion.
     env.DB.prepare("PRAGMA defer_foreign_keys = ON"),
     env.DB.prepare("UPDATE system_reset_control SET active = 1 WHERE singleton = 1"),
-    env.DB.prepare(`DELETE FROM ${table}`),
+    ...tables.map((table) => env.DB.prepare(`DELETE FROM ${table}`)),
     env.DB.prepare("UPDATE system_reset_control SET active = 0 WHERE singleton = 1"),
   ];
 }
@@ -148,14 +164,14 @@ export async function executeFactoryResetDatabase(
   input: FactoryResetDatabaseInput,
 ): Promise<void> {
   // A production installation can accumulate tens of thousands of indexed planning rows. Keeping
-  // every table in one D1 transaction can exceed the database request duration. Each bulk table is
-  // therefore its own bounded transaction in child-to-parent order. The identity and root tables
-  // remain in the final transaction so an interrupted reset can still be retried by the same admin.
-  for (const table of FACTORY_RESET_BULK_DELETE_TABLES) {
+  // every table in one D1 transaction can exceed the database request duration. The large history
+  // tables remain isolated while adjacent small tables share bounded child-to-parent phases. The
+  // identity and root tables stay in the final transaction so the same admin can retry an interruption.
+  for (const phase of FACTORY_RESET_BULK_DELETE_PHASES) {
     try {
-      await env.DB.batch(deleteTableStatements(env, table));
+      await env.DB.batch(deletePhaseStatements(env, phase.tables));
     } catch (cause) {
-      throw new FactoryResetDatabaseError(`delete:${table}`, cause);
+      throw new FactoryResetDatabaseError(`delete:${phase.name}`, cause);
     }
   }
 

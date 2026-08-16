@@ -234,7 +234,7 @@ sequenceDiagram
     A->>W: Werksreset mit Sitzung, Gerät, aktueller PIN und commandId
     W->>R: optionale portable Wiederherstellungssicherung
     W->>DO: Alarm, Storage und Live-Verbindungen je Veranstaltung leeren
-    loop operative und historische Tabellen, Kind vor Eltern
+    loop begrenzte Löschphasen, große Historientabellen isoliert
         W->>D: begrenzte Löschtransaktion mit aufgeschobenen Fremdschlüsseln
     end
     W->>D: finale Transaktion: Identität und Wurzeln löschen, Reset-Beleg schreiben
