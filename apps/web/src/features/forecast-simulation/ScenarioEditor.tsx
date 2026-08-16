@@ -6,7 +6,7 @@ import {
 } from "@rundflug/domain";
 import { Clock3, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { type KeyboardEvent, useEffect, useState } from "react";
-import { Button, SidePanel } from "../../design-system/components";
+import { Button, ModalDialog } from "../../design-system/components";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "../../event-time";
 import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
 import {
@@ -721,7 +721,10 @@ export function ScenarioEditor({
   });
 
   return (
-    <SidePanel
+    <ModalDialog
+      bodyClassName="sim-editor-dialog-body"
+      className="sim-editor-dialog"
+      description="Stammdaten, Tagesplan, simulierte Realität und Prognose-Labor"
       footer={
         <>
           <Button onClick={onClose}>Abbrechen</Button>
@@ -730,14 +733,12 @@ export function ScenarioEditor({
           </Button>
         </>
       }
+      initialFocusSelector='.sim-editor-tabs button[aria-current="page"]'
       onClose={onClose}
       open={open}
-      title={
-        <span className="sim-editor-title">
-          Szenario konfigurieren{" "}
-          <small>Stammdaten, Tagesplan, simulierte Realität und Prognose-Labor</small>
-        </span>
-      }
+      portal
+      size="wide"
+      title="Szenario konfigurieren"
     >
       <nav aria-label="Konfigurationsbereiche" className="sim-editor-tabs">
         {[
@@ -1572,6 +1573,6 @@ export function ScenarioEditor({
           ))}
         </div>
       ) : null}
-    </SidePanel>
+    </ModalDialog>
   );
 }

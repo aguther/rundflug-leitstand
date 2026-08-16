@@ -151,16 +151,20 @@ describe("forecast simulation view", () => {
     render(<ForecastSimulationView />);
 
     expect(screen.getByText("Nur Simulation – keine Tickets oder Ist-Zustände")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Szenarioübersicht" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Szenario konfigurieren" }).textContent).toContain(
+      "Konfigurieren",
+    );
     const variantSelect = screen.getByLabelText("Variante");
     expect(within(variantSelect).getAllByRole("option")).toHaveLength(1);
 
-    await user.click(screen.getByRole("button", { name: /Duplizieren/ }));
+    await user.click(screen.getByRole("button", { name: /duplizieren/i }));
     expect(within(variantSelect).getAllByRole("option")).toHaveLength(2);
     expect((screen.getByLabelText("Variantenname") as HTMLInputElement).value).toBe(
       "Variante 1 – Kopie",
     );
 
-    await user.click(screen.getByRole("button", { name: /Löschen/ }));
+    await user.click(screen.getByRole("button", { name: /löschen/i }));
     expect(within(variantSelect).getAllByRole("option")).toHaveLength(1);
 
     await user.click(screen.getByRole("button", { name: /Simulationsgrundlage laden/ }));

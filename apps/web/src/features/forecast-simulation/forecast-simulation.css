@@ -157,15 +157,13 @@
 }
 
 .sim-sidebar section,
-.sim-sidebar label,
-.sim-model-summary {
+.sim-sidebar label {
   display: grid;
   gap: 6px;
 }
 
 .sim-sidebar label,
-.sim-sidebar section > span,
-.sim-model-summary > span {
+.sim-sidebar section > span {
   color: var(--ui-muted);
   font-size: 12px;
 }
@@ -189,22 +187,25 @@
 
 .sim-variant-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
 
 .sim-variant-actions button {
-  min-height: 32px;
+  min-width: 0;
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
+  padding: 0 6px;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-sm);
   color: var(--ui-muted);
   background: var(--ui-control);
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .sim-variant-actions button:disabled {
@@ -212,32 +213,64 @@
   opacity: 0.5;
 }
 
-.sim-variant-actions .sim-variant-export {
-  grid-column: 1 / -1;
-  min-height: 36px;
-  color: var(--ui-text);
-}
-
 .sim-variant-actions svg {
-  width: 13px;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
 }
 
-.sim-imported-topology {
-  display: grid;
-  gap: 3px;
-  padding: 9px 10px;
+.sim-scenario-summary {
+  overflow: hidden;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
   background: var(--ui-surface);
 }
 
-.sim-imported-topology strong {
-  font-size: 16px;
+.sim-scenario-summary h2 {
+  margin: 0;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-muted);
+  font-size: 11px;
+  font-weight: 600;
 }
 
-.sim-imported-topology small {
+.sim-scenario-summary dl {
+  margin: 0;
+}
+
+.sim-scenario-summary dl > div {
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.sim-scenario-summary dl > div:last-child {
+  border-bottom: 0;
+}
+
+.sim-scenario-summary dt {
+  min-width: 0;
   color: var(--ui-muted);
-  font-size: 10px;
+  font-size: 11px;
+}
+
+.sim-scenario-summary dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--ui-text);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.sim-scenario-summary dd strong {
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .sim-sidebar input.visually-hidden {
@@ -248,13 +281,14 @@
   margin: -1px;
 }
 
-.sim-stepper {
+.sim-summary-stepper {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 44px 44px;
+  grid-template-columns: repeat(3, 28px);
 }
 
-.sim-stepper :is(output, button) {
-  min-height: 36px;
+.sim-summary-stepper :is(output, button) {
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
   border: 1px solid var(--ui-border);
@@ -262,24 +296,31 @@
   background: var(--ui-control);
 }
 
-.sim-stepper output {
-  justify-content: start;
-  padding-left: 12px;
+.sim-summary-stepper button:first-child {
   border-radius: var(--radius-md) 0 0 var(--radius-md);
 }
 
-.sim-stepper button {
-  border-left: 0;
+.sim-summary-stepper button {
   cursor: pointer;
-  font-size: 20px;
+  font-size: 16px;
 }
 
-.sim-stepper button:last-child {
+.sim-summary-stepper output,
+.sim-summary-stepper button:last-child {
+  border-left: 0;
+}
+
+.sim-summary-stepper button:last-child {
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
 }
 
-.sim-stepper svg {
-  width: 17px;
+.sim-summary-stepper button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.sim-summary-stepper svg {
+  width: 14px;
 }
 
 .sim-input-unit {
@@ -302,26 +343,12 @@
   background: var(--ui-surface-subtle);
 }
 
-.sim-model-summary {
-  padding: 10px 12px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-md);
-  background: var(--ui-surface);
-}
-
-.sim-model-summary strong {
-  font-size: 14px;
-  font-weight: 560;
-}
-
-.sim-model-summary small {
-  color: var(--ui-muted);
-  font-size: 11px;
-}
-
 .sim-full-button {
   width: 100%;
+  min-height: 40px;
   justify-content: center;
+  padding-inline: 12px;
+  white-space: nowrap;
 }
 
 .sim-full-button svg,
@@ -339,11 +366,33 @@
   line-height: 1.4;
 }
 
-.sim-sidebar-note {
-  margin: auto 0 0;
-  color: var(--ui-muted);
+.sim-seed-row {
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+}
+
+.sim-sidebar-imports > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sim-sidebar-imports .ds-button {
+  min-width: 0;
+  min-height: 38px;
+  justify-content: center;
+  padding: 6px 8px;
   font-size: 11px;
-  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.sim-sidebar-imports .ds-button-content {
+  gap: 5px;
+}
+
+.sim-sidebar-imports svg {
+  width: 15px;
+  height: 15px;
 }
 
 .sim-workspace {
@@ -1072,23 +1121,15 @@
   font-size: 10px;
 }
 
-.forecast-simulator .ds-sidepanel {
-  width: min(760px, 100%);
+.sim-editor-dialog.ds-modal-dialog {
+  width: min(1120px, calc(100vw - 32px));
+  height: min(900px, calc(100dvh - 32px));
+  max-height: calc(100dvh - 32px);
 }
 
-.forecast-simulator .ds-sidepanel[data-open="false"] {
-  visibility: hidden;
-}
-
-.sim-editor-title {
-  display: grid;
-  gap: 4px;
-}
-
-.sim-editor-title small {
-  color: var(--ui-muted);
-  font-size: 11px;
-  font-weight: 400;
+.sim-editor-dialog-body.ds-modal-body {
+  overflow-y: auto;
+  padding: 0;
 }
 
 .sim-editor-tabs {
@@ -1097,9 +1138,8 @@
   top: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-bottom: 14px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-md);
+  margin: 0;
+  border-bottom: 1px solid var(--ui-border);
   background: var(--ui-surface);
 }
 
@@ -1125,6 +1165,7 @@
 
 .sim-editor-tab-content {
   min-width: 0;
+  padding: 20px 20px 4px;
 }
 
 .sim-editor-card {
@@ -2272,6 +2313,7 @@
 }
 
 .sim-editor-errors {
+  margin: 0 20px 20px;
   padding: 10px 12px;
   border: 1px solid var(--ui-danger);
   border-radius: var(--radius-md);
@@ -3251,6 +3293,59 @@
   }
 }
 
+@media (max-width: 760px) {
+  .sim-editor-dialog.ds-modal-dialog {
+    width: calc(100vw - 16px);
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  .sim-editor-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sim-editor-tabs button:nth-child(2) {
+    border-right: 0;
+  }
+
+  .sim-editor-tabs button:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .sim-editor-tab-content {
+    padding: 14px 14px 2px;
+  }
+
+  .sim-editor-errors {
+    margin: 0 14px 14px;
+  }
+
+  .sim-tuning-head,
+  .sim-tuning-row {
+    grid-template-columns: 80px minmax(0, 1fr) 34px;
+  }
+
+  .sim-tuning-head span:first-child {
+    display: none;
+  }
+
+  .sim-tuning-row > div {
+    grid-column: 1 / -1;
+  }
+
+  .sim-tuning-row output {
+    grid-column: 1;
+  }
+
+  .sim-tuning-row > input {
+    grid-column: 2;
+  }
+
+  .sim-tuning-row > button {
+    grid-column: 3;
+  }
+}
+
 @media (max-height: 820px) {
   .sim-sidebar {
     gap: 6px;
@@ -3258,13 +3353,11 @@
   }
 
   .sim-sidebar section,
-  .sim-sidebar label,
-  .sim-model-summary {
+  .sim-sidebar label {
     gap: 4px;
   }
 
-  .sim-sidebar :is(input, select),
-  .sim-stepper :is(output, button) {
+  .sim-sidebar :is(input, select) {
     min-height: 32px;
   }
 
@@ -3273,20 +3366,20 @@
   }
 
   .sim-variant-actions button {
-    min-height: 28px;
+    min-height: 32px;
   }
 
-  .sim-model-summary {
-    gap: 2px;
-    padding: 6px 9px;
+  .sim-scenario-summary h2 {
+    padding-block: 6px;
   }
 
-  .sim-model-summary strong {
-    font-size: 13px;
+  .sim-scenario-summary dl > div {
+    min-height: 31px;
+    padding-block: 4px;
   }
 
-  .sim-model-summary small {
-    font-size: 10px;
+  .sim-sidebar-imports .ds-button {
+    min-height: 34px;
   }
 
   .sim-full-button.ds-button {
@@ -3298,10 +3391,6 @@
 
   .sim-full-button .ds-button-content {
     gap: 6px;
-  }
-
-  .sim-sidebar-note {
-    display: none;
   }
 
   .sim-controls {

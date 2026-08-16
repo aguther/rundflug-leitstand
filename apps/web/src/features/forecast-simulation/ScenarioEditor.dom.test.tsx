@@ -99,6 +99,22 @@ function EditorHarness() {
 }
 
 describe("product demand editor", () => {
+  it("renders as a centered modal with one scrollable body and a persistent footer", () => {
+    render(<EditorHarness />);
+
+    const dialog = screen.getByRole("dialog", { name: "Szenario konfigurieren" });
+    expect(dialog.classList.contains("sim-editor-dialog")).toBe(true);
+    expect(screen.getByText(/Stammdaten, Tagesplan, simulierte Realität/)).toBeTruthy();
+
+    const body = dialog.querySelector(".sim-editor-dialog-body");
+    const apply = within(dialog).getByRole("button", { name: "Übernehmen & neu starten" });
+    expect(body).not.toBeNull();
+    expect(body?.contains(screen.getByRole("navigation", { name: "Konfigurationsbereiche" }))).toBe(
+      true,
+    );
+    expect(body?.contains(apply)).toBe(false);
+  });
+
   it("updates admin planning values and automatic precall switches", async () => {
     const user = userEvent.setup();
     render(<EditorHarness />);
@@ -193,6 +209,7 @@ describe("product demand editor", () => {
     await user.click(screen.getByRole("button", { name: "Prognose-Labor" }));
 
     expect(screen.getByText(/nur lokal/)).toBeTruthy();
+    expect(screen.getAllByLabelText(/, Kandidat$/)).toHaveLength(17);
     const maximumSamples = screen.getByLabelText(
       "Maximale Lernwerte, Kandidat",
     ) as HTMLInputElement;

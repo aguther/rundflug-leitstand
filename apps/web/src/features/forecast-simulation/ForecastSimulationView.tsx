@@ -31,7 +31,6 @@ import {
   calculateSimulationDemandSummary,
   forecastUncertaintyLabel,
   type ManualIncident,
-  SIMULATION_DEMAND_PROFILE_LABELS,
   type SimulationConfig,
   type SimulationForecastSnapshot,
   type SimulationRotation,
@@ -695,94 +694,104 @@ export function ForecastSimulationView() {
               value={variants.find((variant) => variant.id === selectedVariantId)?.name ?? ""}
             />
             <div className="sim-variant-actions">
-              <button className="sim-variant-export" onClick={exportVariant} type="button">
-                <Download aria-hidden="true" /> Variante exportieren
+              <button aria-label="Variante exportieren" onClick={exportVariant} type="button">
+                <Download aria-hidden="true" /> Export
               </button>
-              <button onClick={duplicateVariant} type="button">
-                <Copy aria-hidden="true" /> Duplizieren
+              <button aria-label="Variante duplizieren" onClick={duplicateVariant} type="button">
+                <Copy aria-hidden="true" /> Kopie
               </button>
-              <button disabled={variants.length <= 1} onClick={deleteVariant} type="button">
+              <button
+                aria-label="Variante löschen"
+                disabled={variants.length <= 1}
+                onClick={deleteVariant}
+                type="button"
+              >
                 <Trash2 aria-hidden="true" /> Löschen
               </button>
             </div>
           </section>
-          <section>
-            <span>Flugzeuge</span>
-            {config.operationalModel ? (
-              <div className="sim-imported-topology">
-                <strong>{config.operationalModel.aircraft.length}</strong>
-                <small>
-                  {config.operationalModel.resourceGroups.length} Ressourcengruppen ·{" "}
-                  {config.operationalModel.products.length} Produkte
-                </small>
+          <section className="sim-scenario-summary">
+            <h2>Szenarioübersicht</h2>
+            <dl>
+              <div>
+                <dt>Flugzeuge</dt>
+                <dd>
+                  {config.operationalModel ? (
+                    <strong>{config.operationalModel.aircraft.length}</strong>
+                  ) : (
+                    <span className="sim-summary-stepper">
+                      <button
+                        aria-label="Ein Flugzeug entfernen"
+                        disabled={config.adminParameters.aircraftCount <= 1}
+                        onClick={() =>
+                          applyQuickConfig({
+                            ...config,
+                            adminParameters: {
+                              ...config.adminParameters,
+                              aircraftCount: config.adminParameters.aircraftCount - 1,
+                            },
+                          })
+                        }
+                        type="button"
+                      >
+                        −
+                      </button>
+                      <output>{config.adminParameters.aircraftCount}</output>
+                      <button
+                        aria-label="Ein Flugzeug hinzufügen"
+                        disabled={config.adminParameters.aircraftCount >= 12}
+                        onClick={() =>
+                          applyQuickConfig({
+                            ...config,
+                            adminParameters: {
+                              ...config.adminParameters,
+                              aircraftCount: config.adminParameters.aircraftCount + 1,
+                            },
+                          })
+                        }
+                        type="button"
+                      >
+                        <Plus aria-hidden="true" />
+                      </button>
+                    </span>
+                  )}
+                </dd>
               </div>
-            ) : (
-              <div className="sim-stepper">
-                <output>{config.adminParameters.aircraftCount}</output>
-                <button
-                  aria-label="Ein Flugzeug entfernen"
-                  disabled={config.adminParameters.aircraftCount <= 1}
-                  onClick={() =>
-                    applyQuickConfig({
-                      ...config,
-                      adminParameters: {
-                        ...config.adminParameters,
-                        aircraftCount: config.adminParameters.aircraftCount - 1,
-                      },
-                    })
-                  }
-                  type="button"
-                >
-                  −
-                </button>
-                <button
-                  aria-label="Ein Flugzeug hinzufügen"
-                  disabled={config.adminParameters.aircraftCount >= 12}
-                  onClick={() =>
-                    applyQuickConfig({
-                      ...config,
-                      adminParameters: {
-                        ...config.adminParameters,
-                        aircraftCount: config.adminParameters.aircraftCount + 1,
-                      },
-                    })
-                  }
-                  type="button"
-                >
-                  <Plus aria-hidden="true" />
-                </button>
+              <div>
+                <dt>Gruppen / Produkte</dt>
+                <dd>
+                  <strong>
+                    {config.operationalModel
+                      ? `${config.operationalModel.resourceGroups.length} / ${config.operationalModel.products.length}`
+                      : "1 / 1"}
+                  </strong>
+                </dd>
               </div>
-            )}
-          </section>
-          <section className="sim-model-summary sim-demand-summary">
-            <span>Nachfrage</span>
-            <strong>Ø {metric(demandSummary.averagePersonsPerHour)} Pers./Std.</strong>
-            <small>
-              {config.operationalModel
-                ? `${config.operationalModel.products.length} individuelle Produktprofile`
-                : SIMULATION_DEMAND_PROFILE_LABELS[config.realityModel.demand.profile]}
-            </small>
-          </section>
-          <section className="sim-model-summary">
-            <span>Zeitmodell</span>
-            <strong>4 Phasen</strong>
-            <small>Boarding · Flug · Boden · Puffer</small>
-          </section>
-          <section className="sim-model-summary">
-            <span>Störmodell</span>
-            <strong>4 Ereignisarten</strong>
-            <small>Tanken · Pausen · Defekte</small>
+              <div>
+                <dt>Nachfrage</dt>
+                <dd>
+                  <strong>Ø {metric(demandSummary.averagePersonsPerHour)}/h</strong>
+                </dd>
+              </div>
+              <div>
+                <dt>Modelle</dt>
+                <dd>
+                  <strong>4 Phasen · 4 Ereignisse</strong>
+                </dd>
+              </div>
+            </dl>
           </section>
           <Button
+            aria-label="Szenario konfigurieren"
             className="sim-full-button"
             onClick={() => {
               setEditorConfig(structuredClone(config));
               setEditorOpen(true);
             }}
           >
-            <Settings2 aria-hidden="true" /> Szenario konfigurieren
+            <Settings2 aria-hidden="true" /> Konfigurieren
           </Button>
-          <section>
+          <section className="sim-seed-row">
             <label htmlFor="sim-seed">Seed</label>
             <input
               id="sim-seed"
@@ -802,24 +811,28 @@ export function ForecastSimulationView() {
             ref={fileInputRef}
             type="file"
           />
-          <Button className="sim-full-button" onClick={() => setFoundationOpen(true)}>
-            <FileJson aria-hidden="true" /> Simulationsgrundlage laden
-          </Button>
-          <Button
-            busy={importingCsv}
-            className="sim-full-button"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload aria-hidden="true" /> CSV importieren
-          </Button>
+          <section className="sim-sidebar-imports">
+            <span>Import</span>
+            <div>
+              <Button
+                aria-label="Simulationsgrundlage laden"
+                onClick={() => setFoundationOpen(true)}
+              >
+                <FileJson aria-hidden="true" /> Grundlage
+              </Button>
+              <Button
+                aria-label="CSV importieren"
+                busy={importingCsv}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload aria-hidden="true" /> CSV
+              </Button>
+            </div>
+          </section>
           <Button className="sim-full-button" onClick={() => restart(config)} variant="primary">
             <RotateCcw aria-hidden="true" /> Neu starten
           </Button>
           {importMessage ? <output className="sim-import-message">{importMessage}</output> : null}
-          <p className="sim-sidebar-note">
-            Stammdaten dürfen aus dem Betrieb stammen. Nachfrage, Umläufe, Ereignisse und Ergebnisse
-            bleiben synthetisch und lokal.
-          </p>
         </aside>
 
         <div className="sim-workspace">
