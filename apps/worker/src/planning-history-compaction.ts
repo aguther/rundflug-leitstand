@@ -565,6 +565,41 @@ async function markPackageVerified(input: {
   if ((results[0]?.meta.changes ?? 0) !== 1) throw new Error("PLANNING_HISTORY_CLAIM_LOST");
 }
 
+async function verifyExistingPlanningHistoryPackage(input: {
+  env: Env;
+  compaction: CompactionRow;
+  entryCounts: Record<PlanningHistoryPackageEntry["path"], number>;
+}): Promise<boolean> {
+  const [existingObject, existingChecksumObject] = await Promise.all([
+    input.env.BACKUPS.head(input.compaction.object_key),
+    input.env.BACKUPS.get(input.compaction.checksum_key),
+  ]);
+  if (!existingObject && existingChecksumObject) {
+    throw new Error("PLANNING_HISTORY_ORPHAN_CHECKSUM");
+  }
+  if (!existingObject) return false;
+
+  let checksum: string;
+  if (existingChecksumObject?.body) {
+    checksum = (await existingChecksumObject.text()).trim().split(/\s+/)[0] ?? "";
+    if (!/^[a-f0-9]{64}$/.test(checksum)) {
+      throw new Error("PLANNING_HISTORY_SIDECAR_INVALID");
+    }
+  } else {
+    const object = await input.env.BACKUPS.get(input.compaction.object_key);
+    if (!object?.body) throw new Error("PLANNING_HISTORY_OBJECT_MISSING");
+    checksum = await sha256Stream(object.body);
+    await writeChecksumSidecar(input.env, input.compaction, checksum);
+  }
+  await markPackageVerified({
+    env: input.env,
+    compaction: input.compaction,
+    checksum,
+    entryCounts: input.entryCounts,
+  });
+  return true;
+}
+
 export async function buildPlanningHistoryPackage(env: Env, id: string): Promise<boolean> {
   let compaction = await compactionById(env, id);
   if (!compaction) return false;
@@ -601,29 +636,14 @@ export async function buildPlanningHistoryPackage(env: Env, id: string): Promise
   if ((countUpdate.meta.changes ?? 0) !== 1) throw new Error("PLANNING_HISTORY_CLAIM_LOST");
   compaction = (await compactionById(env, id)) ?? compaction;
 
-  const [existingObject, existingChecksumObject] = await Promise.all([
-    env.BACKUPS.head(compaction.object_key),
-    env.BACKUPS.get(compaction.checksum_key),
-  ]);
-  if (!existingObject && existingChecksumObject) {
-    throw new Error("PLANNING_HISTORY_ORPHAN_CHECKSUM");
-  }
-  if (existingObject) {
-    let checksum: string;
-    if (existingChecksumObject?.body) {
-      checksum = (await existingChecksumObject.text()).trim().split(/\s+/)[0] ?? "";
-      if (!/^[a-f0-9]{64}$/.test(checksum)) {
-        throw new Error("PLANNING_HISTORY_SIDECAR_INVALID");
-      }
-    } else {
-      const object = await env.BACKUPS.get(compaction.object_key);
-      if (!object?.body) throw new Error("PLANNING_HISTORY_OBJECT_MISSING");
-      checksum = await sha256Stream(object.body);
-      await writeChecksumSidecar(env, compaction, checksum);
-    }
-    await markPackageVerified({ env, compaction, checksum, entryCounts: expectedEntryCounts });
+  if (
+    await verifyExistingPlanningHistoryPackage({
+      env,
+      compaction,
+      entryCounts: expectedEntryCounts,
+    })
+  )
     return true;
-  }
 
   const writer = new StreamingZipWriter();
   const [uploadStream, digestInput] = writer.readable.tee();

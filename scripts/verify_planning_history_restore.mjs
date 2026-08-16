@@ -164,10 +164,9 @@ try {
   ];
   for (const row of hotRuns) {
     const columns = Object.keys(row);
+    const placeholders = columns.map((_, index) => `?${index + 1}`).join(",");
     database
-      .prepare(
-        `INSERT INTO planning_runs (${columns.join(",")}) VALUES (${columns.map((_, index) => `?${index + 1}`).join(",")})`,
-      )
+      .prepare(`INSERT INTO planning_runs (${columns.join(",")}) VALUES (${placeholders})`)
       .run(...Object.values(row));
   }
   database

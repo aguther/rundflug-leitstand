@@ -171,29 +171,27 @@ const outerEntries = new Map([
 const v2Archive = archiveModel(outerEntries);
 const verifiedV2 = verifyIntegrity(v2Archive);
 assert.equal(verifiedV2.runById.size, 1);
+const legacyArchiveEntry = (path, bytes) => {
+  if (path === "manifest.json") {
+    return strToU8(
+      JSON.stringify({
+        format: "rundflug-analysis-day-archive",
+        formatVersion: 1,
+        sourceRevision: "synthetic",
+        applicationVersion: "1.12.0",
+      }),
+    );
+  }
+  if (path === "planning/chunks.ndjson") return strToU8(`${JSON.stringify(rawChunk)}\n`);
+  if (path === "planning/contexts.ndjson") return strToU8(`${JSON.stringify(rawContext)}\n`);
+  if (path === "planning/runs.ndjson") return strToU8(`${JSON.stringify(rawRun)}\n`);
+  return bytes;
+};
 const v1Archive = archiveModel(
   new Map(
     [...outerEntries]
       .filter(([path]) => path !== "planning-history/cold.zip")
-      .map(([path, bytes]) => [
-        path,
-        path === "manifest.json"
-          ? strToU8(
-              JSON.stringify({
-                format: "rundflug-analysis-day-archive",
-                formatVersion: 1,
-                sourceRevision: "synthetic",
-                applicationVersion: "1.12.0",
-              }),
-            )
-          : path === "planning/chunks.ndjson"
-            ? strToU8(`${JSON.stringify(rawChunk)}\n`)
-            : path === "planning/contexts.ndjson"
-              ? strToU8(`${JSON.stringify(rawContext)}\n`)
-              : path === "planning/runs.ndjson"
-                ? strToU8(`${JSON.stringify(rawRun)}\n`)
-                : bytes,
-      ]),
+      .map(([path, bytes]) => [path, legacyArchiveEntry(path, bytes)]),
   ),
 );
 assert.equal(verifyIntegrity(v1Archive).runById.size, 1);
