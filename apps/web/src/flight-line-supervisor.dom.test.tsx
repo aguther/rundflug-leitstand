@@ -482,8 +482,10 @@ describe("Flight Director operational coordination", () => {
     renderConsole();
     const ticketPanel = screen.getByRole("region", { name: "Verkaufte Tickets" });
     const bottomGrid = ticketPanel.parentElement;
+    const collapseButton = screen.getByRole("button", { name: "Verkaufte Tickets einklappen" });
 
     expect(bottomGrid?.classList.contains("size-balanced")).toBe(true);
+    expect(collapseButton.querySelector(".lucide-panel-bottom-close")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Verkaufte Tickets vergrößern" }));
     expect(bottomGrid?.classList.contains("size-expanded")).toBe(true);
     await user.click(screen.getByRole("button", { name: "Verkaufte Tickets verkleinern" }));
@@ -492,6 +494,11 @@ describe("Flight Director operational coordination", () => {
     await user.click(screen.getByRole("button", { name: "Verkaufte Tickets einklappen" }));
     expect(bottomGrid?.classList.contains("is-collapsed")).toBe(true);
     expect(screen.queryByRole("searchbox", { name: "Verkaufte Tickets suchen" })).toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "Verkaufte Tickets ausklappen" })
+        .querySelector(".lucide-panel-bottom-open"),
+    ).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "Verkaufte Tickets ausklappen" }));
     expect(bottomGrid?.classList.contains("is-collapsed")).toBe(false);

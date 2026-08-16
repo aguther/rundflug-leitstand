@@ -22,6 +22,8 @@ import {
   Info,
   ListOrdered,
   Package,
+  PanelBottomClose,
+  PanelBottomOpen,
   Plane,
   PlaneLanding,
   PlaneTakeoff,
@@ -869,9 +871,9 @@ export function FlightLineSupervisorConsole({
                   size="compact"
                 >
                   {ticketPanelCollapsed ? (
-                    <ArrowDown aria-hidden="true" />
+                    <PanelBottomOpen aria-hidden="true" />
                   ) : (
-                    <ArrowUp aria-hidden="true" />
+                    <PanelBottomClose aria-hidden="true" />
                   )}
                 </IconButton>
               </div>

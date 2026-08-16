@@ -150,13 +150,13 @@
 .flight-director-aircraft-table,
 .flight-director-aircraft-head,
 .flight-director-aircraft-row {
-  min-width: 1040px;
+  min-width: 1180px;
 }
 
 .flight-director-aircraft-head,
 .flight-director-aircraft-row {
-  grid-template-columns: 100px 104px 126px minmax(320px, 1fr) 314px;
-  gap: 10px;
+  grid-template-columns: 100px 104px 126px minmax(320px, 1fr) max-content;
+  gap: 18px;
 }
 
 .flight-director-aircraft-row {
@@ -197,7 +197,7 @@
 .flight-director-row-actions {
   min-width: 0;
   display: grid;
-  grid-template-columns: 168px repeat(5, var(--control-touch));
+  grid-template-columns: 148px repeat(5, var(--control-touch));
   gap: 5px;
 }
 
@@ -210,8 +210,8 @@
 }
 
 .flight-director-row-actions .flight-director-primary-action {
-  width: 168px;
-  min-width: 168px;
+  width: 148px;
+  min-width: 148px;
   padding-inline: 10px;
 }
 
@@ -258,8 +258,8 @@
 
   .flight-director-aircraft-head,
   .flight-director-aircraft-row {
-    grid-template-columns: 66px 68px 66px minmax(150px, 1fr) 308px;
-    gap: 4px;
+    grid-template-columns: 60px 62px 52px minmax(128px, 1fr) max-content;
+    gap: 12px;
     padding-inline: 6px;
   }
 

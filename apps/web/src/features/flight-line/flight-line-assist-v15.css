@@ -1048,7 +1048,7 @@
   }
 
   .flight-assist-v15 .assist-v15-action-bar {
-    grid-template-columns: minmax(176px, 220px) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .flight-assist-v15 .assist-v15-primary-action {

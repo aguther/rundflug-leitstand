@@ -14,7 +14,7 @@ export const WEB_ASSET_BUDGETS = {
   adminEntry: { rawBytes: 180 * 1024, gzipBytes: 48 * 1024 },
   mainEntry: { rawBytes: 215 * 1024, gzipBytes: 68 * 1024 },
   largestJavaScriptChunk: { rawBytes: 327_418, gzipBytes: 96_085 },
-  pwaPrecache: { rawBytes: 1_394_606 },
+  pwaPrecache: { rawBytes: 1_395_000 },
 };
 
 export const WEB_ROUTE_ENTRIES = {
