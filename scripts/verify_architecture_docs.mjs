@@ -49,36 +49,6 @@ if (missingMaintainability.length > 0) {
   throw new Error(`Wartbarkeitsdokumentation unvollständig: ${missingMaintainability.join(", ")}`);
 }
 
-const technicalDebtPath = new URL(
-  "../docs/architecture/technical-debts/README.md",
-  import.meta.url,
-);
-const technicalDebt = await readFile(technicalDebtPath, "utf8");
-const technicalDebtEvidence = [];
-const missingTechnicalDebt = technicalDebtEvidence.filter(
-  (entry) => !technicalDebt.includes(entry),
-);
-if (missingTechnicalDebt.length > 0) {
-  throw new Error(
-    `Technische-Schulden-Dokumentation unvollständig: ${missingTechnicalDebt.join(", ")}`,
-  );
-}
-
-const technicalDebtDirectory = resolve(root, "docs/architecture/technical-debts");
-for (const name of technicalDebtEvidence) {
-  const debt = await readFile(resolve(technicalDebtDirectory, name), "utf8");
-  for (const heading of [
-    "**Status:**",
-    "## Wirkung",
-    "## Sicherer Abbau",
-    "## Abschlusskriterium",
-  ]) {
-    if (!debt.includes(heading)) {
-      throw new Error(`Technische Schuld ${name} enthält nicht ${heading}.`);
-    }
-  }
-}
-
 for (const obsolete of [
   "technical-debt-1.11.0.md",
   "technical-debt-1.12.0.md",
