@@ -7,6 +7,7 @@ import {
   createMigratedTestDatabase,
   describeDatabaseSchema,
   readBaselineSql,
+  readMigrationSql,
 } from "../test-support/migrated-database";
 
 const expectedSchema = JSON.parse(
@@ -40,6 +41,25 @@ describe("V1.12 database baseline", () => {
       expect.arrayContaining(["idx_planning_runs_anchor_run", "idx_planning_runs_previous_run"]),
     );
     expect(database.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+
+    database.close();
+  });
+
+  it("records the follow-up safely when its indexes already exist", () => {
+    const database = createBaselineTestDatabase();
+    database.exec(`
+      CREATE INDEX idx_planning_runs_anchor_run
+        ON planning_runs(anchor_run_id);
+      CREATE INDEX idx_planning_runs_previous_run
+        ON planning_runs(previous_run_id);
+    `);
+
+    expect(() => database.exec(readMigrationSql()[1] ?? "")).not.toThrow();
+    expect(describeDatabaseSchema(database).objectCounts).toEqual({
+      tables: 42,
+      namedIndexes: 75,
+      triggers: 20,
+    });
 
     database.close();
   });
