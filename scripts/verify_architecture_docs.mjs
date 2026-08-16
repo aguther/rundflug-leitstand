@@ -54,10 +54,7 @@ const technicalDebtPath = new URL(
   import.meta.url,
 );
 const technicalDebt = await readFile(technicalDebtPath, "utf8");
-const technicalDebtEvidence = [
-  "mutation-test-effectiveness.md",
-  "worker-orchestration-complexity.md",
-];
+const technicalDebtEvidence = ["mutation-test-effectiveness.md"];
 const missingTechnicalDebt = technicalDebtEvidence.filter(
   (entry) => !technicalDebt.includes(entry),
 );

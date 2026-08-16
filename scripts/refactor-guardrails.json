@@ -490,8 +490,28 @@
     },
     {
       "path": "apps/worker/src/master-data-command-service.ts",
-      "maxLines": 1300,
-      "targetLines": 1500
+      "maxLines": 67,
+      "targetLines": 100
+    },
+    {
+      "path": "apps/worker/src/master-data-deletion-service.ts",
+      "maxLines": 113,
+      "targetLines": 150
+    },
+    {
+      "path": "apps/worker/src/master-data-gate-product-service.ts",
+      "maxLines": 335,
+      "targetLines": 400
+    },
+    {
+      "path": "apps/worker/src/master-data-resource-service.ts",
+      "maxLines": 518,
+      "targetLines": 600
+    },
+    {
+      "path": "apps/worker/src/master-data-turnaround-service.ts",
+      "maxLines": 317,
+      "targetLines": 400
     },
     {
       "path": "apps/worker/src/outage-recovery-command-service.ts",
@@ -695,13 +715,23 @@
     },
     {
       "path": "apps/worker/src/operations-read-service.ts",
-      "maxLines": 867,
-      "targetLines": 1500
+      "maxLines": 67,
+      "targetLines": 100
+    },
+    {
+      "path": "apps/worker/src/operations-read-query-plan.ts",
+      "maxLines": 866,
+      "targetLines": 900
     },
     {
       "path": "apps/worker/src/operations-routes.ts",
-      "maxLines": 1043,
-      "targetLines": 1500
+      "maxLines": 89,
+      "targetLines": 120
+    },
+    {
+      "path": "apps/worker/src/operations-response-projector.ts",
+      "maxLines": 896,
+      "targetLines": 950
     },
     {
       "path": "apps/worker/src/api-cache-policy.ts",

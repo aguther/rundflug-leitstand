@@ -65,6 +65,15 @@ async function stopProcessTree(processHandle) {
       stdio: "ignore",
       windowsHide: true,
     });
+    if (processHandle.exitCode === null) {
+      await new Promise((resolvePromise) => {
+        const timeout = setTimeout(resolvePromise, 2_000);
+        processHandle.once("exit", () => {
+          clearTimeout(timeout);
+          resolvePromise();
+        });
+      });
+    }
     return;
   }
   processHandle.kill("SIGTERM");
@@ -115,7 +124,7 @@ export async function createWorkerTestHarness(options) {
     if (disposed) return;
     disposed = true;
     await stopProcessTree(server);
-    await rm(stateDirectory, { recursive: true, force: true });
+    await rm(stateDirectory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   };
 
   try {

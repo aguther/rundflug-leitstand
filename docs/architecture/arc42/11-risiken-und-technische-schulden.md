@@ -44,7 +44,6 @@ Verbleibende, bewusst priorisierte Schulden:
 | Priorität | Thema | Nächster geplanter Schnitt |
 | --- | --- | --- |
 | Mittel | [Mutationstest-Aussagekraft](../technical-debts/mutation-test-effectiveness.md) | überlebende Mutanten nach fachlichem Risiko priorisieren und Ratchets ausschließlich anheben |
-| Mittel | [Worker-Orchestrierung](../technical-debts/worker-orchestration-complexity.md) | entitätsspezifische Entscheidungs- und Persistenzpläne isolieren |
 
 Die Online-Pflicht der Administration und der inkompatible V1.12-Baseline-Neuaufbau sind bewusste
 Architektur- beziehungsweise Rolloutentscheidungen und werden nicht als technische Schulden geführt.

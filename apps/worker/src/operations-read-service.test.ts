@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { applyDemoSeed, createD1TestDatabase } from "../test-support/migrated-database";
 import { loadOperationsReadModels } from "./operations-read-service";
 
 const EVENT_ID = "synthetic-event";
@@ -55,6 +56,60 @@ function createDatabase(input?: {
 }
 
 describe("operations read service", () => {
+  it("keeps grouped read models event-scoped against migrated SQLite", async () => {
+    const testDatabase = createD1TestDatabase();
+    try {
+      applyDemoSeed(testDatabase.database);
+      testDatabase.database.exec(`
+        INSERT INTO operation_days
+          (id, name, event_date, time_zone, status, version, created_at, updated_at)
+        VALUES
+          ('other-event', 'Other synthetic event', '2026-07-12', 'Europe/Berlin',
+           'PREPARATION', 0, '2026-07-12T08:00:00.000Z', '2026-07-12T08:00:00.000Z');
+        INSERT INTO gates
+          (id, operation_day_id, label, gate_type, active, sort_order, created_at, updated_at)
+        VALUES
+          ('other-gate', 'other-event', 'Other gate', 'FLIGHT_LINE', 1, 10,
+           '2026-07-12T08:00:00.000Z', '2026-07-12T08:00:00.000Z');
+        INSERT INTO resource_groups
+          (id, operation_day_id, name, short_code, gate_id, created_at, updated_at)
+        VALUES
+          ('other-resource-group', 'other-event', 'Other group', 'OT', 'other-gate',
+           '2026-07-12T08:00:00.000Z', '2026-07-12T08:00:00.000Z');
+        INSERT INTO products
+          (id, operation_day_id, resource_group_id, gate_id, name, code, price_cents,
+           reference_capacity, reference_duration_minutes, promised_flight_minutes,
+           created_at, updated_at)
+        VALUES
+          ('other-product', 'other-event', 'other-resource-group', 'other-gate',
+           'Other product', 'OTHER', 1000, 1, 10, 10,
+           '2026-07-12T08:00:00.000Z', '2026-07-12T08:00:00.000Z');
+      `);
+
+      const result = await loadOperationsReadModels(
+        testDatabase.d1,
+        "demo-2026",
+        PROJECTION_READ_AT,
+      );
+
+      expect(result.eventId).toBe("demo-2026");
+      expect(result.projectionReadAt).toBe(PROJECTION_READ_AT);
+      expect(result.products.results.map((product) => product.id)).toEqual([
+        "panorama-20",
+        "panorama-30",
+      ]);
+      expect(result.gatesRows.results.map((gate) => gate.id)).toEqual(["demo-2026-gate-main"]);
+      expect(result.resourceGroupRows.results.map((group) => group.id)).toEqual(["rg-panorama"]);
+      expect(result.groups.commercial.products).toBe(result.products);
+      expect(result.groups.operations.rotations).toBe(result.rotations);
+      expect(result.groups.resources.fleetRows).toBe(result.fleetRows);
+      expect(result.groups.planning.gatesRows).toBe(result.gatesRows);
+      expect(JSON.stringify(result)).not.toContain("other-product");
+    } finally {
+      testDatabase.close();
+    }
+  });
+
   it("loads every projection with stable event scoping and query semantics", async () => {
     const context = createDatabase();
     const result = await loadOperationsReadModels(context.database, EVENT_ID, PROJECTION_READ_AT);

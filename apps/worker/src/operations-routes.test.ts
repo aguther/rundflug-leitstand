@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthorizedDevice } from "./device-authorization";
 import { OPERATIONS_PROJECTION_MAXIMUM_MILLISECONDS } from "./operations-projection-indexes";
+import { buildOperationsResponse } from "./operations-response-projector";
 import { type OperationsRouteDependencies, registerOperationsRoutes } from "./operations-routes";
 import type { Env, StoredEventRow } from "./types";
 
@@ -495,6 +496,28 @@ function request(route: ReturnType<typeof createRoute>) {
     route.env,
   );
 }
+
+describe("operations response projector", () => {
+  it("projects an empty board without a route or database harness", () => {
+    const response = buildOperationsResponse({
+      eventId: EVENT_ID,
+      eventRow,
+      device: operatorDevice,
+      readModels: emptyReadModels() as never,
+      forecastReadAt: NOW,
+      nowMs: Date.parse(NOW),
+    });
+
+    expect(response).toMatchObject({
+      currentDeviceRole: "FLIGHT_LINE",
+      event: { eventId: EVENT_ID, version: 7 },
+      products: [],
+      rotations: [],
+      queueGroups: [],
+      metrics: { openTickets: 0, soldTickets: 0 },
+    });
+  });
+});
 
 describe("operations routes", () => {
   it.each([null, { ...operatorDevice, role: "DISPLAY" as const }])(

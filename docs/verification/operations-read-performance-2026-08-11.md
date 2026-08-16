@@ -22,22 +22,23 @@ Optimierung betrifft ausschließlich das Laden und Projizieren bestätigter Date
 
 - `d1-read-scheduler.ts` kapselt typisierte `all`- und `first`-Projektionen und prüft, dass D1 für
   jedes vorbereitete Statement genau ein positionsgleiches Ergebnis liefert.
-- `operations-read-service.ts` bereitet die 14 unabhängigen Kernabfragen vor und sendet sie gemeinsam
+- `operations-read-query-plan.ts` bereitet die 14 unabhängigen Kernabfragen vor und sendet sie gemeinsam
   über `D1Database.batch()`. Der vorhandene Schema-Fallback wiederholt den Batch nur für die konkret
   erkannte fehlende Gate-Filterspalte.
 - `operations-projection-indexes.ts` stellt kleine reine Hilfen für eindeutige und gruppierte Maps
-  bereit. `operations-routes.ts` baut diese Indizes einmalig auf und verwendet sie in den
+  bereit. `operations-response-projector.ts` baut diese Indizes einmalig auf und verwendet sie in den
   nachfolgenden Projektionen.
 - `admin-master-data-template-aircraft-validation.ts` übergibt die normalisierten Registrierungen
   als JSON-Array an SQLite `json_each`; dadurch steigt die Abfragezahl nicht mit der Templategröße.
 
 ## Automatisierter Nachweis
 
-Die folgenden Tests sichern die Grenzen als Regression-Gates:
+Die folgenden Produktionsgrenzen und Tests sichern das Verhalten als Regression-Gates:
 
 - `apps/worker/src/d1-read-scheduler.test.ts`
 - `apps/worker/src/operations-read-service.test.ts`
 - `apps/worker/src/operations-routes.test.ts`
+- `apps/worker/src/operations-response-projector.ts`
 - `apps/worker/src/admin-master-data-template.test.ts`
 
 Gezielter Prüfbefehl:

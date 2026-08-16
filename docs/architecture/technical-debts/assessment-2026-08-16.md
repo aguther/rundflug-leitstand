@@ -14,7 +14,6 @@ gültige Themen werden ausschließlich in den verlinkten eigenständigen Schulde
 
 | Historischer Befund | Aktuelle Einordnung |
 | --- | --- |
-| Komplexe Stammdaten- und Operations-Orchestrierung | [fortgeltend](worker-orchestration-complexity.md); die aktuellen Schwerpunkte sind `master-data-command-service.ts`, `operations-read-service.ts` und `operations-routes.ts` |
 | Geringer Abstand einzelner Web-Assets zu den Budgets | [fortgeltend](web-asset-budget-headroom.md); die manifestbasierten Zwei-Prozent-Ratchets bleiben notwendig |
 | Paralleler Forecast-Legacy-Pfad | behoben durch ADR-0054; `calculateLegacyForecastTimelines` und sein DRAFT-Overlay sind entfernt |
 | Unzureichende Aussagekraft einzelner Tests | [Mutationstest-Aussagekraft](mutation-test-effectiveness.md) bleibt als eigenständige Schuld offen |

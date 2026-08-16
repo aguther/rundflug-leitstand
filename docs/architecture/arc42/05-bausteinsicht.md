@@ -101,7 +101,10 @@ flowchart TB
 
     subgraph Services["Kommando- und Leseservices"]
         CMD["command-handler-registry.ts + event-command-handlers.ts<br/>exhaustive Zuordnung zu *-command-service.ts<br/>für Verkauf, Rotation, Flotte und Planung"]
-        READ["*-read-service.ts, *-projection.ts<br/>Operations, FIDS, öffentlicher Status"]
+        MASTER["master-data-command-service.ts<br/>Fassade vor vier Mutationsplan-Services"]
+        READ["operations-read-service.ts<br/>typisierte Read-Model-Gruppen"]
+        READPLAN["operations-read-query-plan.ts<br/>14 Kernreads in einem D1-Batch"]
+        PROJECT["operations-response-projector.ts<br/>reine Boardprojektion"]
         PRE["command-preflight*<br/>Vertrag, Rolle, Version, Gerät"]
     end
 
@@ -120,8 +123,9 @@ flowchart TB
     ROUTES --> AUTHR & CTRL & OPS & PUB & EXP
     CTRL --> PRE --> DO
     DO --> CMD
-    CMD --> D1A
-    OPS --> READ --> D1A
+    CMD --> MASTER --> D1A
+    OPS --> READ --> READPLAN --> D1A
+    READ --> PROJECT
     PUB --> READ
     EXP --> R2A
     EXP --> REPORT
@@ -141,8 +145,11 @@ flowchart TB
 | `command-preflight*.ts` | prüft Transportvertrag, Sitzung, Rolle, Gerätekopplung und erwartete Version vor der Fachlogik |
 | `event-coordinator.ts` | serialisiert Kommandos je Veranstaltung, führt die gemeinsame Präambel aus, übergibt anschließend an die exhaustive Handler-Registry, stößt Prognose an, verteilt Versionssignale und bedient Alarm für Prognosetakt und Nachrufablauf |
 | `command-handler-registry.ts`, `event-command-handlers.ts`, `*-command-service.ts` | ordnen jeden Contract-Command zur Compile-Zeit genau einer Familie und einem Service-Handler zu; die Cloudflare-unabhängige Registry-Fabrik ist isoliert testbar, Ticketverkauf und Verkaufskonfiguration besitzen getrennte Services; reine Validierungs- und Mutationsplanung liegt in fokussierten `*-validator.ts`-, `*-validation.ts`- und `*-mutation-planner.ts`-Modulen |
+| `master-data-command-service.ts`, `master-data-*-service.ts` | halten die öffentliche Handler-Fassade klein und trennen Gate/Produkt, Reihenfolge/Turnaround, Löschung sowie Ressourcengruppe/Flugzeug in typisierte Mutationspläne; Eventversion, Audit, Receipt und Outbox bleiben je Kommando in einer D1-Batch-Grenze |
 | `public-code-service.ts` | kryptografische Vergabe und kollisionsgeprüfte Reservierung öffentlicher Gruppen- und Ticketcodes |
-| `*-read-service.ts`, `*-projection.ts`, `*-route-projection.ts` | berechtigungsabhängige Lesesichten und reines Response-Mapping: operative Vollsicht, FIDS-Board, öffentlicher Ticket-/Gruppenstatus |
+| `operations-read-service.ts`, `operations-read-query-plan.ts` | führen die 14 Operations-Kernreads weiterhin in einem gemeinsamen D1-Batch aus und ordnen die Ergebnisse typisiert den Gruppen Verkauf, Betrieb, Ressourcen und Planung zu; Event-ID und Projektionszeitpunkt bleiben gemeinsame Orchestratorwerte |
+| `operations-routes.ts`, `operations-response-projector.ts` | trennen Transport, Autorisierung und Event-Lookup von der reinen Operations-Projektion für Kapazität, Forecast, Dispatch, Pläne und Nachruf |
+| übrige `*-read-service.ts`, `*-projection.ts`, `*-route-projection.ts` | berechtigungsabhängige Lesesichten und reines Response-Mapping für FIDS-Board und öffentlichen Ticket-/Gruppenstatus |
 | `forecast-timeline-service.ts` | kleiner Orchestrator des Prognoselaufs; besitzt keine D1-Abfragen oder Projektionsregeln |
 | `forecast-timeline-loader.ts`, `forecast-timeline-projector.ts`, `forecast-timeline-projector-support.ts` | laden alle gültigen Tagesmessungen und einen begrenzten historischen Kaltstartkorpus aus D1 und normalisieren sie anschließend über reine Projektionshelfer zu Domain-Eingaben |
 | `forecast-timeline-repository.ts`, `forecast-precall-evaluator.ts`, `forecast-publication-service.ts` | persistieren Prognose/Snapshots/Voraufruf atomar beziehungsweise wählen Voraufrufe rein aus und veröffentlichen erst nach erfolgreicher Persistenz |
