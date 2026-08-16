@@ -1,709 +1,87 @@
-import type { OperationBoard, TicketGroupPrintData, TicketSearchResult } from "@rundflug/contracts";
-import {
-  Activity,
-  AlertTriangle,
-  ArrowDown,
-  ArrowUp,
-  CircleArrowRight,
-  CircleCheck,
-  Clock3,
-  Coins,
-  Flag,
-  GripVertical,
-  ListOrdered,
-  Minus,
-  Package,
-  PlaneLanding,
-  PlaneTakeoff,
-  Plus,
-  Printer,
-  RefreshCw,
-  RotateCcw,
-  Search,
-  Sigma,
-  Tag,
-  Ticket,
-  Tickets,
-  TicketsPlane,
-  Trash2,
-  UserRound,
-  Users,
-} from "lucide-react";
-import QRCode from "qrcode";
-import {
-  type DragEvent,
-  type PointerEvent as ReactPointerEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { getTicketGroupPrintData, searchTickets, sendCommand } from "../../api";
+import type { OperationBoard } from "@rundflug/contracts";
+import { useState } from "react";
+import { sendCommand } from "../../api";
 import { AppShell as Shell } from "../../app/AppShell";
 import { useActionMessageBridge } from "../../app/PageNotifications";
 import { useUpdateBlocker } from "../../app/PwaUpdate";
-import {
-  Button,
-  CheckboxField,
-  ConfirmationDialog,
-  DataTable,
-  IconButton,
-  PageHeader,
-  Panel,
-  Tabs,
-  TextField,
-} from "../../design-system/components";
-import {
-  appendCashierDraftRevision,
-  cashierDraftQueueKey,
-  latestCashierDraft,
-  legacyCashierDraftQueueKey,
-  readCashierDraftQueue,
-  shouldPersistCashierDraft,
-  writeCashierDraftQueue,
-} from "../../offline-drafts";
-import { oversizeSplitPreview } from "../../operational-exceptions";
 import { useConnectivity } from "../../shared/hooks/use-connectivity";
 import { formatAbsoluteTimeWindow } from "../../time-window";
 import { useAuth } from "../auth/AuthContext";
-import { type LoginAccount, loadLoginAccounts } from "../auth/api";
 import { useOperationIdentity } from "../operations/operation-identity";
-import type { TicketReceipt } from "../operations/operation-types";
 import { useOperationBoard } from "../operations/use-operation-board";
-import { CashierCompletionIcon, QrScanDialog, TableIconHeader } from "./CashierTicketPresentation";
-import {
-  activeFlightEmptyLabel,
-  CashierCapacityGuidance,
-  CashierNotifications,
-  CashierTicketGroupHeader,
-  CashierTicketPaperPreview,
-  cancellationDescription,
-  goToGateIcon,
-  measurePerformanceSafely,
-  printableTicketDocument,
-  rotationPhaseClass,
-  rotationStatusLabel,
-  rotationTimeWindowPhase,
-  type TicketListTab,
-  ticketListEmptyLabel,
-  ticketListSentinelLabel,
-  ticketMatchesListStatus,
-  ticketSearchRequest,
-} from "./CashierViewPresentation";
-import { cashierProductOrderChanged, moveCashierProduct } from "./cashier-product-order";
-import {
-  applyOperationBoardTicketStatuses,
-  mergeRevalidatedTicketGroups,
-  ticketGroupIdBatches,
-} from "./cashier-ticket-status-sync";
-import { useTemporaryRowHighlights } from "./use-temporary-row-highlights";
+import { CashierSalePanel } from "./CashierSalePanel";
+import { CashierTicketPanel } from "./CashierTicketPanel";
+import { CashierNotifications, rotationTimeWindowPhase } from "./CashierViewPresentation";
+import { CashierWorkspaceDialogs } from "./CashierWorkspaceDialogs";
+import { useCashierProductOrder } from "./use-cashier-product-order";
+import { useCashierReceipt } from "./use-cashier-receipt";
+import { useCashierSale } from "./use-cashier-sale";
+import { useCashierTicketList } from "./use-cashier-ticket-list";
 
 export function CashierWorkspace() {
   const { session } = useAuth();
   const cashierIdentity = useOperationIdentity("CASHIER", "cashier-tablet-1");
   const { eventId: EVENT_ID, deviceId: CASHIER_DEVICE_ID, deviceToken } = cashierIdentity;
-  const deviceTokenFor = useCallback((_deviceId: string) => deviceToken, [deviceToken]);
   const { board, error, lastConfirmedAt, backendConfirmed, confirmEvent, refresh } =
     useOperationBoard(cashierIdentity);
   const online = useConnectivity();
   const serverConfirmed = online && backendConfirmed && error === null;
-  const draftQueueKey = cashierDraftQueueKey(EVENT_ID, CASHIER_DEVICE_ID);
-  const initialDraftQueue = readCashierDraftQueue(localStorage, draftQueueKey);
-  const initialDraft = latestCashierDraft(initialDraftQueue);
-  const [productId, setProductId] = useState(() => {
-    return initialDraft?.productId ?? "panorama-20";
-  });
-  const [size, setSize] = useState(() => {
-    return initialDraft?.size ?? 1;
-  });
-  const [pendingDraftCount, setPendingDraftCount] = useState(initialDraftQueue.length);
-  const [busyProductId, setBusyProductId] = useState<string | null>(null);
-  const [saleSyncCount, setSaleSyncCount] = useState(0);
-  const [cashierOrderEditing, setCashierOrderEditing] = useState(false);
-  const [cashierOrderSaving, setCashierOrderSaving] = useState(false);
-  const [expectedCashierProductIds, setExpectedCashierProductIds] = useState<string[]>([]);
-  const [orderedCashierProductIds, setOrderedCashierProductIds] = useState<string[]>([]);
-  const [draggedCashierProductId, setDraggedCashierProductId] = useState<string | null>(null);
-  const [receipt, setReceipt] = useState<TicketReceipt | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   useActionMessageBridge(message, setMessage);
-  const [saleAnnouncement, setSaleAnnouncement] = useState("");
-  const [lastTicketGroupId, setLastTicketGroupId] = useState<string | null>(null);
+  const receipt = useCashierReceipt({
+    deviceId: CASHIER_DEVICE_ID,
+    deviceToken,
+    eventId: EVENT_ID,
+    setMessage,
+  });
+  const ticketList = useCashierTicketList({
+    board,
+    clearReceipt: receipt.clear,
+    identity: cashierIdentity,
+    serverConfirmed,
+    sessionAccountId: session?.account.id,
+    setMessage,
+  });
+  const sale = useCashierSale({
+    board,
+    confirmEvent,
+    connectionError: error,
+    identity: cashierIdentity,
+    list: ticketList.data,
+    online,
+    queueHighlight: ticketList.queueHighlight,
+    receipt,
+    refresh,
+    setMessage,
+  });
+  const productOrder = useCashierProductOrder({
+    board,
+    busyProductId: sale.busyProductId,
+    confirmEvent,
+    deviceId: CASHIER_DEVICE_ID,
+    deviceToken,
+    eventId: EVENT_ID,
+    refresh,
+    setMessage,
+  });
   const [cancelReason, setCancelReason] = useState("");
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
-  const [ticketSearch, setTicketSearch] = useState("");
-  const [ticketSearchQuery, setTicketSearchQuery] = useState("");
-  const [ticketSearchResults, setTicketSearchResults] = useState<TicketSearchResult[]>([]);
-  const [ticketListTab, setTicketListTab] = useState<TicketListTab>("ACTIVE");
-  const [ticketListNextCursor, setTicketListNextCursor] = useState<string | null>(null);
-  const [ticketListLoading, setTicketListLoading] = useState(false);
-  const [cashierAccounts, setCashierAccounts] = useState<LoginAccount[]>([]);
-  const [cashierAccountFilter, setCashierAccountFilter] = useState("");
-  const [onlyOwnTickets, setOnlyOwnTickets] = useState(false);
-  const [qrScanOpen, setQrScanOpen] = useState(false);
-  const [printBusy, setPrintBusy] = useState(false);
-  const [manualRefreshBusy, setManualRefreshBusy] = useState(false);
-  const ticketListRequestRef = useRef(0);
-  const ticketStatusRefreshRef = useRef<{ controller: AbortController | null; id: number }>({
-    controller: null,
-    id: 0,
-  });
-  const ticketListSentinelRef = useRef<HTMLDivElement | null>(null);
-  const printDocumentRef = useRef<HTMLDivElement | null>(null);
-  const ticketListResultCountRef = useRef(0);
-  const ticketListNextCursorRef = useRef<string | null>(null);
-  const ticketSearchResultsRef = useRef<TicketSearchResult[]>([]);
-  const previousCashierAccountFilterRef = useRef("");
-  const lastTicketListBoardVersionRef = useRef<number | null>(null);
-  const receiptRequestRef = useRef(0);
-  const operationalTicketGroups = useMemo(
-    () => applyOperationBoardTicketStatuses(ticketSearchResults, board?.rotations),
-    [board?.rotations, ticketSearchResults],
-  );
-  const selectedTicketGroup = operationalTicketGroups.find(
-    (entry) => entry.ticketGroupId === lastTicketGroupId,
-  );
-  const effectiveCashierAccountFilter = onlyOwnTickets
-    ? (session?.account.id ?? "")
-    : cashierAccountFilter;
-  const selectedRotations =
-    board?.rotations.filter((rotation) =>
-      rotation.bookingGroups.some((group) => group.id === lastTicketGroupId),
-    ) ?? [];
-  const visibleTicketGroups = useMemo(
-    () => operationalTicketGroups.filter((entry) => ticketMatchesListStatus(entry, ticketListTab)),
-    [operationalTicketGroups, ticketListTab],
-  );
-  const { highlightedIds: newlySoldTicketGroupIds, queueHighlight: queueSaleHighlight } =
-    useTemporaryRowHighlights(visibleTicketGroups.map((entry) => entry.ticketGroupId));
-  const cashierProductsById = new Map(
-    (board?.products ?? []).map((product) => [product.id, product]),
-  );
-  const cashierOrderHasChanged = cashierProductOrderChanged(
-    expectedCashierProductIds,
-    orderedCashierProductIds,
-  );
   useUpdateBlocker(
     "dirty",
     "cashier-sale-draft",
-    size !== 1 || pendingDraftCount > 0 || (cashierOrderEditing && cashierOrderHasChanged),
+    sale.size !== 1 || sale.pendingDraftCount > 0 || (productOrder.editing && productOrder.changed),
   );
   const currency = (cents: number) =>
     (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-  async function printableTicket(data: TicketGroupPrintData): Promise<TicketReceipt> {
-    const startedAt = performance.now();
-    const statusUrl = `${window.location.origin}/gruppe/${encodeURIComponent(data.code)}`;
-    const ticket = {
-      code: data.code,
-      statusUrl,
-      qrDataUrl: await QRCode.toDataURL(statusUrl, {
-        errorCorrectionLevel: "M",
-        margin: 2,
-        width: 768,
-      }),
-      eventName: data.eventName,
-      productName: data.productName,
-      gateLabel: data.gateLabel,
-      communicationLabel: data.communicationLabel,
-      groupSize: data.groupSize,
-    };
-    try {
-      performance.measure("rundflug:cashier-sale-qr", {
-        start: startedAt,
-        end: performance.now(),
-      });
-    } catch {
-      // Performance-Messung darf den bestätigten Verkauf nie beeinflussen.
-    }
-    return ticket;
-  }
-
-  const cancelTicketStatusRefresh = useCallback(() => {
-    ticketStatusRefreshRef.current.controller?.abort();
-    ticketStatusRefreshRef.current = {
-      controller: null,
-      id: ticketStatusRefreshRef.current.id + 1,
-    };
-  }, []);
-
-  const resetTicketListState = useCallback(() => {
-    cancelTicketStatusRefresh();
-    ticketListRequestRef.current += 1;
-    ticketListResultCountRef.current = 0;
-    ticketListNextCursorRef.current = null;
-    ticketSearchResultsRef.current = [];
-    setTicketSearchResults([]);
-    setTicketListNextCursor(null);
-    setLastTicketGroupId(null);
-    setReceipt(null);
-  }, [cancelTicketStatusRefresh]);
-
-  const loadTicketList = useCallback(
-    async ({
-      append = false,
-      preserveLoaded = false,
-      status = ticketListTab,
-      query = ticketSearchQuery,
-      reportError = true,
-      soldByOperatorAccountId = effectiveCashierAccountFilter || undefined,
-    }: {
-      append?: boolean;
-      preserveLoaded?: boolean;
-      status?: TicketListTab;
-      query?: string;
-      reportError?: boolean;
-      soldByOperatorAccountId?: string;
-    } = {}) => {
-      if (!serverConfirmed) return;
-      cancelTicketStatusRefresh();
-      const requestId = ++ticketListRequestRef.current;
-      setTicketListLoading(true);
-      try {
-        const response = await searchTickets(
-          EVENT_ID,
-          CASHIER_DEVICE_ID,
-          deviceTokenFor(CASHIER_DEVICE_ID),
-          ticketSearchRequest({
-            query,
-            status,
-            preserveLoaded,
-            loadedCount: ticketListResultCountRef.current,
-            append,
-            nextCursor: ticketListNextCursorRef.current,
-            ...(soldByOperatorAccountId ? { soldByOperatorAccountId } : {}),
-          }),
-        );
-        if (requestId !== ticketListRequestRef.current) return;
-        setTicketSearchResults((current) => {
-          let nextResults: TicketSearchResult[];
-          if (append) {
-            const known = new Set(current.map((entry) => entry.ticketGroupId));
-            nextResults = [
-              ...current,
-              ...response.results.filter((entry) => !known.has(entry.ticketGroupId)),
-            ];
-          } else if (!preserveLoaded) {
-            nextResults = response.results;
-          } else {
-            const updatedIds = new Set(response.results.map((entry) => entry.ticketGroupId));
-            nextResults = [
-              ...response.results,
-              ...current.filter(
-                (entry) =>
-                  !updatedIds.has(entry.ticketGroupId) && ticketMatchesListStatus(entry, status),
-              ),
-            ];
-          }
-          ticketListResultCountRef.current = nextResults.length;
-          ticketSearchResultsRef.current = nextResults;
-          return nextResults;
-        });
-        ticketListNextCursorRef.current = response.nextCursor;
-        setTicketListNextCursor(response.nextCursor);
-        const firstResult = response.results[0];
-        if (!append && firstResult) {
-          setLastTicketGroupId((current) => current ?? firstResult.ticketGroupId);
-        }
-      } catch (reason) {
-        if (reportError && requestId === ticketListRequestRef.current) {
-          setMessage(reason instanceof Error ? reason.message : "Ticketliste nicht verfügbar.");
-        }
-      } finally {
-        if (requestId === ticketListRequestRef.current) setTicketListLoading(false);
-      }
-    },
-    [
-      cancelTicketStatusRefresh,
-      effectiveCashierAccountFilter,
-      serverConfirmed,
-      ticketListTab,
-      ticketSearchQuery,
-      EVENT_ID,
-      deviceTokenFor,
-      CASHIER_DEVICE_ID,
-    ],
-  );
-
-  const mergeTicketGroupsById = useCallback(
-    async (ticketGroupIds: string[]) => {
-      if (!serverConfirmed || ticketGroupIds.length === 0) return;
-      const response = await searchTickets(
-        EVENT_ID,
-        CASHIER_DEVICE_ID,
-        deviceTokenFor(CASHIER_DEVICE_ID),
-        {
-          q: "",
-          status: "ACTIVE",
-          limit: Math.min(ticketGroupIds.length, 50),
-          ticketGroupIds,
-          ...(effectiveCashierAccountFilter
-            ? { soldByOperatorAccountId: effectiveCashierAccountFilter }
-            : {}),
-        },
-      );
-      const soldTicketMustMatchFilter =
-        !effectiveCashierAccountFilter || effectiveCashierAccountFilter === session?.account.id;
-      if (soldTicketMustMatchFilter && response.results.length !== ticketGroupIds.length) {
-        throw new Error(
-          "Der bestätigte Verkauf ist noch nicht vollständig in der Kassenliste sichtbar.",
-        );
-      }
-      setTicketSearchResults((current) => {
-        const updatedIds = new Set(response.results.map((entry) => entry.ticketGroupId));
-        const nextResults = [
-          ...response.results,
-          ...current.filter((entry) => !updatedIds.has(entry.ticketGroupId)),
-        ];
-        ticketListResultCountRef.current = nextResults.length;
-        ticketSearchResultsRef.current = nextResults;
-        return nextResults;
-      });
-    },
-    [
-      effectiveCashierAccountFilter,
-      serverConfirmed,
-      session?.account.id,
-      EVENT_ID,
-      deviceTokenFor,
-      CASHIER_DEVICE_ID,
-    ],
-  );
-
-  const revalidateLoadedTicketGroups = useCallback(async () => {
-    if (!serverConfirmed) return;
-    const ticketGroupIds = ticketSearchResultsRef.current.map((result) => result.ticketGroupId);
-    if (ticketGroupIds.length === 0) return;
-
-    ticketStatusRefreshRef.current.controller?.abort();
-    const controller = new AbortController();
-    const refreshId = ticketStatusRefreshRef.current.id + 1;
-    const ticketListRequestId = ticketListRequestRef.current;
-    ticketStatusRefreshRef.current = { controller, id: refreshId };
-
-    try {
-      const responses = await Promise.all(
-        ticketGroupIdBatches(ticketGroupIds).map((batch) =>
-          searchTickets(
-            EVENT_ID,
-            CASHIER_DEVICE_ID,
-            deviceTokenFor(CASHIER_DEVICE_ID),
-            {
-              q: "",
-              status: "ACTIVE",
-              limit: batch.length,
-              ticketGroupIds: batch,
-              ...(effectiveCashierAccountFilter
-                ? { soldByOperatorAccountId: effectiveCashierAccountFilter }
-                : {}),
-            },
-            { signal: controller.signal },
-          ),
-        ),
-      );
-      if (
-        controller.signal.aborted ||
-        refreshId !== ticketStatusRefreshRef.current.id ||
-        ticketListRequestId !== ticketListRequestRef.current
-      ) {
-        return;
-      }
-      const refreshed = responses.flatMap((response) => response.results);
-      setTicketSearchResults((current) => {
-        const nextResults = mergeRevalidatedTicketGroups(current, refreshed);
-        ticketListResultCountRef.current = nextResults.length;
-        ticketSearchResultsRef.current = nextResults;
-        return nextResults;
-      });
-    } catch (reason) {
-      if (reason instanceof DOMException && reason.name === "AbortError") return;
-      // The operation board already provides the live completion state. The next board event,
-      // focus refresh, or manual refresh retries the persistent ticket projection quietly.
-    } finally {
-      if (refreshId === ticketStatusRefreshRef.current.id) {
-        ticketStatusRefreshRef.current = { controller: null, id: refreshId };
-      }
-    }
-  }, [effectiveCashierAccountFilter, serverConfirmed, deviceTokenFor, EVENT_ID, CASHIER_DEVICE_ID]);
-
-  async function reopenTicketGroup(
-    ticketGroupId: string,
-    confirmedPrintData?: TicketGroupPrintData,
-    requestToken = ++receiptRequestRef.current,
-  ): Promise<boolean> {
-    try {
-      const data =
-        confirmedPrintData ??
-        (await getTicketGroupPrintData(
-          EVENT_ID,
-          ticketGroupId,
-          CASHIER_DEVICE_ID,
-          deviceTokenFor(CASHIER_DEVICE_ID),
-        ));
-      const prepared = await printableTicket(data);
-      if (requestToken === receiptRequestRef.current) setReceipt(prepared);
-      return true;
-    } catch (reason) {
-      if (requestToken === receiptRequestRef.current) {
-        setReceipt(null);
-        setMessage(
-          reason instanceof Error ? reason.message : "Ticketzettel konnten nicht geladen werden.",
-        );
-      }
-      return false;
-    }
-  }
-  function changeGroupSize(nextSize: number) {
-    setSize(nextSize);
+  async function cancelLastSale() {
     if (
-      !shouldPersistCashierDraft({
-        hasPendingDraft: pendingDraftCount > 0,
-        online,
-        connectionError: error,
-      })
+      !board ||
+      !ticketList.data.selectedTicketGroupId ||
+      cancelReason.trim().length < 3 ||
+      cancelBusy
     )
       return;
-    const queue = appendCashierDraftRevision(readCashierDraftQueue(localStorage, draftQueueKey), {
-      productId,
-      size: nextSize,
-    });
-    writeCashierDraftQueue(localStorage, draftQueueKey, queue);
-    setPendingDraftCount(queue.length);
-  }
-  useEffect(() => {
-    localStorage.removeItem(legacyCashierDraftQueueKey(EVENT_ID, CASHIER_DEVICE_ID));
-  }, [EVENT_ID, CASHIER_DEVICE_ID]);
-  useEffect(() => () => cancelTicketStatusRefresh(), [cancelTicketStatusRefresh]);
-  useEffect(() => {
-    void loadLoginAccounts()
-      .then((accounts) =>
-        setCashierAccounts(accounts.filter((account) => account.role === "CASHIER")),
-      )
-      .catch(() => setCashierAccounts([]));
-  }, []);
-  useEffect(() => {
-    if (!serverConfirmed) return;
-    void loadTicketList();
-  }, [loadTicketList, serverConfirmed]);
-  useEffect(() => {
-    const boardVersion = board?.event.version ?? null;
-    if (boardVersion === null) return;
-    if (lastTicketListBoardVersionRef.current === null) {
-      lastTicketListBoardVersionRef.current = boardVersion;
-      return;
-    }
-    if (lastTicketListBoardVersionRef.current === boardVersion) return;
-    lastTicketListBoardVersionRef.current = boardVersion;
-    void revalidateLoadedTicketGroups();
-  }, [board?.event.version, revalidateLoadedTicketGroups]);
-  useEffect(() => {
-    const refreshOnFocus = () => {
-      if (document.visibilityState === "visible") {
-        void loadTicketList({ preserveLoaded: true }).then(revalidateLoadedTicketGroups);
-      }
-    };
-    window.addEventListener("focus", refreshOnFocus);
-    document.addEventListener("visibilitychange", refreshOnFocus);
-    return () => {
-      window.removeEventListener("focus", refreshOnFocus);
-      document.removeEventListener("visibilitychange", refreshOnFocus);
-    };
-  }, [loadTicketList, revalidateLoadedTicketGroups]);
-  useEffect(() => {
-    if (
-      lastTicketGroupId &&
-      visibleTicketGroups.some((group) => group.ticketGroupId === lastTicketGroupId)
-    ) {
-      return;
-    }
-    const nextTicketGroupId = visibleTicketGroups[0]?.ticketGroupId ?? null;
-    if (nextTicketGroupId === lastTicketGroupId) return;
-    setLastTicketGroupId(nextTicketGroupId);
-    setReceipt(null);
-  }, [lastTicketGroupId, visibleTicketGroups]);
-  useEffect(() => {
-    const sentinel = ticketListSentinelRef.current;
-    if (!sentinel || !ticketListNextCursor) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting) && !ticketListLoading) {
-          void loadTicketList({ append: true });
-        }
-      },
-      { root: sentinel.parentElement, rootMargin: "120px" },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [loadTicketList, ticketListLoading, ticketListNextCursor]);
-
-  function openCashierOrderEditor() {
-    if (!board || busyProductId !== null) return;
-    const productIds = board.products.map((product) => product.id);
-    setExpectedCashierProductIds(productIds);
-    setOrderedCashierProductIds(productIds);
-    setDraggedCashierProductId(null);
-    setCashierOrderEditing(true);
-  }
-
-  function closeCashierOrderEditor() {
-    if (cashierOrderSaving) return;
-    setCashierOrderEditing(false);
-    setExpectedCashierProductIds([]);
-    setOrderedCashierProductIds([]);
-    setDraggedCashierProductId(null);
-  }
-
-  function moveCashierProductTo(productId: string, targetIndex: number) {
-    setOrderedCashierProductIds((current) => moveCashierProduct(current, productId, targetIndex));
-  }
-
-  function handleCashierOrderDragOver(event: DragEvent<HTMLElement>, targetProductId: string) {
-    event.preventDefault();
-    if (!draggedCashierProductId || draggedCashierProductId === targetProductId) return;
-    const targetIndex = orderedCashierProductIds.indexOf(targetProductId);
-    if (targetIndex >= 0) moveCashierProductTo(draggedCashierProductId, targetIndex);
-  }
-
-  function handleCashierOrderPointerMove(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (!draggedCashierProductId || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    const target = document
-      .elementFromPoint(event.clientX, event.clientY)
-      ?.closest<HTMLElement>("[data-cashier-product-order-id]");
-    const targetProductId = target?.dataset.cashierProductOrderId;
-    if (!targetProductId || targetProductId === draggedCashierProductId) return;
-    const targetIndex = orderedCashierProductIds.indexOf(targetProductId);
-    if (targetIndex >= 0) moveCashierProductTo(draggedCashierProductId, targetIndex);
-  }
-
-  async function saveCashierProductOrder() {
-    if (!board || !cashierOrderHasChanged || cashierOrderSaving) return;
-    setCashierOrderSaving(true);
-    try {
-      const result = await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: CASHIER_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "REORDER_CASHIER_PRODUCTS",
-          payload: {
-            expectedProductIds: expectedCashierProductIds,
-            orderedProductIds: orderedCashierProductIds,
-          },
-        },
-        deviceTokenFor(CASHIER_DEVICE_ID),
-      );
-      confirmEvent(result.event);
-      await refresh(result.event.version).catch(() => undefined);
-      setCashierOrderEditing(false);
-      setExpectedCashierProductIds([]);
-      setOrderedCashierProductIds([]);
-      setDraggedCashierProductId(null);
-      setMessage(
-        "Kassenreihenfolge gespeichert. FIDS, Queue und operative Priorität bleiben unverändert.",
-      );
-    } catch (reason) {
-      setMessage(
-        reason instanceof Error
-          ? reason.message
-          : "Kassenreihenfolge konnte nicht gespeichert werden.",
-      );
-    } finally {
-      setCashierOrderSaving(false);
-    }
-  }
-
-  async function sell(saleProduct: OperationBoard["products"][number]) {
-    if (!board || busyProductId) return;
-    const saleStartedAt = performance.now();
-    const saleSplitPreview = oversizeSplitPreview(size, saleProduct.referenceCapacity);
-    setProductId(saleProduct.id);
-    setBusyProductId(saleProduct.id);
-    let saleResult: Awaited<ReturnType<typeof sendCommand>>;
-    try {
-      saleResult = await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: CASHIER_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "SELL_TICKET_GROUP",
-          payload: {
-            productId: saleProduct.id,
-            ticketCount: size,
-            standby: false,
-            paymentStatus: "INFORMATIONAL_ONLY",
-            paymentMethod: null,
-            oversizeSplitAcknowledged: saleSplitPreview.required,
-          },
-        },
-        deviceTokenFor(CASHIER_DEVICE_ID),
-      );
-    } catch (reason) {
-      setMessage(reason instanceof Error ? reason.message : "Verkauf fehlgeschlagen.");
-      setBusyProductId(null);
-      return;
-    }
-
-    const soldTicketGroupId = saleResult.aggregate?.id ?? null;
-    lastTicketListBoardVersionRef.current = saleResult.event.version;
-    confirmEvent(saleResult.event);
-    setLastTicketGroupId(soldTicketGroupId);
-    setBusyProductId(null);
-    setMessage(null);
-    setSaleAnnouncement(`${size} Ticket${size === 1 ? "" : "s"} verkauft.`);
-    if (soldTicketGroupId) queueSaleHighlight(soldTicketGroupId);
-    measurePerformanceSafely("rundflug:cashier-sale-ready", saleStartedAt);
-    try {
-      writeCashierDraftQueue(localStorage, draftQueueKey, []);
-      setPendingDraftCount(0);
-    } catch {
-      setMessage(
-        `${size} Ticket${size === 1 ? "" : "s"} verkauft. Der lokale Entwurf konnte noch nicht bereinigt werden; Ansicht und Beleg werden aktualisiert.`,
-      );
-    }
-    const receiptRequestToken = ++receiptRequestRef.current;
-    setSaleSyncCount((current) => current + 1);
-    void (async () => {
-      try {
-        const printTask = soldTicketGroupId
-          ? reopenTicketGroup(soldTicketGroupId, saleResult.saleReceipt, receiptRequestToken)
-          : Promise.resolve(true);
-        const targetedListTask = soldTicketGroupId
-          ? mergeTicketGroupsById([soldTicketGroupId])
-          : Promise.reject(new Error("Die bestätigte Buchungsgruppe fehlt."));
-        const [printResult, boardResult, targetedListResult] = await Promise.allSettled([
-          printTask,
-          refresh(saleResult.event.version),
-          targetedListTask,
-        ]);
-        await loadTicketList({ preserveLoaded: true, reportError: false });
-        const printPrepared = printResult.status === "fulfilled" && printResult.value;
-        const synchronized =
-          boardResult.status === "fulfilled" && targetedListResult.status === "fulfilled";
-        if (receiptRequestToken === receiptRequestRef.current && !(printPrepared && synchronized)) {
-          setMessage(
-            `${size} Ticket${size === 1 ? "" : "s"} verkauft. Ansicht oder Druckvorbereitung wird weiter nachgeladen; Nachdruck bleibt möglich.`,
-          );
-        }
-      } catch {
-        if (receiptRequestToken === receiptRequestRef.current) {
-          setMessage(
-            `${size} Ticket${size === 1 ? "" : "s"} verkauft. Ansicht und Beleg werden weiter nachgeladen; Nachdruck bleibt möglich.`,
-          );
-        }
-      } finally {
-        measurePerformanceSafely("rundflug:cashier-sale-synchronized", saleStartedAt);
-        setSaleSyncCount((current) => Math.max(0, current - 1));
-      }
-    })();
-  }
-
-  async function cancelLastSale() {
-    if (!board || !lastTicketGroupId || cancelReason.trim().length < 3 || cancelBusy) return;
     setCancelBusy(true);
     try {
       await sendCommand(
@@ -715,130 +93,26 @@ export function CashierWorkspace() {
           issuedAt: new Date().toISOString(),
           type: "CANCEL_TICKET_GROUP",
           payload: {
-            ticketGroupId: lastTicketGroupId,
+            ticketGroupId: ticketList.data.selectedTicketGroupId,
             reason: cancelReason.trim(),
             adminPin: "SESSION",
           },
         },
-        deviceTokenFor(CASHIER_DEVICE_ID),
+        deviceToken,
       );
       setMessage("Verkauf storniert und Kapazität freigegeben.");
-      setReceipt(null);
+      receipt.clear();
       setCancelReason("");
       setCancelDialogOpen(false);
-      setTicketListTab("CANCELED");
+      ticketList.setTab("CANCELED");
       await Promise.all([
         refresh(),
-        loadTicketList({ status: "CANCELED", query: ticketSearchQuery }),
+        ticketList.data.load({ status: "CANCELED", query: ticketList.query }),
       ]);
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Storno fehlgeschlagen.");
     } finally {
       setCancelBusy(false);
-    }
-  }
-
-  function runTicketSearch() {
-    const query = ticketSearch.trim();
-    if (query.length === 1) {
-      setMessage("Für die Suche mindestens zwei Zeichen eingeben.");
-      return;
-    }
-    resetTicketListState();
-    if (query === ticketSearchQuery) {
-      void loadTicketList({ query });
-      return;
-    }
-    setTicketSearchQuery(query);
-  }
-
-  function changeCashierAccountFilter(nextAccountId: string) {
-    resetTicketListState();
-    if (nextAccountId === cashierAccountFilter) {
-      void loadTicketList(nextAccountId ? { soldByOperatorAccountId: nextAccountId } : {});
-      return;
-    }
-    setCashierAccountFilter(nextAccountId);
-  }
-
-  function changeOnlyOwnTickets(checked: boolean) {
-    resetTicketListState();
-    if (checked) {
-      previousCashierAccountFilterRef.current = cashierAccountFilter;
-      setOnlyOwnTickets(true);
-      return;
-    }
-    setCashierAccountFilter(previousCashierAccountFilterRef.current);
-    setOnlyOwnTickets(false);
-  }
-
-  function selectSearchResult(result: TicketSearchResult) {
-    setLastTicketGroupId(result.ticketGroupId);
-    setReceipt(null);
-  }
-
-  async function printTicketDocument() {
-    if (!receipt || selectedTicketGroup?.groupStatus === "CANCELED") {
-      setMessage("Für diese Buchungsgruppe steht kein druckbares Ticketdokument bereit.");
-      return;
-    }
-    const documentRoot = printDocumentRef.current;
-    if (!documentRoot) {
-      setMessage("Ticketdokument konnte nicht vorbereitet werden.");
-      return;
-    }
-    setPrintBusy(true);
-    try {
-      const images = Array.from(documentRoot.querySelectorAll("img"));
-      if (images.length !== 1) throw new Error("QR-Code ist noch nicht vollständig.");
-      await Promise.all(
-        images.map(async (image) => {
-          if (!image.complete) {
-            await new Promise<void>((resolve, reject) => {
-              image.addEventListener("load", () => resolve(), { once: true });
-              image.addEventListener("error", () => reject(new Error("QR-Code fehlt.")), {
-                once: true,
-              });
-            });
-          }
-          if (image.naturalWidth === 0) throw new Error("QR-Code konnte nicht dargestellt werden.");
-          await image.decode?.();
-        }),
-      );
-      window.print();
-      setMessage("Druckdialog geöffnet. Der Verkauf bleibt unabhängig vom Ausdruck gültig.");
-    } catch (reason) {
-      setMessage(
-        reason instanceof Error ? reason.message : "Ticketdokument konnte nicht gedruckt werden.",
-      );
-    } finally {
-      setPrintBusy(false);
-    }
-  }
-
-  async function refreshTicketList() {
-    setManualRefreshBusy(true);
-    try {
-      await loadTicketList({ preserveLoaded: true });
-      await revalidateLoadedTicketGroups();
-    } finally {
-      setManualRefreshBusy(false);
-    }
-  }
-
-  function rotationStatusIcon(rotation: OperationBoard["rotations"][number]) {
-    const props = { "aria-hidden": true, size: 17 } as const;
-    switch (rotation.status) {
-      case "DRAFT":
-        return <Clock3 {...props} />;
-      case "CALLED":
-        return <TicketsPlane {...props} />;
-      case "IN_FLIGHT":
-        return <PlaneTakeoff {...props} />;
-      case "LANDED":
-        return <PlaneLanding {...props} />;
-      case "COMPLETED":
-        return <CircleCheck {...props} />;
     }
   }
 
@@ -862,572 +136,92 @@ export function CashierWorkspace() {
         <CashierNotifications
           error={error}
           lastConfirmedAt={lastConfirmedAt}
-          pendingDraftCount={pendingDraftCount}
+          pendingDraftCount={sale.pendingDraftCount}
           serverConfirmed={serverConfirmed}
           board={board}
         />
       }
     >
       <p aria-live="polite" className="visually-hidden">
-        {saleAnnouncement}
+        {sale.announcement}
       </p>
       <section className="cashier-v15-workspace">
-        <Panel className="cashier-sale-panel" aria-labelledby="cashier-sale-title">
-          <div className="cashier-sale-heading">
-            <div className="cashier-sale-title">
-              <PageHeader
-                level={1}
-                title={cashierOrderEditing ? "Kassen-Reihenfolge" : "Tickets verkaufen"}
-              />
-              {cashierOrderEditing ? (
-                <p>Nur Kassenreihenfolge · FIDS, Queue und operative Priorität bleiben dynamisch</p>
-              ) : null}
-            </div>
-            {!cashierOrderEditing ? (
-              <div className="cashier-group-size">
-                <div className="cashier-group-size-main">
-                  <span className="cashier-field-label">Gruppengröße</span>
-                  <div className="cashier-stepper">
-                    <IconButton
-                      aria-label="Gruppengröße verringern"
-                      label="Gruppengröße verringern"
-                      onClick={() => changeGroupSize(Math.max(1, size - 1))}
-                      type="button"
-                    >
-                      <Minus aria-hidden="true" size={18} />
-                    </IconButton>
-                    <output aria-live="polite">{size}</output>
-                    <IconButton
-                      aria-label="Gruppengröße erhöhen"
-                      label="Gruppengröße erhöhen"
-                      onClick={() => changeGroupSize(Math.min(12, size + 1))}
-                      type="button"
-                    >
-                      <Plus aria-hidden="true" size={18} />
-                    </IconButton>
-                  </div>
-                  <IconButton
-                    className="cashier-size-reset"
-                    disabled={size === 1 || busyProductId !== null}
-                    label="Gruppengröße auf 1 zurücksetzen"
-                    onClick={() => changeGroupSize(1)}
-                    size="touch"
-                    type="button"
-                  >
-                    <RotateCcw aria-hidden="true" size={18} />
-                  </IconButton>
-                </div>
-                <div className="cashier-group-actions">
-                  <span
-                    aria-live="polite"
-                    className={`cashier-sale-sync${saleSyncCount > 0 ? " is-active" : ""}`}
-                    role="status"
-                    title={saleSyncCount > 0 ? "Verkaufsansicht wird aktualisiert" : undefined}
-                  >
-                    <RefreshCw aria-hidden="true" className="cashier-sale-sync-icon" size={17} />
-                    <span className="visually-hidden">
-                      {saleSyncCount > 0 ? "Verkaufsansicht wird aktualisiert" : ""}
-                    </span>
-                  </span>
-                  <IconButton
-                    className="cashier-order-open"
-                    disabled={
-                      !serverConfirmed ||
-                      busyProductId !== null ||
-                      (board?.products.length ?? 0) < 2
-                    }
-                    label="Kassenreihenfolge bearbeiten"
-                    onClick={openCashierOrderEditor}
-                    size="touch"
-                    type="button"
-                  >
-                    <ListOrdered aria-hidden="true" size={19} />
-                  </IconButton>
-                </div>
-              </div>
-            ) : null}
-          </div>
-          {!cashierOrderEditing ? <CashierCapacityGuidance products={board?.products} /> : null}
-          {cashierOrderEditing ? (
-            <>
-              <ol aria-label="Kassenreihenfolge der Produkte" className="cashier-order-editor">
-                {orderedCashierProductIds.map((productId, index) => {
-                  const product = cashierProductsById.get(productId);
-                  if (!product) return null;
-                  return (
-                    <li
-                      className="cashier-order-row"
-                      data-cashier-product-order-id={productId}
-                      key={productId}
-                      onDragOver={(event) => handleCashierOrderDragOver(event, productId)}
-                    >
-                      <button
-                        aria-label={`${product.name} ziehen`}
-                        className="cashier-order-drag"
-                        disabled={cashierOrderSaving}
-                        draggable={!cashierOrderSaving}
-                        onDragEnd={() => setDraggedCashierProductId(null)}
-                        onDragStart={(event) => {
-                          event.dataTransfer.effectAllowed = "move";
-                          event.dataTransfer.setData("text/plain", productId);
-                          setDraggedCashierProductId(productId);
-                        }}
-                        onPointerCancel={() => setDraggedCashierProductId(null)}
-                        onPointerDown={(event) => {
-                          event.currentTarget.setPointerCapture(event.pointerId);
-                          setDraggedCashierProductId(productId);
-                        }}
-                        onPointerMove={handleCashierOrderPointerMove}
-                        onPointerUp={(event) => {
-                          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                            event.currentTarget.releasePointerCapture(event.pointerId);
-                          }
-                          setDraggedCashierProductId(null);
-                        }}
-                        title={`${product.name} ziehen`}
-                        type="button"
-                      >
-                        <GripVertical aria-hidden="true" size={20} />
-                      </button>
-                      <span className="cashier-order-position">
-                        <span className="visually-hidden">Position </span>
-                        {index + 1}
-                      </span>
-                      <span className="cashier-order-product">
-                        <strong>{product.name}</strong>
-                        <small>{product.code}</small>
-                      </span>
-                      <div className="cashier-order-actions">
-                        <IconButton
-                          disabled={index === 0 || cashierOrderSaving}
-                          label={`${product.name} nach oben verschieben`}
-                          onClick={() => moveCashierProductTo(productId, index - 1)}
-                          size="touch"
-                          type="button"
-                        >
-                          <ArrowUp aria-hidden="true" size={19} />
-                        </IconButton>
-                        <IconButton
-                          disabled={
-                            index === orderedCashierProductIds.length - 1 || cashierOrderSaving
-                          }
-                          label={`${product.name} nach unten verschieben`}
-                          onClick={() => moveCashierProductTo(productId, index + 1)}
-                          size="touch"
-                          type="button"
-                        >
-                          <ArrowDown aria-hidden="true" size={19} />
-                        </IconButton>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
-              <div className="cashier-order-footer">
-                <Button
-                  disabled={cashierOrderSaving}
-                  onClick={closeCashierOrderEditor}
-                  type="button"
-                  variant="secondary"
-                >
-                  Abbrechen
-                </Button>
-                <Button
-                  busy={cashierOrderSaving}
-                  busyLabel="Kassenreihenfolge wird gespeichert"
-                  disabled={!cashierOrderHasChanged}
-                  onClick={() => void saveCashierProductOrder()}
-                  type="button"
-                  variant="primary"
-                >
-                  Speichern
-                </Button>
-              </div>
-            </>
-          ) : (
-            <div className="cashier-products">
-              {board?.products.map((entry) => {
-                const entrySplitPreview = oversizeSplitPreview(size, entry.referenceCapacity);
-                const splitDescriptionId = `cashier-split-${entry.id}`;
-                const saleDisabled =
-                  !serverConfirmed ||
-                  !board ||
-                  !entry.saleEnabled ||
-                  entry.resourceGroupStatus !== "ACTIVE" ||
-                  board.event.emergencyMode ||
-                  board.event.operationalInterrupted ||
-                  busyProductId !== null;
-                return (
-                  <article className="cashier-product" key={entry.id}>
-                    <div className="cashier-product-row">
-                      <span className="cashier-product-name">
-                        <strong>{entry.name}</strong>
-                        <small>
-                          {entry.publicDescription ||
-                            `Flugzeit ca. ${entry.promisedFlightMinutes} Min.`}
-                        </small>
-                      </span>
-                      <span className="cashier-product-metric">
-                        <small>Zeitfenster</small>
-                        <strong>
-                          {formatAbsoluteTimeWindow({
-                            lowerAt: entry.nextBoardingWindowLowerAt,
-                            upperAt: entry.nextBoardingWindowUpperAt,
-                            timeZone: board.event.timeZone,
-                            quality: entry.predictionQuality,
-                          })}
-                        </strong>
-                      </span>
-                      <span className="cashier-product-metric">
-                        <small>Kapazität</small>
-                        <strong>
-                          {entry.remainingSellableSeats}/{entry.projectedSeats}
-                        </strong>
-                      </span>
-                      <span className="cashier-product-price">
-                        <small>Preis / Person</small>
-                        <strong>{currency(entry.priceCents)}</strong>
-                      </span>
-                      <Button
-                        aria-describedby={splitDescriptionId}
-                        aria-label={`${size} Ticket${size === 1 ? "" : "s"} für ${entry.name} verkaufen, ${currency(entry.priceCents * size)}`}
-                        className="cashier-sell-action"
-                        disabled={saleDisabled}
-                        busy={busyProductId === entry.id}
-                        busyLabel={`${size} Ticket${size === 1 ? "" : "s"} für ${entry.name} werden verkauft`}
-                        onClick={() => void sell(entry)}
-                        type="button"
-                        variant="primary"
-                      >
-                        <Ticket aria-hidden="true" size={20} />
-                        <span className="cashier-sell-copy">
-                          <span>
-                            {size} Ticket{size === 1 ? "" : "s"}
-                          </span>
-                          <span>{currency(entry.priceCents * size)}</span>
-                        </span>
-                      </Button>
-                    </div>
-                    <div
-                      className={
-                        entrySplitPreview.required
-                          ? "cashier-split-line warning"
-                          : "cashier-split-line"
-                      }
-                      id={splitDescriptionId}
-                    >
-                      {entrySplitPreview.required ? (
-                        <>
-                          <AlertTriangle aria-hidden="true" size={16} />
-                          <span>
-                            Aufteilung: {entrySplitPreview.slotSizes.join(" + ")} Personen in{" "}
-                            {entrySplitPreview.slotSizes.length} aufeinanderfolgenden Fluggruppen;
-                            die Buchungsgruppe bleibt verbunden.
-                          </span>
-                        </>
-                      ) : (
-                        <span aria-hidden="true">&nbsp;</span>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </Panel>
-
-        <Panel className="cashier-ticket-panel" padding="none" aria-label="Verkaufte Tickets">
-          <Tabs
-            label="Ticketstatus"
-            value={ticketListTab}
-            onChange={(nextTab) => {
-              resetTicketListState();
-              setTicketListTab(nextTab);
-            }}
-            items={[
-              { value: "ACTIVE", label: "Verkaufte Tickets" },
-              { value: "OPEN", label: "Offene Tickets" },
-              { value: "CANCELED", label: "Stornierte Tickets" },
-            ]}
-          />
-          <div className="ds-toolbar cashier-ticket-toolbar">
-            <label className="ds-search-field">
-              <Search aria-hidden="true" size={18} />
-              <input
-                aria-label="Tickets suchen"
-                value={ticketSearch}
-                onChange={(event) => setTicketSearch(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") runTicketSearch();
-                }}
-                placeholder="Suche (z. B. Gruppe, Produkt)"
-              />
-            </label>
-            <label className="cashier-account-filter">
-              <span>Kassenkonto</span>
-              <select
-                aria-label="Nach Kassenkonto filtern"
-                disabled={onlyOwnTickets}
-                onChange={(event) => changeCashierAccountFilter(event.target.value)}
-                value={cashierAccountFilter}
-              >
-                <option value="">Alle Kassen</option>
-                {cashierAccounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.loginCode}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <CheckboxField
-              checked={onlyOwnTickets}
-              className="cashier-own-ticket-filter"
-              disabled={!session}
-              label="Nur meine Tickets"
-              onChange={(event) => changeOnlyOwnTickets(event.target.checked)}
-            />
-            <IconButton
-              label="Liste aktualisieren"
-              busy={manualRefreshBusy}
-              onClick={() => void refreshTicketList()}
-              type="button"
-            >
-              <RefreshCw aria-hidden="true" size={18} />
-            </IconButton>
-          </div>
-          <div className="cashier-ticket-table-wrap">
-            <DataTable
-              className="cashier-ticket-table"
-              columns={[
-                {
-                  key: "sold",
-                  header: (
-                    <TableIconHeader label="Verkauf">
-                      <Coins aria-hidden="true" size={17} />
-                    </TableIconHeader>
-                  ),
-                  render: (result) =>
-                    new Date(result.soldAt).toLocaleTimeString("de-DE", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    }),
-                },
-                {
-                  key: "group",
-                  header: (
-                    <TableIconHeader label="Gruppe">
-                      <Tickets aria-hidden="true" size={17} />
-                    </TableIconHeader>
-                  ),
-                  render: (result) => result.bookingGroupLabel,
-                },
-                {
-                  key: "product",
-                  header: (
-                    <TableIconHeader label="Produkt">
-                      <Package aria-hidden="true" size={17} />
-                    </TableIconHeader>
-                  ),
-                  render: (result) => result.productName,
-                },
-                {
-                  key: "cashier",
-                  header: (
-                    <TableIconHeader label="Kasse">
-                      <UserRound aria-hidden="true" size={17} />
-                    </TableIconHeader>
-                  ),
-                  render: (result) => result.soldByOperatorLoginCode ?? "Nicht zugeordnet",
-                },
-                {
-                  key: "people",
-                  header: (
-                    <TableIconHeader label="Personen">
-                      <Users aria-hidden="true" size={17} />
-                    </TableIconHeader>
-                  ),
-                  render: (result) => result.groupSize,
-                },
-                {
-                  key: "completion",
-                  header: (
-                    <TableIconHeader label="Abgeschlossen">
-                      <Flag aria-hidden="true" size={17} />
-                    </TableIconHeader>
-                  ),
-                  align: "center",
-                  render: (result) => <CashierCompletionIcon result={result} />,
-                },
-                {
-                  key: "total",
-                  header: (
-                    <TableIconHeader label="Summe">
-                      <Sigma aria-hidden="true" size={17} />
-                    </TableIconHeader>
-                  ),
-                  align: "right",
-                  render: (result) =>
-                    currency(
-                      (board?.products.find((entry) => entry.id === result.productId)?.priceCents ??
-                        0) * result.groupSize,
-                    ),
-                },
-              ]}
-              emptyLabel={ticketListEmptyLabel(ticketListTab)}
-              onRowClick={(result) => {
-                selectSearchResult(result);
-                if (result.groupStatus !== "CANCELED") {
-                  void reopenTicketGroup(result.ticketGroupId);
-                }
-              }}
-              rowKey={(result) => result.ticketGroupId}
-              rowClassName={(result) =>
-                newlySoldTicketGroupIds.has(result.ticketGroupId)
-                  ? "cashier-ticket-row--new"
-                  : undefined
-              }
-              rows={visibleTicketGroups}
-              {...(lastTicketGroupId ? { selectedRowKey: lastTicketGroupId } : {})}
-            />
-            <div className="cashier-ticket-list-sentinel" ref={ticketListSentinelRef}>
-              {ticketListSentinelLabel(ticketListLoading, ticketListNextCursor)}
-            </div>
-          </div>
-          <section className="cashier-ticket-detail">
-            <CashierTicketGroupHeader group={selectedTicketGroup} />
-            <div className="cashier-ticket-detail-grid">
-              <div className="cashier-flight-groups">
-                <DataTable
-                  columns={[
-                    {
-                      key: "flight-group",
-                      header: (
-                        <TableIconHeader label="Fluggruppe">
-                          <Tag aria-hidden="true" size={17} />
-                        </TableIconHeader>
-                      ),
-                      render: (rotation) => rotation.communicationLabel,
-                    },
-                    {
-                      key: "people",
-                      header: (
-                        <TableIconHeader label="Personen">
-                          <Users aria-hidden="true" size={17} />
-                        </TableIconHeader>
-                      ),
-                      align: "center",
-                      render: (rotation) =>
-                        rotation.bookingGroups.find(
-                          (group) => group.id === selectedTicketGroup?.ticketGroupId,
-                        )?.ticketCount ?? 0,
-                    },
-                    {
-                      key: "status",
-                      header: (
-                        <TableIconHeader label="Status">
-                          <Activity aria-hidden="true" size={17} />
-                        </TableIconHeader>
-                      ),
-                      align: "center",
-                      render: (rotation) => (
-                        <span
-                          className={rotationPhaseClass(rotation.status)}
-                          role="img"
-                          aria-label={rotationStatusLabel(rotation.status)}
-                          title={rotationStatusLabel(rotation.status)}
-                        >
-                          {rotationStatusIcon(rotation)}
-                        </span>
-                      ),
-                    },
-                    {
-                      key: "go-to-gate",
-                      header: (
-                        <TableIconHeader label="GoToGate-Aktiv">
-                          <CircleArrowRight aria-hidden="true" size={17} />
-                        </TableIconHeader>
-                      ),
-                      align: "center",
-                      render: goToGateIcon,
-                    },
-                    {
-                      key: "time-window",
-                      header: (
-                        <TableIconHeader label="Zeitfenster">
-                          <Clock3 aria-hidden="true" size={17} />
-                        </TableIconHeader>
-                      ),
-                      render: rotationTimeWindow,
-                    },
-                  ]}
-                  emptyLabel={activeFlightEmptyLabel(selectedTicketGroup)}
-                  rowKey={(rotation) => rotation.id}
-                  rows={selectedRotations}
-                />
-              </div>
-              <div className="cashier-ticket-paper">
-                <CashierTicketPaperPreview
-                  receipt={receipt}
-                  onEnlarge={() => setQrScanOpen(true)}
-                />
-              </div>
-            </div>
-            <div className="cashier-ticket-actions">
-              <Button
-                variant="danger"
-                disabled={!lastTicketGroupId || selectedTicketGroup?.groupStatus === "CANCELED"}
-                onClick={() => setCancelDialogOpen(true)}
-                type="button"
-              >
-                <Trash2 aria-hidden="true" size={18} />
-                Stornieren
-              </Button>
-              <Button
-                disabled={!receipt || selectedTicketGroup?.groupStatus === "CANCELED"}
-                busy={printBusy}
-                onClick={() => void printTicketDocument()}
-                type="button"
-              >
-                <Printer aria-hidden="true" size={18} />
-                Ticket drucken
-              </Button>
-            </div>
-          </section>
-        </Panel>
+        <CashierSalePanel
+          board={board}
+          busyProductId={sale.busyProductId}
+          currency={currency}
+          order={{
+            changed: productOrder.changed,
+            editing: productOrder.editing,
+            orderedProductIds: productOrder.orderedProductIds,
+            productsById: productOrder.productsById,
+            saving: productOrder.saving,
+          }}
+          onChangeGroupSize={sale.changeGroupSize}
+          onCloseOrderEditor={productOrder.close}
+          onDragOver={productOrder.handleDragOver}
+          onDraggedProductChange={productOrder.setDraggedProductId}
+          onMoveProduct={productOrder.move}
+          onOpenOrderEditor={productOrder.open}
+          onPointerMove={productOrder.handlePointerMove}
+          onSaveOrder={() => void productOrder.save()}
+          onSell={(product) => void sale.sell(product)}
+          saleSyncCount={sale.syncCount}
+          serverConfirmed={serverConfirmed}
+          size={sale.size}
+        />
+        <CashierTicketPanel
+          accounts={ticketList.accounts}
+          accountFilter={ticketList.accountFilter}
+          board={board}
+          currency={currency}
+          highlightedIds={ticketList.highlightedIds}
+          lastTicketGroupId={ticketList.data.selectedTicketGroupId}
+          loading={ticketList.data.loading}
+          manualRefreshBusy={ticketList.manualRefreshBusy}
+          nextCursor={ticketList.data.nextCursor}
+          onlyOwnTickets={ticketList.onlyOwnTickets}
+          printBusy={receipt.printBusy}
+          receipt={receipt.receipt}
+          rotations={ticketList.selectedRotations}
+          rows={ticketList.visibleGroups}
+          search={ticketList.search}
+          selectedTicketGroup={ticketList.selectedTicketGroup}
+          sentinelRef={ticketList.data.sentinelRef}
+          sessionAvailable={Boolean(session)}
+          tab={ticketList.tab}
+          onAccountFilterChange={ticketList.changeAccountFilter}
+          onCancel={() => setCancelDialogOpen(true)}
+          onEnlarge={receipt.openQrScan}
+          onOnlyOwnTicketsChange={ticketList.changeOnlyOwnTickets}
+          onOpenTicketGroup={(result) => {
+            ticketList.select(result);
+            if (result.groupStatus !== "CANCELED") void receipt.reopen(result.ticketGroupId);
+          }}
+          onPrint={() => void receipt.print(ticketList.selectedTicketGroup)}
+          onRefresh={() => void ticketList.refresh()}
+          onRunSearch={ticketList.runSearch}
+          onSearchChange={ticketList.setSearch}
+          onTabChange={ticketList.setTab}
+          rotationTimeWindow={rotationTimeWindow}
+        />
       </section>
-      <div className="ticket-print-document" ref={printDocumentRef} aria-hidden="true">
-        {printableTicketDocument(receipt)}
-      </div>
-      <QrScanDialog
-        onClose={() => setQrScanOpen(false)}
-        open={qrScanOpen && Boolean(receipt)}
-        ticket={receipt ?? undefined}
-      />
-      <ConfirmationDialog
-        open={cancelDialogOpen}
-        title="Tickets stornieren"
-        body={
-          <div className="cashier-cancel-dialog-body">
-            <p>{cancellationDescription(selectedTicketGroup)}</p>
-            <TextField
-              autoFocus
-              label="Grund"
-              value={cancelReason}
-              onChange={(event) => setCancelReason(event.target.value)}
-              placeholder="Mindestens 3 Zeichen"
-            />
-          </div>
-        }
-        confirmDisabled={cancelReason.trim().length < 3}
-        confirmBusy={cancelBusy}
-        confirmLabel="Stornieren"
-        danger
-        onCancel={() => {
+      <CashierWorkspaceDialogs
+        cancelBusy={cancelBusy}
+        cancelDialogOpen={cancelDialogOpen}
+        cancelReason={cancelReason}
+        onCancelDialogClose={() => {
           if (cancelBusy) return;
           setCancelDialogOpen(false);
           setCancelReason("");
         }}
-        onConfirm={() => void cancelLastSale()}
+        onCancelReasonChange={setCancelReason}
+        onCancelSale={() => void cancelLastSale()}
+        onQrScanClose={receipt.closeQrScan}
+        printDocumentRef={receipt.printDocumentRef}
+        qrScanOpen={receipt.qrScanOpen}
+        receipt={receipt.receipt}
+        selectedTicketGroup={ticketList.selectedTicketGroup}
       />
     </Shell>
   );

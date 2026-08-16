@@ -25,12 +25,13 @@ administrative Aktionen stets eine bestätigte Backend-Verbindung benötigen.
   responsive und Assist-Styles; reine Supervisor-Styles bleiben dem Flight Director vorbehalten.
 - Vite minifiziert CSS explizit mit Lightning CSS. Harte Assetbudgets und ein manifestbasiertes
   Route-Ratchet erlauben höchstens zwei Prozent Regression gegenüber dem gemessenen Stand.
-- Der Administrations-Entry bleibt lazy und wird nicht vorab im Service Worker gespeichert. Die
-  Administration benötigt beim ersten Öffnen eine Netzverbindung. Operative Kassen-, Flight-Line-,
-  Flight-Director- und FIDS-Assets bleiben Bestandteil des Precache.
-- Die noch großen Workspace-Orchestratoren werden als technische Schuld mit fallenden
-  Größenratchets geführt. Neue extrahierte Komponenten und Hooks sollen höchstens 300 Zeilen besitzen;
-  Fachregeln dürfen zur Erreichung dieses Ziels nicht in Präsentationscode wandern.
+- Der Administrations-Entry und die ausschließlich mit live verfügbaren History-Endpunkten nutzbaren
+  Flight-Director-Analyse-Chunks bleiben lazy und werden nicht vorab im Service Worker gespeichert.
+  Operative Kassen-, Flight-Line-, Flight-Director- und FIDS-Grundfunktionen bleiben Bestandteil des
+  Precache.
+- Die Kassen- und Flight-Line-Orchestratoren werden in spezialisierte Zustands-, Kommando-, Listen-,
+  Beleg- und Darstellungsbausteine zerlegt. Neue extrahierte Komponenten und Hooks besitzen fallende
+  Größenratchets von höchstens 300 Zeilen; Fachregeln wandern dafür nicht in Präsentationscode.
 
 ## Konsequenzen
 
@@ -40,6 +41,8 @@ administrative Aktionen stets eine bestätigte Backend-Verbindung benötigen.
 - Ein bereits geladener Administrationsbereich kann den normalen Browsercache verwenden, ist aber
   kein zugesicherter Offline-Einstieg. Das ist konsistent mit der bestehenden Sperre sämtlicher
   administrativer Schreibaktionen ohne Serverbestätigung.
+- Die Verlaufsanalyse benötigt beim ersten Öffnen ebenfalls eine Verbindung. Die bestätigten
+  operativen Snapshots, Standardaktionen und lokalen Kassenentwürfe bleiben davon unberührt.
 - Die Budgets werden durch `npm run web:assets:verify` und die Modulgrenzen durch
   `npm run refactor:guardrails` geprüft.
 

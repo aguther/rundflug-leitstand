@@ -140,12 +140,137 @@
   "extractedModuleBudgets": [
     {
       "path": "apps/web/src/features/cashier/CashierWorkspace.tsx",
-      "maxLines": 1441,
+      "maxLines": 233,
       "targetLines": 300
     },
     {
       "path": "apps/web/src/features/flight-line/FlightLineWorkspace.tsx",
-      "maxLines": 2144,
+      "maxLines": 476,
+      "targetLines": 500
+    },
+    {
+      "path": "apps/web/src/features/cashier/CashierProductList.tsx",
+      "maxLines": 114,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/cashier/CashierProductOrderEditor.tsx",
+      "maxLines": 124,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/cashier/CashierSalePanel.tsx",
+      "maxLines": 139,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/cashier/CashierTicketDetails.tsx",
+      "maxLines": 164,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/cashier/CashierTicketPanel.tsx",
+      "maxLines": 134,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/cashier/CashierTicketTable.tsx",
+      "maxLines": 131,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/cashier/CashierWorkspaceDialogs.tsx",
+      "maxLines": 69,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/cashier/use-cashier-product-order.ts",
+      "maxLines": 130,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/cashier/use-cashier-receipt.ts",
+      "maxLines": 142,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/cashier/use-cashier-sale.ts",
+      "maxLines": 182,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/cashier/use-cashier-ticket-list-data.ts",
+      "maxLines": 263,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/cashier/use-cashier-ticket-list.ts",
+      "maxLines": 209,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/flight-line/FlightLineAircraftPanel.tsx",
+      "maxLines": 100,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/flight-line/FlightLineDispositionPanel.tsx",
+      "maxLines": 197,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/flight-line/FlightLineLegacyQueue.tsx",
+      "maxLines": 191,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/flight-line/FlightLineOperationalConsole.tsx",
+      "maxLines": 175,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/flight-line/FlightLineRotationDetails.tsx",
+      "maxLines": 254,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/flight-line/FlightLineWorkspaceDialogs.tsx",
+      "maxLines": 144,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/flight-line/use-flight-director-operations.ts",
+      "maxLines": 160,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/flight-line/use-flight-director-planning.ts",
+      "maxLines": 201,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/flight-line/use-flight-line-aircraft-commands.ts",
+      "maxLines": 164,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/flight-line/use-flight-line-disposition-commands.ts",
+      "maxLines": 241,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/flight-line/use-flight-line-history.ts",
+      "maxLines": 46,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/flight-line/use-flight-line-rotation-commands.ts",
+      "maxLines": 282,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/flight-line/use-flight-line-workspace-state.ts",
+      "maxLines": 224,
       "targetLines": 300
     },
     {

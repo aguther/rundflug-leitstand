@@ -64,6 +64,9 @@ const operationalPwa = VitePWA({
       "**/ForecastSimulationView-*.css",
       "**/comparison-worker-*.js",
       "**/CartesianChart-*.js",
+      // Historical analytics require live history endpoints and are loaded only on demand.
+      "**/FlightDirectorAnalyticsContent-*.js",
+      "**/flight-director-analytics-model-*.js",
     ],
   },
 });
