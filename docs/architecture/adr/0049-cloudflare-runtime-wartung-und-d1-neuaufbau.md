@@ -25,8 +25,9 @@ vollständigen Neuaufbau des ausdrücklich freigegebenen Cloudflare-Ziels. Ein u
   Bestätigung read-only, prüft Anmeldung, Account, Zielmanifest, D1-ID, R2 und EU-Jurisdiktion und
   verlangt anschließend eine aus dem D1-Namen abgeleitete exakte Löschbestätigung.
 - Nach dem Löschen wird D1 unter demselben Namen und mit EU-Jurisdiktion neu erzeugt. Manifest und
-  generierte Konfiguration erhalten die neue ID; ausschließlich `0001_v1_12_baseline.sql` wird
-  angewandt. Das CLI deployt nicht und spielt keine Seed-Daten ein.
+  generierte Konfiguration erhalten die neue ID; Wrangler wendet die vollständige lückenlose Folge
+  aller eingecheckten und noch ausstehenden Migrationen ab `0001_v1_12_baseline.sql` an. Das CLI
+  deployt nicht und spielt keine Seed-Daten ein.
 
 ## Konsequenzen
 
@@ -37,7 +38,7 @@ vollständigen Neuaufbau des ausdrücklich freigegebenen Cloudflare-Ziels. Ein u
 - Das Zielmanifest unter `.wrangler/targets` bleibt zwingende lokale Sicherheitsgrenze und wird nicht
   eingecheckt. Konto- und Ressourcen-IDs dürfen ausgegeben werden; Secret-Werte und Nutzdaten nie.
 - Nach einem Fehler zwischen Löschen und Migration wird der Lauf mit dem aktualisierten Zielmanifest
-  fortgesetzt: neue D1-Jurisdiktion prüfen, Baseline anwenden, danach erst deployen. Die gelöschte
+  fortgesetzt: neue D1-Jurisdiktion prüfen, ausstehende Migrationen anwenden, danach erst deployen. Die gelöschte
   Entwicklungs-/Abnahme-D1 wird nicht wiederhergestellt; falls fachlich nötig, erfolgt Restore in
   eine isolierte Datenbank nach `docs/operations/backup-restore.md`.
 

@@ -195,14 +195,16 @@ npm run cloudflare:recreate-d1 -- \
 Der erwartete Text wird immer aus dem D1-Namen im ignorierten Zielmanifest abgeleitet; das Beispiel
 ist daher nicht zu kopieren, wenn die Vorschau einen anderen Namen meldet. Das CLI löscht nur die
 bestätigte Remote-D1, legt sie unter demselben Namen mit `jurisdiction eu` neu an, aktualisiert lokale
-Zieldateien und wendet ausschließlich `0001_v1_12_baseline.sql` an. R2, Worker, URL und Secrets
+Zieldateien und wendet alle ausstehenden, eingecheckten D1-Migrationen an. Beim ursprünglichen
+V1.12-Neuaufbau war dies ausschließlich `0001_v1_12_baseline.sql`; spätere Neuaufbauten wenden
+zusätzlich die lückenlosen Folgemigrationen ab `0002` an. R2, Worker, URL und Secrets
 werden weder gelöscht noch verändert. Es erfolgt kein Deployment und kein Remote-Demo-Seed.
 
 Schlägt der Lauf nach der Löschung fehl, wird nicht zur alten D1-ID zurückgewechselt. Nach einer vom
 CLI selbst bestätigten Neuanlage markiert das Zielmanifest den Neuaufbau als ausstehend; derselbe
 Befehl mit derselben exakten Bestätigung setzt dann ausschließlich diesen belegten Zwischenstand fort,
-ohne D1 erneut zu löschen. Neue Ressource und Zielmanifest werden geprüft, die Baseline wird erneut
-angewandt und erst danach separat deployt.
+ohne D1 erneut zu löschen. Neue Ressource und Zielmanifest werden geprüft, alle ausstehenden
+Migrationen werden erneut angewandt und erst danach separat deployt.
 Ein fachlich erforderlicher Daten-Restore erfolgt ausschließlich in einer isolierten Datenbank nach
 `backup-restore.md`.
 

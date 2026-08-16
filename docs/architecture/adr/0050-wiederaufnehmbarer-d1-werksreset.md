@@ -24,7 +24,8 @@ Der D1-Anteil wird in Kind-zu-Eltern-Reihenfolge ausgeführt:
    Versionen zu den früheren Ankerläufen geleert. Kleine, benachbarte Tabellen teilen sich begrenzte Löschphasen in
    Kind-zu-Eltern-Reihenfolge. Fremdschlüssel werden innerhalb jeder Transaktion aufgeschoben; die
    technische Reset-Freigabe für Append-only-Trigger wird in derselben Transaktion gesetzt und
-   wieder entfernt. Direkte Indizes auf beiden selbstreferenzierenden Lineage-Spalten verhindern,
+   wieder entfernt. Die mit `0002_planning_run_lineage_indexes.sql` ergänzten direkten Indizes auf
+   beiden selbstreferenzierenden Lineage-Spalten verhindern,
    dass D1 für jede gelöschte Zeile die vollständige Planlaufhistorie erneut nach Kindreferenzen
    durchsuchen muss.
 2. Konten, Sitzungen, Gerätebindungen, Bootstrap- und Wurzeltabellen bleiben bis zum Schluss

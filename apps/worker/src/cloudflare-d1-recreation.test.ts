@@ -107,4 +107,11 @@ describe("guarded Cloudflare D1 recreation", () => {
       jurisdiction: "eu",
     });
   });
+
+  it("applies every pending checked-in migration during recreation", () => {
+    expect(recreation.createRecreationPlan(manifest)).toMatchObject({
+      migrations: "all-pending",
+      remoteSeeds: "none",
+    });
+  });
 });

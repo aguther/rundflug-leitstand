@@ -64,7 +64,7 @@ export function createRecreationPlan(manifest) {
     d1: { name: manifest.d1Name, id: manifest.d1DatabaseId },
     r2: manifest.r2Name,
     jurisdiction: "eu",
-    migration: "0001_v1_12_baseline.sql",
+    migrations: "all-pending",
     remoteSeeds: "none",
     pendingRecreation: manifest.d1RecreationPending === true,
   };

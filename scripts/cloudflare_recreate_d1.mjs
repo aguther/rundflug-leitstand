@@ -132,5 +132,5 @@ await writeJsonAtomically(configPath, recreatedState.config);
 await runWrangler(["d1", "migrations", "apply", "DB", "--remote", "--config", configPath]);
 await writeJsonAtomically(manifestPath, recreatedState.manifest);
 process.stdout.write(
-  `${JSON.stringify({ target: manifest.target, d1: manifest.d1Name, migration: "0001_v1_12_baseline.sql", status: "recreated" }, null, 2)}\n`,
+  `${JSON.stringify({ target: manifest.target, d1: manifest.d1Name, migrations: "all-pending", status: "recreated" }, null, 2)}\n`,
 );

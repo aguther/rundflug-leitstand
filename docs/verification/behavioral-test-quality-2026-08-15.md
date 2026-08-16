@@ -10,11 +10,12 @@ Funktionsnamen, SQL-Fragmente, JSX-Strukturen oder CSS-Klassen zu behaupten. Zul
 Parser- und Validatorprüfungen für JSON, YAML, Wrangler-Konfiguration, generierte Dokumente sowie
 Datenschutz- und Lizenzscans, weil dort das Artefakt selbst der Vertrag ist.
 
-Der gemeinsame Datenbank-Testbuilder führt `0001_v1_12_baseline.sql` in einer echten
-In-Memory-SQLite-Datenbank aus, aktiviert Fremdschlüssel und bietet eine D1-kompatible
-Prepared-Statement-Schnittstelle. Datenmodell- und Worker-Tests prüfen dadurch Inserts, Constraints,
-Trigger, Abfragen und API-Projektionen gegen das produktive Endschema statt gegen Teil-DDLs oder
-SQL-Text.
+Der gemeinsame Datenbank-Testbuilder führt die lückenlose aktive Migrationsfolge ab
+`0001_v1_12_baseline.sql` in einer echten In-Memory-SQLite-Datenbank aus, aktiviert Fremdschlüssel
+und bietet eine D1-kompatible Prepared-Statement-Schnittstelle. Der getrennte Baseline-Test führt
+ausschließlich `0001` aus und vergleicht sie mit dem eingefrorenen semantischen Manifest.
+Datenmodell- und Worker-Tests prüfen dadurch Inserts, Constraints, Trigger, Abfragen und
+API-Projektionen gegen das aktuelle produktive Endschema statt gegen Teil-DDLs oder SQL-Text.
 
 ## Gemessene Coverage
 

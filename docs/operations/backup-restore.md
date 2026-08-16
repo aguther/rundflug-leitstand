@@ -9,8 +9,9 @@ Backups werden nicht in die Baseline importiert. Sie werden nach verifiziertem F
 verworfen und als leere D1 in EU-Jurisdiktion neu aufgebaut; Remote-Demo-Seeds sind ausgeschlossen.
 
 Scheitert dieser einmalige Neuaufbau, wird die neue leere D1 nochmals gelöscht und aus derselben
-Baseline erzeugt. Nach erfolgreicher Abnahme gelten für Migrationen ab `0002` wieder die jeweils
-dokumentierten Wiederherstellungs- oder Forward-Repair-Verfahren. Details stehen in ADR-0045.
+Baseline sowie allen eingecheckten Folgemigrationen erzeugt. Für Migrationen ab `0002` gelten die
+jeweils dokumentierten Wiederherstellungs- oder Forward-Repair-Verfahren. Details stehen in
+ADR-0045.
 
 ## Geplante Erweiterung 1.12 – Analysemetadaten
 

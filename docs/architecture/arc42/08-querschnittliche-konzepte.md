@@ -113,6 +113,9 @@ keinen neueren bestätigten Stand ersetzen.
 - Neue SQL-Migrationen sind ab `0002` eindeutig, lückenlos und vorwärtsgerichtet. Jede Migration mit
   operativer Wirkung besitzt eine Wiederherstellungs- oder Forward-Repair-Notiz in
   `docs/operations/backup-restore.md` beziehungsweise ein eigenes Migrationsdokument.
+- `0002_planning_run_lineage_indexes.sql` ergänzt zwei direkte Fremdschlüsselindizes für die
+  begrenzte Werksreset-Löschung. Der gemeinsame Testbuilder führt immer die vollständige aktive
+  Migrationsfolge aus; ein separater Baseline-Test hält die 42/73/20-Identität von `0001` fest.
 - Tabellen sind `STRICT`; fachliche Invarianten werden zusätzlich durch `CHECK`-Bedingungen,
   Fremdschlüssel und partielle Unique-Indizes abgesichert.
 - `operational_events` und `forecast_snapshots` sind append-only; D1-Trigger verbieten `UPDATE` und

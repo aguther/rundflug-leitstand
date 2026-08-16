@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   applyDemoSeed,
+  createBaselineTestDatabase,
   createMigratedTestDatabase,
   describeDatabaseSchema,
   readBaselineSql,
@@ -14,19 +15,28 @@ const expectedSchema = JSON.parse(
 
 describe("V1.12 database baseline", () => {
   it("recreates the complete legacy end schema from one migration", () => {
-    const database = createMigratedTestDatabase();
+    const database = createBaselineTestDatabase();
 
     expect(describeDatabaseSchema(database)).toEqual(expectedSchema);
     expect(expectedSchema.objectCounts).toEqual({
       tables: 42,
-      namedIndexes: 75,
+      namedIndexes: 73,
       triggers: 20,
     });
+    expect(database.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+
+    database.close();
+  });
+
+  it("applies follow-up migrations without changing the baseline identity", () => {
+    const database = createMigratedTestDatabase();
+    const schema = describeDatabaseSchema(database);
     const planningRunIndexes = database.prepare("PRAGMA index_list('planning_runs')").all() as {
       name: string;
     }[];
-    const planningRunIndexNames = planningRunIndexes.map((index) => String(index.name));
-    expect(planningRunIndexNames).toEqual(
+
+    expect(schema.objectCounts).toEqual({ tables: 42, namedIndexes: 75, triggers: 20 });
+    expect(planningRunIndexes.map((index) => String(index.name))).toEqual(
       expect.arrayContaining(["idx_planning_runs_anchor_run", "idx_planning_runs_previous_run"]),
     );
     expect(database.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
@@ -35,7 +45,7 @@ describe("V1.12 database baseline", () => {
   });
 
   it("keeps the baseline independent from Wrangler migration bookkeeping", () => {
-    const database = createMigratedTestDatabase();
+    const database = createBaselineTestDatabase();
 
     expect(readBaselineSql()).not.toContain("d1_migrations");
     expect(
@@ -48,7 +58,7 @@ describe("V1.12 database baseline", () => {
   });
 
   it("contains no guest identity or direct contact columns", () => {
-    const database = createMigratedTestDatabase();
+    const database = createBaselineTestDatabase();
     const forbiddenColumn =
       /^(guest_?name|passenger_?name|customer_?name|phone(_number)?|telephone(_number)?|telefon(_nummer)?|mobile(_number)?|email(_address)?)$/i;
     const violations = expectedSchema.tables.flatMap((table) =>

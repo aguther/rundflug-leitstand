@@ -18,10 +18,7 @@ diese Historie weder erforderlich noch erwünscht.
 Die aktive D1-Historie beginnt neu mit `0001_v1_12_baseline.sql`. Die Baseline wurde aus einer
 SQLite-Datenbank abgeleitet, auf die alle 69 bisherigen Migrationen in ihrer bisherigen Reihenfolge
 angewendet wurden. Sie beschreibt das konsolidierte V1.12-Endschema mit 42 Anwendungstabellen,
-75 benannten Indizes und 20 Triggern. Zwei direkte Lineage-Indizes auf `planning_runs.previous_run_id`
-und `planning_runs.anchor_run_id` stellen sicher, dass D1 die selbstreferenzierenden
-Fremdschlüssel auch bei einem vollständigen Reset ohne wiederholte Tabellenscans prüfen kann.
-Historische Backfills und die Wrangler-interne Tabelle
+73 benannten Indizes und 20 Triggern. Historische Backfills und die Wrangler-interne Tabelle
 `d1_migrations` sind nicht enthalten. Der technische Singleton `system_reset_control` wird mit dem
 sicheren inaktiven Wert initialisiert, weil Append-only-Trigger und Resetabläufe ihn voraussetzen.
 
@@ -32,7 +29,9 @@ Abnahmedaten ist ausdrücklich zulässig. Portable Backups aus der alten Histori
 Importquelle für die neue Baseline.
 
 Nachfolgende Änderungen sind vorwärtsgerichtete Migrationen mit eindeutiger, lückenloser Nummer.
-Die nächste Datei heißt `0002_<english-slug>.sql`. Angewandte Dateien werden niemals nachträglich
+Die erste davon ist `0002_planning_run_lineage_indexes.sql`; sie ergänzt die beiden direkten
+Lineage-Indizes auf `planning_runs.previous_run_id` und `planning_runs.anchor_run_id`, die D1 für die
+skalierbare Werksreset-Löschung benötigt. Angewandte Dateien werden niemals nachträglich
 umbenannt oder verändert. Jede neue Migration benötigt eine Wiederherstellungs- oder
 Forward-Repair-Notiz und einen Test, der sie ausführt und ihr beobachtbares Schema- oder
 Fachverhalten prüft.
@@ -51,7 +50,8 @@ Datenschutzspalten und die zugesagten 20-/30-Minuten-Produkte aus dem synthetisc
 - Vor dem Neuaufbau wird ein administrativer Factory Reset einschließlich Durable Objects und R2
   ausgeführt und verifiziert; danach wird die alte D1 gelöscht und unter demselben Namen in
   EU-Jurisdiktion neu angelegt.
-- Remote werden nur Baseline und Worker ausgerollt, niemals Demo-Daten.
+- Remote werden alle ausstehenden, eingecheckten Migrationen und der Worker ausgerollt, niemals
+  Demo-Daten.
 - Scheitert der Neuaufbau vor der Abnahme, wird die neue leere D1 erneut gelöscht und aus derselben
   Baseline aufgebaut. Die alte Nutzdateninstanz wird nicht wiederhergestellt.
 - Historische ADRs und Migrationsnotizen bleiben als Entscheidungsverlauf erhalten; für den aktuell

@@ -8,6 +8,7 @@ nachvollziehbar (ADR-0045).
 | Reihenfolge | Datei | Hinweis |
 | ---: | --- | --- |
 | 1 | `0001_v1_12_baseline.sql` | eindeutig und lückenlos ab `0001` |
+| 2 | `0002_planning_run_lineage_indexes.sql` | eindeutig und lückenlos ab `0001` |
 
-Gesamt: 1 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
+Gesamt: 2 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
 `apps/worker/migrations/README.md` geprüft.

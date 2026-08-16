@@ -34,3 +34,17 @@ bewusst verworfen.
 Neue Migrationen beginnen mit `0002_<english-slug>.sql`. Nummern sind vierstellig, eindeutig und
 lückenlos. Jede Folgemigration enthält eine Wiederherstellungs- oder Forward-Repair-Notiz und wird
 durch ausgeführte Schema- oder Verhaltenstests abgesichert.
+
+## 0002 – Planning-run lineage indexes
+
+`0002_planning_run_lineage_indexes.sql` ergänzt direkte Indizes auf `planning_runs.anchor_run_id`
+und `planning_runs.previous_run_id`. Damit kann D1 die selbstreferenzierenden Fremdschlüssel bei der
+begrenzten Werksreset-Löschung prüfen, ohne für jede Zeile die vollständige Planlaufhistorie zu
+durchsuchen. Die Migration verändert keine Nutzdaten.
+
+### Wiederherstellung
+
+Bei einem fehlgeschlagenen oder inkonsistenten Indexaufbau werden beide Indizes mit `DROP INDEX IF
+EXISTS` entfernt und die korrigierte Migration erneut angewendet. Vor dem Rückbau wird der
+Werksreset angehalten; ein bereits laufender Reset wird anschließend mit demselben autorisierten
+Vorgang fortgesetzt.

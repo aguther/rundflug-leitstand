@@ -1,9 +1,10 @@
 // @ts-expect-error Tests execute in Node while the Worker production config excludes Node types.
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 // @ts-expect-error Tests execute in Node while the Worker production config excludes Node types.
 import { DatabaseSync } from "node:sqlite";
 
-const baselineUrl = new URL("../migrations/0001_v1_12_baseline.sql", import.meta.url);
+const migrationsUrl = new URL("../migrations/", import.meta.url);
+const baselineUrl = new URL("0001_v1_12_baseline.sql", migrationsUrl);
 const demoSeedUrl = new URL("../seed/demo.sql", import.meta.url);
 
 export type SqliteRow = Record<string, unknown>;
@@ -20,10 +21,28 @@ export function readBaselineSql(): string {
   return readFileSync(baselineUrl, "utf8");
 }
 
-export function createMigratedTestDatabase(): DatabaseSync {
+function createEmptyTestDatabase(): DatabaseSync {
   const database = new DatabaseSync(":memory:");
   database.exec("PRAGMA foreign_keys = ON");
+  return database;
+}
+
+export function createBaselineTestDatabase(): DatabaseSync {
+  const database = createEmptyTestDatabase();
   database.exec(readBaselineSql());
+  return database;
+}
+
+export function readMigrationSql(): string[] {
+  return readdirSync(migrationsUrl)
+    .filter((name: string) => /^\d{4}_.+\.sql$/.test(name))
+    .sort((left: string, right: string) => left.localeCompare(right, "en"))
+    .map((name: string) => readFileSync(new URL(name, migrationsUrl), "utf8"));
+}
+
+export function createMigratedTestDatabase(): DatabaseSync {
+  const database = createEmptyTestDatabase();
+  for (const migrationSql of readMigrationSql()) database.exec(migrationSql);
   return database;
 }
 
