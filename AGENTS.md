@@ -12,14 +12,15 @@ Auditierung.
 1. `docs/requirements/requirements-v1.12.0.md`
 2. `docs/requirements/requirements-v1.12.0.yaml`
 3. der unveränderte Basiskatalog V1.4 und die in V1.12.0 konsolidierten fortgeltenden Anforderungen
-4. freigegebene ADRs in `docs/adr/`
+4. freigegebene ADRs in `docs/architecture/adr/`
 5. automatisierte Tests
 6. diese `AGENTS.md`
 
 Binäre PDF-/DOCX-Dateien dienen als unveränderte Referenz. Ändere keine Anforderung stillschweigend.
 Dokumentiere Unklarheiten in `docs/requirements/open-questions.md`.
 
-Die zentrale, aus diesen Quellen abgeleitete Architekturdokumentation liegt unter `docs/arc42/`.
+Die zentrale, aus diesen Quellen abgeleitete Architekturdokumentation liegt unter
+`docs/architecture/arc42/`.
 Sie beschreibt den aktuellen Architekturstand, ersetzt aber weder Anforderungen noch ADRs oder Tests.
 
 ## Nicht verhandelbare fachliche Invarianten
@@ -68,7 +69,8 @@ Sie beschreibt den aktuellen Architekturstand, ersetzt aber weder Anforderungen 
 
 - Änderungen an Systemgrenzen, Bausteinen, öffentlichen oder internen Schnittstellen, Persistenz,
   Laufzeitinteraktionen, Deployment, Querschnittskonzepten, Qualitätszielen, Risiken oder ADRs müssen
-  im selben Auftrag in den betroffenen Kapiteln und Mermaid-Diagrammen unter `docs/arc42/`
+  im selben Auftrag in den betroffenen Kapiteln und Mermaid-Diagrammen unter
+  `docs/architecture/arc42/`
   nachvollzogen werden.
 - Strukturprägende Entscheidungen werden zuerst als ADR dokumentiert und in Kapitel 9 der
   arc42-Dokumentation als aktueller Entscheidungsstand verlinkt und zusammengefasst.

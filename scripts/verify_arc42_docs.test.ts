@@ -20,12 +20,15 @@ async function replace(path: string, current: string, replacement: string) {
 
 async function createValidFixture() {
   await write("package.json", JSON.stringify({ version: "1.2.3" }));
-  await write("docs/adr/0001-test.md", "# Test ADR\n");
+  await write(
+    "docs/architecture/adr/0001-test.md",
+    "# ADR-0001: Test decision\n\n- Status: Akzeptiert\n",
+  );
   const links = expectedArc42Chapters
     .map(([name, heading]) => `- [${heading.slice(2)}](${name})`)
     .join("\n");
   await write(
-    "docs/arc42/README.md",
+    "docs/architecture/arc42/README.md",
     `# Architekturdokumentation\n\nStand **1.2.3**\n\n${links}\n`,
   );
   for (const [name, heading] of expectedArc42Chapters) {
@@ -33,18 +36,18 @@ async function createValidFixture() {
     const diagram =
       Number(name.slice(0, 2)) <= 8 ? "\n\n```mermaid\nflowchart LR\n    A --> B\n```" : "";
     const adr = name.startsWith("09-") ? "\n\n[0001](../adr/0001-test.md)" : "";
-    await write(`docs/arc42/${name}`, `${heading}${version}${diagram}${adr}\n`);
+    await write(`docs/architecture/arc42/${name}`, `${heading}${version}${diagram}${adr}\n`);
   }
 }
 
 beforeEach(async () => {
   root = await mkdtemp(resolve(tmpdir(), "arc42-verifier-"));
   await createValidFixture();
-});
+}, 30_000);
 
 afterEach(async () => {
   await rm(root, { recursive: true, force: true });
-});
+}, 30_000);
 
 describe("arc42 documentation verifier", () => {
   it("accepts a complete and consistent document set", async () => {
@@ -56,39 +59,45 @@ describe("arc42 documentation verifier", () => {
   });
 
   it("rejects a missing chapter", async () => {
-    await rm(resolve(root, "docs/arc42/06-laufzeitsicht.md"));
+    await rm(resolve(root, "docs/architecture/arc42/06-laufzeitsicht.md"));
     await expect(verifyArc42Documentation(root)).rejects.toThrow("Kapitel fehlt");
   });
 
   it("rejects an ADR missing from the decision chapter", async () => {
-    await write("docs/adr/0002-unlinked.md", "# Unlinked ADR\n");
+    await write(
+      "docs/architecture/adr/0002-unlinked.md",
+      "# ADR-0002: Unlinked decision\n\n- Status: Akzeptiert\n",
+    );
     await expect(verifyArc42Documentation(root)).rejects.toThrow(
       "0002-unlinked.md muss in Kapitel 9 genau einmal verlinkt sein",
     );
   });
 
   it("rejects stale project version references", async () => {
-    await replace("docs/arc42/README.md", "**1.2.3**", "**1.2.2**");
-    await replace("docs/arc42/01-einfuehrung-und-ziele.md", "**1.2.3**", "**1.2.2**");
+    await replace("docs/architecture/arc42/README.md", "**1.2.3**", "**1.2.2**");
+    await replace("docs/architecture/arc42/01-einfuehrung-und-ziele.md", "**1.2.3**", "**1.2.2**");
     await expect(verifyArc42Documentation(root)).rejects.toThrow("aktuelle Projektversion 1.2.3");
   });
 
   it("rejects a broken local link", async () => {
     await write(
-      "docs/arc42/12-glossar.md",
+      "docs/architecture/arc42/12-glossar.md",
       "# 12. Glossar\n\n[Fehlend](../architecture/fehlt.md)\n",
     );
     await expect(verifyArc42Documentation(root)).rejects.toThrow("Lokaler Link fehlt");
   });
 
   it("rejects an open code fence", async () => {
-    await write("docs/arc42/02-randbedingungen.md", "# 2. Randbedingungen\n\n```text\noffen\n");
+    await write(
+      "docs/architecture/arc42/02-randbedingungen.md",
+      "# 2. Randbedingungen\n\n```text\noffen\n",
+    );
     await expect(verifyArc42Documentation(root)).rejects.toThrow("offenen Codeblock");
   });
 
   it("rejects invalid Mermaid syntax", async () => {
     await replace(
-      "docs/arc42/01-einfuehrung-und-ziele.md",
+      "docs/architecture/arc42/01-einfuehrung-und-ziele.md",
       "flowchart LR\n    A --> B",
       "flowchart LR\n    A --",
     );

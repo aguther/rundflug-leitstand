@@ -354,7 +354,7 @@
       <div><b>D1 + R2</b><span>Zustand, Audit, Backups und Analyse</span></div>
     </aside>
   </div>
-  <div class="source-note">Originaldiagramm „Technischer Kontext“ · beim Build unverändert aus <code>docs/arc42/03-kontextabgrenzung.md</code> geladen</div>
+  <div class="source-note">Originaldiagramm „Technischer Kontext“ · beim Build unverändert aus <code>docs/architecture/arc42/03-kontextabgrenzung.md</code> geladen</div>
 </section>
 
 <!-- 21 -->
@@ -489,7 +489,7 @@
   <div class="section-label appendix-label">A7 · ARC42 · TECHNISCHER KONTEXT</div>
   <div class="title-wrap compact"><h2>Originaldiagramm: Technischer Kontext</h2></div>
   <div class="mermaid-full" data-mermaid-diagram="technical-context-appendix"></div>
-  <div class="source-note">Unverändert aus <code>docs/arc42/03-kontextabgrenzung.md</code></div>
+  <div class="source-note">Unverändert aus <code>docs/architecture/arc42/03-kontextabgrenzung.md</code></div>
 </section>
 
 <!-- A8 -->
@@ -497,7 +497,7 @@
   <div class="section-label appendix-label">A8 · ARC42 · GESAMTSYSTEM</div>
   <div class="title-wrap compact"><h2>Originaldiagramm: Gesamtsystem</h2></div>
   <div class="mermaid-full" data-mermaid-diagram="workspace-overview"></div>
-  <div class="source-note">Unverändert aus <code>docs/arc42/05-bausteinsicht.md</code></div>
+  <div class="source-note">Unverändert aus <code>docs/architecture/arc42/05-bausteinsicht.md</code></div>
 </section>
 
 <!-- A9 -->
@@ -505,7 +505,7 @@
   <div class="section-label appendix-label">A9 · ARC42 · WEB</div>
   <div class="title-wrap compact"><h2>Originaldiagramm: Web-interne Bausteingrenzen</h2></div>
   <div class="mermaid-full" data-mermaid-diagram="web-component-flow"></div>
-  <div class="source-note">Unverändert aus <code>docs/arc42/05-bausteinsicht.md</code></div>
+  <div class="source-note">Unverändert aus <code>docs/architecture/arc42/05-bausteinsicht.md</code></div>
 </section>
 
 <!-- A10 -->
@@ -514,7 +514,7 @@
   <div class="title-wrap compact"><h2>Originaldiagramm: SELL_TICKET_GROUP</h2></div>
   <div class="mermaid-full sequence" data-mermaid-diagram="sell-ticket-sequence"></div>
   <div class="sequence-key"><span class="conflict">409</span> stale write wird abgelehnt <span class="success">200</span> Antwort nach D1-Commit <span class="live">LIVE</span> Versionssignal an Clients</div>
-  <div class="source-note">Unverändert aus <code>docs/arc42/06-laufzeitsicht.md</code></div>
+  <div class="source-note">Unverändert aus <code>docs/architecture/arc42/06-laufzeitsicht.md</code></div>
 </section>
 
 <!-- A11 -->
@@ -528,7 +528,7 @@
     <div><h3>Regeln</h3><p>Jeder Client sendet <code>commandId</code> und <code>expectedVersion</code>. Kein Zustand existiert nur im Durable Object.</p></div>
     <div class="consequence"><h3>Folgen</h3><p>Realtime erst nach bestätigter Persistenz; Snapshot-Rekonstruktion aus D1 nach Neustart.</p></div>
   </div>
-  <div class="source-note">Quelle: <code>docs/adr/0002-d1-und-durable-object.md</code></div>
+  <div class="source-note">Quelle: <code>docs/architecture/adr/0002-d1-und-durable-object.md</code></div>
 </section>
 
 <!-- A12 -->

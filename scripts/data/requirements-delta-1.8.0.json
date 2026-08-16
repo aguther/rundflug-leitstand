@@ -94,7 +94,7 @@
       "priority": "MUSS",
       "stage": "V1",
       "status": "implemented",
-      "module": "docs/adr/0023-oeffentlicher-gruppencode.md und apps/worker/migrations/README.md",
+      "module": "docs/architecture/adr/0023-oeffentlicher-gruppencode.md und apps/worker/migrations/README.md",
       "tests": "Requirements-Verifikation und Diffprüfung",
       "traceStatus": "umgesetzt"
     },

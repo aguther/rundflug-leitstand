@@ -1,7 +1,9 @@
 # Verifikationsnachweis: Forecast-Pipeline-Modularisierung
 
 Stand: 2026-08-12
-Arbeitspaket: AP-12 aus `docs/architecture/technical-debt-analysis-2026-08-10.md`
+Historischer Ursprung: AP-12 der inzwischen entfernten, datierten Schuldenanalyse. Der noch offene
+Legacy-Anteil wird unter
+`docs/architecture/technical-debts/forecast-legacy-comparison-path.md` fortgeführt.
 
 ## Nachgewiesene Struktur
 

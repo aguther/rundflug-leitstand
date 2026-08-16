@@ -41,12 +41,12 @@ Optional schreibt `PREVIEW_DIR` zusätzlich jede Folie als PNG für die visuelle
 
 Die Präsentation bindet kanonische Quellen ein, statt sie nochmals abzulegen:
 
-- Architektur und Mermaid-Diagramme: [`docs/arc42/`](../../arc42/)
-- Architekturentscheidungen: [`docs/adr/`](../../adr/)
+- Architektur und Mermaid-Diagramme: [`docs/architecture/arc42/`](../../architecture/arc42/)
+- Architekturentscheidungen: [`docs/architecture/adr/`](../../architecture/adr/)
 - Engineering- und Integrationsprozess: [`AGENTS.md`](../../../AGENTS.md)
 - Anforderungen und Traceability: [`docs/requirements/`](../../requirements/)
 
-Vier Architektur- und Laufzeitdiagramme werden beim PDF-Build unverändert aus ihren Mermaid-Quellblöcken unter `docs/arc42/` gelesen und gerendert. Dadurch bleiben arc42-Dokumentation und Präsentation inhaltlich identisch, ohne zusätzliche SVG- oder Bildkopien.
+Vier Architektur- und Laufzeitdiagramme werden beim PDF-Build unverändert aus ihren Mermaid-Quellblöcken unter `docs/architecture/arc42/` gelesen und gerendert. Dadurch bleiben arc42-Dokumentation und Präsentation inhaltlich identisch, ohne zusätzliche SVG- oder Bildkopien.
 
 Vorhandene Live-, Simulator- und SonarQube-Bilder werden direkt aus ihren bestehenden Ordnern verwendet. Ergänzt wurden ausschließlich die vom Auftraggeber neu bereitgestellten mobilen Flight-Line-Aufnahmen, das Festmotiv und fünf historische UX/UI-Stände, die zuvor ausschließlich in der nun entfernten PowerPoint-Datei eingebettet waren.
 

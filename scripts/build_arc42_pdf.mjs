@@ -47,7 +47,7 @@ function documentStyles() {
       font-size: 8.3pt; margin: 0 0 10pt; }
     thead { display: table-header-group; }
     th, td { border: 1px solid #c9ccd6; padding: 3pt 4pt; text-align: left;
-      vertical-align: top; overflow-wrap: anywhere; }
+      vertical-align: top; overflow-wrap: break-word; }
     th { background: #eaeef8; color: #1f2f50; }
     tr { break-inside: avoid; }
     figure, .diagram { margin: 10pt 0 12pt; text-align: center; break-inside: avoid; }
@@ -77,7 +77,7 @@ function titlePage(metadata) {
       <h1 class="title">${metadata.title ?? "Architekturdokumentation"}</h1>
       <div class="subtitle">${metadata.subtitle ?? ""}</div>
       <div class="meta">Stand ${metadata.date ?? ""}<br>
-        Erzeugt aus docs/arc42 mit npm run docs:arc42:pdf</div>
+        Erzeugt aus docs/architecture/arc42 und docs/architecture/adr mit npm run docs:arc42:pdf</div>
     </section>
   `;
 }

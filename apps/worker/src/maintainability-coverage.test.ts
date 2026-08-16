@@ -4,7 +4,7 @@ import ciWorkflow from "../../../.github/workflows/ci.yml?raw";
 import cloudflarePerformanceWorkflow from "../../../.github/workflows/cloudflare-performance.yml?raw";
 import deployCloudflareWorkflow from "../../../.github/workflows/deploy-cloudflare.yml?raw";
 import nodeVersion from "../../../.nvmrc?raw";
-import interfaceDocumentation from "../../../docs/architecture/command-and-realtime-interface.md?raw";
+import architectureConcepts from "../../../docs/architecture/arc42/08-querschnittliche-konzepte.md?raw";
 import rootManifestRaw from "../../../package.json?raw";
 import packageLockRaw from "../../../package-lock.json?raw";
 import contractsManifestRaw from "../../../packages/contracts/package.json?raw";
@@ -248,8 +248,8 @@ describe("V1 maintainability and portability boundaries", () => {
       { id: "panorama-20", resource_group_id: "rg-panorama" },
       { id: "panorama-30", resource_group_id: "rg-panorama" },
     ]);
-    expect(interfaceDocumentation).toContain(
-      "Weitere Datenquellen integrieren sich über neue Adapter",
+    expect(architectureConcepts).toContain(
+      "zusätzliche Datenquellen (Wetter, ADS-B, spätere Integrationen)",
     );
     database.close();
   });

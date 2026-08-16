@@ -114,7 +114,7 @@ den operativen Weiterbetrieb bestimmt. Durable-Object-Speicher und offene WebSoc
 geleert. Die R2-Leerung ist wiederholbar; ein technischer Reset-Beleg erlaubt das Fortsetzen, wenn
 ausschließlich dieser letzte Schritt unterbrochen wurde. Dieser Beleg enthält keine PIN, keinen
 Gerätetoken und keine personenbezogenen Daten. Die Entscheidung und der Forward-Repair sind in
-[ADR-0050](../adr/0050-wiederaufnehmbarer-d1-werksreset.md) dokumentiert.
+[ADR-0050](../architecture/adr/0050-wiederaufnehmbarer-d1-werksreset.md) dokumentiert.
 
 Der Reset verlangt eine Begründung und die aktuelle PIN des angemeldeten Administratorkontos. Eine
 zusätzliche Texteingabe oder ein Codewort ist nicht erforderlich. Nach einem

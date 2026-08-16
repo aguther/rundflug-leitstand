@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import anonymityDecision from "../../../docs/adr/0006-vollstaendig-anonyme-identitaeten.md?raw";
+import anonymityDecision from "../../../docs/architecture/adr/0006-vollstaendig-anonyme-identitaeten.md?raw";
 import { createMigratedTestDatabase, type SqliteRow } from "../test-support/migrated-database";
 
 const columnsOf = (table: string) => {

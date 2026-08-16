@@ -7,27 +7,27 @@ const { chromium } = require("playwright");
 const canonicalDiagrams = [
   {
     id: "technical-context-appendix",
-    file: "docs/arc42/03-kontextabgrenzung.md",
+    file: "docs/architecture/arc42/03-kontextabgrenzung.md",
     heading: "## 3.2 Technischer Kontext",
   },
   {
     id: "technical-context",
-    file: "docs/arc42/03-kontextabgrenzung.md",
+    file: "docs/architecture/arc42/03-kontextabgrenzung.md",
     heading: "## 3.2 Technischer Kontext",
   },
   {
     id: "workspace-overview",
-    file: "docs/arc42/05-bausteinsicht.md",
+    file: "docs/architecture/arc42/05-bausteinsicht.md",
     heading: "## 5.1 Ebene 1 – Gesamtsystem",
   },
   {
     id: "web-component-flow",
-    file: "docs/arc42/05-bausteinsicht.md",
+    file: "docs/architecture/arc42/05-bausteinsicht.md",
     heading: "### Web-interne Bausteingrenzen",
   },
   {
     id: "sell-ticket-sequence",
-    file: "docs/arc42/06-laufzeitsicht.md",
+    file: "docs/architecture/arc42/06-laufzeitsicht.md",
     heading: "## 6.1 Schreibkommando: Verkauf an der Kasse",
   },
 ];

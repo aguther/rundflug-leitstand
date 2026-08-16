@@ -1,7 +1,13 @@
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseFrontMatter, renderMarkdown } from "./arc42_markdown_to_html.mjs";
-import { chapterFiles, rewriteRelativeLinks, trimTrailingSlashes } from "./build_arc42_bundle.mjs";
+import {
+  adrFiles,
+  chapterFiles,
+  renderAdrAppendix,
+  rewriteRelativeLinks,
+  trimTrailingSlashes,
+} from "./build_arc42_bundle.mjs";
 
 describe("arc42 bundle builder", () => {
   it("keeps all chapters in arc42 order", async () => {
@@ -21,15 +27,34 @@ describe("arc42 bundle builder", () => {
     ]);
   });
 
+  it("keeps all ADRs in technical order", async () => {
+    const files = await adrFiles();
+    expect(files).toHaveLength(52);
+    expect(files[0]).toBe("0001-cloudflare-worker-static-assets.md");
+    expect(files.at(-1)).toBe("0052-event-archive-delete-reset-lifecycle.md");
+  });
+
   it("rewrites repository links while preserving external links and anchors", () => {
-    const source = resolve("docs/arc42/05-bausteinsicht.md");
+    const source = resolve("docs/architecture/arc42/05-bausteinsicht.md");
     const markdown =
-      "[Detail](../architecture/overview.md) [Extern](https://arc42.org/) [Lokal](#ebene)";
+      "[Detail](../technical-debts/README.md) [ADR](../adr/0002-d1-und-durable-object.md) " +
+      "[Extern](https://arc42.org/) [Lokal](#ebene)";
     expect(rewriteRelativeLinks(markdown, source, "https://example.test/main")).toBe(
-      "[Detail](https://example.test/main/docs/architecture/overview.md) " +
-        "[Extern](https://arc42.org/) [Lokal](#ebene)",
+      "[Detail](https://example.test/main/docs/architecture/technical-debts/README.md) " +
+        "[ADR](#adr-0002) [Extern](https://arc42.org/) [Lokal](#ebene)",
     );
     expect(rewriteRelativeLinks("[Leer]()", source, "https://example.test/main")).toBe("[Leer]()");
+  });
+
+  it("renders ADR source documents as a demoted appendix with internal links", () => {
+    const appendix = renderAdrAppendix(
+      "# ADR-0001: Synthetic decision\n\n- Status: Akzeptiert\n\n## Kontext\n\n[Next](0002-next.md)\n",
+      "0001-synthetic-decision.md",
+      "https://example.test/main",
+    );
+    expect(appendix).toContain("## ADR-0001\n\n**Titel:** Synthetic decision");
+    expect(appendix).toContain("### Kontext");
+    expect(appendix).toContain("[Next](#adr-0002)");
   });
 
   it("parses bundle metadata and renders stable heading anchors", () => {
@@ -42,7 +67,7 @@ describe("arc42 bundle builder", () => {
 
   it("processes adversarial malformed links in linear time", () => {
     const malformedLinks = "[x](".repeat(20_000);
-    const source = resolve("docs/arc42/05-bausteinsicht.md");
+    const source = resolve("docs/architecture/arc42/05-bausteinsicht.md");
     const startedAt = performance.now();
 
     expect(rewriteRelativeLinks(malformedLinks, source, "https://example.test/main")).toBe(

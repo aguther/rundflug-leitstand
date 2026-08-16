@@ -6,23 +6,21 @@ import { markdownLinkTargets } from "./lib/markdown-links.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const documentPath = new URL(
-  "../docs/architecture/domain-state-and-forecast-v1.md",
+  "../docs/architecture/arc42/08-querschnittliche-konzepte.md",
   import.meta.url,
 );
 const content = await readFile(documentPath, "utf8");
 const requiredEvidence = [
-  "Q-WAR-050",
-  "## 3. Zustandsautomaten",
-  "## 4. Nicht verhandelbare Invarianten und technische Sicherungen",
-  "## 5. Prognoseverfahren",
-  "## 6. Betreiberleitfaden",
-  "## 7. Entwicklerleitfaden und Nachweise",
-  "packages/domain/src/index.ts",
-  "packages/domain/src/forecast.ts",
-  "packages/domain/src/capacity.ts",
-  "packages/domain/src/queue.ts",
-  "apps/worker/src/event-coordinator.ts",
-  "npm run check",
+  "## 8.1 Fachliches Domänenmodell",
+  "## 8.2 Kommando-, Idempotenz- und Versionskonzept",
+  "## 8.5 Prognose, Dispatch und Kapazität",
+  "## 8.11 Konfigurierbarkeit ohne Deployment",
+  "## 8.12 Test- und Qualitätssicherungskonzept",
+  "POST /api/control/:eventId/commands",
+  "GET /api/control/:eventId/operations",
+  "D1-Loader → reiner Eingabe-Projector",
+  "Format-2-Sicherung",
+  "Der interne Legacy-Vergleichspfad",
 ];
 
 const missing = requiredEvidence.filter((entry) => !content.includes(entry));
@@ -31,18 +29,16 @@ if (missing.length > 0) {
 }
 
 const maintainabilityPath = new URL(
-  "../docs/architecture/maintainability-and-extension-v1.md",
+  "../docs/architecture/arc42/10-qualitaetsanforderungen.md",
   import.meta.url,
 );
-const maintainability = await readFile(maintainabilityPath, "utf8");
+const maintainability = `${content}\n${await readFile(maintainabilityPath, "utf8")}`;
 const maintainabilityEvidence = [
-  "Q-WAR-010",
-  "Q-WAR-020",
-  "Q-WAR-040",
   "packages/domain",
   "packages/contracts",
-  "Abhängigkeits-Allowlist",
-  "Adapter",
+  "Konfigurierbarkeit ohne Deployment",
+  "Architekturregeln",
+  "Mutation",
   "apps/worker/src/maintainability-coverage.test.ts",
 ];
 const missingMaintainability = maintainabilityEvidence.filter(
@@ -52,21 +48,16 @@ if (missingMaintainability.length > 0) {
   throw new Error(`Wartbarkeitsdokumentation unvollständig: ${missingMaintainability.join(", ")}`);
 }
 
-const technicalDebtPath = new URL("../docs/architecture/technical-debt-1.12.0.md", import.meta.url);
+const technicalDebtPath = new URL(
+  "../docs/architecture/technical-debts/README.md",
+  import.meta.url,
+);
 const technicalDebt = await readFile(technicalDebtPath, "utf8");
 const technicalDebtEvidence = [
-  "Technische Schulden – Stand 1.12.0",
-  "1.394 Zeilen",
-  "219 Zeilen",
-  "663 Zeilen",
-  "135",
-  "D1Database.batch()",
-  "npm audit --omit=dev",
-  "npm run refactor:guardrails",
-  "scripts/verify_web_assets.mjs",
-  "apps/web/src/app/realtime-refresh-scheduler.ts",
-  "20 operative",
-  "50 öffentliche",
+  "forecast-legacy-comparison-path.md",
+  "mutation-test-effectiveness.md",
+  "worker-orchestration-complexity.md",
+  "web-asset-budget-headroom.md",
 ];
 const missingTechnicalDebt = technicalDebtEvidence.filter(
   (entry) => !technicalDebt.includes(entry),
@@ -77,9 +68,37 @@ if (missingTechnicalDebt.length > 0) {
   );
 }
 
+const technicalDebtDirectory = resolve(root, "docs/architecture/technical-debts");
+for (const name of technicalDebtEvidence) {
+  const debt = await readFile(resolve(technicalDebtDirectory, name), "utf8");
+  for (const heading of [
+    "**Status:**",
+    "## Wirkung",
+    "## Sicherer Abbau",
+    "## Abschlusskriterium",
+  ]) {
+    if (!debt.includes(heading)) {
+      throw new Error(`Technische Schuld ${name} enthält nicht ${heading}.`);
+    }
+  }
+}
+
+for (const obsolete of [
+  "technical-debt-1.11.0.md",
+  "technical-debt-1.12.0.md",
+  "technical-debt-analysis-2026-08-10.md",
+]) {
+  try {
+    await access(resolve(root, "docs/architecture", obsolete));
+    throw new Error(`Historischer Schuldenbericht wurde nicht entfernt: ${obsolete}`);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Historischer")) throw error;
+  }
+}
+
 const repositoryReadme = await readFile(resolve(root, "README.md"), "utf8");
-if (!repositoryReadme.includes("technical-debt-1.12.0.md")) {
-  throw new Error("README verweist nicht auf den aktuellen technischen Schuldenstand 1.12.0.");
+if (!repositoryReadme.includes("docs/architecture/technical-debts/")) {
+  throw new Error("README verweist nicht auf das aktuelle technische Schuldenregister.");
 }
 
 const privacyAcceptancePath = new URL(
@@ -132,7 +151,7 @@ if (missingLicenseInventory.length > 0) {
 }
 
 const environmentDecisionPath = new URL(
-  "../docs/adr/0007-eine-cloudflare-abnahmeumgebung.md",
+  "../docs/architecture/adr/0007-eine-cloudflare-abnahmeumgebung.md",
   import.meta.url,
 );
 const environmentDecision = await readFile(environmentDecisionPath, "utf8");

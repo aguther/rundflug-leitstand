@@ -135,6 +135,40 @@ function validateAdrLinks(adrFiles, documents, failures) {
   }
 }
 
+function adrStatus(markdown) {
+  const bullet = markdown.match(/^- Status:\s*(.+)$/m)?.[1]?.trim();
+  if (bullet) return bullet;
+  return markdown.match(/^## Status\s*\r?\n\s*([^\r\n]+)$/m)?.[1]?.trim() ?? null;
+}
+
+function validateAdrLifecycle(adrDocuments, adrNames, failures) {
+  const validStatus =
+    /^(?:akzeptiert|angenommen|freigegeben|teilweise ersetzt|ersetzt|veraltet|vorgeschlagen)\b/i;
+  const knownIds = new Set(adrNames.map((name) => name.slice(0, 4)));
+  for (const [name, markdown] of adrDocuments) {
+    const expectedHeading = `# ADR-${name.slice(0, 4)}:`;
+    if (!markdown.startsWith(expectedHeading)) {
+      failures.push(`ADR ${name} beginnt nicht mit "${expectedHeading}".`);
+    }
+    const status = adrStatus(markdown);
+    if (!status || !validStatus.test(status)) {
+      failures.push(`ADR ${name} besitzt keinen gültigen Lebenszyklusstatus.`);
+      continue;
+    }
+    if (/^teilweise ersetzt|^ersetzt/i.test(status)) {
+      const successors = [...status.matchAll(/ADR-(\d{4})/g)].map((match) => match[1]);
+      if (successors.length === 0) {
+        failures.push(`ADR ${name} nennt trotz Ersetzungsstatus keinen ADR-Nachfolger.`);
+      }
+      for (const successor of successors) {
+        if (!knownIds.has(successor)) {
+          failures.push(`ADR ${name} verweist auf unbekannten Nachfolger ADR-${successor}.`);
+        }
+      }
+    }
+  }
+}
+
 function validateTerminology(documents, failures) {
   for (const forbidden of ["Flight Line Assist", "Flight Line Supervisor"]) {
     const affected = documents
@@ -147,8 +181,8 @@ function validateTerminology(documents, failures) {
 }
 
 export async function verifyArc42Documentation(root = defaultRoot) {
-  const chapterDirectory = resolve(root, "docs/arc42");
-  const adrDirectory = resolve(root, "docs/adr");
+  const chapterDirectory = resolve(root, "docs/architecture/arc42");
+  const adrDirectory = resolve(root, "docs/architecture/adr");
   const failures = [];
   const packageJson = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
   const expectedNames = new Set(expectedArc42Chapters.map(([name]) => name));
@@ -177,6 +211,10 @@ export async function verifyArc42Documentation(root = defaultRoot) {
     .filter((name) => /^\d{4}-.*\.md$/.test(name))
     .sort(compareTechnicalStrings);
   validateAdrLinks(adrFiles, documents, failures);
+  const adrDocuments = await Promise.all(
+    adrFiles.map(async (name) => [name, await readFile(resolve(adrDirectory, name), "utf8")]),
+  );
+  validateAdrLifecycle(adrDocuments, adrFiles, failures);
 
   for (const [document, markdown] of documents) {
     await validateLocalLinks(document, markdown, failures);

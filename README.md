@@ -26,23 +26,20 @@ Laufzeitmetadaten und die aktuelle Requirements-/Traceability-Fassung.
 - Cloudflare Cron Triggers für Wartung, Löschung und spätere Backups
 - plattformneutrale Domänenlogik in `packages/domain`
 
-Die Entscheidung für diese Architektur ist in `docs/adr/` dokumentiert.
+Die Entscheidung für diese Architektur ist in `docs/architecture/adr/` dokumentiert.
 Die zentrale, nach arc42 gegliederte Architekturdokumentation mit Kontext-, Baustein-, Laufzeit- und
 Verteilungssicht sowie Mermaid-Diagrammen steht unter
-[docs/arc42/](docs/arc42/README.md). Ein druckfertiges PDF erzeugt
+[docs/architecture/arc42/](docs/architecture/arc42/README.md). Ein druckfertiges, nicht
+versioniertes PDF einschließlich ADR-Anhang erzeugt
 `npm run docs:arc42:pdf`.
 Das unverbindliche Zukunftskonzept für Multi-Tenancy, mehrere Veranstaltungen,
 Subdomain-Routing, Plattformadministration und eine versionierte Stammdatenbibliothek liegt unter
-[docs/architecture/multi-tenant-multi-event-plan.md](docs/architecture/multi-tenant-multi-event-plan.md).
+[docs/architecture/concepts/multi-tenant-multi-event-plan.md](docs/architecture/concepts/multi-tenant-multi-event-plan.md).
 Es ändert den aktuellen Architekturstand nicht.
 Ein datierter Vergleich mit kostengünstigen Alternativen liegt unter `docs/operations/provider-comparison.md`.
-Fachmodell, Zustandsautomaten, Invarianten und Prognoseverfahren sind unter
-`docs/architecture/domain-state-and-forecast-v1.md` zusammenhängend beschrieben.
-Der erledigte und noch verbleibende Konsolidierungsbedarf steht in
-[docs/architecture/technical-debt-1.12.0.md](docs/architecture/technical-debt-1.12.0.md). Die
-quellenkritische Gesamtanalyse einschließlich SonarCloud-Triage und nummerierter Arbeitspakete liegt
-unter
-[docs/architecture/technical-debt-analysis-2026-08-10.md](docs/architecture/technical-debt-analysis-2026-08-10.md).
+Fachmodell, Zustandsautomaten, Invarianten, Prognoseverfahren und Schnittstellen sind Bestandteil der
+arc42-Dokumentation. Die aktuell bestätigten technischen Schulden stehen themenbezogen unter
+[docs/architecture/technical-debts/](docs/architecture/technical-debts/README.md).
 
 ## Voraussetzungen
 
@@ -130,7 +127,7 @@ Einrichtung, CI-Secret und Fehlerverhalten beschreibt der
 Die aktuell verwendete D1-Datenbank und der R2-Bucket sind in `wrangler.jsonc` gebunden. Neue,
 getrennte Zielumgebungen werden namensgesteuert und in EU-Jurisdiktion gemäß
 [Cloudflare-Neuaufbau](docs/operations/cloudflare-neuaufbau.md) sowie
-[ADR-0027](docs/adr/0027-portable-cloudflare-ziele-und-reset-fortsetzung.md) erstellt.
+[ADR-0027](docs/architecture/adr/0027-portable-cloudflare-ziele-und-reset-fortsetzung.md) erstellt.
 
 Die für V1 erforderliche, telefonnummernfreie Browser-Benachrichtigung wird sicher eingerichtet mit:
 
@@ -165,7 +162,7 @@ packages/domain/          reine Fachlogik und Invarianten
 packages/config/          gemeinsame Konstanten
 packages/testkit/         synthetische Testdaten und Testuhr
 docs/requirements/        Lastenheft, strukturierte Anforderungen und Traceability
-docs/adr/                 Architekturentscheidungen
+docs/architecture/        arc42, ADRs, Zukunftskonzepte und technische Schulden
 docs/operations/          Konto-, Deployment-, Backup- und Notfallhinweise
 docs/roles/               aktuelle Rollenblätter und synthetische Screenshots
 scripts/                   lokale Prüf- und Hilfsskripte

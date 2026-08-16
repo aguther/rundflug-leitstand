@@ -2,7 +2,7 @@
 
 - Datum: 2026-08-12
 - Arbeitspaket: AP-13
-- Entscheidung: [ADR-0042](../adr/0042-modulare-deterministische-simulationspipeline.md)
+- Entscheidung: [ADR-0042](../architecture/adr/0042-modulare-deterministische-simulationspipeline.md)
 
 ## Geprüfter Umfang
 
