@@ -197,7 +197,7 @@
 .flight-director-row-actions {
   min-width: 0;
   display: grid;
-  grid-template-columns: 148px repeat(5, var(--control-touch));
+  grid-template-columns: 168px repeat(5, var(--control-touch));
   gap: 5px;
 }
 
@@ -210,8 +210,8 @@
 }
 
 .flight-director-row-actions .flight-director-primary-action {
-  width: 148px;
-  min-width: 148px;
+  width: 168px;
+  min-width: 168px;
   padding-inline: 10px;
 }
 
