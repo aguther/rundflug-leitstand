@@ -50,7 +50,7 @@ Der D1-Anteil wird in Kind-zu-Eltern-Reihenfolge ausgeführt:
 - Die Chunk-Löschung macht den destruktiven Reset linear skalierbar, ersetzt aber keine reguläre
   Aufbewahrungsstrategie. Die event- und tagesbezogene Verlagerung verifizierter Planungshistorie
   nach R2 mit anschließender D1-Kompaktierung bleibt als OQ-20 getrennt zu entscheiden.
-- Der verpflichtende Integrationsnachweis erzeugt ungefähr 12.000 Planläufe und 8.000
+- Der verpflichtende Integrationsnachweis erzeugt ungefähr 6.000 Planläufe und 4.000
   Prognose-Snapshots und prüft Reset, Setup-Fortsetzung und Idempotenz über die lokale
   Worker-/D1-Grenze innerhalb der dortigen Verbindungsgrenze. Der zusätzliche manuelle
   Produktionsmaßstab mit ungefähr 29.000 Planläufen und 24.000 Prognose-Snapshots wird über

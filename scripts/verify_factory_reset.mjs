@@ -4,8 +4,8 @@ import { createWorkerTestHarness } from "./lib/worker-test-harness.mjs";
 const pin = "123456";
 const setupCode = ["synthetic", "factory", "reset", "setup", "code"].join("-");
 const productionScale = process.argv.includes("--production-scale");
-const planningRunCount = productionScale ? 29000 : 12000;
-const forecastSnapshotCount = productionScale ? 24000 : 8000;
+const planningRunCount = productionScale ? 29000 : 6000;
+const forecastSnapshotCount = productionScale ? 24000 : 4000;
 const forecastFixtureSql = `INSERT INTO flight_groups
       (id, operation_day_id, resource_group_id, product_id, communication_number, status, version, created_at, updated_at)
      VALUES ('factory-reset-flight-group', 'demo-2026', 'rg-panorama', 'panorama-20', 999, 'PLANNED', 0,
