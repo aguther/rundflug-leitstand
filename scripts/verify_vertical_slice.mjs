@@ -367,8 +367,9 @@ try {
   const reconnectStartedAt = Date.now();
   flightLineSocket = await connectRealtime();
   const reconnectMilliseconds = Date.now() - reconnectStartedAt;
-  const callSignal = nextRealtimeVersion(flightLineSocket);
-  const callForecastSignal = nextForecastVersion(flightLineSocket);
+  const expectedCallVersion = noted.event.version + 1;
+  const callSignal = nextRealtimeVersion(flightLineSocket, expectedCallVersion);
+  const callForecastSignal = nextForecastVersion(flightLineSocket, expectedCallVersion);
   const firstCall = await post(
     tokens.flightLine,
     envelope("flight-line-tablet-1", noted.event.version, "CALL_NEXT", {
