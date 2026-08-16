@@ -40,6 +40,14 @@ describe("V1.12 database baseline", () => {
     expect(planningRunIndexes.map((index) => String(index.name))).toEqual(
       expect.arrayContaining(["idx_planning_runs_anchor_run", "idx_planning_runs_previous_run"]),
     );
+    for (const table of ["rotations", "forecast_snapshots"]) {
+      const columns = database.prepare(`PRAGMA table_info('${table}')`).all() as { name: string }[];
+      expect(columns.map((column) => column.name)).toContain("dispatch_decision_details_json");
+    }
+    const leaseColumns = database
+      .prepare("PRAGMA table_info('dispatch_recommendation_leases')")
+      .all() as { name: string }[];
+    expect(leaseColumns.map((column) => column.name)).toContain("decision_details_json");
     expect(database.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
 
     database.close();

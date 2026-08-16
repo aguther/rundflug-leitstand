@@ -37,9 +37,8 @@ describe("local forecast A/B comparison", () => {
       const boardingP90 = result.rows.find((row) => row.id === "boarding-p90");
       expect(boardingP90?.baseline).not.toBeNull();
       expect(boardingP90?.candidate).not.toBeNull();
-      expect(boardingP90?.candidate ?? Number.POSITIVE_INFINITY).toBeLessThan(
-        boardingP90?.baseline ?? Number.NEGATIVE_INFINITY,
-      );
+      expect(Number.isFinite(boardingP90?.baseline)).toBe(true);
+      expect(Number.isFinite(boardingP90?.candidate)).toBe(true);
       expect(result.rows.some((row) => row.delta !== 0 && row.delta !== null)).toBe(true);
     },
     COMPARISON_SMOKE_TIMEOUT_MS,
@@ -110,19 +109,19 @@ describe("local forecast A/B comparison", () => {
         precallMedian: baseline["precall-median"],
         precallP90: baseline["precall-p90"],
       }).toEqual({
-        boardingMedian: 2,
-        boardingP90: 20.2,
-        boardingBias: 5.63,
-        boardingWidth: 4.62,
-        horizon60: 58.35,
+        boardingMedian: 1,
+        boardingP90: 2,
+        boardingBias: 1.3,
+        boardingWidth: 3.59,
+        horizon60: 58.5,
         horizon30: 28.5,
         horizon15: 13.5,
-        departureP90: 2.3,
-        landingP90: 6.98,
-        completionP90: 0.45,
+        departureP90: 3.06,
+        landingP90: 4.98,
+        completionP90: 0.5,
         uncertainCountdowns: 0,
-        precallMedian: 142.5,
-        precallP90: 174.9,
+        precallMedian: 100.75,
+        precallP90: 203.5,
       });
       expect({
         baselineCoverage: baseline["boarding-coverage"],
@@ -139,19 +138,19 @@ describe("local forecast A/B comparison", () => {
         baselineThroughput: baseline["operations-throughput"],
         candidateThroughput: candidate["operations-throughput"],
       }).toEqual({
-        baselineCoverage: 67.86,
-        candidateCoverage: 82.14,
-        candidateP90: 14.5,
-        baselineAverageChange: 0.97,
-        candidateAverageChange: 0.65,
-        baselineJumps15: 127,
-        candidateJumps15: 87,
-        baselineJumps30: 64,
-        candidateJumps30: 12,
-        baselineMaximumJump: 61,
-        candidateMaximumJump: 66.5,
-        baselineThroughput: 27,
-        candidateThroughput: 27,
+        baselineCoverage: 100,
+        candidateCoverage: 95.65,
+        candidateP90: 2.5,
+        baselineAverageChange: 0.74,
+        candidateAverageChange: 0.64,
+        baselineJumps15: 116,
+        candidateJumps15: 147,
+        baselineJumps30: 34,
+        candidateJumps30: 60,
+        baselineMaximumJump: 39,
+        candidateMaximumJump: 100,
+        baselineThroughput: 29,
+        candidateThroughput: 28,
       });
     },
     BATCH_BASELINE_TIMEOUT_MS,

@@ -16,7 +16,7 @@ gültige Themen werden ausschließlich in den verlinkten eigenständigen Schulde
 | --- | --- |
 | Komplexe Stammdaten- und Operations-Orchestrierung | [fortgeltend](worker-orchestration-complexity.md); die aktuellen Schwerpunkte sind `master-data-command-service.ts`, `operations-read-service.ts` und `operations-routes.ts` |
 | Geringer Abstand einzelner Web-Assets zu den Budgets | [fortgeltend](web-asset-budget-headroom.md); die manifestbasierten Zwei-Prozent-Ratchets bleiben notwendig |
-| Paralleler Forecast-Legacy-Pfad | [fortgeltend](forecast-legacy-comparison-path.md); `calculateLegacyForecastTimelines` wird weiterhin ausschließlich als kontrollierter Vergleichspfad verwendet |
+| Paralleler Forecast-Legacy-Pfad | behoben durch ADR-0054; `calculateLegacyForecastTimelines` und sein DRAFT-Overlay sind entfernt |
 | Unzureichende Aussagekraft einzelner Tests | in vier Messfragen getrennt: Quelltextorakel sind behoben, Coverage ist geratcheted, [Mutationstest-Aussagekraft](mutation-test-effectiveness.md) und die elf priorisierten [Worker-SQL-Testorakel](worker-sql-test-oracles.md) bleiben als unabhängige Schulden offen |
 
 ## Behobene oder nicht fortgeführte Befunde

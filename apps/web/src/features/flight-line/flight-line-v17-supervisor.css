@@ -214,10 +214,12 @@ html:has(.flight-director-assignment-modal) {
 }
 
 .flight-director-dispatch-slot {
+  position: relative;
+  z-index: 2;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 66px;
   min-height: 86px;
-  overflow: hidden;
+  overflow: visible;
   border-bottom: 1px solid var(--ui-border);
   background: var(--ui-surface-subtle);
 }
@@ -335,6 +337,42 @@ html:has(.flight-director-assignment-modal) {
   color: var(--ui-text);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.flight-director-dispatch-details {
+  position: relative;
+  min-width: 0;
+}
+
+.flight-director-dispatch-details > summary {
+  color: var(--ui-accent);
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 700;
+  list-style-position: inside;
+  white-space: nowrap;
+}
+
+.flight-director-dispatch-details > div {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  width: min(320px, calc(100vw - 40px));
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-surface-raised);
+  box-shadow: var(--ui-shadow-lg);
+}
+
+.flight-director-dispatch-details > div > span {
+  color: var(--ui-text);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  white-space: normal;
 }
 
 .flight-director-dispatch-reservation {
@@ -812,6 +850,10 @@ html:has(.flight-director-assignment-modal) {
   .flight-director-dispatch-reason > span {
     max-width: 126px;
     text-align: right;
+  }
+
+  .flight-director-dispatch-details > div {
+    width: min(240px, calc(100vw - 32px));
   }
 
   .flight-director-dispatch-reservation {

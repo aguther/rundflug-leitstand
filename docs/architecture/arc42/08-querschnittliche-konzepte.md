@@ -168,24 +168,32 @@ keinen neueren bestätigten Stand ersetzen.
   Verfügbarkeitsbahn gelegt.
 - `assessMarginalProductCapacity` liefert die konservative Verkaufsfreigabe je Produkt; sie ist eine
   organisatorische Hilfe ohne Freigabewirkung.
-- Der lokale Browser-Simulator verwendet für Legacy- und importierte Betriebsszenarien dieselben
-  deterministischen Seed-, PRNG-, Stichproben- und Zeitprimitive. Seine feste Tick-Reihenfolge
+- Der lokale Browser-Simulator bildet Presets und den einfachen Editor deterministisch auf eine
+  synthetische operative Topologie ab; importierte Betriebsmodelle werden unverändert an dieselbe
+  operative Engine übergeben. Seine feste Tick-Reihenfolge
   Lifecycle → Precall → Dispatch → Snapshot sowie Golden-Seed-Sequenzen machen Replay-Ergebnisse
   über Refactorings hinweg reproduzierbar.
 - Der Worker verarbeitet jeden Lauf als gerichtete Pipeline: D1-Loader → reiner Eingabe-Projector →
   Domain-Projektion → reiner Precall-Evaluator → D1-Repository → Push/WebSocket-Publikation.
   Persistenz und Audit/Outbox liegen vor jeder extern sichtbaren Veröffentlichung.
-- Der interne Legacy-Vergleichspfad erhält keine neuen Fachregeln. ADR-0041 definiert seinen
-  synthetischen Replay-Nachweis und die Bedingungen für seine Entfernung.
 - Messwerte stammen ausschließlich aus `COMPLETED`-Umläufen mit bestätigtem Aufruf und Abschluss.
-  Aktuelle Tageswerte verdrängen Kaltstartwerte; pro Produkt und möglichst Flugzeugtyp werden
-  höchstens zwölf Werte gewichtet. Nicht endliche Werte, Werte unter der halben oder über der
+  Der Resolver bevorzugt Veranstaltungstag plus Produkt/Flugzeugtyp, Veranstaltungstag plus Produkt,
+  Historie plus Produkt/Typ und Produkthistorie in genau dieser Reihenfolge; erst danach greift die
+  Referenz-Umlaufzeit. Tageswerte werden vollständig geladen, der historische Kaltstart ist je
+  Produkt beziehungsweise Produkt/Typ begrenzt. Nicht endliche Werte, Werte unter der halben oder über der
   1,75-fachen Referenzdauer sowie robuste Median-/MAD-Ausreißer werden verworfen.
+- Aktive Umläufe werden als unveränderliche Ressourcenbelegungen projiziert. Nur DRAFT-Gruppen
+  gelangen in Dispatch und Langzeit-Replay. Die je Lane gewählte Dauerbasis wird nicht erneut
+  geschätzt, sondern bis in sichtbare Projektion und Snapshotdiagnostik weitergereicht.
+- Die Dispatch-Zielordnung schützt Verpflichtungen und Must-Serve-Regeln vor Fairness, bewertet
+  anschließend Passagiere und nahe Sitzplatzauslastung vor prognostischen Überholungen und nutzt
+  Stabilität sowie technische IDs erst nachrangig. Objective-Vektor, Suchdiagnostik und faktische
+  Batchdetails erklären exakt diese eine Bewertung.
 - Nach jedem erfolgreich persistierten operativen Kommando wird für jeden offenen Umlauf ein
   append-only Snapshot mit Eventversion, Erfassungszeitpunkt, Qualitätsstufe, Intervall,
   Boarding-/Start-/Lande-/Abschlussprognose, Datenbasis, Kapazität und abgeleiteter
   Referenz-Umlaufzeit angefügt. Abgewiesene Kommandos erzeugen keinen Snapshot.
-- Details und Begründungen: ADR-0028, ADR-0031 bis ADR-0033 sowie ADR-0041 und ADR-0042.
+- Details und Begründungen: ADR-0028, ADR-0031 bis ADR-0033, ADR-0042 und ADR-0054.
 
 ## 8.6 Sicherheit und Zugriffsschutz
 

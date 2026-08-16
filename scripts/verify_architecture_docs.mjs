@@ -20,7 +20,8 @@ const requiredEvidence = [
   "GET /api/control/:eventId/operations",
   "D1-Loader → reiner Eingabe-Projector",
   "Format-2-Sicherung",
-  "Der interne Legacy-Vergleichspfad",
+  "Nur DRAFT-Gruppen",
+  "Objective-Vektor",
 ];
 
 const missing = requiredEvidence.filter((entry) => !content.includes(entry));
@@ -54,7 +55,6 @@ const technicalDebtPath = new URL(
 );
 const technicalDebt = await readFile(technicalDebtPath, "utf8");
 const technicalDebtEvidence = [
-  "forecast-legacy-comparison-path.md",
   "mutation-test-effectiveness.md",
   "worker-orchestration-complexity.md",
   "web-asset-budget-headroom.md",

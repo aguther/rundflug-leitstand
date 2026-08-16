@@ -5,11 +5,11 @@ import {
   type QueueAvailabilityState,
   reserveNextQueueWindow,
 } from "./forecast-availability";
+import type { ForecastDurationBasis } from "./forecast-duration-basis";
 import type {
   DurationEstimate,
   ForecastAvailabilityConstraintInput,
   ForecastCapacityStatus,
-  ForecastTimelineProjection,
   ForecastTimelinesInput,
   PredictionQuality,
 } from "./forecast-types";
@@ -33,6 +33,7 @@ interface DispatchReplayReservation {
   boardingSource: string;
   deboardingSource: string;
   bufferSource: string;
+  durationBasis: ForecastDurationBasis;
 }
 
 export interface ForecastTurnaroundProfile {
@@ -52,31 +53,22 @@ export interface LongRangeReplayReservation extends DispatchReplayReservation {
   availableSeats: number;
 }
 
-export function collectBusyMinutesByResourceGroup(
-  legacy: ForecastTimelineProjection[],
-  rotationsById: Map<string, ForecastRotation>,
-  now: Date,
-): Map<string, number[]> {
-  const busyMinutesByResourceGroup = new Map<string, number[]>();
-  for (const projection of legacy) {
-    const rotation = rotationsById.get(projection.rotationId);
-    if (!rotation || rotation.status === "DRAFT") continue;
-    const completionMs = projection.predictedCompletionAt
-      ? Date.parse(projection.predictedCompletionAt)
-      : Number.NaN;
-    const remaining = Number.isFinite(completionMs)
-      ? Math.max(0, (completionMs - now.getTime()) / 60_000)
-      : projection.referenceDurationMinutes;
-    const values = busyMinutesByResourceGroup.get(rotation.resourceGroupId) ?? [];
-    values.push(remaining);
-    busyMinutesByResourceGroup.set(rotation.resourceGroupId, values);
-  }
-  return busyMinutesByResourceGroup;
+export interface ActiveForecastResourceReservation {
+  resourceGroupId: string;
+  aircraftId: string | null;
+  pilotId: string | null;
+  lowerMinutes: number;
+  expectedMinutes: number;
+  upperMinutes: number;
+}
+
+export function forecastLaneDurationKey(laneId: string, productId: string): string {
+  return `${laneId}\u0000${productId}`;
 }
 
 export function createDispatchAvailability(args: {
   input: ForecastTimelinesInput;
-  busyMinutesByResourceGroup: Map<string, number[]>;
+  activeReservations: readonly ActiveForecastResourceReservation[];
   operationStartMinutes: number;
   offsetMinutes: (value: string) => number;
   convertConstraint: (
@@ -85,22 +77,46 @@ export function createDispatchAvailability(args: {
 }): {
   availabilityByResourceGroup: Map<string, QueueAvailabilityState>;
   pilotIdByLaneId: Map<string, string | null>;
+  aircraftTypeByLaneId: Map<string, string | null>;
 } {
   const availabilityByResourceGroup = new Map<string, QueueAvailabilityState>();
   const pilotIdByLaneId = new Map<string, string | null>();
+  const aircraftTypeByLaneId = new Map<string, string | null>();
   for (const capacity of args.input.capacities) {
     const sharedConstraints = (capacity.sharedConstraints ?? []).map(args.convertConstraint);
     const explicitLanes = capacity.availabilityLanes?.map((lane) => {
       pilotIdByLaneId.set(lane.laneId, lane.pilotId ?? null);
-      const lower = Math.max(args.operationStartMinutes, args.offsetMinutes(lane.availableLowerAt));
+      aircraftTypeByLaneId.set(lane.laneId, lane.aircraftType ?? null);
+      const activeReservations = args.activeReservations.filter(
+        (reservation) =>
+          reservation.resourceGroupId === capacity.resourceGroupId &&
+          (reservation.aircraftId === lane.aircraftId ||
+            (reservation.pilotId !== null && reservation.pilotId === (lane.pilotId ?? null))),
+      );
+      const activeLowerMinutes =
+        activeReservations.length === 0
+          ? null
+          : Math.max(...activeReservations.map((reservation) => reservation.lowerMinutes));
+      const activeExpectedMinutes =
+        activeReservations.length === 0
+          ? null
+          : Math.max(...activeReservations.map((reservation) => reservation.expectedMinutes));
+      const activeUpperMinutes =
+        activeReservations.length === 0
+          ? null
+          : Math.max(...activeReservations.map((reservation) => reservation.upperMinutes));
+      const lower = Math.max(
+        args.operationStartMinutes,
+        activeLowerMinutes ?? args.offsetMinutes(lane.availableLowerAt),
+      );
       const expected = Math.max(
         args.operationStartMinutes,
-        args.offsetMinutes(lane.availableExpectedAt),
+        activeExpectedMinutes ?? args.offsetMinutes(lane.availableExpectedAt),
       );
       const upper = Math.max(
         expected,
         args.operationStartMinutes,
-        args.offsetMinutes(lane.availableUpperAt),
+        activeUpperMinutes ?? args.offsetMinutes(lane.availableUpperAt),
       );
       return {
         laneId: lane.laneId,
@@ -143,10 +159,10 @@ export function createDispatchAvailability(args: {
       continue;
     }
     const activeAircraft = Math.max(0, Math.floor(capacity.activeAircraft));
-    const busy = (args.busyMinutesByResourceGroup.get(capacity.resourceGroupId) ?? []).slice(
-      0,
-      activeAircraft,
-    );
+    const busy = args.activeReservations
+      .filter((reservation) => reservation.resourceGroupId === capacity.resourceGroupId)
+      .map((reservation) => reservation.expectedMinutes)
+      .slice(0, activeAircraft);
     const fallbackLanes = [
       ...busy.map((minutes, index) => ({
         laneId: `busy-${capacity.resourceGroupId}-${index + 1}`,
@@ -178,7 +194,7 @@ export function createDispatchAvailability(args: {
       }),
     );
   }
-  return { availabilityByResourceGroup, pilotIdByLaneId };
+  return { availabilityByResourceGroup, pilotIdByLaneId, aircraftTypeByLaneId };
 }
 
 export function replayDispatchBatches(args: {
@@ -186,11 +202,8 @@ export function replayDispatchBatches(args: {
   rotationsById: Map<string, ForecastRotation>;
   availabilityByResourceGroup: Map<string, QueueAvailabilityState>;
   operationEndMinutes: number | null;
-  durationEstimate: (
-    rotation: ForecastRotation,
-    aircraftId: string | null,
-    activeCapacity: number,
-  ) => DurationEstimate;
+  dispatchLaneById: Map<string, DispatchLaneInput>;
+  durationBasisByLaneAndProduct: ReadonlyMap<string, ForecastDurationBasis>;
   turnaroundProfile: (
     rotation: ForecastRotation,
     aircraftId: string | null,
@@ -203,24 +216,28 @@ export function replayDispatchBatches(args: {
     if (!member || !availability) continue;
     const estimatesByAircraftId = new Map(
       availability.lanes.flatMap((lane) =>
-        lane.aircraftId
+        lane.aircraftId &&
+        args.durationBasisByLaneAndProduct.has(
+          forecastLaneDurationKey(lane.laneId, batch.productId),
+        )
           ? [
               [
                 lane.aircraftId,
-                args.durationEstimate(member, lane.aircraftId, availability.lanes.length),
+                args.durationBasisByLaneAndProduct.get(
+                  forecastLaneDurationKey(lane.laneId, batch.productId),
+                )?.estimate as DurationEstimate,
               ] as const,
             ]
           : [],
       ),
     );
-    const estimate = args.durationEstimate(
-      member,
-      batch.assumedAircraftId,
-      availability.lanes.length,
+    const durationBasis = args.durationBasisByLaneAndProduct.get(
+      forecastLaneDurationKey(batch.laneId, batch.productId),
     );
+    if (!durationBasis) continue;
     const reservation = reserveNextQueueWindow(
       availability,
-      estimate,
+      durationBasis.estimate,
       args.operationEndMinutes,
       batch.occupiedSeats,
       estimatesByAircraftId,
@@ -234,6 +251,7 @@ export function replayDispatchBatches(args: {
       capacityStatus: reservation.capacityStatus,
       selectedAircraftId: reservation.selectedAircraftId,
       duration: reservation.duration,
+      durationBasis: { ...durationBasis, estimate: reservation.duration },
       ...profile,
     });
   }
@@ -281,11 +299,7 @@ export function createLongRangeReplayReservation(args: {
   availabilityByResourceGroup: Map<string, QueueAvailabilityState>;
   dispatchLaneById: Map<string, DispatchLaneInput>;
   rotationsById: Map<string, ForecastRotation>;
-  durationEstimate: (
-    rotation: ForecastRotation,
-    aircraftId: string | null,
-    activeCapacity: number,
-  ) => DurationEstimate;
+  durationBasisByLaneAndProduct: ReadonlyMap<string, ForecastDurationBasis>;
   turnaroundProfile: (
     rotation: ForecastRotation,
     aircraftId: string | null,
@@ -307,25 +321,36 @@ export function createLongRangeReplayReservation(args: {
   if (!member) throw new Error(`Forecast rotation ${anchorGroup.id} disappeared.`);
   const estimatesByAircraftId = new Map(
     availability.lanes.flatMap((lane) =>
-      lane.aircraftId
+      lane.aircraftId &&
+      args.durationBasisByLaneAndProduct.has(
+        forecastLaneDurationKey(lane.laneId, anchorGroup.productId),
+      )
         ? [
             [
               lane.aircraftId,
-              args.durationEstimate(member, lane.aircraftId, availability.lanes.length),
+              args.durationBasisByLaneAndProduct.get(
+                forecastLaneDurationKey(lane.laneId, anchorGroup.productId),
+              )?.estimate as DurationEstimate,
             ] as const,
           ]
         : [],
     ),
   );
-  const estimate = args.durationEstimate(member, null, availability.lanes.length);
   const eligibleLaneIds = new Set(
     availability.lanes
       .filter((lane) => laneSupportsDispatchGroup(lane, anchorGroup, args.dispatchLaneById))
       .map((lane) => lane.laneId),
   );
+  const firstEligibleLaneId = [...eligibleLaneIds].sort()[0];
+  const initialDurationBasis = firstEligibleLaneId
+    ? args.durationBasisByLaneAndProduct.get(
+        forecastLaneDurationKey(firstEligibleLaneId, anchorGroup.productId),
+      )
+    : undefined;
+  if (!initialDurationBasis) return null;
   const laneSelection = reserveNextQueueWindow(
     availability,
-    estimate,
+    initialDurationBasis.estimate,
     null,
     anchorGroup.size,
     estimatesByAircraftId,
@@ -336,6 +361,10 @@ export function createLongRangeReplayReservation(args: {
     (lane) => lane.laneId === laneSelection.selectedLaneId,
   );
   if (!selectedLane) return null;
+  const selectedDurationBasis = args.durationBasisByLaneAndProduct.get(
+    forecastLaneDurationKey(selectedLane.laneId, anchorGroup.productId),
+  );
+  if (!selectedDurationBasis) return null;
   const { memberIds, occupiedSeats } = collectLongRangeMembers(
     args.remaining,
     anchorGroup,
@@ -343,7 +372,7 @@ export function createLongRangeReplayReservation(args: {
   );
   const reservation = reserveNextQueueWindow(
     availability,
-    estimate,
+    selectedDurationBasis.estimate,
     null,
     occupiedSeats,
     estimatesByAircraftId,
@@ -364,6 +393,7 @@ export function createLongRangeReplayReservation(args: {
       selectedAircraftId: reservation.selectedAircraftId,
       selectedLaneId: reservation.selectedLaneId,
       duration: reservation.duration,
+      durationBasis: { ...selectedDurationBasis, estimate: reservation.duration },
       ...profile,
       memberIds,
       groupIds: args.remaining

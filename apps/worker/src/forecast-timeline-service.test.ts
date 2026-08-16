@@ -26,7 +26,7 @@ vi.mock("./forecast-timeline-loader", () => ({
 }));
 
 vi.mock("./forecast-timeline-calculation", () => ({
-  calculateConvergedForecastTimeline: mocks.calculateForecast,
+  calculateForecastTimelineOnce: mocks.calculateForecast,
 }));
 
 vi.mock("./forecast-timeline-repository", () => ({

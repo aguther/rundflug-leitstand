@@ -350,7 +350,7 @@
     },
     {
       "path": "apps/worker/src/forecast-timeline-repository.ts",
-      "maxLines": 315,
+      "maxLines": 324,
       "targetLines": 500
     },
     {
@@ -365,12 +365,12 @@
     },
     {
       "path": "packages/domain/src/forecast.ts",
-      "maxLines": 5,
+      "maxLines": 6,
       "targetLines": 20
     },
     {
       "path": "packages/domain/src/forecast-types.ts",
-      "maxLines": 254,
+      "maxLines": 257,
       "targetLines": 350
     },
     {
@@ -390,8 +390,23 @@
     },
     {
       "path": "packages/domain/src/forecast-projection.ts",
-      "maxLines": 1111,
-      "targetLines": 1500
+      "maxLines": 10,
+      "targetLines": 20
+    },
+    {
+      "path": "packages/domain/src/forecast-unified-projection.ts",
+      "maxLines": 693,
+      "targetLines": 800
+    },
+    {
+      "path": "packages/domain/src/forecast-duration-basis.ts",
+      "maxLines": 99,
+      "targetLines": 150
+    },
+    {
+      "path": "apps/worker/src/forecast-duration-samples-query.ts",
+      "maxLines": 63,
+      "targetLines": 100
     },
     {
       "path": "apps/worker/src/dispatch-ordering-sql.ts",
@@ -650,7 +665,7 @@
     },
     {
       "path": "apps/worker/src/history-service.ts",
-      "maxLines": 507,
+      "maxLines": 511,
       "targetLines": 1500
     },
     {
@@ -815,8 +830,13 @@
     },
     {
       "path": "apps/web/src/features/forecast-simulation/engine.ts",
-      "maxLines": 214,
-      "targetLines": 300
+      "maxLines": 26,
+      "targetLines": 50
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/synthetic-operational-model.ts",
+      "maxLines": 85,
+      "targetLines": 150
     },
     {
       "path": "apps/web/src/features/forecast-simulation/operational-engine.ts",
@@ -834,43 +854,13 @@
       "targetLines": 500
     },
     {
-      "path": "apps/web/src/features/forecast-simulation/legacy-simulation-scenario.ts",
-      "maxLines": 204,
-      "targetLines": 250
-    },
-    {
-      "path": "apps/web/src/features/forecast-simulation/legacy-simulation-forecast.ts",
-      "maxLines": 208,
-      "targetLines": 250
-    },
-    {
-      "path": "apps/web/src/features/forecast-simulation/legacy-simulation-lifecycle.ts",
-      "maxLines": 274,
-      "targetLines": 300
-    },
-    {
-      "path": "apps/web/src/features/forecast-simulation/legacy-simulation-precall.ts",
-      "maxLines": 143,
-      "targetLines": 200
-    },
-    {
-      "path": "apps/web/src/features/forecast-simulation/legacy-simulation-dispatch.ts",
-      "maxLines": 203,
-      "targetLines": 250
-    },
-    {
-      "path": "apps/web/src/features/forecast-simulation/legacy-simulation-snapshot.ts",
-      "maxLines": 87,
-      "targetLines": 120
-    },
-    {
       "path": "apps/web/src/features/forecast-simulation/operational-simulation-scenario.ts",
       "maxLines": 234,
       "targetLines": 300
     },
     {
       "path": "apps/web/src/features/forecast-simulation/operational-simulation-forecast.ts",
-      "maxLines": 333,
+      "maxLines": 334,
       "targetLines": 400
     },
     {
@@ -915,12 +905,12 @@
     },
     {
       "path": "packages/contracts/src/operation-assistance.ts",
-      "maxLines": 51,
+      "maxLines": 53,
       "targetLines": 100
     },
     {
       "path": "packages/contracts/src/operation-board.ts",
-      "maxLines": 440,
+      "maxLines": 442,
       "targetLines": 500
     },
     {
@@ -950,8 +940,13 @@
     },
     {
       "path": "packages/contracts/src/reports-recovery.ts",
-      "maxLines": 383,
+      "maxLines": 386,
       "targetLines": 1500
+    },
+    {
+      "path": "packages/contracts/src/dispatch-decision-details.ts",
+      "maxLines": 15,
+      "targetLines": 100
     },
     {
       "path": "packages/contracts/src/schema-helpers.ts",

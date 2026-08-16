@@ -37,6 +37,7 @@ export function completeOperationalRotation(input: {
       (rotation.flightMinutes ?? 0) +
       (rotation.deboardingMinutes ?? 0) +
       (rotation.bufferMinutes ?? 0);
+    entry.operatingMinutes += rotationOperatingMinutes;
     scheduleRecurringOperations({
       rotation,
       entry,
@@ -187,6 +188,29 @@ function scheduleAutomaticBlocks(input: {
         config.realityModel.incidents.unplannedPause.duration,
       ),
       dayOutage: false,
+      source: "AUTOMATIC",
+    });
+  }
+  if (
+    config.realityModel.incidents.technicalDefect.enabled &&
+    deterministicChance(config.seed, `${rotation.id}:technical-defect`) <
+      1 -
+        Math.exp(
+          -config.realityModel.incidents.technicalDefect.ratePerOperatingHour * operatingHours,
+        )
+  ) {
+    const dayOutage =
+      deterministicChance(config.seed, `${rotation.id}:technical-defect-day-outage`) <
+      config.realityModel.incidents.technicalDefect.dayOutageProbability;
+    entry.pendingBlocks.push({
+      key: `${rotation.id}:technical-defect`,
+      state: dayOutage ? "DAY_OUT" : "TECHNICAL_DEFECT",
+      durationMinutes: deterministicSample(
+        config.seed,
+        `${rotation.id}:technical-defect-duration`,
+        config.realityModel.incidents.technicalDefect.duration,
+      ),
+      dayOutage,
       source: "AUTOMATIC",
     });
   }

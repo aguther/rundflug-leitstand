@@ -1,4 +1,4 @@
-import { compareTechnicalStrings } from "@rundflug/domain";
+import { compareTechnicalStrings, type DispatchDecisionDetails } from "@rundflug/domain";
 
 export type DispatchRecommendationSelectionSource = "CURRENT_PLAN_BATCH" | "CANONICAL_REPLAN";
 
@@ -25,6 +25,7 @@ export interface StoredDispatchBatchCandidateRow {
   plannedGroupIds: readonly string[];
   plannedOccupiedSeats: number | null;
   decisionReasons: readonly string[];
+  decisionDetails?: DispatchDecisionDetails | null;
   predictionUpdatedAt: string | null;
 }
 
@@ -36,6 +37,7 @@ export interface ReusableDispatchBatch {
   groupIds: string[];
   occupiedSeats: number;
   decisionReasons: string[];
+  decisionDetails: DispatchDecisionDetails | null;
 }
 
 export interface ReusableDispatchBatchSelection {
@@ -128,6 +130,7 @@ export function selectReusableDispatchBatch(input: {
         groupIds: [...(first.plannedGroupIds ?? [])],
         occupiedSeats,
         decisionReasons: stableStrings(rows.flatMap((row) => row.decisionReasons)),
+        decisionDetails: first.decisionDetails ?? null,
       },
       fallbackReason: null,
     };

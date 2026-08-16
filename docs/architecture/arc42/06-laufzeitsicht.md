@@ -74,13 +74,12 @@ sequenceDiagram
     participant C as verbundene Clients
 
     DO->>F: Neuberechnung nach erfolgreicher Fachtransaktion
-    F->>D: offene Umläufe, Ist-Zeiten, bis zu 12 Vergleichsumläufe,<br/>Pausen, weiche Pläne, wiederkehrende Regeln
-    F->>F: aktive Timelines und Verfügbarkeitsbahnen berechnen
-    opt aktive Completion-Projektion hat sich geändert
-        F->>F: Dispatch mit denselben Eingaben und demselben Zeitpunkt<br/>einmal konsistent nachberechnen
-    end
-    F->>F: Dispatch-Fenster, Gewichtung,<br/>Ausreißerfilter, Qualitätsstufe
-    F->>D: Prognosefelder aktualisieren + unveränderlichen Snapshot je Umlauf anhängen
+    F->>D: offene Umläufe, Ist-Zeiten, alle gültigen Tagesmessungen,<br/>begrenzter Kaltstartkorpus, Pausen und Pläne
+    F->>F: aktive Timelines als unveränderliche Belegungen projizieren
+    F->>F: Ressourcenfreigaben auf Flugzeug-/Pilotenbahnen übertragen
+    F->>F: einheitliche Dauerbasis je Lane wählen
+    F->>F: DRAFT-Gruppen einmal per Dispatch und Replay projizieren
+    F->>D: Prognosefelder, Decision-Details und unveränderliche Snapshots persistieren
     F->>F: Voraufrufbedingungen prüfen
     opt Voraufruf ausgelöst
         F->>D: AUTOMATIC_PRECALL mit Audit und Outbox
@@ -95,11 +94,10 @@ Der Prognoselauf verändert keine bestätigten Ist-Ereignisse. Zusätzlich takte
 Durable-Object-Alarm die Neuberechnung alle 30 Sekunden und beendet fällige Gruppennachrufe über
 dieselbe serielle Kommandogrenze.
 
-Die einmalige interne Nachberechnung verhindert, dass ein durch Debouncing zusammengefasster
-Commandlauf einen Dispatch-Vorschlag noch aus den zuvor gespeicherten Completion-Zeiten aktiver
-Flugzeuge oder Piloten ableitet. Beide Rechenschritte verwenden denselben geladenen Zustand und
-denselben Berechnungszeitpunkt; nur der konvergierte Endstand wird persistiert, als Analysepaket
-erfasst und veröffentlicht.
+Die Domainberechnung projiziert aktive Completion-Zeiten und überträgt deren Flugzeug-/Pilotenfreigabe
+direkt auf die Scheduler-Lanes. Damit benötigt der Worker keinen zweiten Konvergenzlauf. Scheduler,
+Replay, sichtbare Zeitlinie und Snapshotdiagnostik verwenden dieselbe einmal gewählte Dauerbasis;
+nur dieser konsistente Endstand wird persistiert, als Analysepaket erfasst und veröffentlicht.
 
 ## 6.4 Verbindungsverlust und Wiederaufnahme
 

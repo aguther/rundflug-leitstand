@@ -182,6 +182,7 @@ export function dispatchPlanProjection(
     dispatch_available_seats: number | null;
     dispatch_commitment_level: string | null;
     dispatch_decision_reasons_json: string;
+    dispatch_decision_details_json?: string | null;
     dispatch_confirmed_overtake_count: number;
     dispatch_projected_overtake_count: number;
     dispatch_unplanned_reason: string | null;
@@ -201,6 +202,9 @@ export function dispatchPlanProjection(
     availableSeats: rotation.dispatch_available_seats,
     commitmentLevel: rotation.dispatch_commitment_level,
     decisionReasons: JSON.parse(rotation.dispatch_decision_reasons_json) as string[],
+    decisionDetails: rotation.dispatch_decision_details_json
+      ? (JSON.parse(rotation.dispatch_decision_details_json) as Record<string, number>)
+      : null,
     confirmedOvertakeCount: rotation.dispatch_confirmed_overtake_count,
     projectedOvertakeCount: rotation.dispatch_projected_overtake_count,
     unplannedReason: rotation.dispatch_unplanned_reason,

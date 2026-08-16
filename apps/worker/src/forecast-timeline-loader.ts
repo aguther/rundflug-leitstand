@@ -1,5 +1,6 @@
 import type { AircraftOperationalState } from "@rundflug/domain";
 import { dispatchSegmentOrderSql } from "./dispatch-ordering-sql";
+import { forecastDurationSamplesSql } from "./forecast-duration-samples-query";
 import type { ForecastRecalculationRequest } from "./forecast-timeline-types";
 
 export class ForecastTimelineLoader {
@@ -91,7 +92,8 @@ export class ForecastTimelineLoader {
                 r.dispatch_order, r.dispatch_wave, r.dispatch_lane_id,
                 r.dispatch_group_ids_json, r.dispatch_occupied_seats,
                 r.dispatch_available_seats, r.dispatch_commitment_level,
-                r.dispatch_decision_reasons_json, r.dispatch_confirmed_overtake_count,
+                r.dispatch_decision_reasons_json, r.dispatch_decision_details_json,
+                r.dispatch_confirmed_overtake_count,
                 r.dispatch_projected_overtake_count,
                 r.dispatch_unplanned_reason,
                 r.turnaround_boarding_minutes, r.turnaround_deboarding_minutes,
@@ -168,6 +170,7 @@ export class ForecastTimelineLoader {
           dispatch_available_seats: number | null;
           dispatch_commitment_level: "WAITING" | "PREPARE" | "COME_TO_FLIGHT_LINE" | null;
           dispatch_decision_reasons_json: string;
+          dispatch_decision_details_json: string | null;
           dispatch_confirmed_overtake_count: number;
           dispatch_projected_overtake_count: number;
           dispatch_unplanned_reason:
@@ -181,64 +184,17 @@ export class ForecastTimelineLoader {
             | "UNKNOWN_RESOURCE_RETURN"
             | null;
         }>(),
-      this.db
-        .prepare(
-          `SELECT (julianday(r.completed_at) - julianday(r.called_at)) * 1440.0 AS minutes,
-                r.completed_at, r.operation_day_id, p.code AS product_code, a.aircraft_type
-           FROM rotations r
-           JOIN flight_groups fg ON fg.id = r.flight_group_id
-           JOIN rotation_tickets rt ON rt.rotation_id = r.id
-           JOIN tickets t ON t.id = rt.ticket_id
-           JOIN ticket_groups tg ON tg.id = t.ticket_group_id
-           JOIN products p ON p.id = tg.product_id
-           LEFT JOIN aircraft a ON a.id = r.aircraft_id
-          WHERE r.status = 'COMPLETED' AND r.called_at IS NOT NULL AND r.completed_at IS NOT NULL
-            AND NOT EXISTS (
-              SELECT 1 FROM operational_events interruption
-               WHERE interruption.operation_day_id = r.operation_day_id
-                 AND interruption.event_type IN ('EVENT_OPERATION_INTERRUPTED', 'EMERGENCY_MODE_TRIGGERED')
-                 AND interruption.occurred_at < r.completed_at
-                 AND NOT EXISTS (
-                   SELECT 1 FROM operational_events resumed
-                    WHERE resumed.operation_day_id = r.operation_day_id
-                      AND resumed.occurred_at > interruption.occurred_at
-                      AND resumed.occurred_at <= r.called_at
-                      AND ((interruption.event_type = 'EVENT_OPERATION_INTERRUPTED'
-                            AND resumed.event_type = 'EVENT_OPERATION_RESUMED')
-                        OR (interruption.event_type = 'EMERGENCY_MODE_TRIGGERED'
-                            AND resumed.event_type = 'EMERGENCY_MODE_CLEARED'))
-                 )
-            )
-            AND NOT EXISTS (
-              SELECT 1
-                FROM planned_operational_constraints slowdown
-               WHERE slowdown.operation_day_id = r.operation_day_id
-                 AND slowdown.effect_mode = 'SLOWDOWN'
-                 AND slowdown.activated_at IS NOT NULL
-                 AND slowdown.activated_at < r.completed_at
-                 AND COALESCE(slowdown.cleared_at, '9999-12-31T23:59:59.999Z') > r.called_at
-                 AND (
-                   (slowdown.scope_type = 'EVENT' AND slowdown.scope_id = r.operation_day_id)
-                   OR (slowdown.scope_type = 'RESOURCE_GROUP'
-                       AND slowdown.scope_id = fg.resource_group_id)
-                   OR (slowdown.scope_type = 'AIRCRAFT' AND slowdown.scope_id = r.aircraft_id)
-                   OR (slowdown.scope_type = 'PILOT' AND slowdown.scope_id = r.pilot_id)
-                 )
-            )
-          GROUP BY r.id, p.code, a.aircraft_type
-          ORDER BY r.completed_at DESC LIMIT 200`,
-        )
-        .all<{
-          minutes: number;
-          completed_at: string;
-          operation_day_id: string;
-          product_code: string;
-          aircraft_type: string | null;
-        }>(),
+      this.db.prepare(forecastDurationSamplesSql).bind(eventId).all<{
+        minutes: number;
+        completed_at: string;
+        operation_day_id: string;
+        product_code: string;
+        aircraft_type: string | null;
+      }>(),
       this.db
         .prepare(
           `SELECT m.resource_group_id, m.current_pilot_id,
-                  a.id AS aircraft_id, a.passenger_seats,
+                  a.id AS aircraft_id, a.aircraft_type, a.passenger_seats,
                   a.operational_state, a.operational_interrupted,
                   active_rotation.predicted_completion_at,
                   (SELECT block.expected_review_at
@@ -264,6 +220,7 @@ export class ForecastTimelineLoader {
           resource_group_id: string;
           current_pilot_id: string | null;
           aircraft_id: string;
+          aircraft_type: string;
           passenger_seats: number;
           operational_state: AircraftOperationalState;
           operational_interrupted: number;

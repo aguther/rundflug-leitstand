@@ -198,6 +198,7 @@ export function calculateOperationalSimulationProjections(input: {
         {
           laneId: entry.id,
           aircraftId: entry.id,
+          aircraftType: entry.aircraftType,
           pilotId: lanePilot.id,
           passengerSeats: entry.capacity,
           availableLowerAt: iso(expectedAt),

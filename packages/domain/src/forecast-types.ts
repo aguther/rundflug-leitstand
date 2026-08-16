@@ -1,5 +1,6 @@
 import type {
   DispatchCommitmentLevel,
+  DispatchDecisionDetails,
   DispatchDecisionReason,
   DispatchLockedBatchInput,
   DispatchPlan,
@@ -162,6 +163,7 @@ export interface ForecastAvailabilityConstraintInput {
 export interface ForecastAvailabilityLaneInput {
   laneId: string;
   aircraftId: string;
+  aircraftType?: string | null;
   pilotId?: string | null;
   passengerSeats?: number;
   availableLowerAt: string;
@@ -228,6 +230,7 @@ export interface ForecastTimelineProjection {
   dispatchAvailableSeats: number | null;
   dispatchCommitmentLevel: DispatchCommitmentLevel | null;
   dispatchDecisionReasons: DispatchDecisionReason[];
+  dispatchDecisionDetails?: DispatchDecisionDetails | null;
   dispatchProjectedOvertakeCount: number;
   dispatchUnplannedReason: DispatchUnplannedReason | null;
 }

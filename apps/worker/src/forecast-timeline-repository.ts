@@ -78,8 +78,9 @@ export class ForecastTimelineRepository {
               dispatch_lane_id = ?6, dispatch_group_ids_json = ?7,
               dispatch_occupied_seats = ?8, dispatch_available_seats = ?9,
               dispatch_commitment_level = ?10, dispatch_decision_reasons_json = ?11,
-              dispatch_projected_overtake_count = ?12, dispatch_unplanned_reason = ?13
-            WHERE id = ?14 AND status = 'DRAFT'`,
+              dispatch_decision_details_json = ?12,
+              dispatch_projected_overtake_count = ?13, dispatch_unplanned_reason = ?14
+            WHERE id = ?15 AND status = 'DRAFT'`,
         ).bind(
           projection.dispatchPlanId,
           projection.dispatchPlanRevision,
@@ -92,6 +93,9 @@ export class ForecastTimelineRepository {
           projection.dispatchAvailableSeats,
           projection.dispatchCommitmentLevel,
           JSON.stringify(projection.dispatchDecisionReasons),
+          projection.dispatchDecisionDetails
+            ? JSON.stringify(projection.dispatchDecisionDetails)
+            : null,
           projection.dispatchProjectedOvertakeCount,
           projection.dispatchUnplannedReason,
           rotation.id,
@@ -114,11 +118,13 @@ export class ForecastTimelineRepository {
              dispatch_plan_id, dispatch_plan_revision, dispatch_batch_id, dispatch_order,
              dispatch_wave, dispatch_lane_id, dispatch_group_ids_json,
              dispatch_occupied_seats, dispatch_available_seats, dispatch_commitment_level,
-             dispatch_decision_reasons_json, dispatch_confirmed_overtake_count,
+             dispatch_decision_reasons_json, dispatch_decision_details_json,
+             dispatch_confirmed_overtake_count,
              dispatch_projected_overtake_count, dispatch_unplanned_reason, planning_run_id)
            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
                    ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28,
-                   ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37, ?38, ?39, ?40, ?41)`,
+                   ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37, ?38, ?39, ?40, ?41,
+                   ?42)`,
           ).bind(
             crypto.randomUUID(),
             eventId,
@@ -157,6 +163,9 @@ export class ForecastTimelineRepository {
             projection.dispatchAvailableSeats,
             projection.dispatchCommitmentLevel,
             JSON.stringify(projection.dispatchDecisionReasons),
+            projection.dispatchDecisionDetails
+              ? JSON.stringify(projection.dispatchDecisionDetails)
+              : null,
             rotation.dispatch_confirmed_overtake_count,
             projection.dispatchProjectedOvertakeCount,
             projection.dispatchUnplannedReason,

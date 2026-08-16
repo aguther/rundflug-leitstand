@@ -1,4 +1,5 @@
 import type { DispatchRecommendationLease } from "@rundflug/contracts";
+import type { DispatchDecisionDetails } from "@rundflug/domain";
 import type { selectReusableDispatchBatch } from "./dispatch-recommendation-selection";
 
 export interface StoredDispatchRecommendationLease {
@@ -15,6 +16,7 @@ export interface StoredDispatchRecommendationLease {
   occupied_seats: number;
   available_seats: number;
   decision_reasons_json: string;
+  decision_details_json?: string | null;
   operation_day_version: number;
   member_rotation_ids_json: string;
   status: "ACTIVE" | "RELEASED" | "EXPIRED" | "CONSUMED" | "INVALIDATED";
@@ -37,6 +39,9 @@ export function dispatchRecommendationLeaseResponse(
     occupiedSeats: lease.occupied_seats,
     availableSeats: lease.available_seats,
     decisionReasons: strings(lease.decision_reasons_json),
+    decisionDetails: lease.decision_details_json
+      ? (JSON.parse(lease.decision_details_json) as DispatchDecisionDetails)
+      : null,
     acquiredAt: lease.acquired_at,
     expiresAt: lease.expires_at,
     serverNow,
@@ -74,6 +79,7 @@ export interface DispatchRecommendationPlanningRow {
   dispatch_group_ids_json: string;
   dispatch_occupied_seats: number | null;
   dispatch_decision_reasons_json: string;
+  dispatch_decision_details_json?: string | null;
   dispatch_confirmed_overtake_count: number;
   dispatch_projected_overtake_count: number;
   prediction_updated_at: string | null;
@@ -123,5 +129,6 @@ export function selectedDispatchBatch(selection: ReturnType<typeof selectReusabl
     groupIds: [] as string[],
     occupiedSeats: 0,
     decisionReasons: [] as string[],
+    decisionDetails: null,
   };
 }

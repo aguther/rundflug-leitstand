@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dispatchDecisionDetailsSchema } from "./dispatch-decision-details";
 
 export const assistClaimMutationSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("ACQUIRE_OR_RENEW") }).strict(),
@@ -43,6 +44,7 @@ export const dispatchRecommendationLeaseSchema = z
     occupiedSeats: z.number().int().positive(),
     availableSeats: z.number().int().nonnegative(),
     decisionReasons: z.array(z.string().min(1).max(100)).max(20),
+    decisionDetails: dispatchDecisionDetailsSchema.nullable().optional(),
     acquiredAt: z.iso.datetime(),
     expiresAt: z.iso.datetime(),
     serverNow: z.iso.datetime(),

@@ -102,6 +102,19 @@ export interface DispatchBatch {
   predictedCompletionAt: string;
   commitmentLevel: DispatchCommitmentLevel;
   decisionReasons: DispatchDecisionReason[];
+  decisionDetails?: DispatchDecisionDetails;
+}
+
+export interface DispatchDecisionDetails {
+  protectedCommitments: number;
+  mustServeForMaximumWait: number;
+  mustServeForMaximumOvertakes: number;
+  productServiceDeficit: number;
+  oldestWaitMinutes: number;
+  occupiedSeats: number;
+  availableSeats: number;
+  projectedOvertakes: number;
+  retainedPreviousPlanMembers: number;
 }
 
 export interface DispatchGroupDecision {
@@ -152,6 +165,32 @@ export interface DispatchPlan {
   groupDecisions: DispatchGroupDecision[];
   unplannedGroups: DispatchUnplannedGroup[];
   limits: DispatchPlanningLimits;
+  objective?: DispatchPlanObjective;
+  searchDiagnostics?: DispatchSearchDiagnostics;
+}
+
+export interface DispatchPlanObjective {
+  unservedHardCommitments: number;
+  delayedHardCommitmentMinutes: number;
+  unservedMustServeGroups: number;
+  productServiceDeficitScore: number;
+  starvationScore: number;
+  transportedPassengers: number;
+  nearSeatUtilization: number;
+  projectedOvertakes: number;
+  maximumUnservedWaitMinutes: number;
+  maximumUnservedConfirmedOvertakes: number;
+  servedWaitMinutes: number;
+  brokenPrepareAssignments: number;
+  retainedPreviousPlanMembers: number;
+}
+
+export interface DispatchSearchDiagnostics {
+  consideredGroups: number;
+  deferredGroups: number;
+  expandedStates: number;
+  candidateLimitReached: boolean;
+  beamLimitReached: boolean;
 }
 
 export interface DispatchLockedBatchInput {
@@ -234,6 +273,19 @@ interface SearchState {
   stabilityMatches: number;
   prepareBreaks: number;
   stableKey: string;
+}
+
+interface CandidateEnumeration {
+  candidates: CandidateBatch[];
+  limitReached: boolean;
+}
+
+interface DispatchSearchResult {
+  state: SearchState;
+  diagnostics: Pick<
+    DispatchSearchDiagnostics,
+    "expandedStates" | "candidateLimitReached" | "beamLimitReached"
+  >;
 }
 
 const MINUTE_MS = 60_000;
@@ -586,7 +638,7 @@ function enumerateCandidates(
   lane: NormalizedLane,
   limits: DispatchPlanningLimits,
   previousMembers: ReadonlySet<string>,
-): CandidateBatch[] {
+): CandidateEnumeration {
   const remainingIds = new Set(remaining.map((group) => group.id));
   const eligible = remaining.filter((group) =>
     (group.predecessorMemberIds ?? []).every((predecessorId) => !remainingIds.has(predecessorId)),
@@ -654,7 +706,12 @@ function enumerateCandidates(
       unique.set(`${productGateKey}:${candidate.stableKey}`, candidate);
     }
   }
-  return [...unique.values()].sort(compareCandidates).slice(0, limits.maximumCandidatesPerStep);
+  const orderedCandidates = [...unique.values()].sort(compareCandidates);
+  return {
+    candidates: orderedCandidates.slice(0, limits.maximumCandidatesPerStep),
+    limitReached:
+      unique.size >= generationLimit || orderedCandidates.length > limits.maximumCandidatesPerStep,
+  };
 }
 
 function laneOrder(left: NormalizedLane, right: NormalizedLane): number {
@@ -693,14 +750,14 @@ function compareStates(left: SearchState, right: SearchState): number {
     leftHardUnserved - rightHardUnserved ||
     left.calledDelayMs - right.calledDelayMs ||
     leftMustServeUnserved - rightMustServeUnserved ||
-    right.productFairnessScore - left.productFairnessScore ||
-    leftMaximumWait - rightMaximumWait ||
-    leftMaximumOvertakeDebt - rightMaximumOvertakeDebt ||
     right.mustServeCount - left.mustServeCount ||
+    right.productFairnessScore - left.productFairnessScore ||
     right.starvationScore - left.starvationScore ||
-    left.queueOvertakes - right.queueOvertakes ||
     right.passengers - left.passengers ||
     right.nearUtilizationScore - left.nearUtilizationScore ||
+    left.queueOvertakes - right.queueOvertakes ||
+    leftMaximumWait - rightMaximumWait ||
+    leftMaximumOvertakeDebt - rightMaximumOvertakeDebt ||
     right.ageScore - left.ageScore ||
     left.prepareBreaks - right.prepareBreaks ||
     right.commitmentServed - left.commitmentServed ||
@@ -853,67 +910,97 @@ function applyLockedBatch(
   );
 }
 
-function expandSearchState(state: SearchState, input: PlanResourceGroupInput): SearchState[] {
-  if (state.remaining.length === 0) return [state];
+function expandSearchState(
+  state: SearchState,
+  input: PlanResourceGroupInput,
+): { states: SearchState[]; candidateLimitReached: boolean } {
+  if (state.remaining.length === 0) {
+    return { states: [state], candidateLimitReached: false };
+  }
   const lane = state.lanes
     .filter((entry) => entry.wave <= input.limits.maximumWaves)
     .sort(laneOrder)[0];
-  if (!lane) return [state];
+  if (!lane) return { states: [state], candidateLimitReached: false };
   const previousMembers = input.previousSlots.get(`${lane.id}:${lane.wave}`) ?? new Set();
-  const candidates = enumerateCandidates(state.remaining, lane, input.limits, previousMembers);
-  if (candidates.length === 0) {
-    return [
-      {
-        ...state,
-        lanes: state.lanes.map((entry) =>
-          entry.id === lane.id ? { ...entry, wave: input.limits.maximumWaves + 1 } : entry,
-        ),
-        stableKey: `${state.stableKey}|${lane.id}:no-fit`,
-      },
-    ];
-  }
-  return candidates.flatMap((candidate) => {
-    const duration = lane.productDurations.get(candidate.productId);
-    return duration
-      ? [
-          advanceState(
-            state,
-            lane,
-            candidate,
-            duration,
-            input.limits,
-            input.previousExpectedAtByMember,
+  const enumeration = enumerateCandidates(state.remaining, lane, input.limits, previousMembers);
+  if (enumeration.candidates.length === 0) {
+    return {
+      states: [
+        {
+          ...state,
+          lanes: state.lanes.map((entry) =>
+            entry.id === lane.id ? { ...entry, wave: input.limits.maximumWaves + 1 } : entry,
           ),
-        ]
-      : [];
-  });
+          stableKey: `${state.stableKey}|${lane.id}:no-fit`,
+        },
+      ],
+      candidateLimitReached: enumeration.limitReached,
+    };
+  }
+  return {
+    states: enumeration.candidates.flatMap((candidate) => {
+      const duration = lane.productDurations.get(candidate.productId);
+      return duration
+        ? [
+            advanceState(
+              state,
+              lane,
+              candidate,
+              duration,
+              input.limits,
+              input.previousExpectedAtByMember,
+            ),
+          ]
+        : [];
+    }),
+    candidateLimitReached: enumeration.limitReached,
+  };
 }
 
 function searchDispatchBatches(
   initialState: SearchState,
   input: PlanResourceGroupInput,
-): PlannedBatchState[] {
+): DispatchSearchResult {
   let beam: SearchState[] = [initialState];
+  let expandedStates = 0;
+  let candidateLimitReached = false;
+  let beamLimitReached = false;
   const maximumSteps = input.lanes.length * input.limits.maximumWaves;
   for (let step = 0; step < maximumSteps; step += 1) {
-    const expanded = beam.flatMap((state) => expandSearchState(state, input));
+    const expansions = beam.map((state) => expandSearchState(state, input));
+    const expanded = expansions.flatMap((entry) => entry.states);
+    expandedStates += expanded.length;
+    candidateLimitReached ||= expansions.some((entry) => entry.candidateLimitReached);
     expanded.sort(compareStates);
+    beamLimitReached ||= expanded.length > input.limits.beamWidth;
     beam = expanded.slice(0, input.limits.beamWidth);
   }
   beam.sort(compareStates);
-  const batches = [...(beam[0]?.batches ?? [])];
-  batches.sort(
+  const state = beam[0] ?? initialState;
+  state.batches.sort(
     (left, right) =>
       left.expectedMs - right.expectedMs ||
       left.laneId.localeCompare(right.laneId) ||
       left.wave - right.wave,
   );
-  return batches;
+  return {
+    state,
+    diagnostics: { expandedStates, candidateLimitReached, beamLimitReached },
+  };
 }
 
-function planResourceGroup(input: PlanResourceGroupInput): PlannedBatchState[] {
-  if (input.groups.length === 0 || input.lanes.length === 0) return [];
+function planResourceGroup(input: PlanResourceGroupInput): DispatchSearchResult {
   let state = initialSearchState(input);
+  if (input.groups.length === 0 || input.lanes.length === 0) {
+    return {
+      state,
+      diagnostics: {
+        expandedStates: 0,
+        candidateLimitReached: false,
+        beamLimitReached: false,
+      },
+    };
+  }
   const lockedAircraftIds = new Set<string>();
   for (const lockedBatch of [...input.lockedBatches].sort((left, right) =>
     left.id.localeCompare(right.id),
@@ -998,6 +1085,33 @@ function reasonForUnplannedGroup(
   );
 }
 
+function objectiveForSearchStates(states: readonly SearchState[]): DispatchPlanObjective {
+  const remainingGroups = states.flatMap((state) => state.remaining);
+  return {
+    unservedHardCommitments: remainingGroups.filter(
+      (group) => group.publicStatus === "COME_TO_FLIGHT_LINE",
+    ).length,
+    delayedHardCommitmentMinutes:
+      states.reduce((sum, state) => sum + state.calledDelayMs, 0) / MINUTE_MS,
+    unservedMustServeGroups: remainingGroups.filter(
+      (group) => group.mustServeForWait || group.mustServeForOvertakes,
+    ).length,
+    productServiceDeficitScore: states.reduce((sum, state) => sum + state.productFairnessScore, 0),
+    starvationScore: states.reduce((sum, state) => sum + state.starvationScore, 0),
+    transportedPassengers: states.reduce((sum, state) => sum + state.passengers, 0),
+    nearSeatUtilization: states.reduce((sum, state) => sum + state.nearUtilizationScore, 0),
+    projectedOvertakes: states.reduce((sum, state) => sum + state.queueOvertakes, 0),
+    maximumUnservedWaitMinutes: Math.max(0, ...remainingGroups.map((group) => group.waitMinutes)),
+    maximumUnservedConfirmedOvertakes: Math.max(
+      0,
+      ...remainingGroups.map((group) => group.confirmedOvertakeCount),
+    ),
+    servedWaitMinutes: states.reduce((sum, state) => sum + state.ageScore, 0),
+    brokenPrepareAssignments: states.reduce((sum, state) => sum + state.prepareBreaks, 0),
+    retainedPreviousPlanMembers: states.reduce((sum, state) => sum + state.stabilityMatches, 0),
+  };
+}
+
 export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
   const nowMs = Date.parse(input.now);
   if (!Number.isFinite(nowMs)) throw new Error("Dispatch planning time is invalid.");
@@ -1008,6 +1122,14 @@ export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
   const lockedBatches = input.lockedBatches ?? [];
   validateLockedBatchAssignments(lockedBatches);
   const plannedStates: PlannedBatchState[] = [];
+  const searchStates: SearchState[] = [];
+  const searchDiagnostics: DispatchSearchDiagnostics = {
+    consideredGroups: 0,
+    deferredGroups: 0,
+    expandedStates: 0,
+    candidateLimitReached: false,
+    beamLimitReached: false,
+  };
   const consideredIds = new Set<string>();
   const resourceGroupIds = [
     ...new Set([
@@ -1029,17 +1151,22 @@ export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
     groups.forEach((group) => {
       consideredIds.add(group.id);
     });
-    plannedStates.push(
-      ...planResourceGroup({
-        groups,
-        lanes: normalizedLanes.filter((lane) => lane.resourceGroupId === resourceGroupId),
-        limits,
-        previousSlots,
-        previousExpectedAtByMember: previousExpectedAtByMember(input.previousPlan, resourceGroupId),
-        lockedBatches: lockedBatches.filter((batch) => batch.resourceGroupId === resourceGroupId),
-      }),
-    );
+    const searchResult = planResourceGroup({
+      groups,
+      lanes: normalizedLanes.filter((lane) => lane.resourceGroupId === resourceGroupId),
+      limits,
+      previousSlots,
+      previousExpectedAtByMember: previousExpectedAtByMember(input.previousPlan, resourceGroupId),
+      lockedBatches: lockedBatches.filter((batch) => batch.resourceGroupId === resourceGroupId),
+    });
+    plannedStates.push(...searchResult.state.batches);
+    searchStates.push(searchResult.state);
+    searchDiagnostics.expandedStates += searchResult.diagnostics.expandedStates;
+    searchDiagnostics.candidateLimitReached ||= searchResult.diagnostics.candidateLimitReached;
+    searchDiagnostics.beamLimitReached ||= searchResult.diagnostics.beamLimitReached;
   }
+  searchDiagnostics.consideredGroups = consideredIds.size;
+  searchDiagnostics.deferredGroups = normalizedGroups.length - consideredIds.size;
   plannedStates.sort(
     (left, right) =>
       left.expectedMs - right.expectedMs ||
@@ -1086,6 +1213,26 @@ export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
       predictedCompletionAt: new Date(entry.completionMs).toISOString(),
       commitmentLevel: strongestCommitment(entry.candidate.groups),
       decisionReasons: entry.candidate.reasons,
+      decisionDetails: {
+        protectedCommitments: entry.candidate.groups.filter(
+          (group) =>
+            entry.fixedBatchId !== undefined || group.publicStatus === "COME_TO_FLIGHT_LINE",
+        ).length,
+        mustServeForMaximumWait: entry.candidate.groups.filter((group) => group.mustServeForWait)
+          .length,
+        mustServeForMaximumOvertakes: entry.candidate.groups.filter(
+          (group) => group.mustServeForOvertakes,
+        ).length,
+        productServiceDeficit: entry.candidate.groups.reduce(
+          (sum, group) => sum + group.productServiceDeficit,
+          0,
+        ),
+        oldestWaitMinutes: Math.max(0, ...entry.candidate.groups.map((group) => group.waitMinutes)),
+        occupiedSeats: entry.candidate.occupiedSeats,
+        availableSeats: lane.passengerSeats - entry.candidate.occupiedSeats,
+        projectedOvertakes: entry.candidate.queueOvertakes,
+        retainedPreviousPlanMembers: entry.candidate.stabilityMatches,
+      },
     };
   });
   const batchByMemberId = new Map(
@@ -1134,5 +1281,7 @@ export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
     groupDecisions,
     unplannedGroups,
     limits,
+    objective: objectiveForSearchStates(searchStates),
+    searchDiagnostics,
   };
 }

@@ -1,6 +1,6 @@
 # ADR-0041: Modulare Forecast-Pipeline und Abschaltung des Legacy-Vergleichspfads
 
-- Status: Akzeptiert
+- Status: Ersetzt durch ADR-0054
 - Datum: 2026-08-12
 - Entscheidung: Strukturierung einer bestehenden Prognosefunktion ohne fachliche Vertragsänderung
 - Betroffene Anforderungen: F-PRG-010 bis F-PRG-120, F-FLN-120, Q-WAR-060, Q-PER-030

@@ -1,6 +1,6 @@
 # ADR-0032: Durchsatz- und fairnessorientierte Dispatch-Planung
 
-- Status: Teilweise ersetzt durch ADR-0036 für die FIDS-Sortierung
+- Status: Akzeptiert; fortgeführt durch ADR-0054 und teilweise ersetzt durch ADR-0036 für die FIDS-Sortierung
 - Datum: 2026-08-01
 - Entscheidung: Auftraggeber
 - Betroffene Anforderungen: F-PRG-020, F-PRG-030, F-BEN-030, F-BEN-090, F-BEN-100,
@@ -46,6 +46,10 @@ Die Bewertung ist fachlich lexikografisch, nicht als frei austauschbare gewichte
 5. Überholungen begrenzen, Alter und Queue-Reihenfolge bevorzugen;
 6. den vorherigen Plan stabil halten;
 7. bei Gleichstand stabile technische IDs verwenden.
+
+ADR-0054 vereinheitlicht Kandidaten- und Zustandsvergleich auf genau diese Reihenfolge und ergänzt
+einen strukturierten Objective-Vektor sowie faktische Batchdetails. Insbesondere werden
+Passagierzahl und Auslastung vor der Minimierung prognostischer Überholungen verglichen.
 
 Ein Überholen ist damit eine begrenzte, sichtbare Optimierungsentscheidung und keine Auflösung der
 Buchungsgruppe. Eine bereits zu `COME_TO_FLIGHT_LINE` aufgerufene Gruppe bleibt auf ihrer weiterhin

@@ -53,7 +53,7 @@ verlinkt bleiben.
 | [0039](../adr/0039-kontobezogene-fids-modi-url-seiten-filter-und-simulation.md) | Kontobezogene FIDS-Modi, URL-Seiten, Filter und gemeinsame Simulation | Monitorseiten aus der URL, Filter ausschließlich im geschützten Dialog |
 | [0040](../adr/0040-serverseitige-oeffentliche-codevergabe.md) | Serverseitige Vergabe öffentlicher Statuscodes | reguläre Verkäufe akzeptieren keine Clientcodes; Worker-Vergabe, Kollisionsprüfung und idempotenter Beleg |
 | [0041](../adr/0041-modulare-forecast-pipeline-und-legacy-abschaltung.md) | Modulare Forecast-Pipeline und Legacy-Abschaltung | explizite Adapter- und Domain-Phasen, Persist-before-publish und messbares Abschaltkriterium |
-| [0042](../adr/0042-modulare-deterministische-simulationspipeline.md) | Modulare deterministische Simulationspipeline | gemeinsame Seed-Primitive und fachliche Phasen für Legacy-/Operational-Simulation; operative Tests sind Teil der Coverage |
+| [0042](../adr/0042-modulare-deterministische-simulationspipeline.md) | Modulare deterministische Simulationspipeline | gemeinsame Seed-Primitive und fachliche Phasen; die fortgeltende operative Engine ist Teil der Coverage |
 | [0043](../adr/0043-familienvertraege-und-isoliertes-worker-testharness.md) | Familienverträge und isoliertes Worker-Testharness | kompatible Operations-Fassade mit vier Command-Familien; parallele lokale Verifier ohne geteilten Port oder D1-Zustand |
 | [0044](../adr/0044-eigenstaendiger-simulations-fids-tab.md) | Eigenständiger Simulations-FIDS-Tab mit lokalem Zustandskanal | direkte Route ohne Popup-/Portal-Kopplung; versionierte flüchtige Tab-Synchronisation ohne Backend oder Browser-Storage |
 | [0045](../adr/0045-d1-v1-12-schema-baseline.md) | Inkompatible D1-Schema-Baseline für V1.12 | eine ausführbare Baseline statt 69 Entwicklungsmigrationen; künftige Nummerierung eindeutig und lückenlos ab `0002` |
@@ -65,6 +65,7 @@ verlinkt bleiben.
 | [0051](../adr/0051-online-only-operational-commands.md) | Onlinepflicht für operative Kommandos und lokale reversible Entwürfe | kein unbestätigter Parallelzustand; Offlineentwürfe werden bewusst gegen den aktuellen Serverstand bestätigt |
 | [0052](../adr/0052-event-archive-delete-reset-lifecycle.md) | Koexistenz von Veranstaltungsarchiv, Löschung und Werksreset | getrennte fachliche, destruktive und Wiederherstellungssemantik für drei unterschiedliche Lebenszykluspfade |
 | [0053](../adr/0053-planning-history-compaction.md) | Verifizierte Kompaktion der Planungshistorie in R2 | 24-Stunden-Heißfenster in D1, autoritative verifizierte Kaltsegmente in R2, Workflows und isolierter Restore |
+| [0054](../adr/0054-einheitliche-forecast-und-dispatch-pipeline.md) | Einheitliche Forecast- und Dispatch-Pipeline | aktive Ressourcenprojektion und DRAFT-Scheduler in einem Lauf, eine Dauerbasis, korrigierte Zielordnung und eine operative Simulationsengine |
 
 ## Entscheidungsstatus und Nachfolger
 
@@ -78,12 +79,13 @@ verlinkt bleiben.
 | 0020 | teilweise ersetzt | ADR-0047 ersetzt die gemeinsame Overlay-Fläche persistenter Meldungen |
 | 0029 | teilweise ersetzt | ADR-0032 ersetzt Queue-Präfix und Nicht-Überholen-Regel |
 | 0030 | teilweise ersetzt | ADR-0031 ergänzt die komponentenweise Umlaufzeit-Hierarchie |
-| 0032 | teilweise ersetzt | ADR-0036 ersetzt ausschließlich die abweichende FIDS-Sortierung |
-| 0041 | akzeptiert, Übergang aktiv | Legacy-Vergleichspfad bleibt bis zum dokumentierten Freigabe- und Replay-Nachweis bestehen |
+| 0032 | teilweise ersetzt | ADR-0036 ersetzt ausschließlich die abweichende FIDS-Sortierung; ADR-0054 präzisiert die gemeinsame Zielordnung und Diagnose |
+| 0041 | ersetzt | ADR-0054 schaltet den Legacy-Vergleichspfad und die Worker-Konvergenz ab |
+| 0042 | teilweise ersetzt | ADR-0054 ersetzt die Zwei-Engine-Entscheidung; deterministische Primitive, Tick-Reihenfolge und modulare operative Phasen gelten fort |
 
 Historische Begriffe wie „Supervisor“ oder „Assist“ bleiben in den ursprünglichen ADR-Texten
 erhalten. Die aktuelle Architektur verwendet die Rollen und Oberflächen „Flight Director“ und
-„Flight Line“. Vollständig ersetzte oder veraltete ADRs existieren derzeit nicht.
+„Flight Line“. ADR-0041 ist vollständig durch ADR-0054 ersetzt.
 
 ## Offene Entscheidungen
 

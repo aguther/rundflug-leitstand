@@ -603,7 +603,7 @@ function AssignmentGuidance({
   return <small>Eine manuelle Belegung ist mit Abweichungsgrund jederzeit möglich.</small>;
 }
 
-function DispatchRecommendationStatus({
+export function DispatchRecommendationStatus({
   dispatchLease,
   leaseRemainingSeconds,
   recommendationContainsGateCall,
@@ -676,6 +676,35 @@ function DispatchRecommendationStatus({
             {skippedEarlierProductGroupCount} frühere Gruppe
             {skippedEarlierProductGroupCount === 1 ? " wird" : "n werden"} fair eingeordnet.
           </small>
+        ) : null}
+        {recommendation.decisionDetails ? (
+          <details className="flight-director-dispatch-details">
+            <summary>Warum diese Empfehlung?</summary>
+            <div>
+              <span>
+                Verpflichtungen geschützt: {recommendation.decisionDetails.protectedCommitments}
+              </span>
+              <span>
+                Must-Serve Wartezeit/Überholungen:{" "}
+                {recommendation.decisionDetails.mustServeForMaximumWait}/
+                {recommendation.decisionDetails.mustServeForMaximumOvertakes}
+              </span>
+              <span>
+                Älteste Wartezeit: {Math.round(recommendation.decisionDetails.oldestWaitMinutes)}{" "}
+                Min.
+              </span>
+              <span>
+                Sitze belegt/frei: {recommendation.decisionDetails.occupiedSeats}/
+                {recommendation.decisionDetails.availableSeats}
+              </span>
+              <span>
+                Prognostische Überholungen: {recommendation.decisionDetails.projectedOvertakes}
+              </span>
+              <span>
+                Aus Vorplan erhalten: {recommendation.decisionDetails.retainedPreviousPlanMembers}
+              </span>
+            </div>
+          </details>
         ) : null}
       </div>
     </div>

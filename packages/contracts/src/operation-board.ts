@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { dispatchDecisionDetailsSchema } from "./dispatch-decision-details";
 import { eventSnapshotSchema } from "./event-auth";
 import {
   operationalPlanEffectModeSchema,
@@ -177,6 +178,7 @@ export const rotationOperationalSummarySchema = z.object({
           "STANDBY_PRIORITY",
         ]),
       ),
+      decisionDetails: dispatchDecisionDetailsSchema.nullable().optional(),
       confirmedOvertakeCount: z.number().int().nonnegative().default(0),
       projectedOvertakeCount: z.number().int().nonnegative(),
       unplannedReason: z

@@ -1,6 +1,6 @@
 # Verifikation Prognose-Simulator V1
 
-Stand: 27. Juli 2026
+Stand: 16. August 2026
 
 ## Zweck und Ausführung
 
@@ -22,24 +22,24 @@ Alle hier genannten Läufe verwenden die freigegebenen Standardparameter und See
 Der Verkauf läuft 09:00–17:00 Uhr, der Flugbetrieb 10:00–18:00 Uhr Europe/Berlin. Das
 Normalprofil verwendet zwei Wellen mit 40/8/32/6 Personen pro Stunde über
 90/180/90/120 Minuten und damit einen Erwartungswert von 144 Personen. Die Nachfrage erzeugt
-synthetische, ungeteilte Vierergruppen und wird mit der vorhandenen Queue-Planung disponiert. Die
-Preset-Baseline ist als exakter Testwert fixiert.
+synthetische, ungeteilte Gruppen zwischen einer Person und der Referenzkapazität. Presets werden an
+der Engine-Grenze auf ein Gate, eine Ressourcengruppe, ein Produkt sowie die konfigurierte Zahl
+synthetischer Flugzeuge und Pilotencodes abgebildet. Dieselbe operative Engine verarbeitet auch
+importierte Modelle. Die Preset-Baseline ist als exakter Testwert fixiert.
 
 ## Baseline-Ergebnis
 
 | Preset | erzeugte / abgeschlossene Umläufe | Boarding-Fenster getroffen | Median absolut | P90 absolut | Ø Fensterbreite | max. Reaktion |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Normalbetrieb | 40 / 28 | 0 % | 0,5 Min. | 23,1 Min. | 0 Min. | 29,648 Sek. |
-| Stoßlast | 78 / 28 | 0 % | 0,5 Min. | 23,1 Min. | 0 Min. | 29,648 Sek. |
-| Flugzeugausfall | 40 / 21 | 0 % | 0,5 Min. | 15,5 Min. | 0 Min. | 29,648 Sek. |
-| Betriebsunterbrechung | 40 / 27 | 0 % | 0,5 Min. | 27,5 Min. | 0 Min. | 29,648 Sek. |
+| Normalbetrieb | 35 / 22 | 95,45 % | 2,0 Min. | 2,5 Min. | 4,45 Min. | 0 Sek. |
+| Stoßlast | 88 / 22 | 100 % | 2,0 Min. | 2,45 Min. | 4,50 Min. | 0 Sek. |
+| Flugzeugausfall | 35 / 22 | 95,45 % | 2,0 Min. | 2,5 Min. | 4,45 Min. | 0 Sek. |
+| Betriebsunterbrechung | 34 / 22 | 86,36 % | 2,0 Min. | 16,0 Min. | 4,59 Min. | 0 Sek. |
 
-Die Baseline zeigt damit transparent, dass die aktuelle Prognoseformel für die meisten
-Boarding-Prognosen Punktfenster statt praktisch nutzbarer Zeitspannen erzeugt. Die niedrige
-Trefferquote ist kein Zielwert und wird nicht beschönigt: Der Simulator erfüllt gerade den Zweck,
-diesen fehlenden operativen Mehrwert messbar zu machen. Die Korrektur der Freshness-Semantik macht
-mehr Rohprognosen sichtbar, verbessert aber nicht automatisch deren Genauigkeit: Das Boarding-P90
-steigt in allen vier Presets und bleibt ausdrücklich ein diagnostischer Befund.
+Diese Werte sind bewusst eine neue Vergleichsbasis: Die früheren Presets liefen durch eine separate
+Legacy-Engine und sind nicht unmittelbar vergleichbar. Fensterbreite und Trefferquote entstehen nun
+aus derselben Dauerbasis und Schedulerprojektion wie im operativen Modell. Die Unterbrechungsbaseline
+zeigt weiterhin sichtbar die größere Unsicherheit außergewöhnlicher Betriebsphasen.
 
 Alle vier Presets weisen `0` dargestellte Countdowns während `UNCERTAIN` aus. Ereignisbedingte
 Neuberechnungen erfolgen im 30-Sekunden-Raster und liegen mit maximal 29,648 Sekunden innerhalb des
@@ -57,10 +57,10 @@ Sperrgründe, ein ungeeigneter vorderer Queue-Eintrag und fehlende passende Kapa
 
 | Preset | voraufgerufen / aufgerufen | Abdeckung | Median Gate → Boarding | P90 | gleicher 30-Sek.-Tick | bei `UNCERTAIN` |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Normalbetrieb | 28 / 28 | 100 % | 18,0 Min. | 34,75 Min. | 5 | 0 |
-| Stoßlast | 28 / 28 | 100 % | 18,0 Min. | 34,75 Min. | 5 | 0 |
-| Flugzeugausfall | 21 / 21 | 100 % | 17,0 Min. | 29,5 Min. | 4 | 0 |
-| Betriebsunterbrechung | 27 / 27 | 100 % | 17,0 Min. | 34,2 Min. | 8 | 0 |
+| Normalbetrieb | 22 / 22 | 100 % | 23,5 Min. | 40,0 Min. | 3 | 0 |
+| Stoßlast | 22 / 22 | 100 % | 22,5 Min. | 40,45 Min. | 3 | 0 |
+| Flugzeugausfall | 22 / 22 | 100 % | 23,5 Min. | 40,0 Min. | 3 | 0 |
+| Betriebsunterbrechung | 22 / 22 | 100 % | 18,0 Min. | 63,45 Min. | 3 | 0 |
 
 Nicht jeder bis zum Simulationsende aufgerufene Umlauf besitzt einen Voraufruf: Ein bestätigter
 Boardingbeginn bleibt fachlich auch ohne vorherigen Voraufruf möglich, beispielsweise wenn mehrere
@@ -81,14 +81,14 @@ seedübergreifenden Mediane der wichtigsten Baselinewerte lauten:
 
 | Kennzahl | Baseline |
 | --- | ---: |
-| Boarding Median absolut | 0,5 Min. |
-| Boarding P90 absolut | 19,7 Min. |
-| Boarding Bias | +4,75 Min. |
-| Boarding Fensterbreite | 0 Min. |
-| P90 bei 60 / 30 / 15 Minuten Horizont | 60,0 / 30,0 / 20,6 Min. |
-| Off-Block / On-Block / Abschluss P90 | 2,3 / 6,98 / 0,45 Min. |
+| Boarding Median absolut | 1,0 Min. |
+| Boarding P90 absolut | 2,0 Min. |
+| Boarding Bias | +1,3 Min. |
+| Boarding Fensterbreite | 3,59 Min. |
+| P90 bei 60 / 30 / 15 Minuten Horizont | 58,5 / 28,5 / 13,5 Min. |
+| Off-Block / On-Block / Abschluss P90 | 3,06 / 4,98 / 0,5 Min. |
 | Countdowns bei `UNCERTAIN` | 0 |
-| GO TO GATE → Boarding Median / P90 | 16,5 / 34,65 Min. |
+| GO TO GATE → Boarding Median / P90 | 100,75 / 203,0 Min. |
 
 Der Vergleich läuft abbrechbar in einem lokalen Browser-Worker. Er bewertet keine Variante
 automatisch als Gewinner.

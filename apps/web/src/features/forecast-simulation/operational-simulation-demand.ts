@@ -36,7 +36,10 @@ export function productDemandArrivals(
       const draw = Math.max(Number.EPSILON, random.next());
       arrivalMs += (-Math.log(draw) / groupRatePerHour) * 60 * SIMULATION_MINUTE_MS;
       if (arrivalMs < windowEndMs) {
-        arrivals.push({ at: roundSimulationTick(arrivalMs), productId: product.id });
+        const roundedArrivalMs = roundSimulationTick(arrivalMs);
+        if (roundedArrivalMs < windowEndMs) {
+          arrivals.push({ at: roundedArrivalMs, productId: product.id });
+        }
       }
     }
   }

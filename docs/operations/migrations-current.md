@@ -10,6 +10,7 @@ nachvollziehbar (ADR-0045).
 | 1 | `0001_v1_12_baseline.sql` | eindeutig und lückenlos ab `0001` |
 | 2 | `0002_planning_run_lineage_indexes.sql` | eindeutig und lückenlos ab `0001` |
 | 3 | `0003_planning_history_compaction.sql` | eindeutig und lückenlos ab `0001` |
+| 4 | `0004_dispatch_decision_details.sql` | eindeutig und lückenlos ab `0001` |
 
-Gesamt: 3 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
+Gesamt: 4 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
 `apps/worker/migrations/README.md` geprüft.

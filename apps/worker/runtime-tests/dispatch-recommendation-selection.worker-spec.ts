@@ -126,7 +126,8 @@ beforeEach(async () => {
       dispatch_decision_reasons_json TEXT NOT NULL DEFAULT '[]',
       dispatch_confirmed_overtake_count INTEGER NOT NULL DEFAULT 0,
       dispatch_projected_overtake_count INTEGER NOT NULL DEFAULT 0,
-      booking_segment_order INTEGER NOT NULL DEFAULT 1
+      booking_segment_order INTEGER NOT NULL DEFAULT 1,
+      dispatch_decision_details_json TEXT
     );
     CREATE TABLE ticket_groups (
       id TEXT PRIMARY KEY,
@@ -160,6 +161,7 @@ beforeEach(async () => {
       occupied_seats INTEGER NOT NULL,
       available_seats INTEGER NOT NULL,
       decision_reasons_json TEXT NOT NULL,
+      decision_details_json TEXT,
       operation_day_version INTEGER NOT NULL DEFAULT 0,
       member_rotation_ids_json TEXT NOT NULL DEFAULT '[]',
       status TEXT NOT NULL,
@@ -217,15 +219,15 @@ beforeEach(async () => {
       ('rotation-early', 'event-dispatch-runtime', 'flight-early', 'DRAFT',
        '2026-08-05T08:00:00.000Z', 'gate-a', '2026-08-05T09:00:00.000Z',
        'plan-current', 'batch-current', 1, 1, '["group-early","group-pair"]', 3,
-       '["CAPACITY_OPTIMIZED","QUEUE_ORDER"]', 0, 0, 1),
+       '["CAPACITY_OPTIMIZED","QUEUE_ORDER"]', 0, 0, 1, NULL),
       ('rotation-between', 'event-dispatch-runtime', 'flight-between', 'DRAFT',
        '2026-08-05T08:01:00.000Z', 'gate-a', '2026-08-05T09:00:00.000Z',
        'plan-current', 'batch-later', 2, 1, '["group-between"]', 1,
-       '["MUST_SERVE_MAX_OVERTAKES"]', 0, 2, 1),
+       '["MUST_SERVE_MAX_OVERTAKES"]', 0, 2, 1, NULL),
       ('rotation-pair', 'event-dispatch-runtime', 'flight-pair', 'DRAFT',
        '2026-08-05T08:02:00.000Z', 'gate-a', '2026-08-05T09:00:00.000Z',
        'plan-current', 'batch-current', 1, 1, '["group-early","group-pair"]', 3,
-       '["CAPACITY_OPTIMIZED","QUEUE_ORDER"]', 0, 0, 1);
+       '["CAPACITY_OPTIMIZED","QUEUE_ORDER"]', 0, 0, 1, NULL);
     INSERT INTO ticket_groups VALUES
       ('group-early', 1, 101, '2026-08-05T08:00:00.000Z', 'QUEUED', 0),
       ('group-between', 2, 102, '2026-08-05T08:01:00.000Z', 'QUEUED', 0),

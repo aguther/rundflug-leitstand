@@ -144,7 +144,7 @@ flowchart TB
 | `public-code-service.ts` | kryptografische Vergabe und kollisionsgeprüfte Reservierung öffentlicher Gruppen- und Ticketcodes |
 | `*-read-service.ts`, `*-projection.ts`, `*-route-projection.ts` | berechtigungsabhängige Lesesichten und reines Response-Mapping: operative Vollsicht, FIDS-Board, öffentlicher Ticket-/Gruppenstatus |
 | `forecast-timeline-service.ts` | kleiner Orchestrator des Prognoselaufs; besitzt keine D1-Abfragen oder Projektionsregeln |
-| `forecast-timeline-loader.ts`, `forecast-timeline-projector.ts`, `forecast-timeline-projector-support.ts` | laden Forecast-Grundlagen aus D1 und normalisieren sie anschließend über reine Projektionshelfer zu Domain-Eingaben |
+| `forecast-timeline-loader.ts`, `forecast-timeline-projector.ts`, `forecast-timeline-projector-support.ts` | laden alle gültigen Tagesmessungen und einen begrenzten historischen Kaltstartkorpus aus D1 und normalisieren sie anschließend über reine Projektionshelfer zu Domain-Eingaben |
 | `forecast-timeline-repository.ts`, `forecast-precall-evaluator.ts`, `forecast-publication-service.ts` | persistieren Prognose/Snapshots/Voraufruf atomar beziehungsweise wählen Voraufrufe rein aus und veröffentlichen erst nach erfolgreicher Persistenz |
 | `backup.ts`, `analysis-archive-writer.ts`, `admin-event-logo-service.ts`, `analysis-archive*.ts` | portable seitenweise ZIP-/NDJSON-Sicherungen mit inkrementeller Prüfsumme, Veranstaltungslogos und Analysepakete in R2 |
 | `planning-history-compaction.ts`, `planning-history-workflow.ts` | wählen 24-Stunden-Segmente fair aus, streamen und verifizieren unveränderliche R2-Pakete und reduzieren D1 in wiederaufnehmbaren begrenzten Transaktionen |
@@ -182,7 +182,7 @@ flowchart TB
 | `fids` | Board, Einstellungsdialog, Live- und Simulationsdatenquelle |
 | `public-status` | Ticket- und Gruppenstatus, Push-Einwilligung, öffentliche Texte |
 | `analysis` | Diagnose-Momentaufnahmen und clientseitige Auswertung |
-| `forecast-simulation` | lokaler Prognosesimulator; getrennte Legacy-/Operational-Szenarien orchestrieren gemeinsame deterministische Primitive sowie Lifecycle-, Forecast-, Precall-, Dispatch-, Snapshot- und Metrikphasen |
+| `forecast-simulation` | lokaler Prognosesimulator; Presets werden in eine synthetische operative Topologie übersetzt, importierte Modelle gelangen unverändert in dieselbe operative Lifecycle-, Forecast-, Precall-, Dispatch-, Snapshot- und Metrikpipeline |
 
 Verbindliche Regeln dieser Ebene (Q-WAR-060): `App.tsx` enthält ausschließlich Komposition und
 Routing. Rollenansichten werden lazy geladen, damit ein Monitor nicht den Verwaltungscode lädt. Der
@@ -205,16 +205,18 @@ mounten.
 
 ```mermaid
 flowchart LR
-    CONFIG["synthetische Konfiguration<br/>oder importiertes Betriebsmodell"] --> SCENARIO["Legacy-/Operational-<br/>Szenarioaufbau"]
-    PRIMITIVES["deterministische Primitive<br/>Seed, PRNG, Zeit, Stichprobe"] --> SCENARIO
-    SCENARIO --> LIFE["Lifecycle"] --> PRECALL["Precall"] --> DISPATCH["Dispatch"] --> SNAPSHOT["Forecast-Snapshot"]
+    PRESET["Preset oder einfacher Editor"] --> ADAPTER["synthetische operative Topologie"]
+    IMPORT["importiertes Betriebsmodell"] --> LIFE
+    ADAPTER --> LIFE["operativer Lifecycle"] --> PRECALL["Precall"] --> DISPATCH["Dispatch"] --> SNAPSHOT["Forecast-Snapshot"]
+    PRIMITIVES["deterministische Primitive<br/>Seed, PRNG, Zeit, Stichprobe"] --> ADAPTER
     PRIMITIVES --> LIFE
     PRIMITIVES --> DISPATCH
-    SNAPSHOT --> METRICS["gemeinsame Metriken"]
+    SNAPSHOT --> METRICS["operative Metriken"]
 ```
 
-Die Tick-Reihenfolge ist Teil des reproduzierbaren Simulationsvertrags. Beide Orchestratoren dürfen
-keine fachliche Phasenlogik zurückübernehmen; Golden-Seed-Tests und Größenratchets sichern diese Grenze.
+Die Tick-Reihenfolge ist Teil des reproduzierbaren Simulationsvertrags. Die Engine-Grenze bildet
+einfache Eingaben ausschließlich auf das operative Modell ab und übernimmt keine fachliche
+Phasenlogik; Golden-Seed-Tests sichern diese Grenze.
 
 Das simulierte FIDS läuft gemäß ADR-0044 als eigenständiger Tab und eigener React-Baum. Es verwendet
 dieselben FIDS-Komponenten wie der Livebetrieb, erhält seinen flüchtigen Zustand aber ausschließlich
@@ -244,9 +246,9 @@ Daten und besitzt keine Verbindung zu Worker, D1, R2 oder Service Worker.
 | `index.ts` | Rollen (`CASHIER`, `FLIGHT_LINE`, `FLIGHT_DIRECTOR`, `ADMIN`, `DISPLAY`), `assertRoleMayExecute`, Kommandotypen, `transitionRotation`, Gruppenschutz, Verkaufsschutz |
 | `queue.ts` | Queue-Ordnung ganzer Buchungsgruppen, `planNextRotations`, produkt- und gatereine Batches |
 | `forecast.ts` | kompatible Exportfassade ohne eigene Fachlogik |
-| `forecast-types.ts`, `forecast-sampling.ts`, `forecast-availability.ts` | Forecast-Verträge, robuste Stichprobenauswahl und deterministische Verfügbarkeitsbahnen |
-| `forecast-projection.ts`, `forecast-dispatch-replay.ts`, `forecast-diagnostics.ts` | kurz- und langfristige Projektion, deterministischer Dispatch-Replay sowie Frische- und Operationsende-Diagnostik |
-| `dispatch-plan.ts` | begrenzte kombinatorische Dispatch-Planung mit Durchsatz- und Fairnesszielen |
+| `forecast-types.ts`, `forecast-sampling.ts`, `forecast-availability.ts`, `forecast-duration-basis.ts` | Forecast-Verträge, robuste Stichprobenauswahl, einheitliche Dauerbasis je Produkt/Lane und deterministische Verfügbarkeitsbahnen |
+| `forecast-unified-projection.ts`, `forecast-dispatch-replay.ts`, `forecast-diagnostics.ts` | aktive Ressourcenprojektion, ausschließlich schedulerbasierte DRAFT-Projektion, Langzeit-Replay sowie Frische- und Operationsende-Diagnostik; `forecast-projection.ts` bleibt eine kompatible Fassade |
+| `dispatch-plan.ts` | begrenzte kombinatorische Dispatch-Planung mit lexikografischen Durchsatz-/Fairnesszielen, Objective-Vektor und faktischen Batchdetails |
 | `capacity.ts` | `assessMarginalProductCapacity`: konservative Restkapazität je Produkt (`AVAILABLE`, `LIMITED`, `MANUAL_REVIEW`, `SOLD_OUT`) |
 | `turnaround.ts`, `reference-rotation.ts` | komponentenweise Umlaufzeit aus Flugzeug + Produkt, Produkt und Veranstaltung |
 | `precall.ts` | automatischer Voraufruf und dessen Rücknahmebedingungen |

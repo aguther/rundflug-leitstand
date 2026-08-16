@@ -1,6 +1,6 @@
 import { evaluateAutomaticPrecalls } from "./forecast-precall-evaluator";
 import { ForecastPublicationService } from "./forecast-publication-service";
-import { calculateConvergedForecastTimeline } from "./forecast-timeline-calculation";
+import { calculateForecastTimelineOnce } from "./forecast-timeline-calculation";
 import { ForecastTimelineLoader } from "./forecast-timeline-loader";
 import { ForecastTimelineRepository } from "./forecast-timeline-repository";
 import type {
@@ -49,7 +49,7 @@ export class ForecastTimelineService {
       nowIso,
       calculationResult,
       calculationDurationMs,
-    } = calculateConvergedForecastTimeline(loaded, eventId);
+    } = calculateForecastTimelineOnce(loaded, eventId);
     const projections = calculationResult.projections;
     const planningRunId = request.planningRunId ?? crypto.randomUUID();
     const {

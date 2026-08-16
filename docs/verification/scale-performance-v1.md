@@ -134,6 +134,22 @@ datenschutzneutralen Phasen `sale-preflight` und `sale-persist` im `Server-Timin
 Auditierung, Idempotenzbeleg, Outbox und fachliche Mutation bleiben vollständig im vor der
 Bestätigung abgewarteten D1-Batch.
 
+## Nachmessung der einheitlichen Forecast-Pipeline
+
+Am 16. August 2026 wurde der identische lokale 300-Umlauf-Datensatz nach ADR-0054 erneut ausgeführt.
+Die vollständige Ein-Pass-Prognose einschließlich aktiver Ressourcenprojektion, Dispatch und
+Langzeit-Replay benötigte 816 ms und blieb damit unter der geforderten Zwei-Sekunden-Grenze. Der
+Parallelabruf über 20 Geräte lag im p95 bei 995 ms statt 1.212 ms in der Messung vom 30. Juli
+(-217 ms beziehungsweise -17,9 %). Die Forecastzeit stieg gegenüber 285 ms um 531 ms; der Vergleich
+ist bewusst konservativ, weil die neue Messung Objective-Vektor, Suchdiagnostik und faktische
+Batchdetails zusätzlich berechnet und persistiert.
+
+Der Nahhorizont bleibt standardmäßig auf 64 Kandidaten je Schritt und Beam-Breite 24 begrenzt.
+`DispatchPlan.searchDiagnostics` weist `candidateLimitReached` und `beamLimitReached` getrennt aus.
+Der deterministische Domain-Grenztest reduziert beide Grenzen gezielt, erzwingt beide
+Trunkierungsfälle und verlangt dennoch bytegleichen Plan, Revision und Objective bei identischer
+Eingabe. Der lineare Langzeitschwanz führt keine kombinatorische Beam-Suche aus.
+
 `npm run test:browser:cashier` führte anschließend 30 Verkäufe gegen einen isolierten lokalen
 Worker und eine synthetische D1-Datenbank in Microsoft Edge aus:
 

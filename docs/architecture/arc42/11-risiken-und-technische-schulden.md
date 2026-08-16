@@ -43,7 +43,6 @@ Verbleibende, bewusst priorisierte Schulden:
 
 | Priorität | Thema | Nächster geplanter Schnitt |
 | --- | --- | --- |
-| Mittel | [Legacy-Prognosepfad](../technical-debts/forecast-legacy-comparison-path.md) | Abschaltkriterien aus ADR-0041 erfüllen; keine neuen Fachregeln im Legacy-Pfad ergänzen |
 | Mittel | [Mutationstest-Aussagekraft](../technical-debts/mutation-test-effectiveness.md) | überlebende Mutanten nach fachlichem Risiko priorisieren und Ratchets ausschließlich anheben |
 | Mittel | [Worker-SQL-Testorakel](../technical-debts/worker-sql-test-oracles.md) | elf Priorität-A-Familien auf ausgeführtes SQLite-, Runtime-, HTTP- oder E2E-Verhalten migrieren |
 | Mittel | [Worker-Orchestrierung](../technical-debts/worker-orchestration-complexity.md) | entitätsspezifische Entscheidungs- und Persistenzpläne isolieren |
@@ -52,10 +51,10 @@ Verbleibende, bewusst priorisierte Schulden:
 Die Online-Pflicht der Administration und der inkompatible V1.12-Baseline-Neuaufbau sind bewusste
 Architektur- beziehungsweise Rolloutentscheidungen und werden nicht als technische Schulden geführt.
 
-Die vormals monolithischen lokalen Simulationsengines sind in Szenario-, Lifecycle-, Forecast-,
-Precall-, Dispatch-, Snapshot- und Metrikmodule zerlegt. Gemeinsame deterministische Primitive und
-Golden-Seed-Tests verhindern Drift; die Operational-Tests werden nicht mehr aus dem Coverage-Lauf
-ausgeschlossen. Größenratchets schützen die erreichten Orchestratorgrenzen.
+Die vormals getrennten lokalen Simulationsengines sind durch eine operative Pipeline ersetzt. Presets
+werden an der Engine-Grenze in eine synthetische operative Topologie übersetzt, importierte Modelle
+direkt übernommen. Gemeinsame deterministische Primitive und Golden-Seed-Tests verhindern Drift;
+die Operational-Tests werden nicht aus dem Coverage-Lauf ausgeschlossen.
 
 Die Rollenrouten sind nun 6 bis 11 Zeilen große Shells. `CashierWorkspace.tsx` liegt bei 228 Zeilen,
 `FlightLineWorkspace.tsx` bei 466 Zeilen; alle daraus neu extrahierten Komponenten und Hooks bleiben

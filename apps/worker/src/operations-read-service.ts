@@ -140,7 +140,8 @@ export async function loadOperationsReadModels(
               r.dispatch_order, r.dispatch_wave, r.dispatch_lane_id,
               r.dispatch_group_ids_json, r.dispatch_occupied_seats,
               r.dispatch_available_seats, r.dispatch_commitment_level,
-              r.dispatch_decision_reasons_json, r.dispatch_confirmed_overtake_count,
+              r.dispatch_decision_reasons_json, r.dispatch_decision_details_json,
+              r.dispatch_confirmed_overtake_count,
               r.dispatch_projected_overtake_count,
               r.dispatch_unplanned_reason,
               r.turnaround_deboarding_minutes, r.turnaround_buffer_minutes,
@@ -380,6 +381,7 @@ export async function loadOperationsReadModels(
         dispatch_available_seats: number | null;
         dispatch_commitment_level: "WAITING" | "PREPARE" | "COME_TO_FLIGHT_LINE" | null;
         dispatch_decision_reasons_json: string;
+        dispatch_decision_details_json: string | null;
         dispatch_confirmed_overtake_count: number;
         dispatch_projected_overtake_count: number;
         dispatch_unplanned_reason:

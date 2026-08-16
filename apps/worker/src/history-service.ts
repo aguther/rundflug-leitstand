@@ -230,6 +230,7 @@ export async function loadForecastHistory(
       dispatch_available_seats: number | null;
       dispatch_commitment_level: "WAITING" | "PREPARE" | "COME_TO_FLIGHT_LINE" | null;
       dispatch_decision_reasons_json: string;
+      dispatch_decision_details_json: string | null;
       dispatch_confirmed_overtake_count: number;
       dispatch_projected_overtake_count: number;
       dispatch_unplanned_reason:
@@ -303,6 +304,9 @@ export async function loadForecastHistory(
         availableSeats: row.dispatch_available_seats,
         commitmentLevel: row.dispatch_commitment_level,
         decisionReasons: JSON.parse(row.dispatch_decision_reasons_json) as string[],
+        decisionDetails: row.dispatch_decision_details_json
+          ? (JSON.parse(row.dispatch_decision_details_json) as Record<string, number>)
+          : null,
         confirmedOvertakeCount: row.dispatch_confirmed_overtake_count,
         projectedOvertakeCount: row.dispatch_projected_overtake_count,
         unplannedReason: row.dispatch_unplanned_reason,

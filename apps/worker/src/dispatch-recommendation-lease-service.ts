@@ -75,6 +75,7 @@ export class DispatchRecommendationLeaseService {
       `SELECT id, operation_day_id, aircraft_id, operator_account_id, device_id,
               acquire_command_id, dispatch_plan_revision, dispatch_batch_id, dispatch_order,
               ticket_group_ids_json, occupied_seats, available_seats, decision_reasons_json,
+              decision_details_json,
               operation_day_version, member_rotation_ids_json,
               status, acquired_at, expires_at, version
          FROM dispatch_recommendation_leases
@@ -146,6 +147,7 @@ export class DispatchRecommendationLeaseService {
       `SELECT id, operation_day_id, aircraft_id, operator_account_id, device_id,
               acquire_command_id, dispatch_plan_revision, dispatch_batch_id, dispatch_order,
               ticket_group_ids_json, occupied_seats, available_seats, decision_reasons_json,
+              decision_details_json,
               operation_day_version, member_rotation_ids_json,
               status, acquired_at, expires_at, version
          FROM dispatch_recommendation_leases
@@ -195,6 +197,7 @@ export class DispatchRecommendationLeaseService {
       `SELECT id, operation_day_id, aircraft_id, operator_account_id, device_id,
               acquire_command_id, dispatch_plan_revision, dispatch_batch_id, dispatch_order,
               ticket_group_ids_json, occupied_seats, available_seats, decision_reasons_json,
+              decision_details_json,
               operation_day_version, member_rotation_ids_json,
               status, acquired_at, expires_at, version
          FROM dispatch_recommendation_leases
@@ -660,7 +663,8 @@ export class DispatchRecommendationLeaseService {
               fg.precalled_at, fg.precall_decision_status,
               r.dispatch_plan_revision, r.dispatch_batch_id, r.dispatch_order, r.dispatch_wave,
               r.dispatch_group_ids_json, r.dispatch_occupied_seats,
-              r.dispatch_decision_reasons_json, r.dispatch_confirmed_overtake_count,
+              r.dispatch_decision_reasons_json, r.dispatch_decision_details_json,
+              r.dispatch_confirmed_overtake_count,
               r.dispatch_projected_overtake_count, r.prediction_updated_at,
               CASE WHEN EXISTS (
                 SELECT 1
@@ -727,6 +731,9 @@ export class DispatchRecommendationLeaseService {
         plannedGroupIds: strings(row.dispatch_group_ids_json),
         plannedOccupiedSeats: row.dispatch_occupied_seats,
         decisionReasons: strings(row.dispatch_decision_reasons_json),
+        decisionDetails: row.dispatch_decision_details_json
+          ? JSON.parse(row.dispatch_decision_details_json)
+          : null,
         predictionUpdatedAt: row.prediction_updated_at,
       })),
     });
@@ -743,6 +750,7 @@ export class DispatchRecommendationLeaseService {
     const selectedGroupIds = selectedBatch.groupIds;
     const selectedOccupiedSeats = selectedBatch.occupiedSeats;
     const selectedDecisionReasons = selectedBatch.decisionReasons;
+    const selectedDecisionDetails = selectedBatch.decisionDetails;
     if (selectedGroupIds.length === 0) {
       return json(
         {
@@ -795,6 +803,9 @@ export class DispatchRecommendationLeaseService {
       occupied_seats: liveOccupiedSeats,
       available_seats: Math.max(0, aircraft.passenger_seats - liveOccupiedSeats),
       decision_reasons_json: JSON.stringify(decisionReasons),
+      decision_details_json: selectedDecisionDetails
+        ? JSON.stringify(selectedDecisionDetails)
+        : null,
       operation_day_version: event.version,
       member_rotation_ids_json: JSON.stringify(memberRotationIds),
       status: "ACTIVE",
@@ -850,10 +861,11 @@ export class DispatchRecommendationLeaseService {
           (id, operation_day_id, aircraft_id, operator_account_id, device_id,
            acquire_command_id, dispatch_plan_revision, dispatch_batch_id, dispatch_order,
            ticket_group_ids_json, occupied_seats, available_seats, decision_reasons_json,
+           decision_details_json,
            operation_day_version, member_rotation_ids_json,
            status, acquired_at, expires_at, version)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13,
-                 ?14, ?15, 'ACTIVE', ?16, ?17, 1)`,
+                 ?14, ?15, ?16, 'ACTIVE', ?17, ?18, 1)`,
       ).bind(
         lease.id,
         eventId,
@@ -868,6 +880,7 @@ export class DispatchRecommendationLeaseService {
         lease.occupied_seats,
         lease.available_seats,
         lease.decision_reasons_json,
+        lease.decision_details_json,
         lease.operation_day_version,
         lease.member_rotation_ids_json,
         nowIso,

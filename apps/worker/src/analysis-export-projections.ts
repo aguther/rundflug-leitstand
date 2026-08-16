@@ -52,6 +52,7 @@ export const analysisExportProjections: readonly AnalysisExportProjection[] = [
                      dispatch_order, dispatch_wave, dispatch_lane_id, dispatch_group_ids_json,
                      dispatch_occupied_seats, dispatch_available_seats,
                      dispatch_commitment_level, dispatch_decision_reasons_json,
+                     dispatch_decision_details_json,
                      dispatch_confirmed_overtake_count, dispatch_projected_overtake_count,
                      dispatch_unplanned_reason
                 FROM forecast_snapshots WHERE operation_day_id = ?1 ORDER BY captured_at, id`,

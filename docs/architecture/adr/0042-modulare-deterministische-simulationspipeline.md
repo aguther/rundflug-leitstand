@@ -1,6 +1,6 @@
 # ADR-0042: Modulare deterministische Simulationspipeline
 
-- Status: Akzeptiert
+- Status: Teilweise ersetzt durch ADR-0054
 - Datum: 2026-08-12
 - Entscheidung: Technische Modularisierung ohne Änderung des Simulationsvertrags
 - Betroffene Anforderungen: Q-WAR-040, Q-WAR-060, Q-PER-010 und Q-TST-010

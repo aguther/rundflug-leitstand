@@ -58,6 +58,7 @@ describe("selectReusableDispatchBatch", () => {
         groupIds: ["group-early", "group-pair"],
         occupiedSeats: 3,
         decisionReasons: ["CAPACITY_OPTIMIZED", "QUEUE_ORDER"],
+        decisionDetails: null,
       },
       fallbackReason: null,
     });

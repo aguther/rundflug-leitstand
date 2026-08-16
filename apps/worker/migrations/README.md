@@ -68,3 +68,16 @@ gelöste Boundary-Links nicht durch ein Schema-Downgrade wieder heiß werden. Be
 Pruning angehalten. Der zulässige Pfad ist eine korrigierte Vorwärtsmigration oder der geprüfte
 Restore aus portablem Backup und chronologisch verifizierten Planungshistorienpaketen in eine neue,
 isolierte D1 gemäß `docs/operations/planning-history-compaction.md`.
+
+## 0004 – Dispatch decision details
+
+`0004_dispatch_decision_details.sql` ergänzt an Rotationen, Forecast-Snapshots und kurzlebigen
+Dispatch-Leases jeweils ein nullable, validiertes JSON-Feld mit den faktischen Entscheidungsdetails
+des Dispatch-Schedulers. Bestehende Zeilen bleiben unverändert und sind mit älteren Workern
+kompatibel.
+
+### Wiederherstellung
+
+Bei einem Worker-Rollback bleiben die additiven Spalten bestehen und werden von der vorherigen
+Version ignoriert. Ein Tabellen-Rebuild oder eine Datenreparatur ist nicht erforderlich; eine
+korrigierte Version darf vorhandene `NULL`-Werte später regulär überschreiben.

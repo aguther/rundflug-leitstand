@@ -305,6 +305,22 @@ describe("createDispatchPlan", () => {
     expect(plan.batches[0]?.decisionReasons).toContain("MUST_SERVE_MAX_WAIT");
   });
 
+  it("prefers more passengers before minimizing projected overtakes at equal higher priorities", () => {
+    const plan = createDispatchPlan({
+      now: NOW,
+      groups: [group("early-a", 1, 1), group("early-b", 1, 2), group("full", 3, 3)],
+      lanes: [lane("three-seat", 3)],
+      limits: { maximumWaves: 1 },
+    });
+
+    expect(plan.batches[0]?.memberIds).toEqual(["full"]);
+    expect(plan.batches[0]?.decisionDetails).toMatchObject({
+      occupiedSeats: 3,
+      availableSeats: 0,
+      projectedOvertakes: 2,
+    });
+  });
+
   it("accepts a fair partial load when the maximum-wait group cannot mix products", () => {
     const oldWaitingAt = new Date(
       Date.parse(NOW) - DEFAULT_DISPATCH_PLANNING_LIMITS.maximumWaitMinutes * 60_000,
@@ -728,6 +744,18 @@ describe("createDispatchPlan", () => {
     const second = createDispatchPlan(input);
 
     expect(second).toEqual(first);
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first));
+    expect(first.objective).toMatchObject({
+      transportedPassengers: expect.any(Number),
+      projectedOvertakes: expect.any(Number),
+      retainedPreviousPlanMembers: expect.any(Number),
+    });
+    expect(first.searchDiagnostics).toMatchObject({
+      consideredGroups: 3,
+      expandedStates: expect.any(Number),
+      candidateLimitReached: expect.any(Boolean),
+      beamLimitReached: expect.any(Boolean),
+    });
     expect(groups).toEqual(snapshot);
     expect(
       first.batches.every((batch) => {
@@ -737,6 +765,27 @@ describe("createDispatchPlan", () => {
         return new Set(products).size === 1;
       }),
     ).toBe(true);
+  });
+
+  it("reports candidate and beam truncation without changing deterministic output", () => {
+    const input = {
+      now: NOW,
+      groups: Array.from({ length: 10 }, (_, index) => group(`bounded-${index + 1}`, 1, index + 1)),
+      lanes: [lane("bounded-lane", 4)],
+      limits: {
+        maximumCandidatesPerStep: 2,
+        beamWidth: 1,
+        maximumWaves: 2,
+      },
+    };
+    const first = createDispatchPlan(input);
+    const second = createDispatchPlan(input);
+
+    expect(first.searchDiagnostics).toMatchObject({
+      candidateLimitReached: true,
+      beamLimitReached: true,
+    });
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first));
   });
 
   it("keeps each product-pure batch on one gate", () => {

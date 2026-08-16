@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiCommandError } from "./api";
 import { ActionNotificationProvider } from "./app/PageNotifications";
 import { ThemeProvider } from "./design-system/theme";
+import { DispatchRecommendationStatus } from "./flight-line-shared";
 import { FlightLineView } from "./flight-line-view";
 
 const api = vi.hoisted(() => ({
@@ -33,8 +34,23 @@ const dispatchLease = vi.hoisted(() => ({
     error: null,
     lease: null as {
       batchId: string;
+      availableSeats?: number;
+      decisionDetails?: {
+        availableSeats: number;
+        mustServeForMaximumOvertakes: number;
+        mustServeForMaximumWait: number;
+        occupiedSeats: number;
+        oldestWaitMinutes: number;
+        productServiceDeficit: number;
+        projectedOvertakes: number;
+        protectedCommitments: number;
+        retainedPreviousPlanMembers: number;
+      };
       groupIds: string[];
+      decisionReasons?: string[];
+      dispatchOrder?: number;
       leaseId: string;
+      occupiedSeats?: number;
       planRevision: string;
     } | null,
     markExpired: vi.fn(),
@@ -139,6 +155,8 @@ vi.mock("./features/auth/AuthContext", () => ({
 }));
 
 vi.mock("./dispatch-recommendation-lease", () => ({
+  formatDispatchLeaseCountdown: (seconds: number) =>
+    `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`,
   useDispatchRecommendationLease: () => dispatchLease.controller,
 }));
 
@@ -637,6 +655,7 @@ describe("flight line workflows", () => {
     const user = userEvent.setup();
     dispatchLease.controller.mode = "RESERVED";
     dispatchLease.controller.lease = {
+      availableSeats: 1,
       batchId: "batch-1",
       groupIds: ["ticket-group-1"],
       leaseId: "lease-1",
@@ -662,6 +681,52 @@ describe("flight line workflows", () => {
       "synthetic-device-token",
     );
     expect(dispatchLease.controller.consume).toHaveBeenCalledOnce();
+  });
+
+  it("shows optional dispatch facts in a collapsed explanation without informational tab stops", async () => {
+    const user = userEvent.setup();
+    dispatchLease.controller.mode = "RESERVED";
+    dispatchLease.controller.lease = {
+      availableSeats: 1,
+      batchId: "batch-1",
+      decisionDetails: {
+        availableSeats: 1,
+        mustServeForMaximumOvertakes: 1,
+        mustServeForMaximumWait: 0,
+        occupiedSeats: 3,
+        oldestWaitMinutes: 42.4,
+        productServiceDeficit: 2,
+        projectedOvertakes: 1,
+        protectedCommitments: 1,
+        retainedPreviousPlanMembers: 2,
+      },
+      decisionReasons: ["CAPACITY_OPTIMIZED"],
+      dispatchOrder: 1,
+      groupIds: ["ticket-group-1"],
+      leaseId: "lease-1",
+      occupiedSeats: 3,
+      planRevision: "plan-7",
+    };
+    render(
+      <DispatchRecommendationStatus
+        dispatchLease={dispatchLease.controller as never}
+        leaseRemainingSeconds={75}
+        recommendationContainsGateCall={false}
+        recommendationIsCurrent
+        skippedEarlierProductGroupCount={0}
+      />,
+    );
+
+    const summary = screen.getByText("Warum diese Empfehlung?");
+    const details = summary.closest("details");
+    expect(details?.hasAttribute("open")).toBe(false);
+    expect(details?.querySelectorAll("[tabindex]")).toHaveLength(0);
+
+    await user.click(summary);
+    expect(details?.hasAttribute("open")).toBe(true);
+    expect(screen.getByText("Sitze belegt/frei: 3/1")).toBeTruthy();
+    expect(screen.getByText("Älteste Wartezeit: 42 Min.")).toBeTruthy();
+    expect(screen.getByText("Aus Vorplan erhalten: 2")).toBeTruthy();
   });
 
   it("shows the emergency state as critical while retaining the confirmed board", () => {

@@ -3,10 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { evaluateAutomaticPrecalls } from "./forecast-precall-evaluator";
 import { ForecastPublicationService } from "./forecast-publication-service";
 import { ForecastTimelineLoader } from "./forecast-timeline-loader";
-import {
-  applyActiveForecastProjections,
-  projectForecastTimelineInput,
-} from "./forecast-timeline-projector";
+import { projectForecastTimelineInput } from "./forecast-timeline-projector";
 import { ForecastTimelineRepository } from "./forecast-timeline-repository";
 
 const EVENT_ROW = {
@@ -82,61 +79,6 @@ function projection(
 }
 
 describe("forecast pipeline module boundaries", () => {
-  it("feeds projected active completion times into the convergence pass", () => {
-    const data = {
-      rotationRows: {
-        ...emptyResult(),
-        results: [
-          {
-            id: "rotation-active",
-            status: "CALLED",
-            aircraft_id: "aircraft-a",
-            pilot_id: "pilot-a",
-            predicted_boarding_at: "2026-08-12T09:05:00.000Z",
-            predicted_departure_at: "2026-08-12T09:10:00.000Z",
-            predicted_landing_at: "2026-08-12T09:40:00.000Z",
-            predicted_completion_at: "2026-08-12T09:50:00.000Z",
-          },
-        ],
-      },
-      capacityRows: {
-        ...emptyResult(),
-        results: [
-          { aircraft_id: "aircraft-a", predicted_completion_at: "2026-08-12T09:50:00.000Z" },
-        ],
-      },
-      pilotRows: {
-        ...emptyResult(),
-        results: [{ id: "pilot-a", predicted_completion_at: "2026-08-12T09:50:00.000Z" }],
-      },
-    } as unknown as Parameters<typeof applyActiveForecastProjections>[0];
-    const activeProjection = projection({
-      rotationId: "rotation-active",
-      predictedBoardingAt: "2026-08-12T09:04:00.000Z",
-      predictedDepartureAt: "2026-08-12T09:09:00.000Z",
-      predictedLandingAt: "2026-08-12T09:29:00.000Z",
-      predictedCompletionAt: "2026-08-12T09:35:00.000Z",
-    });
-
-    const converged = applyActiveForecastProjections(data, [activeProjection]);
-
-    expect(converged?.rotationRows.results[0]).toMatchObject({
-      predicted_boarding_at: activeProjection.predictedBoardingAt,
-      predicted_departure_at: activeProjection.predictedDepartureAt,
-      predicted_landing_at: activeProjection.predictedLandingAt,
-      predicted_completion_at: activeProjection.predictedCompletionAt,
-    });
-    expect(converged?.capacityRows.results[0]?.predicted_completion_at).toBe(
-      activeProjection.predictedCompletionAt,
-    );
-    expect(converged?.pilotRows.results[0]?.predicted_completion_at).toBe(
-      activeProjection.predictedCompletionAt,
-    );
-    expect(data.rotationRows.results[0]?.predicted_completion_at).toBe("2026-08-12T09:50:00.000Z");
-    if (!converged) throw new Error("Expected active timeline convergence data.");
-    expect(applyActiveForecastProjections(converged, [activeProjection])).toBeNull();
-  });
-
   it("rejects stale event versions at the loader boundary", async () => {
     const statement = {
       bind: vi.fn(),
