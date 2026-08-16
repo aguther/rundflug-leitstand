@@ -163,11 +163,15 @@ flowchart TB
     SHELLM["app/<br/>AppShell, AppHeader, Navigation,<br/>PageNotifications, PwaUpdate,<br/>Realtime-Refresh-Scheduler"]
     FEAT["features/<br/>auth, cashier, flight-line, admin, fids,<br/>public-status, analysis, forecast-simulation"]
     DS["design-system/<br/>Tokens, Themes, Button, DataTable,<br/>ModalDialog, SidePanel, StatusPill"]
+    CHART["shared/time-series-svg-chart<br/>dependency-freie SVG-Zeitreihen"]
+    STYLES["rollenbezogene CSS-Einstiege<br/>globale, operative und online-only Grenzen"]
     API["api.ts, board-sync.ts, event-context.ts,<br/>Offline-Snapshot in IndexedDB"]
 
     APP --> PROV --> ROUTER --> FEAT
     APP --> SHELLM
     FEAT --> DS
+    FEAT --> CHART
+    FEAT --> STYLES
     FEAT --> API
     SHELLM --> API
     SHELLM --> DS
@@ -194,6 +198,10 @@ Kasse, Flight Line und Flight Director besitzen dünne Route-Shells vor ihren be
 Workspace-Orchestratoren. Flight Line und Flight Director verwenden denselben fachlichen Workspace,
 aber getrennte Style-Einstiege; dadurch lädt jede Rolle nur ihre freigegebene Oberflächenvariante.
 Das manifestbasierte Asset-Ratchet misst den vollständigen statischen Importgraph jeder Route.
+Globale Styles enthalten nur rollenübergreifende Regeln; Admin-, Kassen-, Flight-Line-,
+Flight-Director- und Analytics-Styles folgen ihren Entry- beziehungsweise Lazy-Grenzen. Admin- und
+Flight-Director-Zeitreihen verwenden denselben dependency-freien SVG-Renderer, ohne Fachlogik in den
+Darstellungsbaustein zu verlagern.
 
 `AppShell` trennt persistente Zustandsmeldungen von transienten Aktionsbestätigungen. Persistente
 Hinweise liegen inline unter dem Header; `PwaUpdate` koordiniert den expliziten Service-Worker-Reload

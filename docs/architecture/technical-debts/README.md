@@ -16,7 +16,6 @@ bewusste Architekturentscheidung ein.
 | [Mutationstest-Aussagekraft](mutation-test-effectiveness.md) | Mittel | fokussiertes Gate ist etabliert, einzelne Module und überlebende Mutanten bleiben schwach |
 | [Worker-SQL-Testorakel](worker-sql-test-oracles.md) | Mittel | elf priorisierte Historien-, Read- und Command-Service-Familien besitzen noch reine SQL-Shape-Orakel |
 | [Worker-Orchestrierung](worker-orchestration-complexity.md) | Mittel | Stammdaten- und Operationspfade bündeln weiterhin viele Entscheidungen |
-| [Web-Asset-Spielraum](web-asset-budget-headroom.md) | Mittel | mehrere ausgelieferte Assetgrenzen liegen nahe ihren harten Budgets |
 
 Bewusste Architekturentscheidungen wie die Online-Pflicht der Administration oder der inkompatible
 V1.12-D1-Baseline-Neuaufbau sind keine technischen Schulden. Sie werden als Randbedingungen,

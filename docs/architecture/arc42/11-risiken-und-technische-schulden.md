@@ -46,7 +46,6 @@ Verbleibende, bewusst priorisierte Schulden:
 | Mittel | [Mutationstest-Aussagekraft](../technical-debts/mutation-test-effectiveness.md) | überlebende Mutanten nach fachlichem Risiko priorisieren und Ratchets ausschließlich anheben |
 | Mittel | [Worker-SQL-Testorakel](../technical-debts/worker-sql-test-oracles.md) | elf Priorität-A-Familien auf ausgeführtes SQLite-, Runtime-, HTTP- oder E2E-Verhalten migrieren |
 | Mittel | [Worker-Orchestrierung](../technical-debts/worker-orchestration-complexity.md) | entitätsspezifische Entscheidungs- und Persistenzpläne isolieren |
-| Mittel | [Web-Asset-Spielraum](../technical-debts/web-asset-budget-headroom.md) | rollenbezogene Grenzen weiter absenken und keine globale Rückverlagerung zulassen |
 
 Die Online-Pflicht der Administration und der inkompatible V1.12-Baseline-Neuaufbau sind bewusste
 Architektur- beziehungsweise Rolloutentscheidungen und werden nicht als technische Schulden geführt.
@@ -56,14 +55,14 @@ werden an der Engine-Grenze in eine synthetische operative Topologie übersetzt,
 direkt übernommen. Gemeinsame deterministische Primitive und Golden-Seed-Tests verhindern Drift;
 die Operational-Tests werden nicht aus dem Coverage-Lauf ausgeschlossen.
 
-Die Rollenrouten sind nun 6 bis 11 Zeilen große Shells. `CashierWorkspace.tsx` liegt bei 228 Zeilen,
-`FlightLineWorkspace.tsx` bei 466 Zeilen; alle daraus neu extrahierten Komponenten und Hooks bleiben
-unter 300 Zeilen. Der historische globale Flight-Line-Layer ist entfernt; Flight Line und Flight
-Director besitzen getrennte CSS-Chunks. Ausschließlich online nutzbare Administrations-, Simulator-
-und Verlaufsanalyse-Chunks werden nicht vorab im PWA-Precache gespeichert. Der aktuelle Nachweis misst
-93,87 KiB globale CSS, 72,41 KiB Flight-Line-CSS, 313,48 KiB für den größten JavaScript-Chunk und
-1.289,35 KiB PWA-Precache. Die Ratchets erlauben höchstens zwei Prozent Wachstum, ohne die
-vereinbarten harten Obergrenzen zu überschreiten.
+Die Rollenrouten sind dünne Shells. Der historische globale Flight-Line-Layer ist entfernt; Flight
+Line, Flight Director, Administration, Kasse und Analytics besitzen getrennte CSS-Grenzen. Native
+React-/SVG-Zeitreihen ersetzen Recharts. Online-only Administration, Simulation, Vergleich und
+Verlaufsanalyse bleiben außerhalb des PWA-Precache. Der Abschlussnachweis misst 82,75 KiB globale
+CSS, 42,38 KiB Flight-Line-CSS, 184,02 KiB für den größten JavaScript-Chunk und 1.220,04 KiB
+PWA-Precache. Unveränderte Hard Limits besitzen mindestens zehn Prozent Pflichtreserve; die
+abgesenkte Baseline erlaubt pro Route weiterhin höchstens zwei Prozent Wachstum. Damit ist die
+Web-Asset-Spielraum-Schuld geschlossen; ADR-0055 und QS-21 verhindern eine stille Rückverlagerung.
 
 Der Operations-Contract ist in vier Command-Familien sowie getrennte Board- und Assistance-Module
 zerlegt; Exhaustiveness- und Subpath-Tests schützen die kompatible Fassade. Produktive Domain-Module

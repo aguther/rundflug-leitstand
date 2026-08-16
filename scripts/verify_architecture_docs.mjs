@@ -57,7 +57,6 @@ const technicalDebt = await readFile(technicalDebtPath, "utf8");
 const technicalDebtEvidence = [
   "mutation-test-effectiveness.md",
   "worker-orchestration-complexity.md",
-  "web-asset-budget-headroom.md",
 ];
 const missingTechnicalDebt = technicalDebtEvidence.filter(
   (entry) => !technicalDebt.includes(entry),
@@ -191,11 +190,16 @@ const currentDocuments = [
   ...(await markdownFiles(resolve(root, "docs"))),
 ];
 const missingLinks = [];
+const allowedHistoricalTombstones = new Set([
+  "docs/architecture/technical-debts/assessment-2026-08-16.md::web-asset-budget-headroom.md",
+]);
 for (const document of currentDocuments) {
   const markdown = await readFile(document, "utf8");
   for (const linkTarget of markdownLinkTargets(markdown)) {
     const target = linkTarget.trim().replace(/^<|>$/g, "").split("#", 1)[0];
     if (!target || /^(?:https?:|mailto:)/i.test(target)) continue;
+    const documentKey = document.slice(root.length + 1).replaceAll("\\", "/");
+    if (allowedHistoricalTombstones.has(`${documentKey}::${target}`)) continue;
     const path = target.startsWith("/")
       ? resolve(root, target.slice(1))
       : resolve(dirname(document), decodeURIComponent(target));

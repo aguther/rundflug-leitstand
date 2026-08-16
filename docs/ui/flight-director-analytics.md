@@ -18,7 +18,7 @@ ausschließlich mit ihrem anonymen operativen Code dargestellt.
 
 ![Dunkles Konzept für den kumulierten Ticketverlauf](flight-director-analytics/admin-event-flow-dark.png)
 
-- Recharts-Stufenkurven mit 1,75 Pixel Linienstärke
+- native SVG-Stufenkurven mit 1,75 Pixel Linienstärke
 - verkauft und abgeschlossen als kumulierte Linien
 - offene Tickets als Fläche zwischen beiden Kurven
 - aktueller Stand, Tooltip und feste Höhe ohne Layoutsprung
@@ -93,4 +93,5 @@ erforderlich.
 
 Die bestehende Prognosehistorie bleibt unverändert. Der Browser lädt ihre Seiten zu je höchstens
 200 Snapshots vollständig und verwirft Antworten, die zu einer inzwischen veralteten Auswahl
-gehören. Der umfangreiche Dialog einschließlich Recharts wird erst beim Öffnen nachgeladen.
+gehören. Der umfangreiche Dialog einschließlich Analytics-CSS und SVG-Renderer wird erst beim Öffnen
+nachgeladen.

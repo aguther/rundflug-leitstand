@@ -274,9 +274,12 @@ Reset, `DISPLAY` besitzt ausschließlich Lesezugriff auf die Boardprojektion.
 - Je Rolle existiert ein eigenes Web-App-Manifest mit eigenem Icon-Satz, damit installierte Geräte
   eindeutig erkennbar bleiben.
 - Rollenansichten werden lazy geladen; Flight Line und Flight Director besitzen getrennte
-  CSS-Einstiege. Der Administrations-Entry wird wegen seiner zwingenden Online-Abhängigkeit nicht
-  vorab im Service Worker gespeichert. Ein Asset-Budget wird durch `npm run web:assets:verify`
-  überwacht.
+  CSS-Einstiege, und die Verlaufsanalyse lädt ihre CSS erst beim Öffnen. Administration, Simulation,
+  Vergleich und Analytics bleiben wegen ihrer Online-Abhängigkeit außerhalb des Precache. Kasse,
+  FIDS, Flight Line und Flight Director einschließlich Entry-CSS werden dagegen vorgehalten.
+  `npm run web:assets:verify` erzwingt neben unveränderten Hard Limits mindestens zehn Prozent
+  Raw-/Gzip-Reserve und das Zwei-Prozent-Routenratchet; `npm run web:assets:report` baut vor jeder
+  Messung neu. Zeitreihen werden durch den gemeinsamen dependency-freien React-/SVG-Renderer gezeichnet.
 - Die aktive Veranstaltung wird nach Auswahl und Sitzungsprüfung über `ActiveEventProvider`
   bereitgestellt. REST-, Offline- und WebSocket-Hooks sowie Geräteidentitäten lesen diese Laufzeitquelle;
   ein Wechsel der Veranstaltung kann deshalb keine beim Modulimport eingefrorene Event-ID weiterverwenden.

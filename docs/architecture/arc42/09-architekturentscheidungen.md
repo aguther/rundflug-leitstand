@@ -66,6 +66,7 @@ verlinkt bleiben.
 | [0052](../adr/0052-event-archive-delete-reset-lifecycle.md) | Koexistenz von Veranstaltungsarchiv, Löschung und Werksreset | getrennte fachliche, destruktive und Wiederherstellungssemantik für drei unterschiedliche Lebenszykluspfade |
 | [0053](../adr/0053-planning-history-compaction.md) | Verifizierte Kompaktion der Planungshistorie in R2 | 24-Stunden-Heißfenster in D1, autoritative verifizierte Kaltsegmente in R2, Workflows und isolierter Restore |
 | [0054](../adr/0054-einheitliche-forecast-und-dispatch-pipeline.md) | Einheitliche Forecast- und Dispatch-Pipeline | aktive Ressourcenprojektion und DRAFT-Scheduler in einem Lauf, eine Dauerbasis, korrigierte Zielordnung und eine operative Simulationsengine |
+| [0055](../adr/0055-web-asset-headroom-and-native-svg.md) | Dauerhafter Web-Asset-Spielraum und native SVG-Diagramme | zehn Prozent Pflichtreserve, rollenbezogene CSS-/Precache-Grenzen und dependency-freie Zeitreihen |
 
 ## Entscheidungsstatus und Nachfolger
 
@@ -73,7 +74,7 @@ verlinkt bleiben.
 | --- | --- | --- |
 | 0005 | teilweise ersetzt | ADR-0051 ersetzt die automatische Übertragung einer allgemeinen Offline-Kommando-Queue |
 | 0010 | teilweise ersetzt | Sitzungsfristen folgen V15-AUTH-010/V173-SES-010, Displaydetails ADR-0021 |
-| 0011 | teilweise ersetzt | aktuelle Rollen-, UI-Shell-, PWA- und Assetgrenzen folgen ADR-0018, ADR-0019, ADR-0047 und ADR-0048 |
+| 0011 | teilweise ersetzt | aktuelle Rollen-, UI-Shell-, PWA- und Assetgrenzen folgen ADR-0018, ADR-0019, ADR-0047, ADR-0048 und ADR-0055 |
 | 0013 | teilweise ersetzt | interne Veranstaltungsauswahl bleibt; Display- und FIDS-Anteile folgen ADR-0016, ADR-0021 und ADR-0039 |
 | 0016 | teilweise ersetzt | ADR-0052 ersetzt den damaligen Verzicht auf Archivierung |
 | 0020 | teilweise ersetzt | ADR-0047 ersetzt die gemeinsame Overlay-Fläche persistenter Meldungen |
