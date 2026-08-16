@@ -18,7 +18,10 @@ diese Historie weder erforderlich noch erwünscht.
 Die aktive D1-Historie beginnt neu mit `0001_v1_12_baseline.sql`. Die Baseline wurde aus einer
 SQLite-Datenbank abgeleitet, auf die alle 69 bisherigen Migrationen in ihrer bisherigen Reihenfolge
 angewendet wurden. Sie beschreibt das konsolidierte V1.12-Endschema mit 42 Anwendungstabellen,
-73 benannten Indizes und 20 Triggern. Historische Backfills und die Wrangler-interne Tabelle
+75 benannten Indizes und 20 Triggern. Zwei direkte Lineage-Indizes auf `planning_runs.previous_run_id`
+und `planning_runs.anchor_run_id` stellen sicher, dass D1 die selbstreferenzierenden
+Fremdschlüssel auch bei einem vollständigen Reset ohne wiederholte Tabellenscans prüfen kann.
+Historische Backfills und die Wrangler-interne Tabelle
 `d1_migrations` sind nicht enthalten. Der technische Singleton `system_reset_control` wird mit dem
 sicheren inaktiven Wert initialisiert, weil Append-only-Trigger und Resetabläufe ihn voraussetzen.
 

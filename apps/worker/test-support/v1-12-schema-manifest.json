@@ -3,7 +3,7 @@
   "sourceMigrationCount": 69,
   "objectCounts": {
     "tables": 42,
-    "namedIndexes": 73,
+    "namedIndexes": 75,
     "triggers": 20
   },
   "tables": [
@@ -7238,6 +7238,30 @@
           ]
         },
         {
+          "name": "idx_planning_runs_anchor_run",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 5,
+              "name": "anchor_run_id",
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 1
+            },
+            {
+              "seqno": 1,
+              "cid": -1,
+              "name": null,
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 0
+            }
+          ]
+        },
+        {
           "name": "idx_planning_runs_dispatch_revision",
           "unique": 0,
           "origin": "c",
@@ -7293,6 +7317,30 @@
             },
             {
               "seqno": 2,
+              "cid": -1,
+              "name": null,
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 0
+            }
+          ]
+        },
+        {
+          "name": "idx_planning_runs_previous_run",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 4,
+              "name": "previous_run_id",
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 1
+            },
+            {
+              "seqno": 1,
               "cid": -1,
               "name": null,
               "desc": 0,
@@ -11410,12 +11458,20 @@
       "sql": "CREATE INDEX idx_planning_runs_anchor\n  ON planning_runs(operation_day_id, anchor_run_id, replay_distance)"
     },
     {
+      "name": "idx_planning_runs_anchor_run",
+      "sql": "CREATE INDEX idx_planning_runs_anchor_run\n  ON planning_runs(anchor_run_id)"
+    },
+    {
       "name": "idx_planning_runs_dispatch_revision",
       "sql": "CREATE INDEX idx_planning_runs_dispatch_revision\n  ON planning_runs(operation_day_id, dispatch_plan_revision)"
     },
     {
       "name": "idx_planning_runs_event_time",
       "sql": "CREATE INDEX idx_planning_runs_event_time\n  ON planning_runs(operation_day_id, calculation_now DESC)"
+    },
+    {
+      "name": "idx_planning_runs_previous_run",
+      "sql": "CREATE INDEX idx_planning_runs_previous_run\n  ON planning_runs(previous_run_id)"
     },
     {
       "name": "idx_recurring_operational_rules_active_target_kind",

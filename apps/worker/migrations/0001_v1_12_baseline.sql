@@ -969,11 +969,17 @@ CREATE INDEX idx_planning_contexts_event_version
 CREATE INDEX idx_planning_runs_anchor
   ON planning_runs(operation_day_id, anchor_run_id, replay_distance);
 
+CREATE INDEX idx_planning_runs_anchor_run
+  ON planning_runs(anchor_run_id);
+
 CREATE INDEX idx_planning_runs_dispatch_revision
   ON planning_runs(operation_day_id, dispatch_plan_revision);
 
 CREATE INDEX idx_planning_runs_event_time
   ON planning_runs(operation_day_id, calculation_now DESC);
+
+CREATE INDEX idx_planning_runs_previous_run
+  ON planning_runs(previous_run_id);
 
 CREATE UNIQUE INDEX idx_recurring_operational_rules_active_target_kind
   ON recurring_operational_rules(operation_day_id, scope_type, scope_id, operation_kind)

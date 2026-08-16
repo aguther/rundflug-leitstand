@@ -19,9 +19,16 @@ describe("V1.12 database baseline", () => {
     expect(describeDatabaseSchema(database)).toEqual(expectedSchema);
     expect(expectedSchema.objectCounts).toEqual({
       tables: 42,
-      namedIndexes: 73,
+      namedIndexes: 75,
       triggers: 20,
     });
+    const planningRunIndexes = database.prepare("PRAGMA index_list('planning_runs')").all() as {
+      name: string;
+    }[];
+    const planningRunIndexNames = planningRunIndexes.map((index) => String(index.name));
+    expect(planningRunIndexNames).toEqual(
+      expect.arrayContaining(["idx_planning_runs_anchor_run", "idx_planning_runs_previous_run"]),
+    );
     expect(database.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
 
     database.close();
