@@ -36,7 +36,7 @@ const flow: AdminEventFlow = {
 afterEach(cleanup);
 
 describe("admin event flow chart", () => {
-  it("zooms its Recharts time domain and restores the full range", () => {
+  it("zooms its native SVG time domain and restores the full range", () => {
     render(
       <AdminEventFlowChart
         averageWaitMinutes={18}
@@ -60,9 +60,7 @@ describe("admin event flow chart", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Gesamten Zeitverlauf anzeigen" }));
     expect(screen.getByText("100 %")).not.toBeNull();
-    expect(
-      viewport.querySelector(".recharts-surface")?.getAttribute("tabindex") ?? null,
-    ).toBeNull();
+    expect(viewport.querySelector(".admin-flow-svg")?.getAttribute("tabindex") ?? null).toBeNull();
   });
 
   it("positions its tooltip from the cursor and stops at the observed time", () => {
@@ -109,7 +107,7 @@ describe("admin event flow chart", () => {
     expect(screen.queryByText("12:00 Uhr")).toBeNull();
   });
 
-  it("prevents mouse focus on the Recharts drawing surface", () => {
+  it("prevents mouse focus on the SVG drawing surface", () => {
     render(
       <AdminEventFlowChart
         averageWaitMinutes={18}

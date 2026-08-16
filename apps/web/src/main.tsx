@@ -10,7 +10,7 @@ import { PWA_UPDATE_CONTROLLER_READY_EVENT } from "./app/pwa-update-events";
 import { applyInitialTheme, ThemeProvider } from "./design-system/theme";
 import "./design-system/tokens.css";
 import "./styles.css";
-import "./features/ui-finish-v12.css";
+import "./features/ui-finish-shared.css";
 import "./design-system/base.css";
 import "./design-system/components.css";
 

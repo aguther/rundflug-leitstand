@@ -198,8 +198,6 @@ describe("V1 maintainability and portability boundaries", () => {
       "qrcode",
       "react",
       "react-dom",
-      "react-is",
-      "recharts",
       "typescript",
       "vite",
       "vite-plugin-pwa",

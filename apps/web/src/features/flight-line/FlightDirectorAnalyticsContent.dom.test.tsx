@@ -302,9 +302,9 @@ describe("FlightDirectorAnalyticsContent resource timeline", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("Historie nicht erreichbar");
   });
 
-  it("renders forecast metrics, all quality labels, and paginates snapshots", async () => {
+  it("renders the native forecast chart, tooltip, references, metrics, and pagination", async () => {
     const entries = Array.from({ length: 10 }, (_, index) => forecastEntry(index));
-    renderGroupAnalytics(vi.fn(async () => entries));
+    const { container } = renderGroupAnalytics(vi.fn(async () => entries));
 
     expect(await screen.findAllByText("10 Umläufe")).toHaveLength(2);
     expect(screen.getByText("+1 Min.")).not.toBeNull();
@@ -313,6 +313,26 @@ describe("FlightDirectorAnalyticsContent resource timeline", () => {
     expect(screen.getByText("Flugzeug + Produkt / Produkt / Veranstaltung")).not.toBeNull();
     expect(screen.getByText(/\+5 Min\./)).not.toBeNull();
     expect(screen.getByRole("img", { name: /Prognosediagramm/ })).not.toBeNull();
+    expect(container.querySelectorAll(".flight-director-forecast-svg [data-series]")).toHaveLength(
+      4,
+    );
+    expect(
+      container.querySelectorAll(".flight-director-forecast-svg .svg-chart-reference.horizontal"),
+    ).toHaveLength(4);
+    const viewport = container.querySelector(".flight-director-chart-viewport");
+    expect(viewport).toBeInstanceOf(HTMLDivElement);
+    if (viewport instanceof HTMLDivElement) {
+      Object.defineProperties(viewport, {
+        clientWidth: { configurable: true, value: 800 },
+        getBoundingClientRect: {
+          configurable: true,
+          value: () => ({ height: 260, left: 100, right: 900, top: 100, width: 800 }),
+        },
+      });
+      fireEvent.pointerMove(viewport, { buttons: 0, clientX: 500, clientY: 150 });
+      expect(screen.getByText(/Stand .* Uhr/)).not.toBeNull();
+      expect(screen.getByText(/Boarding: .* Uhr/)).not.toBeNull();
+    }
     expect(screen.getByText("Seite 1 von 2")).not.toBeNull();
     expect(screen.getAllByRole("row")).toHaveLength(9);
 

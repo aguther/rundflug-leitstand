@@ -1,16 +1,14 @@
 import type { ForecastHistory, OperationBoard, ResourceDayHistory } from "@rundflug/contracts";
 import { ArrowLeft, ArrowRight, ChartNoAxesCombined, Plane, UserRound } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button, IconButton } from "../../design-system/components";
 import { rotationGroupLabelList } from "../../flight-line-shared";
 import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
@@ -19,6 +17,7 @@ import {
   timeToPercent,
   useTimeDiagramViewport,
 } from "../../shared/time-diagram-viewport";
+import { nearestChartPoint, TimeSeriesSvgChart } from "../../shared/time-series-svg-chart";
 import type { AnalyticsTab } from "./FlightDirectorAnalyticsDialog";
 import {
   type AnalyticsTicketGroup,
@@ -31,6 +30,7 @@ import {
   resourceTimelineRotations,
   sortedForecastEntries,
 } from "./flight-director-analytics-model";
+import "./flight-director-analytics.css";
 
 type Rotation = OperationBoard["rotations"][number];
 type ForecastEntry = ForecastHistory["entries"][number];
@@ -263,6 +263,7 @@ function ForecastDiagram({
   rotation: Rotation | undefined;
   timeZone: string;
 }>) {
+  const [hoveredPoint, setHoveredPoint] = useState<ForecastChartPoint | null>(null);
   const domain = useMemo(() => capturedDomain(chartData), [chartData]);
   const {
     changeZoom,
@@ -293,6 +294,128 @@ function ForecastDiagram({
     timeZone,
     until: visibleDomain.until,
   });
+  const chartWidth = Math.max(320, viewportWidth || 720);
+  const yStep = (maximum - minimum) / 4;
+  const yTicks = Array.from({ length: 5 }, (_, index) => minimum + yStep * index);
+  const series = [
+    {
+      color: "var(--analytics-boarding)",
+      curve: "monotone" as const,
+      id: "boarding",
+      label: "Boarding",
+      points: chartData.flatMap((point) =>
+        point.boardingAt === null ? [] : [{ x: point.capturedAt, y: point.boardingAt }],
+      ),
+      showPoints: true,
+    },
+    {
+      color: "var(--analytics-departure)",
+      curve: "monotone" as const,
+      id: "departure",
+      label: "Off-Block",
+      points: chartData.flatMap((point) =>
+        point.departureAt === null ? [] : [{ x: point.capturedAt, y: point.departureAt }],
+      ),
+      showPoints: true,
+    },
+    {
+      color: "var(--analytics-landing)",
+      curve: "monotone" as const,
+      id: "landing",
+      label: "On-Block",
+      points: chartData.flatMap((point) =>
+        point.landingAt === null ? [] : [{ x: point.capturedAt, y: point.landingAt }],
+      ),
+      showPoints: true,
+    },
+    {
+      color: "var(--analytics-completion)",
+      curve: "monotone" as const,
+      id: "completion",
+      label: "Abschluss",
+      points: chartData.flatMap((point) =>
+        point.completionAt === null ? [] : [{ x: point.capturedAt, y: point.completionAt }],
+      ),
+      showPoints: true,
+    },
+  ];
+  const actualReferenceValues: Array<{ color: string; value: string | null | undefined }> = [
+    { color: "var(--analytics-boarding)", value: actual?.boardingAt },
+    { color: "var(--analytics-departure)", value: actual?.departureAt },
+    { color: "var(--analytics-landing)", value: actual?.landingAt },
+    { color: "var(--analytics-completion)", value: actual?.completionAt },
+  ];
+  const horizontalReferences = actualReferenceValues.flatMap(({ color, value }) =>
+    value ? [{ color, dash: "3 5", value: Date.parse(value) }] : [],
+  );
+  const updateHover = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.buttons !== 0) {
+        setHoveredPoint(null);
+        return;
+      }
+      const viewport = event.currentTarget;
+      const bounds = viewport.getBoundingClientRect();
+      const plotWidth = Math.max(1, viewport.clientWidth - FORECAST_CHART_HORIZONTAL_INSET_PX);
+      const ratio = Math.min(1, Math.max(0, (event.clientX - bounds.left - 64) / plotWidth));
+      const at = visibleDomain.from + ratio * (visibleDomain.until - visibleDomain.from);
+      setHoveredPoint(
+        nearestChartPoint(
+          chartData
+            .filter(
+              (point) =>
+                point.capturedAt >= visibleDomain.from && point.capturedAt <= visibleDomain.until,
+            )
+            .map((point) => ({ ...point, x: point.capturedAt })),
+          at,
+        ),
+      );
+    },
+    [chartData, visibleDomain],
+  );
+  const handlePointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      onPointerMove(event);
+      updateHover(event);
+    },
+    [onPointerMove, updateHover],
+  );
+  const handlePointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      setHoveredPoint(null);
+      onPointerDown(event);
+    },
+    [onPointerDown],
+  );
+  const handlePointerUp = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      onPointerUp(event);
+      if (!dragging) updateHover(event);
+    },
+    [dragging, onPointerUp, updateHover],
+  );
+  const hoveredPayload = hoveredPoint
+    ? [
+        { color: "var(--analytics-boarding)", name: "Boarding", value: hoveredPoint.boardingAt },
+        {
+          color: "var(--analytics-departure)",
+          name: "Off-Block",
+          value: hoveredPoint.departureAt,
+        },
+        { color: "var(--analytics-landing)", name: "On-Block", value: hoveredPoint.landingAt },
+        {
+          color: "var(--analytics-completion)",
+          name: "Abschluss",
+          value: hoveredPoint.completionAt,
+        },
+      ]
+    : [];
+  const hoveredLeft = hoveredPoint
+    ? 64 +
+      ((hoveredPoint.capturedAt - visibleDomain.from) /
+        Math.max(1, visibleDomain.until - visibleDomain.from)) *
+        Math.max(1, chartWidth - FORECAST_CHART_HORIZONTAL_INSET_PX)
+    : 0;
   return (
     <>
       <TimeDiagramZoomControls
@@ -305,9 +428,11 @@ function ForecastDiagram({
         className={`flight-director-chart-viewport time-diagram-viewport${zoom > 1 ? " is-pannable" : ""}${dragging ? " is-dragging" : ""}`}
         onClickCapture={onClickCapture}
         onPointerCancel={onPointerCancel}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
+        onPointerDown={handlePointerDown}
+        onPointerLeave={() => setHoveredPoint(null)}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onWheelCapture={() => setHoveredPoint(null)}
         ref={setViewportRef}
       >
         <div
@@ -315,111 +440,49 @@ function ForecastDiagram({
           className="flight-director-forecast-chart"
           role="img"
         >
-          <ResponsiveContainer height="100%" width="100%">
-            <LineChart
-              accessibilityLayer
-              data={chartData}
-              margin={{ top: 18, right: 28, bottom: 2, left: 12 }}
-            >
-              <CartesianGrid stroke="var(--ui-border)" strokeDasharray="2 4" />
-              <XAxis
-                allowDataOverflow
-                dataKey="capturedAt"
-                domain={[visibleDomain.from, visibleDomain.until]}
-                interval={0}
-                scale="time"
-                tickFormatter={(value: number) => formatTime(value, timeZone)}
-                ticks={timeAxisTicks.map((tick) => tick.value)}
-                type="number"
-              />
-              <YAxis
-                domain={[minimum, maximum]}
-                scale="time"
-                tickFormatter={(value: number) => formatTime(value, timeZone)}
-                type="number"
-                width={52}
-              />
-              <Tooltip
-                content={<ForecastTooltip timeZone={timeZone} />}
-                isAnimationActive={false}
-              />
-              <Line
-                dataKey="boardingAt"
-                dot={{ r: 2 }}
-                isAnimationActive={false}
-                name="Boarding"
-                stroke="var(--analytics-boarding)"
-                strokeWidth={1.75}
-                type="monotone"
-              />
-              <Line
-                dataKey="departureAt"
-                dot={{ r: 2 }}
-                isAnimationActive={false}
-                name="Off-Block"
-                stroke="var(--analytics-departure)"
-                strokeWidth={1.75}
-                type="monotone"
-              />
-              <Line
-                dataKey="landingAt"
-                dot={{ r: 2 }}
-                isAnimationActive={false}
-                name="On-Block"
-                stroke="var(--analytics-landing)"
-                strokeWidth={1.75}
-                type="monotone"
-              />
-              <Line
-                dataKey="completionAt"
-                dot={{ r: 2 }}
-                isAnimationActive={false}
-                name="Abschluss"
-                stroke="var(--analytics-completion)"
-                strokeWidth={1.75}
-                type="monotone"
-              />
-              {actual?.boardingAt ? (
-                <ReferenceLine
-                  stroke="var(--analytics-boarding)"
-                  strokeDasharray="3 5"
-                  y={Date.parse(actual.boardingAt)}
-                />
-              ) : null}
-              {actual?.departureAt ? (
-                <ReferenceLine
-                  stroke="var(--analytics-departure)"
-                  strokeDasharray="3 5"
-                  y={Date.parse(actual.departureAt)}
-                />
-              ) : null}
-              {actual?.landingAt ? (
-                <ReferenceLine
-                  stroke="var(--analytics-landing)"
-                  strokeDasharray="3 5"
-                  y={Date.parse(actual.landingAt)}
-                />
-              ) : null}
-              {actual?.completionAt ? (
-                <ReferenceLine
-                  stroke="var(--analytics-completion)"
-                  strokeDasharray="3 5"
-                  y={Date.parse(actual.completionAt)}
-                />
-              ) : null}
-              {rotation?.precalledAt &&
+          <TimeSeriesSvgChart
+            className="flight-director-forecast-svg"
+            formatXTick={(value) => formatTime(value, timeZone)}
+            formatYTick={(value) => formatTime(value, timeZone)}
+            height={260}
+            horizontalReferences={horizontalReferences}
+            insets={{ bottom: 22, left: 64, right: 28, top: 18 }}
+            series={series}
+            verticalReferences={
+              rotation?.precalledAt &&
               Date.parse(rotation.precalledAt) >= visibleDomain.from &&
-              Date.parse(rotation.precalledAt) <= visibleDomain.until ? (
-                <ReferenceLine
-                  label={{ value: "GO TO GATE", fill: "var(--ui-muted)", fontSize: 10 }}
-                  stroke="var(--ui-warning)"
-                  strokeDasharray="4 4"
-                  x={Date.parse(rotation.precalledAt)}
-                />
-              ) : null}
-            </LineChart>
-          </ResponsiveContainer>
+              Date.parse(rotation.precalledAt) <= visibleDomain.until
+                ? [
+                    {
+                      color: "var(--ui-warning)",
+                      dash: "4 4",
+                      label: "GO TO GATE",
+                      value: Date.parse(rotation.precalledAt),
+                    },
+                  ]
+                : []
+            }
+            width={chartWidth}
+            xDomain={[visibleDomain.from, visibleDomain.until]}
+            xTicks={timeAxisTicks.map((tick) => tick.value)}
+            yDomain={[minimum, maximum]}
+            yTicks={yTicks}
+          />
         </div>
+        {hoveredPoint ? (
+          <div
+            className="flight-director-analytics-tooltip-position"
+            data-edge={hoveredLeft > chartWidth - 190 ? "right" : "default"}
+            style={{ left: hoveredLeft, top: 12 }}
+          >
+            <ForecastTooltip
+              active
+              label={hoveredPoint.capturedAt}
+              payload={hoveredPayload}
+              timeZone={timeZone}
+            />
+          </div>
+        ) : null}
       </div>
       <fieldset className="flight-director-forecast-legend">
         <legend className="visually-hidden">Diagrammlegende</legend>

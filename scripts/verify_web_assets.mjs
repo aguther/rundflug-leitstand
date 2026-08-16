@@ -17,6 +17,8 @@ export const WEB_ASSET_BUDGETS = {
   pwaPrecache: { rawBytes: 1_395_000 },
 };
 
+export const WEB_ASSET_MINIMUM_HEADROOM_RATIO = 0.1;
+
 export const WEB_ROUTE_ENTRIES = {
   admin: "src/admin-view.tsx",
   cashier: "src/cashier-view.tsx",
@@ -32,8 +34,23 @@ export const WEB_ROUTE_ENTRIES = {
 
 const ENTRY_KEY = "index.html";
 const ROUTER_KEY = "src/FeatureRouter.tsx";
+const REQUIRED_PRECACHE_ENTRIES = {
+  cashier: WEB_ROUTE_ENTRIES.cashier,
+  fids: WEB_ROUTE_ENTRIES.fids,
+  flightDirector: WEB_ROUTE_ENTRIES.flightDirector,
+  flightLine: WEB_ROUTE_ENTRIES.flightLine,
+};
+const EXCLUDED_PRECACHE_ENTRIES = {
+  admin: WEB_ROUTE_ENTRIES.admin,
+  analytics: "src/features/flight-line/FlightDirectorAnalyticsContent.tsx",
+  simulation: WEB_ROUTE_ENTRIES.simulation,
+};
+const EXCLUDED_PRECACHE_FILE_PATTERNS = {
+  analyticsModel: /^assets\/flight-director-analytics-model-.*\.js$/,
+  comparisonWorker: /^assets\/comparison-worker-.*\.js$/,
+};
 const defaultDistDirectory = resolve(repositoryRoot, "apps/web/dist");
-const defaultBaselinePath = resolve(repositoryRoot, "scripts/data/web-asset-baseline-5e1dce.json");
+const defaultBaselinePath = resolve(repositoryRoot, "scripts/data/web-asset-baseline.json");
 
 function formatKilobytes(bytes) {
   return `${(bytes / 1024).toFixed(2)} KiB`;
@@ -91,6 +108,40 @@ function extractPrecacheUrls(serviceWorkerSource) {
   return urls;
 }
 
+function collectEntryCssFiles(manifest, key) {
+  return collectManifestFiles(manifest, [key]).filter((file) => file.endsWith(".css"));
+}
+
+export function verifyPrecachePolicy(manifest, precacheFiles) {
+  const failures = [];
+  const precache = new Set(precacheFiles);
+  for (const [label, key] of Object.entries(REQUIRED_PRECACHE_ENTRIES)) {
+    const entry = requireManifestEntry(manifest, key);
+    const requiredFiles = [entry.file, ...collectEntryCssFiles(manifest, key)];
+    for (const file of requiredFiles) {
+      if (!precache.has(file)) {
+        failures.push(`Required PWA precache file is missing for ${label}: ${file}`);
+      }
+    }
+  }
+  for (const [label, key] of Object.entries(EXCLUDED_PRECACHE_ENTRIES)) {
+    const entry = requireManifestEntry(manifest, key);
+    for (const file of [entry.file, ...(entry.css ?? [])]) {
+      if (precache.has(file)) {
+        failures.push(`Online-only PWA file is precached for ${label}: ${file}`);
+      }
+    }
+  }
+  for (const [label, pattern] of Object.entries(EXCLUDED_PRECACHE_FILE_PATTERNS)) {
+    for (const file of precacheFiles) {
+      if (pattern.test(file)) {
+        failures.push(`Online-only PWA file is precached for ${label}: ${file}`);
+      }
+    }
+  }
+  return failures;
+}
+
 async function readSourceRevision() {
   return execFileSync(GIT_EXECUTABLE, ["rev-parse", "HEAD"], {
     cwd: repositoryRoot,
@@ -138,6 +189,7 @@ export async function createWebAssetReport({
     rawBytes: (await Promise.all(precacheFiles.map((file) => stat(resolve(distDirectory, file)))))
       .map((file) => file.size)
       .reduce((sum, size) => sum + size, 0),
+    policyFailures: verifyPrecachePolicy(manifest, precacheFiles),
   };
   const routes = {};
   for (const [route, routeEntry] of Object.entries(WEB_ROUTE_ENTRIES)) {
@@ -173,7 +225,15 @@ export function verifyWebAssetReport(report, baseline, budgets = WEB_ASSET_BUDGE
   const failures = [];
   for (const [asset, budget] of Object.entries(budgets)) {
     compareMetric(failures, asset, report.assets[asset], budget);
+    const headroomBudget = Object.fromEntries(
+      Object.entries(budget).map(([metric, maximum]) => [
+        metric,
+        Math.floor(maximum * (1 - WEB_ASSET_MINIMUM_HEADROOM_RATIO)),
+      ]),
+    );
+    compareMetric(failures, `${asset} 10% headroom`, report.assets[asset], headroomBudget);
   }
+  failures.push(...(report.assets.pwaPrecache?.policyFailures ?? []));
   for (const [route, baselineMetrics] of Object.entries(baseline.routes)) {
     const actual = report.routes[route];
     if (!actual) {
@@ -188,16 +248,33 @@ export function verifyWebAssetReport(report, baseline, budgets = WEB_ASSET_BUDGE
   return failures;
 }
 
-function printReport(report) {
-  for (const [asset, metrics] of Object.entries(report.assets)) {
-    const gzip =
-      metrics.gzipBytes === undefined ? "" : ` / ${formatKilobytes(metrics.gzipBytes)} gzip`;
-    console.log(`${asset}: ${formatKilobytes(metrics.rawBytes)} raw${gzip}`);
+function formatBudgetMetric(actual, budget) {
+  const reserve = budget - actual;
+  const reservePercent = (reserve / budget) * 100;
+  return `budget ${budget} B, actual ${actual} B, reserve ${reserve} B (${reservePercent.toFixed(2)}%)`;
+}
+
+function printReport(report, baseline) {
+  for (const [asset, budget] of Object.entries(WEB_ASSET_BUDGETS)) {
+    const metrics = report.assets[asset];
+    for (const metric of ["rawBytes", "gzipBytes"]) {
+      if (budget[metric] !== undefined) {
+        console.log(`${asset} ${metric}: ${formatBudgetMetric(metrics[metric], budget[metric])}`);
+      }
+    }
   }
   for (const [route, metrics] of Object.entries(report.routes)) {
-    console.log(
-      `route ${route}: ${formatKilobytes(metrics.rawBytes)} raw / ${formatKilobytes(metrics.gzipBytes)} gzip`,
-    );
+    const baselineMetrics = baseline?.routes[route];
+    if (!baselineMetrics) {
+      console.log(
+        `route ${route}: ${formatKilobytes(metrics.rawBytes)} raw / ${formatKilobytes(metrics.gzipBytes)} gzip`,
+      );
+      continue;
+    }
+    for (const metric of ["rawBytes", "gzipBytes"]) {
+      const routeBudget = Math.floor(baselineMetrics[metric] * 1.02);
+      console.log(`route ${route} ${metric}: ${formatBudgetMetric(metrics[metric], routeBudget)}`);
+    }
   }
 }
 
@@ -211,14 +288,15 @@ async function run() {
     distDirectory,
     sourceRevision: baselineIndex >= 0 ? args[baselineIndex + 1] : undefined,
   });
-  printReport(report);
+  const baseline =
+    baselineIndex < 0 ? JSON.parse(await readFile(defaultBaselinePath, "utf8")) : undefined;
+  printReport(report, baseline);
   if (baselineIndex >= 0) {
     await writeFile(defaultBaselinePath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
     console.log(`Wrote baseline snapshot: ${defaultBaselinePath}`);
     return;
   }
   if (args.includes("--report-only")) return;
-  const baseline = JSON.parse(await readFile(defaultBaselinePath, "utf8"));
   const failures = verifyWebAssetReport(report, baseline);
   if (failures.length > 0) {
     throw new Error(`Web asset budgets failed:\n- ${failures.join("\n- ")}`);

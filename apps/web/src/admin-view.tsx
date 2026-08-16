@@ -649,8 +649,10 @@ export function AdminView() {
   );
 }
 
+import "./features/admin/admin-shell-foundation.css";
 import "./features/admin/admin-v12.css";
 import "./features/admin/admin-v15.css";
 import "./features/admin/admin-event-workspace.css";
 import "./features/admin/admin-modernization.css";
 import "./features/admin/event-parameters/event-parameters.css";
+import "./features/ui-finish-v12.css";

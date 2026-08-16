@@ -1,0 +1,174 @@
+/* Shared interaction finish retained in the global application entry. */
+
+:is(.app-shell, .flight-line-shell) button,
+:is(.app-shell, .flight-line-shell) summary,
+:is(.app-shell, .flight-line-shell) input,
+:is(.app-shell, .flight-line-shell) select,
+:is(.app-shell, .flight-line-shell) textarea {
+  border-radius: var(--radius-sm);
+}
+
+:is(.app-shell, .flight-line-shell) button,
+:is(.app-shell, .flight-line-shell) summary,
+:is(.app-shell, .flight-line-shell) a {
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 100ms ease;
+}
+
+:is(.app-shell, .flight-line-shell) button:not(:disabled) {
+  cursor: pointer;
+}
+
+:is(.app-shell, .flight-line-shell) button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+:is(.app-shell, .flight-line-shell) :is(input, select, textarea) {
+  box-shadow: inset 0 1px 1px rgb(0 0 0 / 4%);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease;
+}
+
+:is(.app-shell, .flight-line-shell) :is(input, select, textarea):focus {
+  border-color: color-mix(in srgb, var(--ui-accent) 72%, var(--ui-border));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--ui-accent) 17%, transparent),
+    inset 0 1px 1px rgb(0 0 0 / 4%);
+  outline: 0;
+}
+
+:is(.app-shell, .flight-line-shell)
+  :is(.primary-action, .assist-claim, .assist-finish, .login-submit) {
+  color: #fff;
+  border: 1px solid color-mix(in srgb, var(--ui-accent) 78%, #063b7a);
+  background: var(--ui-accent);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 8%),
+    0 1px 2px rgb(0 0 0 / 16%);
+  font-weight: 650;
+}
+
+:is(.app-shell, .flight-line-shell)
+  :is(.primary-action, .assist-claim, .assist-finish, .login-submit):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ui-accent-hover) 76%, white 8%);
+  background: var(--ui-accent-hover);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 12%),
+    0 2px 4px rgb(0 0 0 / 18%);
+}
+
+:is(.app-shell, .flight-line-shell)
+  :is(
+    .secondary-action,
+    .dialog-actions > button:not(.primary-action, .danger-action),
+    .editor-actions > button:not(.primary-action, .danger-action),
+    .table-action,
+    .table-overflow-action
+  ) {
+  min-height: var(--control-compact);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-control);
+  box-shadow: inset 0 0 0 1px var(--ui-highlight);
+  font-weight: 600;
+}
+
+:is(.app-shell, .flight-line-shell)
+  :is(
+    .secondary-action,
+    .dialog-actions > button:not(.primary-action, .danger-action),
+    .editor-actions > button:not(.primary-action, .danger-action),
+    .table-action,
+    .table-overflow-action
+  ):hover:not(:disabled) {
+  color: var(--ui-text);
+  border-color: color-mix(in srgb, var(--ui-accent) 42%, var(--ui-border-strong));
+  background: var(--ui-control-hover);
+}
+
+:is(.app-shell, .flight-line-shell) .danger-action {
+  color: #fff;
+  border: 1px solid color-mix(in srgb, var(--ui-danger) 80%, black);
+  background: var(--ui-danger);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 8%);
+  font-weight: 650;
+}
+
+:is(.app-shell, .flight-line-shell) .danger-action:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ui-danger) 86%, black);
+}
+
+.app-account,
+.app-event,
+.theme-toggle,
+.admin-shell .reset-level-row > button,
+.admin-shell .section-heading-row button,
+.cashier-shell .stepper button {
+  box-shadow:
+    inset 0 1px 0 var(--ui-highlight),
+    0 1px 2px rgb(0 0 0 / 7%);
+}
+
+.app-account:hover,
+.app-event:hover,
+.theme-toggle:hover,
+.admin-shell .reset-level-row > button:hover:not(:disabled),
+.cashier-shell .stepper button:hover:not(:disabled) {
+  color: var(--ui-accent);
+  border-color: color-mix(in srgb, var(--ui-accent) 48%, var(--ui-border));
+  background: color-mix(in srgb, var(--ui-accent-soft) 62%, var(--ui-control));
+}
+
+.modal-backdrop {
+  backdrop-filter: blur(6px) saturate(0.82);
+}
+
+.confirmation-dialog,
+.aircraft-pause-dialog {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--ui-shadow);
+}
+
+@media (max-width: 560px) {
+  .assist-pick-list,
+  .assist-current,
+  .assist-gate-groups {
+    border-radius: var(--radius-md);
+  }
+
+  .assist-aircraft-cards article {
+    box-shadow:
+      inset 0 1px 0 var(--ui-highlight),
+      0 5px 16px rgb(0 0 0 / 8%);
+  }
+
+  .assist-claim {
+    min-height: 50px;
+    font-weight: 650;
+  }
+
+  .assist-more-phone {
+    min-height: 50px;
+    margin-top: 12px;
+    font-size: 0.94rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.app-shell, .flight-line-shell) button,
+  :is(.app-shell, .flight-line-shell) summary,
+  :is(.app-shell, .flight-line-shell) a,
+  :is(.app-shell, .flight-line-shell) input,
+  :is(.app-shell, .flight-line-shell) select,
+  :is(.app-shell, .flight-line-shell) textarea,
+  .assist-aircraft-cards article {
+    transition: none;
+  }
+}

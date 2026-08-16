@@ -16,6 +16,11 @@ export function collectManifestFiles(
   entryKeys: string[],
 ): string[];
 
+export function verifyPrecachePolicy(
+  manifest: Record<string, ViteManifestEntry>,
+  precacheFiles: string[],
+): string[];
+
 export function verifyWebAssetReport(
   report: {
     assets: Record<string, WebAssetMetrics>;

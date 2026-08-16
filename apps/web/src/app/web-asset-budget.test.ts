@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   collectManifestFiles,
+  verifyPrecachePolicy,
   verifyWebAssetReport,
 } from "../../../../scripts/verify_web_assets.mjs";
 
@@ -33,7 +34,7 @@ describe("web asset budgets", () => {
     ]);
   });
 
-  it("enforces hard asset limits and the two-percent route regression ceiling", () => {
+  it("enforces hard limits, ten-percent headroom, and the route regression ceiling", () => {
     const report = {
       assets: { globalCss: { rawBytes: 121, gzipBytes: 20 } },
       routes: { admin: { rawBytes: 103, gzipBytes: 100 } },
@@ -47,7 +48,58 @@ describe("web asset budgets", () => {
 
     expect(failures).toEqual([
       "globalCss rawBytes is 0.12 KiB; budget is 0.12 KiB",
+      "globalCss 10% headroom rawBytes is 0.12 KiB; budget is 0.11 KiB",
       "admin initial route rawBytes is 0.10 KiB; budget is 0.10 KiB",
+    ]);
+  });
+
+  it("requires operational entries and CSS while excluding online-only entries", () => {
+    const manifest = {
+      "src/cashier-view.tsx": {
+        file: "assets/cashier.js",
+        css: ["assets/cashier.css"],
+      },
+      "src/fids-view.tsx": { file: "assets/fids.js", imports: ["fidsStyles"] },
+      "src/flight-director-view.tsx": {
+        file: "assets/flight-director.js",
+        css: ["assets/flight-director.css"],
+      },
+      "src/flight-line-view.tsx": {
+        file: "assets/flight-line.js",
+        css: ["assets/flight-line.css"],
+      },
+      fidsStyles: { file: "assets/fids-support.js", css: ["assets/fids.css"] },
+      "src/admin-view.tsx": {
+        file: "assets/admin.js",
+        css: ["assets/admin.css"],
+      },
+      "src/features/flight-line/FlightDirectorAnalyticsContent.tsx": {
+        file: "assets/FlightDirectorAnalyticsContent.js",
+        css: ["assets/FlightDirectorAnalyticsContent.css"],
+      },
+      "src/features/forecast-simulation/ForecastSimulationView.tsx": {
+        file: "assets/ForecastSimulationView.js",
+        css: ["assets/ForecastSimulationView.css"],
+      },
+    };
+    const precacheFiles = [
+      "assets/cashier.js",
+      "assets/cashier.css",
+      "assets/fids.js",
+      "assets/fids.css",
+      "assets/flight-director.js",
+      "assets/flight-director.css",
+      "assets/flight-line.js",
+      "assets/flight-line.css",
+      "assets/admin.js",
+      "assets/FlightDirectorAnalyticsContent.css",
+      "assets/comparison-worker-abc.js",
+    ];
+
+    expect(verifyPrecachePolicy(manifest, precacheFiles)).toEqual([
+      "Online-only PWA file is precached for admin: assets/admin.js",
+      "Online-only PWA file is precached for analytics: assets/FlightDirectorAnalyticsContent.css",
+      "Online-only PWA file is precached for comparisonWorker: assets/comparison-worker-abc.js",
     ]);
   });
 });

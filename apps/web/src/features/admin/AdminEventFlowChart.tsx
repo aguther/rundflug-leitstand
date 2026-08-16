@@ -6,23 +6,13 @@ import {
   useMemo,
   useState,
 } from "react";
-import {
-  Area,
-  CartesianGrid,
-  ComposedChart,
-  Line,
-  ReferenceDot,
-  ReferenceLine,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
 import {
   timeAtRatio,
   timeDiagramAxisTickValues,
   useTimeDiagramViewport,
 } from "../../shared/time-diagram-viewport";
+import { TimeSeriesSvgChart } from "../../shared/time-series-svg-chart";
 
 const ADMIN_FLOW_CHART_INSETS = { left: 26, right: 16 } as const;
 const MINUTE_MS = 60_000;
@@ -237,6 +227,28 @@ export function AdminEventFlowChart({
     domain: visibleDomain,
     pixelWidth: Math.max(320, viewportWidth || 720) - 42,
   });
+  const yStep = Math.max(
+    1,
+    Math.ceil(Math.max(...chartData.map((point) => point.soldTickets), 1) / 4),
+  );
+  const yMaximum = yStep * 4;
+  const chartWidth = Math.max(320, viewportWidth || 720);
+  const svgSeries = [
+    {
+      color: "var(--ui-accent)",
+      curve: "stepAfter" as const,
+      id: "sold",
+      label: "Verkauft",
+      points: chartData.map((point) => ({ x: point.time, y: point.soldTickets })),
+    },
+    {
+      color: "var(--ui-success)",
+      curve: "stepAfter" as const,
+      id: "completed",
+      label: "Abgeschlossen",
+      points: chartData.map((point) => ({ x: point.time, y: point.completedTickets })),
+    },
+  ];
 
   return (
     <section className="admin-flow-panel">
@@ -283,101 +295,49 @@ export function AdminEventFlowChart({
         ref={setViewportRef}
         role="img"
       >
-        <ResponsiveContainer height="100%" width="100%">
-          <ComposedChart
-            accessibilityLayer={false}
-            data={chartData}
-            margin={{ top: 12, right: 16, bottom: 2, left: -12 }}
-          >
-            <CartesianGrid
-              className="admin-flow-grid-line"
-              strokeDasharray="2 4"
-              vertical={false}
-            />
-            <XAxis
-              allowDataOverflow
-              dataKey="time"
-              domain={[visibleDomain.from, visibleDomain.until]}
-              minTickGap={32}
-              scale="time"
-              tickFormatter={(value: number) => hourLabel(value, timeZone)}
-              ticks={timeTicks}
-              type="number"
-            />
-            <YAxis allowDecimals={false} domain={[0, "dataMax + 1"]} width={38} />
-            <Area
-              activeDot={false}
-              dataKey="completedTickets"
-              fill="transparent"
-              isAnimationActive={false}
-              stackId="ticket-flow"
-              stroke="transparent"
-              type="stepAfter"
-            />
-            <Area
-              activeDot={false}
-              className="admin-flow-open-area"
-              dataKey="openTickets"
-              fill="var(--admin-flow-open-fill)"
-              isAnimationActive={false}
-              stackId="ticket-flow"
-              stroke="transparent"
-              type="stepAfter"
-            />
-            <Line
-              className="admin-flow-line sold"
-              activeDot={false}
-              dataKey="soldTickets"
-              dot={false}
-              isAnimationActive={false}
-              stroke="var(--ui-accent)"
-              strokeWidth={1.75}
-              type="stepAfter"
-            />
-            <Line
-              className="admin-flow-line completed"
-              activeDot={false}
-              dataKey="completedTickets"
-              dot={false}
-              isAnimationActive={false}
-              stroke="var(--ui-success)"
-              strokeWidth={1.75}
-              type="stepAfter"
-            />
-            {hover ? (
-              <>
-                <ReferenceDot
-                  className="admin-flow-hover-dot sold"
-                  fill="var(--ui-surface-raised)"
-                  ifOverflow="visible"
-                  r={HOVER_DOT_RADIUS}
-                  stroke="var(--ui-accent)"
-                  strokeWidth={2}
-                  x={hover.at}
-                  y={hover.point.soldTickets}
-                />
-                <ReferenceDot
-                  className="admin-flow-hover-dot completed"
-                  fill="var(--ui-surface-raised)"
-                  ifOverflow="visible"
-                  r={HOVER_DOT_RADIUS}
-                  stroke="var(--ui-success)"
-                  strokeWidth={2}
-                  x={hover.at}
-                  y={hover.point.completedTickets}
-                />
-              </>
-            ) : null}
-            {observedUntil >= visibleDomain.from && observedUntil <= visibleDomain.until ? (
-              <ReferenceLine
-                className="admin-flow-now-line"
-                stroke="var(--ui-border-strong)"
-                strokeDasharray="4 5"
-                x={observedUntil}
-              />
-            ) : null}
-          </ComposedChart>
-        </ResponsiveContainer>
+        <TimeSeriesSvgChart
+          activePoints={
+            hover
+              ? [
+                  {
+                    color: "var(--ui-accent)",
+                    id: "sold",
+                    radius: HOVER_DOT_RADIUS,
+                    x: hover.at,
+                    y: hover.point.soldTickets,
+                  },
+                  {
+                    color: "var(--ui-success)",
+                    id: "completed",
+                    radius: HOVER_DOT_RADIUS,
+                    x: hover.at,
+                    y: hover.point.completedTickets,
+                  },
+                ]
+              : []
+          }
+          areaBand={{
+            color: "var(--admin-flow-open-fill)",
+            lower: chartData.map((point) => ({ x: point.time, y: point.completedTickets })),
+            upper: chartData.map((point) => ({ x: point.time, y: point.soldTickets })),
+          }}
+          className="admin-flow-svg"
+          formatXTick={(value) => hourLabel(value, timeZone)}
+          formatYTick={(value) => String(Math.round(value))}
+          height={210}
+          insets={{ bottom: 22, left: 26, right: 16, top: 12 }}
+          series={svgSeries}
+          verticalReferences={
+            observedUntil >= visibleDomain.from && observedUntil <= visibleDomain.until
+              ? [{ color: "var(--ui-border-strong)", dash: "4 5", value: observedUntil }]
+              : []
+          }
+          width={chartWidth}
+          xDomain={[visibleDomain.from, visibleDomain.until]}
+          xTicks={timeTicks}
+          yDomain={[0, yMaximum]}
+          yTicks={[0, yStep, yStep * 2, yStep * 3, yMaximum]}
+        />
         {hover ? (
           <div
             className="admin-flow-tooltip-position"

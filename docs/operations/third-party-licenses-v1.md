@@ -5,8 +5,8 @@ Betroffene Anforderungen: T-080, V1100-DEP-010 und V1120-DEP-010
 
 ## Ergebnis
 
-`npm ls --omit=dev --all --json --long` meldet 82 externe Produktionspakete:
-1 BSD-3-Clause, 19 ISC, 60 MIT, 1 MIT AND ISC, 1 OFL-1.1. Kein Produktionspaket besitzt fehlende, `UNLICENSED`- oder proprietäre
+`npm ls --omit=dev --all --json --long` meldet 40 externe Produktionspakete:
+8 ISC, 31 MIT, 1 OFL-1.1. Kein Produktionspaket besitzt fehlende, `UNLICENSED`- oder proprietäre
 Lizenzmetadaten.
 
 Die frühere Abhängigkeit `@block65/webcrypto-web-push` und deren unlizenziertes Transitpaket
@@ -24,8 +24,6 @@ RFC 8188, RFC 8291 und RFC 8292.
 | `qrcode` | 1.5.4 | MIT |
 | `react` | 19.2.8 | MIT |
 | `react-dom` | 19.2.8 | MIT |
-| `react-is` | 19.2.8 | MIT |
-| `recharts` | 3.10.1 | MIT |
 | `workbox-window` | 7.4.1 | MIT |
 | `zod` | 4.4.3 | MIT |
 

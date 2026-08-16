@@ -20,7 +20,7 @@
     "build": "npm run typecheck && npm run test && npm run build:web && npm run build:worker",
     "build:web": "npm run build -w @rundflug/web",
     "build:web:bundle": "npm run build:bundle -w @rundflug/web",
-    "web:assets:report": "node scripts/verify_web_assets.mjs --report-only",
+    "web:assets:report": "npm run assets:report -w @rundflug/web",
     "web:assets:verify": "node scripts/verify_web_assets.mjs",
     "build:worker": "npm run build -w @rundflug/worker",
     "typecheck": "npm run typecheck --workspaces --if-present",

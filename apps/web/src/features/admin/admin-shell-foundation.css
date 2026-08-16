@@ -1,0 +1,230 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: V3 deliberately overrides the layered legacy stylesheet. */
+/* Administration-only foundation moved out of the global application entry. */
+@layer admin-foundation {
+  :root {
+    font-synthesis: none;
+  }
+
+  /* Admin V3: approved compact, responsive light/dark surface language. */
+  .app-shell,
+  .admin-layout,
+  .admin-workspace,
+  .admin-section,
+  .master-data-table,
+  .master-data-drawer,
+  .confirmation-dialog {
+    color: var(--ui-text);
+    background: var(--ui-surface);
+  }
+  .app-header {
+    min-height: 60px;
+    padding-block: 8px;
+    color: var(--ui-text);
+    border-color: var(--ui-border);
+    background: var(--ui-surface);
+  }
+  .app-header > div {
+    align-items: center;
+    gap: 10px;
+  }
+  .app-header strong,
+  .app-header nav a,
+  .drawer-heading > button {
+    color: var(--ui-text);
+  }
+  .app-header span,
+  .admin-page-header p,
+  .drawer-heading p,
+  .field-help {
+    color: var(--ui-muted);
+  }
+  .app-brand-mark {
+    width: 25px;
+    height: 25px;
+    fill: none;
+    stroke: var(--ui-accent);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.7;
+  }
+  .theme-toggle {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--ui-border);
+    border-radius: 7px;
+    color: var(--ui-text);
+    background: var(--ui-surface-subtle);
+    cursor: pointer;
+  }
+  .theme-toggle svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+  }
+  /* Complete theme coverage for administrative surfaces that still originate in the legacy layer. */
+  .metrics-grid > div,
+  .admin-edit-context,
+  .setup-checklist,
+  .admin-section,
+  .correction-controls,
+  .capacity-row,
+  .fleet-row,
+  .pilot-row {
+    color: var(--ui-text);
+    border-color: var(--ui-border);
+    background: var(--ui-surface);
+  }
+  .admin-edit-context,
+  .correction-controls {
+    background: var(--ui-surface-subtle);
+  }
+  .metrics-grid span,
+  .admin-edit-context > div:first-child span,
+  .setup-checklist strong,
+  .capacity-row span {
+    color: var(--ui-muted);
+  }
+  .setup-progress {
+    border-color: var(--ui-border);
+  }
+  .setup-progress li::before {
+    background: var(--ui-border);
+  }
+  .setup-progress button,
+  .setup-step-number {
+    color: var(--ui-muted);
+  }
+  .setup-step-number {
+    border-color: var(--ui-border);
+    background: var(--ui-surface-subtle);
+  }
+  .setup-checklist li,
+  .active-rotation-list > div {
+    border-color: var(--ui-border);
+  }
+  .setup-checklist button {
+    color: var(--ui-accent);
+  }
+  .admin-workspace input,
+  .admin-workspace select,
+  .admin-workspace textarea,
+  .admin-edit-context input {
+    color: var(--ui-text);
+    border-color: var(--ui-border);
+    background: var(--ui-surface-subtle);
+  }
+  .admin-workspace .primary-action:disabled,
+  .admin-workspace button:disabled {
+    border-color: var(--ui-border);
+    color: var(--ui-muted);
+    background: color-mix(in srgb, var(--ui-surface-subtle) 82%, var(--ui-border));
+  }
+  .action-message,
+  .readonly-banner,
+  .admin-validation {
+    color: color-mix(in srgb, var(--ui-accent) 78%, var(--ui-text));
+    border-color: color-mix(in srgb, var(--ui-accent) 45%, var(--ui-border));
+    background: var(--ui-accent-soft);
+  }
+  .admin-validation.error {
+    color: var(--ui-danger);
+    border-color: color-mix(in srgb, var(--ui-danger) 48%, var(--ui-border));
+    background: var(--ui-danger-soft);
+  }
+  .admin-validation.warning {
+    color: var(--ui-warning-text);
+    border-color: color-mix(in srgb, var(--ui-warning) 58%, var(--ui-border));
+    background: var(--ui-warning-soft);
+  }
+  .admin-validation code {
+    font-size: 0.88em;
+    overflow-wrap: anywhere;
+  }
+  .safety-disclaimer,
+  .operational-notice,
+  .connection-warning {
+    color: var(--ui-warning-text);
+    border-color: var(--ui-warning);
+    background: var(--ui-warning-soft);
+  }
+  .success-message {
+    color: var(--ui-success-text);
+    background: var(--ui-success-soft);
+  }
+  .master-data-empty {
+    min-height: 230px;
+    color: var(--ui-muted);
+    background: var(--ui-surface);
+  }
+  footer {
+    color: var(--ui-muted);
+    border-top: 1px solid var(--ui-border);
+    background: var(--ui-surface-subtle);
+  }
+  .localized-input-field {
+    display: grid;
+    gap: 7px;
+    color: var(--ui-text);
+    font-weight: 750;
+  }
+  .localized-date-time {
+    display: grid;
+    grid-template-columns: minmax(145px, 1fr) auto minmax(105px, 0.6fr);
+    align-items: center;
+    gap: 8px;
+  }
+  .localized-date-time > span {
+    color: var(--ui-muted);
+    font-size: 0.82rem;
+    font-weight: 650;
+  }
+  .localized-date-time input {
+    min-width: 0;
+  }
+  .localized-picker-control {
+    position: relative;
+    min-width: 0;
+  }
+  .localized-picker-control > input {
+    width: 100%;
+    padding-right: 48px;
+    font-variant-numeric: tabular-nums;
+  }
+  .localized-picker-trigger {
+    width: 46px;
+    position: absolute;
+    inset: 1px 1px 1px auto;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border-left: 1px solid var(--ui-border);
+    color: var(--ui-muted);
+    cursor: pointer;
+  }
+  .localized-picker-trigger svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.7;
+    pointer-events: none;
+  }
+  .localized-picker-trigger input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+}

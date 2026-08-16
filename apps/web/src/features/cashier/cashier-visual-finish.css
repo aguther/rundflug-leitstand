@@ -1,0 +1,37 @@
+/* Cashier-only visual finish moved out of the global application entry. */
+.admin-shell .admin-workspace.master-data-active .master-data-table-scroll,
+.admin-shell .reset-level-row,
+.cashier-shell :is(.group-size, .ticket-preview, .ticket-search) {
+  box-shadow: var(--ui-shadow-soft);
+}
+
+.admin-shell .admin-workspace.master-data-active .master-data-table tbody tr {
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.admin-shell .admin-workspace.master-data-active .master-data-table tbody tr:hover {
+  background: color-mix(in srgb, var(--ui-accent-soft) 42%, var(--ui-surface));
+}
+
+.admin-shell .admin-workspace.master-data-active .master-data-table tbody tr.selected {
+  background: color-mix(in srgb, var(--ui-accent-soft) 68%, var(--ui-surface));
+  box-shadow: inset 3px 0 0 var(--ui-accent);
+}
+
+.cashier-shell .product-option {
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 0 var(--ui-highlight);
+}
+
+.cashier-shell .product-option:hover {
+  border-color: color-mix(in srgb, var(--ui-accent) 45%, var(--ui-border));
+  background: color-mix(in srgb, var(--ui-accent-soft) 42%, var(--ui-surface));
+}
+
+.cashier-shell .product-option.selected {
+  box-shadow:
+    inset 3px 0 0 var(--ui-accent),
+    0 7px 20px color-mix(in srgb, var(--ui-accent) 14%, transparent);
+}
