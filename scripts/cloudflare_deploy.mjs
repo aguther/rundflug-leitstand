@@ -72,7 +72,7 @@ export async function main(argumentsList = process.argv.slice(2)) {
 
   const migrationFiles = (await readdir(`${repositoryRoot}/apps/worker/migrations`))
     .filter((name) => /^\d{4}_.+\.sql$/.test(name))
-    .sort();
+    .sort((left, right) => left.localeCompare(right));
   const migrationSafety = await loadMigrationSafety(repositoryRoot, migrationFiles);
   const wranglerOptions = { accountId: manifest.accountId };
   const commonD1Arguments = ["--remote", "--config", configPath, "--x-provision=false"];

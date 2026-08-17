@@ -20,7 +20,7 @@ function migratedDatabase() {
   database.exec("PRAGMA foreign_keys = ON");
   for (const file of readdirSync(migrations)
     .filter((name) => /^\d{4}_.+\.sql$/.test(name))
-    .sort()) {
+    .sort((left, right) => left.localeCompare(right))) {
     database.exec(readFileSync(resolve(migrations, file), "utf8"));
   }
   return database;
