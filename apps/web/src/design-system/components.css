@@ -208,6 +208,7 @@
   border-radius: var(--radius-md);
   color: var(--ui-muted);
   background: var(--ui-control);
+  transition: box-shadow 140ms ease;
 }
 .ds-search-field:focus-within {
   box-shadow: var(--field-focus-ring);
@@ -220,10 +221,6 @@
   outline: 0;
   color: var(--ui-text);
   background: transparent;
-}
-.ds-search-field input:focus-visible {
-  outline: 0;
-  box-shadow: none;
 }
 .ds-search-control {
   display: block;
@@ -823,7 +820,9 @@
   position: relative;
   z-index: 1;
   outline: 0;
-  box-shadow: var(--field-focus-ring);
+  box-shadow:
+    inset 0 1px 1px rgb(0 0 0 / 4%),
+    var(--field-focus-ring);
 }
 
 .ds-control-group {

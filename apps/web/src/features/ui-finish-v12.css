@@ -31,14 +31,6 @@
   transform: translateY(1px);
 }
 
-:is(.app-shell, .flight-line-shell) :is(input, select, textarea) {
-  box-shadow: inset 0 1px 1px rgb(0 0 0 / 4%);
-  transition:
-    border-color 140ms ease,
-    box-shadow 140ms ease,
-    background-color 140ms ease;
-}
-
 :is(.app-shell, .flight-line-shell)
   :is(.primary-action, .assist-claim, .assist-finish, .login-submit) {
   color: #fff;
