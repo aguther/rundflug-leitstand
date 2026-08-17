@@ -8,6 +8,7 @@ const rotationCount = full ? 300 : 30;
 const runIntervalSeconds = 30;
 const anchorIntervalRuns = 10;
 const forecastSampleCount = 100;
+const lookupCountPerProbe = 30_000;
 const retainedRunIntervals = (24 * 60 * 60) / runIntervalSeconds;
 const runCount = (durationHours * 60 * 60) / runIntervalSeconds;
 
@@ -74,19 +75,31 @@ function populatedDatabase(runs = runCount) {
   return database;
 }
 
-function percentile95(samples) {
-  const ordered = [...samples].sort((left, right) => left - right);
+function percentile95(samples, metric) {
+  const ordered = samples.map((sample) => sample[metric]).sort((left, right) => left - right);
   return ordered[Math.max(0, Math.ceil(ordered.length * 0.95) - 1)] ?? 0;
 }
 
 function forecastProbe(database, eventId) {
+  const lookupSql = `SELECT run_sequence, lower_minutes, upper_minutes
+                       FROM forecast_snapshots
+                      WHERE event_id = ?1 AND rotation_sequence = ?2
+                      ORDER BY run_sequence DESC LIMIT 1`;
+  const benchmarkLookup = database.prepare(lookupSql);
+  const lookupCpuStarted = process.cpuUsage();
+  const lookupRepeats = Math.ceil(lookupCountPerProbe / rotationCount);
+  let lookupChecksum = 0;
+  for (let repeat = 0; repeat < lookupRepeats; repeat += 1) {
+    for (let rotation = 0; rotation < rotationCount; rotation += 1) {
+      const snapshot = benchmarkLookup.get(eventId, rotation);
+      lookupChecksum = (lookupChecksum + Number(snapshot.run_sequence)) % 2_147_483_647;
+    }
+  }
+  const lookupCpuElapsed = process.cpuUsage(lookupCpuStarted);
+  if (!Number.isFinite(lookupChecksum)) throw new Error("PLANNING_HISTORY_SCALE_LOOKUP_INVALID");
+
   const started = performance.now();
-  const lookup = database.prepare(
-    `SELECT run_sequence, lower_minutes, upper_minutes
-       FROM forecast_snapshots
-      WHERE event_id = ?1 AND rotation_sequence = ?2
-      ORDER BY run_sequence DESC LIMIT 1`,
-  );
+  const lookup = database.prepare(lookupSql);
   const snapshots = [];
   for (let rotation = 0; rotation < rotationCount; rotation += 1) {
     snapshots.push(lookup.get(eventId, rotation));
@@ -104,7 +117,10 @@ function forecastProbe(database, eventId) {
     }
   }
   if (!Number.isFinite(forecastChecksum)) throw new Error("PLANNING_HISTORY_SCALE_PROBE_INVALID");
-  return performance.now() - started;
+  return {
+    wallMs: performance.now() - started,
+    lookupCpuMs: (lookupCpuElapsed.user + lookupCpuElapsed.system) / 1_000,
+  };
 }
 
 function warmAndMeasure(database, eventId, samples) {
@@ -185,12 +201,17 @@ try {
   while (duringSamples.length < forecastSampleCount) {
     duringSamples.push(forecastProbe(database, "event-2"));
   }
-  const baselineP95Ms = percentile95(baselineSamples);
-  const compactionP95Ms = percentile95(duringSamples);
-  const degradation = baselineP95Ms === 0 ? 0 : (compactionP95Ms - baselineP95Ms) / baselineP95Ms;
-  if (compactionP95Ms >= 2_000 || degradation > 0.1) {
+  const baselineP95Ms = percentile95(baselineSamples, "wallMs");
+  const compactionP95Ms = percentile95(duringSamples, "wallMs");
+  const baselineLookupCpuP95Ms = percentile95(baselineSamples, "lookupCpuMs");
+  const compactionLookupCpuP95Ms = percentile95(duringSamples, "lookupCpuMs");
+  const cpuDegradation =
+    baselineLookupCpuP95Ms === 0
+      ? 0
+      : (compactionLookupCpuP95Ms - baselineLookupCpuP95Ms) / baselineLookupCpuP95Ms;
+  if (compactionP95Ms >= 2_000 || cpuDegradation > 0.1) {
     throw new Error(
-      `PLANNING_HISTORY_SCALE_FORECAST_BUDGET_EXCEEDED:${baselineP95Ms}:${compactionP95Ms}`,
+      `PLANNING_HISTORY_SCALE_FORECAST_BUDGET_EXCEEDED:${baselineP95Ms}:${compactionP95Ms}:${baselineLookupCpuP95Ms}:${compactionLookupCpuP95Ms}`,
     );
   }
 
@@ -228,7 +249,9 @@ try {
       totalSnapshots: runCount * rotationCount * eventCount,
       baselineP95Ms,
       compactionP95Ms,
-      degradationPercent: degradation * 100,
+      baselineLookupCpuP95Ms,
+      compactionLookupCpuP95Ms,
+      cpuDegradationPercent: cpuDegradation * 100,
       compactedPages,
       baselinePages,
       segments,

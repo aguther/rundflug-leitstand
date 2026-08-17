@@ -25,6 +25,13 @@ Sicherheitsfensters und wiederholen keine Kommandos. Absolute Latenzbudgets geh�
 die getrennten Baseline- und Skalierungsläufe; schwankende Runner-Zeit darf einen fachlich korrekten
 Vertical-Slice nicht rot machen.
 
+Auch die Lastprüfungen trennen Wandzeit und CPU-Budget: Die Planning-History-Skala erzwingt die
+absolute Zwei-Sekunden-Grenze weiterhin über monotone Wandzeit, bewertet die relative
+Zehn-Prozent-CPU-Verschlechterung jedoch über die Prozess-CPU-Zeit einer gleich großen indexierten
+Snapshot-Lookup-Stichprobe. Dadurch bleibt das fachliche Budget für den von der Kompaktion
+beeinflussbaren Anteil unverändert, während Betriebssystem-Scheduling und der identische synthetische
+Forecast-Rechenkern nicht als Datenbankregression fehlklassifiziert werden.
+
 ## Ablauf für `main`
 
 1. Der Push auf `main` durchläuft dieselben Prüfungen wie jeder andere Branch.

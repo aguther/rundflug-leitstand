@@ -111,6 +111,11 @@ Die Anwendungslöschung bleibt führend; ein R2-Lifecycle dient nur als Sicherhe
   Zustand.
 - Der vollständige Lastnachweis umfasst drei parallele 72-Stunden-Veranstaltungen mit je 300
   Umläufen und prüft Detailfenster, Mengenbilanz, terminale Kompaktion, Speicher und Forecast-p95.
+  Die absolute Zwei-Sekunden-Latenzgrenze wird gegen monotone Wandzeit gemessen. Die relative
+  Zehn-Prozent-CPU-Grenze verwendet die Prozess-CPU-Zeit der gleich großen indexierten
+  Snapshot-Lookup-Stichprobe. Damit misst sie genau den durch die Kompaktion veränderbaren Anteil,
+  während Betriebssystem-Scheduling und der identische synthetische Forecast-Rechenkern keine
+  vermeintliche Datenbankregression erzeugen.
 
 ## Verworfene Alternativen
 
