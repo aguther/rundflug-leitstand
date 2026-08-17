@@ -3,7 +3,15 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CheckboxField, Field, SearchField, SelectField, TextAreaField, TextField } from "./Field";
+import {
+  CheckboxField,
+  Field,
+  SearchField,
+  SelectField,
+  SwitchField,
+  TextAreaField,
+  TextField,
+} from "./Field";
 
 describe("design-system field contracts", () => {
   afterEach(() => cleanup());
@@ -52,6 +60,33 @@ describe("design-system field contracts", () => {
     expect(fixed.id).toBe("fixed-check");
     expect(fixed.disabled).toBe(true);
     expect(fixed.closest(".ds-checkbox-field")?.className).toContain("disabled");
+  });
+
+  it("renders accessible compact and descriptive switches", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <SwitchField
+        checked
+        compact
+        description="Zusätzliche Erklärung"
+        label="Automatik"
+        onChange={onChange}
+      />,
+    );
+
+    const generated = screen.getByRole("switch", { name: "Automatik" });
+    expect(generated.id).not.toBe("");
+    expect(generated.getAttribute("aria-describedby")).toBe(`${generated.id}-description`);
+    expect(generated.closest(".ds-switch-field")?.className).toContain("compact");
+    await user.click(generated);
+    expect(onChange).toHaveBeenCalledOnce();
+
+    rerender(<SwitchField checked={false} disabled id="fixed-switch" label="Gesperrt" />);
+    const fixed = screen.getByRole("switch", { name: "Gesperrt" }) as HTMLInputElement;
+    expect(fixed.id).toBe("fixed-switch");
+    expect(fixed.disabled).toBe(true);
+    expect(fixed.closest(".ds-switch-field")?.className).toContain("disabled");
   });
 
   it("connects text, search, select, and textarea controls with labels and help", () => {

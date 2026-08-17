@@ -48,6 +48,7 @@ function ThemeIcon({
 export function ThemeToggle({ binary = false }: Readonly<{ binary?: boolean }>) {
   const { preference, resolved, cycle, setPreference } = useTheme();
   const label = themeToggleLabel(binary, preference, resolved);
+  const icon = !binary && preference === "system" ? "system" : resolved === "dark" ? "moon" : "sun";
   return (
     <button
       aria-label={label}
@@ -57,7 +58,7 @@ export function ThemeToggle({ binary = false }: Readonly<{ binary?: boolean }>) 
       title={label}
       type="button"
     >
-      <svg aria-hidden="true" viewBox="0 0 24 24">
+      <svg aria-hidden="true" data-theme-icon={icon} viewBox="0 0 24 24">
         <ThemeIcon binary={binary} preference={preference} resolved={resolved} />
       </svg>
     </button>

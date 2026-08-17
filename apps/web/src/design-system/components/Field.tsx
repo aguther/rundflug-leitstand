@@ -19,6 +19,14 @@ export interface CheckboxFieldProps extends Omit<InputHTMLAttributes<HTMLInputEl
   trailing?: ReactNode;
 }
 
+export interface SwitchFieldProps
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, "checked" | "role" | "type"> {
+  checked: boolean;
+  compact?: boolean;
+  description?: ReactNode;
+  label: ReactNode;
+}
+
 export function Field({ label, help, children, className = "" }: Readonly<FieldProps>) {
   return (
     <div className={`ds-field ${className}`.trim()}>
@@ -57,6 +65,65 @@ export function CheckboxField({
       </label>
       {trailing ? <span className="ds-checkbox-field-trailing">{trailing}</span> : null}
     </div>
+  );
+}
+
+export function SwitchField({
+  checked,
+  className = "",
+  compact = false,
+  description,
+  disabled,
+  id: providedId,
+  label,
+  ...input
+}: Readonly<SwitchFieldProps>) {
+  const generatedId = useId();
+  const id = providedId ?? generatedId;
+  const labelId = `${id}-label`;
+  const descriptionId = description ? `${id}-description` : undefined;
+  const describedBy = [input["aria-describedby"], descriptionId].filter(Boolean).join(" ");
+  const labelledBy = input["aria-label"]
+    ? input["aria-labelledby"]
+    : input["aria-labelledby"] || labelId;
+
+  return (
+    <label
+      className={[
+        "ds-switch-field",
+        compact ? "ds-switch-field--compact" : "",
+        disabled ? "ds-switch-field--disabled" : "",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      htmlFor={id}
+    >
+      <span className={`ds-switch-field-copy ${compact ? "visually-hidden" : ""}`.trim()}>
+        <span className="ds-switch-field-label" id={labelId}>
+          {label}
+        </span>
+        {description ? (
+          <small className="ds-switch-field-description" id={descriptionId}>
+            {description}
+          </small>
+        ) : null}
+      </span>
+      <span className="ds-switch-control">
+        <input
+          {...input}
+          aria-checked={checked}
+          aria-describedby={describedBy || undefined}
+          aria-labelledby={labelledBy || undefined}
+          checked={checked}
+          disabled={disabled}
+          id={id}
+          role="switch"
+          type="checkbox"
+        />
+        <span aria-hidden="true" className="ds-switch-track" />
+      </span>
+    </label>
   );
 }
 

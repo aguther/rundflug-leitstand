@@ -45,6 +45,7 @@ import {
 } from "./simulation-scenario-template";
 import { useSimulationComparison } from "./useSimulationComparison";
 import { useSimulationPlayback } from "./useSimulationPlayback";
+import "../../design-system/switch-field.css";
 import "./forecast-simulation.css";
 
 const MINUTE_MS = 60_000;

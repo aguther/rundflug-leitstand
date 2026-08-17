@@ -187,7 +187,7 @@
 
 .admin-shell .event-parameters-workspace .event-parameter-number-control:focus-within {
   border-color: var(--ui-accent);
-  box-shadow: 0 0 0 2px var(--ui-focus);
+  box-shadow: var(--field-focus-ring);
 }
 
 .admin-shell .event-parameters-workspace .event-parameter-number-control input {

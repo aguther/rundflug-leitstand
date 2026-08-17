@@ -7,7 +7,6 @@
   --sim-flight-end: #2d8247;
   --sim-ground-start: #4a5259;
   --sim-ground-end: #596168;
-  --sim-toggle-thumb: #ffffff;
   --sim-on-accent: #ffffff;
   height: 100dvh;
   min-height: 100dvh;
@@ -15,13 +14,7 @@
   flex-direction: column;
   overflow: hidden;
   color: var(--ui-text);
-  background:
-    radial-gradient(
-      circle at 76% 8%,
-      color-mix(in srgb, var(--ui-accent) 7%, transparent),
-      transparent 28rem
-    ),
-    var(--ui-bg);
+  background: var(--ui-bg);
   font-size: 13px;
 }
 
@@ -30,7 +23,6 @@
   --sim-departure: #22bfd6;
   --sim-flight-end: #3b9958;
   --sim-ground-end: #949da4;
-  --sim-toggle-thumb: #f2f3f5;
 }
 
 .forecast-simulator * {
@@ -100,6 +92,11 @@
 
 .sim-run-label {
   color: var(--ui-muted);
+}
+
+.sim-app-header .theme-toggle {
+  width: 40px;
+  height: 40px;
 }
 
 .sim-fids-button.ds-button {
@@ -189,9 +186,9 @@
 .sim-controls select,
 .sim-injector select {
   width: 100%;
-  min-height: 36px;
+  min-height: var(--control-default);
   padding: 0 10px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-border-strong);
   border-radius: var(--radius-md);
   color: var(--ui-text);
   background: var(--ui-control);
@@ -1082,9 +1079,10 @@
 }
 
 .sim-editor-tabs button {
-  min-height: 42px;
+  min-height: 48px;
   padding: 6px 10px;
   border: 0;
+  border-bottom: 3px solid transparent;
   border-right: 1px solid var(--ui-border);
   color: var(--ui-muted);
   background: transparent;
@@ -1096,6 +1094,7 @@
 }
 
 .sim-editor-tabs button[aria-current="page"] {
+  border-bottom-color: var(--ui-accent);
   color: var(--ui-accent);
   background: var(--ui-accent-soft);
   font-weight: 700;
@@ -1182,9 +1181,9 @@
 
 .sim-plan-entry :is(input, select) {
   min-width: 0;
-  min-height: 34px;
+  min-height: var(--control-default);
   padding: 0 8px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-border-strong);
   border-radius: var(--radius-sm);
   color: var(--ui-text);
   background: var(--ui-control);
@@ -1510,9 +1509,9 @@
 }
 
 .sim-admin-grid input[type="text"] {
-  min-height: 32px;
+  min-height: var(--control-default);
   padding: 0 8px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-border-strong);
   border-radius: var(--radius-sm);
   color: var(--ui-text);
   background: var(--ui-control);
@@ -1580,19 +1579,19 @@
 }
 
 .sim-time-control {
-  min-height: 36px;
+  min-height: var(--control-default);
   display: grid;
   grid-template-columns: minmax(0, 1fr) 34px;
   align-items: center;
   overflow: hidden;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-border-strong);
   border-radius: var(--radius-md);
   background: var(--ui-control);
 }
 
 .sim-time-control input {
   min-width: 0;
-  height: 34px;
+  height: calc(var(--control-default) - 2px);
   padding: 0 9px;
   border: 0;
   outline: 0;
@@ -1776,9 +1775,9 @@
 }
 
 .sim-demand-profile-toolbar select {
-  min-height: 36px;
+  min-height: var(--control-default);
   padding: 0 10px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-border-strong);
   border-radius: var(--radius-md);
   color: var(--ui-text);
   background: var(--ui-control);
@@ -1877,9 +1876,9 @@
 .sim-demand-window-row .sim-number-field {
   width: 100%;
   min-width: 0;
-  min-height: 32px;
+  min-height: var(--control-compact);
   padding: 0 8px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-border-strong);
   border-radius: var(--radius-sm);
   color: var(--ui-text);
   background: var(--ui-control);
@@ -2076,9 +2075,9 @@
 
 .sim-number-field {
   width: 100%;
-  min-height: 32px;
+  min-height: var(--control-compact);
   padding: 0 8px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-border-strong);
   border-radius: var(--radius-sm);
   color: var(--ui-text);
   background: var(--ui-control);
@@ -2118,7 +2117,7 @@
 
 .sim-incident-head,
 .sim-incident-row {
-  grid-template-columns: 96px 42px minmax(0, 1fr);
+  grid-template-columns: 96px 56px minmax(0, 1fr);
 }
 
 .sim-incident-group + .sim-incident-group {
@@ -2205,46 +2204,6 @@
 
 .sim-targeted-rules .sim-editor-hint {
   padding: 4px 0;
-}
-
-.sim-toggle {
-  position: relative;
-  width: 30px;
-  height: 18px;
-  display: inline-block;
-}
-
-.sim-toggle input {
-  position: absolute;
-  opacity: 0;
-}
-
-.sim-toggle > span {
-  position: absolute;
-  inset: 0;
-  border-radius: 20px;
-  background: var(--ui-disabled);
-  cursor: pointer;
-}
-
-.sim-toggle > span::after {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--sim-toggle-thumb);
-  content: "";
-  transition: transform 140ms ease;
-}
-
-.sim-toggle input:checked + span {
-  background: var(--ui-accent);
-}
-
-.sim-toggle input:checked + span::after {
-  transform: translateX(12px);
 }
 
 .sim-reproducibility-field {

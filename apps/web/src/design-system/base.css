@@ -543,6 +543,30 @@ textarea {
   font: inherit;
 }
 
+.theme-toggle {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  color: var(--ui-text);
+  background: var(--ui-control);
+  cursor: pointer;
+}
+
+.theme-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
 .app-loading {
   min-height: 100dvh;
   display: grid;

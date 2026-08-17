@@ -17,6 +17,7 @@
   --control-checkbox: 20px;
   --header-height: 56px;
   --focus-ring: 0 0 0 2px var(--ui-bg), 0 0 0 4px var(--ui-accent);
+  --field-focus-ring: 0 0 0 2px var(--ui-bg), 0 0 0 5px var(--ui-accent);
 
   --ui-bg: #f7f7f8;
   --ui-surface: #ffffff;

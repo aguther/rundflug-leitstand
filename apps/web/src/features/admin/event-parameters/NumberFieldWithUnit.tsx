@@ -29,7 +29,7 @@ export function NumberFieldWithUnit({
       htmlFor={generatedId}
     >
       <span>{label}</span>
-      <span className="event-parameter-number-control">
+      <span className="event-parameter-number-control ds-control-group">
         <input
           aria-describedby={errorId}
           aria-invalid={Boolean(error) || undefined}

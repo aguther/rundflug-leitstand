@@ -6,7 +6,7 @@ import {
 } from "@rundflug/domain";
 import { Clock3, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { type KeyboardEvent, useEffect, useState } from "react";
-import { Button, ModalDialog } from "../../design-system/components";
+import { Button, ModalDialog, SwitchField } from "../../design-system/components";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "../../event-time";
 import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
 import {
@@ -292,7 +292,7 @@ function TimeInput({
   return (
     <div className="sim-time-field">
       <span>{label}</span>
-      <span className="sim-time-control">
+      <span className="sim-time-control ds-control-group">
         <EditableTimeInput
           ariaLabel={`${label}, Uhrzeit`}
           onChange={onChange}
@@ -529,28 +529,6 @@ function DistributionInputs({
       />
       <small>Min.</small>
     </div>
-  );
-}
-
-function Toggle({
-  checked,
-  label,
-  onChange,
-}: Readonly<{
-  checked: boolean;
-  label: string;
-  onChange: (checked: boolean) => void;
-}>) {
-  return (
-    <label className="sim-toggle">
-      <input
-        checked={checked}
-        onChange={(event) => onChange(event.currentTarget.checked)}
-        type="checkbox"
-      />
-      <span aria-hidden="true" />
-      <b className="visually-hidden">{label}</b>
-    </label>
   );
 }
 
@@ -870,21 +848,25 @@ export function ScenarioEditor({
             <div className="sim-toggle-list">
               <div>
                 <span>Für Veranstaltung aktiviert</span>
-                <Toggle
+                <SwitchField
                   checked={config.adminParameters.eventAutomaticPrecallEnabled}
+                  compact
                   label="Automatischen Voraufruf für Veranstaltung aktivieren"
-                  onChange={(eventAutomaticPrecallEnabled) =>
-                    updateAdmin({ eventAutomaticPrecallEnabled })
+                  onChange={(event) =>
+                    updateAdmin({ eventAutomaticPrecallEnabled: event.currentTarget.checked })
                   }
                 />
               </div>
               <div>
                 <span>Für Ressourcengruppe aktiviert</span>
-                <Toggle
+                <SwitchField
                   checked={config.adminParameters.resourceGroupAutomaticPrecallEnabled}
+                  compact
                   label="Automatischen Voraufruf für Ressourcengruppe aktivieren"
-                  onChange={(resourceGroupAutomaticPrecallEnabled) =>
-                    updateAdmin({ resourceGroupAutomaticPrecallEnabled })
+                  onChange={(event) =>
+                    updateAdmin({
+                      resourceGroupAutomaticPrecallEnabled: event.currentTarget.checked,
+                    })
                   }
                 />
               </div>
@@ -1206,13 +1188,14 @@ export function ScenarioEditor({
               </div>
               <div className="sim-incident-row">
                 <span className="sim-incident-row-label">Tanken</span>
-                <Toggle
+                <SwitchField
                   checked={config.realityModel.incidents.refueling.enabled}
+                  compact
                   label="Tanken aktiv"
-                  onChange={(enabled) =>
+                  onChange={(event) =>
                     updateIncident("refueling", {
                       ...config.realityModel.incidents.refueling,
-                      enabled,
+                      enabled: event.currentTarget.checked,
                     })
                   }
                 />
@@ -1246,13 +1229,14 @@ export function ScenarioEditor({
               </div>
               <div className="sim-incident-row">
                 <span className="sim-incident-row-label">Geplante Pause</span>
-                <Toggle
+                <SwitchField
                   checked={config.realityModel.incidents.plannedPause.enabled}
+                  compact
                   label="Geplante Pause aktiv"
-                  onChange={(enabled) =>
+                  onChange={(event) =>
                     updateIncident("plannedPause", {
                       ...config.realityModel.incidents.plannedPause,
-                      enabled,
+                      enabled: event.currentTarget.checked,
                     })
                   }
                 />
@@ -1298,13 +1282,14 @@ export function ScenarioEditor({
               </div>
               <div className="sim-incident-row">
                 <span className="sim-incident-row-label">Ungeplante Pause</span>
-                <Toggle
+                <SwitchField
                   checked={config.realityModel.incidents.unplannedPause.enabled}
+                  compact
                   label="Ungeplante Pause aktiv"
-                  onChange={(enabled) =>
+                  onChange={(event) =>
                     updateIncident("unplannedPause", {
                       ...config.realityModel.incidents.unplannedPause,
-                      enabled,
+                      enabled: event.currentTarget.checked,
                     })
                   }
                 />
@@ -1337,13 +1322,14 @@ export function ScenarioEditor({
               </div>
               <div className="sim-incident-row sim-incident-row--defect">
                 <span className="sim-incident-row-label">Technischer Defekt</span>
-                <Toggle
+                <SwitchField
                   checked={config.realityModel.incidents.technicalDefect.enabled}
+                  compact
                   label="Technischer Defekt aktiv"
-                  onChange={(enabled) =>
+                  onChange={(event) =>
                     updateIncident("technicalDefect", {
                       ...config.realityModel.incidents.technicalDefect,
-                      enabled,
+                      enabled: event.currentTarget.checked,
                     })
                   }
                 />

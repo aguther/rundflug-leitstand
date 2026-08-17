@@ -186,8 +186,8 @@
 }
 
 .operational-plan-dialog .localized-picker-control > input:focus {
-  border-color: color-mix(in srgb, var(--ui-accent) 72%, var(--ui-border));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 17%, transparent);
+  border-color: var(--ui-accent);
+  box-shadow: var(--field-focus-ring);
   outline: 0;
 }
 

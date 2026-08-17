@@ -68,11 +68,13 @@ describe("theme contracts", () => {
 
     expect(screen.getByText("system/light/light")).toBeTruthy();
     expect(window.localStorage.getItem("ui-theme")).toBeNull();
+    expect(document.querySelector('svg[data-theme-icon="system"]')).not.toBeNull();
     await user.click(
       screen.getByRole("button", { name: "Systemdarstellung aktiv. Zu Hell wechseln" }),
     );
     expect(screen.getByText("light/light/light")).toBeTruthy();
     expect(window.localStorage.getItem("ui-theme")).toBe("light");
+    expect(document.querySelector('svg[data-theme-icon="sun"]')).not.toBeNull();
     const [cycleToggle] = screen.getAllByRole("button", {
       name: "Helle Darstellung aktiv. Zu Dunkel wechseln",
     });
@@ -80,6 +82,7 @@ describe("theme contracts", () => {
     if (!cycleToggle) return;
     await user.click(cycleToggle);
     expect(screen.getByText("dark/dark/light")).toBeTruthy();
+    expect(document.querySelector('svg[data-theme-icon="moon"]')).not.toBeNull();
     await user.click(
       screen.getByRole("button", {
         name: "Dunkle Darstellung aktiv. Zur Systemdarstellung wechseln",
