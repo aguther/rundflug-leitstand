@@ -3,9 +3,7 @@ import {
   ArrowLeft,
   Clock3,
   Coffee,
-  Copy,
   Download,
-  FileJson,
   Fuel,
   Monitor,
   Pause,
@@ -15,16 +13,14 @@ import {
   RotateCcw,
   Settings2,
   Square,
-  Trash2,
   Upload,
   Wrench,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, ModalDialog } from "../../design-system/components";
 import { ThemeToggle } from "../../design-system/ThemeToggle";
 import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
 import { useTimeDiagramViewport } from "../../shared/time-diagram-viewport";
-import { CalibrationCsvError, calibrateFromCsv } from "./csv-calibration";
 import { calculateSimulationMetrics, runSimulation } from "./engine";
 import { ForecastTimeline } from "./ForecastTimeline";
 import {
@@ -39,10 +35,7 @@ import {
 } from "./model";
 import { ScenarioEditor } from "./ScenarioEditor";
 import { SimulationComparisonDialog } from "./SimulationComparisonDialog";
-import {
-  nextSimulationVariantName,
-  SimulationFoundationDialog,
-} from "./SimulationFoundationDialog";
+import { SimulationImportDialog, type SimulationImportResult } from "./SimulationFoundationDialog";
 import { SimulationHistoryDialog } from "./SimulationHistoryDialog";
 import { createSimulationExport } from "./simulation-export";
 import { useSimulationFidsPublisher } from "./simulation-fids-channel";
@@ -58,13 +51,6 @@ const MINUTE_MS = 60_000;
 const TICK_MS = 30_000;
 const SPEEDS = [1, 10, 60, 300] as const;
 const HOSTED_SIMULATOR = import.meta.env.MODE !== "simulator";
-
-interface SimulationVariant {
-  id: string;
-  name: string;
-  config: SimulationConfig;
-  manualIncidents: ManualIncident[];
-}
 
 const timeFormatter = new Intl.DateTimeFormat("de-DE", {
   hour: "2-digit",
@@ -90,49 +76,6 @@ function forecastQualityLabel(quality: SimulationForecastSnapshot["quality"]): s
       return "Veränderlich";
     default:
       return "Unsicher";
-  }
-}
-
-interface CalibrationImportOptions {
-  config: SimulationConfig;
-  file: File | undefined;
-  fileInput: HTMLInputElement | null;
-  onRestart: (config: SimulationConfig) => void;
-  setImporting: (importing: boolean) => void;
-  setMessage: (message: string) => void;
-}
-
-async function importCalibrationCsv({
-  config,
-  file,
-  fileInput,
-  onRestart,
-  setImporting,
-  setMessage,
-}: CalibrationImportOptions): Promise<void> {
-  if (!file) return;
-  setImporting(true);
-  try {
-    const calibration = calibrateFromCsv(await file.text(), config.realityModel.phases.buffer);
-    onRestart({
-      ...config,
-      realityModel: {
-        ...config.realityModel,
-        phases: calibration.suggestedPhases,
-      },
-    });
-    setMessage(
-      `${calibration.validRows} Umläufe kalibriert, ${calibration.excludedRows} ausgeschlossen. Puffer blieb unverändert.`,
-    );
-  } catch (error) {
-    setMessage(
-      error instanceof CalibrationCsvError
-        ? error.message
-        : "Die Datei konnte nicht gelesen werden.",
-    );
-  } finally {
-    setImporting(false);
-    if (fileInput) fileInput.value = "";
   }
 }
 
@@ -372,22 +315,14 @@ function MetricCard({
       <span>{label}</span>
       <strong>{value}</strong>
       <small>{hint}</small>
-      <footer>Synthetischer Lauf</footer>
+      <small className="sim-metric-card-source">Synthetischer Lauf</small>
     </article>
   );
 }
 
 export function ForecastSimulationView() {
   const initialConfig = useMemo(() => simulationConfigForPreset("NORMAL"), []);
-  const [variants, setVariants] = useState<SimulationVariant[]>(() => [
-    {
-      id: "variant-1",
-      name: "Variante 1",
-      config: structuredClone(initialConfig),
-      manualIncidents: [],
-    },
-  ]);
-  const [selectedVariantId, setSelectedVariantId] = useState("variant-1");
+  const [scenarioName, setScenarioName] = useState("Normalbetrieb");
   const [config, setConfig] = useState<SimulationConfig>(initialConfig);
   const [manualIncidents, setManualIncidents] = useState<ManualIncident[]>([]);
   const [result, setResult] = useState(() => runSimulation(initialConfig));
@@ -407,13 +342,15 @@ export function ForecastSimulationView() {
   );
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [foundationOpen, setFoundationOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const comparison = useSimulationComparison();
   const [importMessage, setImportMessage] = useState<string | null>(null);
-  const [importingCsv, setImportingCsv] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const editorErrors = validateSimulationConfig(editorConfig);
   const simulationEnd = Date.parse(result.runWindow.endAt);
+
+  useEffect(() => {
+    document.title = "Prognose-Simulation · Rundflug-Leitstand";
+  }, []);
 
   useSimulationPlayback({
     endAt: simulationEnd,
@@ -439,21 +376,6 @@ export function ForecastSimulationView() {
 
   const restart = (nextConfig = config, incidents: readonly ManualIncident[] = []) => {
     loadSimulation(nextConfig, incidents);
-    setVariants((current) =>
-      current.map((variant) =>
-        variant.id === selectedVariantId
-          ? {
-              ...variant,
-              config: structuredClone(nextConfig),
-              manualIncidents: structuredClone([...incidents]),
-            }
-          : variant,
-      ),
-    );
-  };
-
-  const applyQuickConfig = (nextConfig: SimulationConfig) => {
-    if (validateSimulationConfig(nextConfig).length === 0) restart(nextConfig);
   };
   const visibleAt = Math.floor(currentMs / TICK_MS) * TICK_MS;
   const { fidsHref } = useSimulationFidsPublisher({
@@ -513,58 +435,11 @@ export function ForecastSimulationView() {
     const nextIncidents = [...manualIncidents, incident];
     setManualIncidents(nextIncidents);
     setResult(runSimulation(config, nextIncidents));
-    setVariants((current) =>
-      current.map((variant) =>
-        variant.id === selectedVariantId
-          ? { ...variant, manualIncidents: structuredClone(nextIncidents) }
-          : variant,
-      ),
-    );
   };
 
-  const handleCsv = (file: File | undefined) =>
-    importCalibrationCsv({
-      config,
-      file,
-      fileInput: fileInputRef.current,
-      onRestart: restart,
-      setImporting: setImportingCsv,
-      setMessage: setImportMessage,
-    });
-
-  const activateVariant = (variant: SimulationVariant) => {
-    setSelectedVariantId(variant.id);
-    loadSimulation(variant.config, variant.manualIncidents);
-  };
-
-  const duplicateVariant = () => {
-    const source = variants.find((variant) => variant.id === selectedVariantId);
-    if (!source) return;
-    const id = `variant-${crypto.randomUUID()}`;
-    const duplicate: SimulationVariant = {
-      id,
-      name: `${source.name} – Kopie`,
-      config: structuredClone(config),
-      manualIncidents: structuredClone(manualIncidents),
-    };
-    setVariants((current) => [...current, duplicate]);
-    activateVariant(duplicate);
-  };
-
-  const deleteVariant = () => {
-    if (variants.length <= 1) return;
-    const remaining = variants.filter((variant) => variant.id !== selectedVariantId);
-    const replacement = remaining[0];
-    if (!replacement) return;
-    setVariants(remaining);
-    activateVariant(replacement);
-  };
-
-  const exportVariant = () => {
-    const selectedVariant = variants.find((variant) => variant.id === selectedVariantId);
-    if (!selectedVariant) return;
+  const exportScenario = () => {
     try {
-      const template = createSimulationScenarioTemplate(selectedVariant.name, config);
+      const template = createSimulationScenarioTemplate(scenarioName, config);
       const blob = new Blob([JSON.stringify(template, null, 2)], {
         type: "application/json;charset=utf-8",
       });
@@ -576,35 +451,24 @@ export function ForecastSimulationView() {
       URL.revokeObjectURL(url);
       setImportMessage(`${template.name} als Szenario-Konfiguration exportiert.`);
     } catch {
-      setImportMessage("Die aktuelle Variante konnte nicht als Szenario exportiert werden.");
+      setImportMessage("Das aktuelle Szenario konnte nicht exportiert werden.");
     }
   };
 
-  const addFoundationVariant = (foundation: {
-    config: SimulationConfig;
-    format:
-      | "rundflug-simulation-scenario"
-      | "rundflug-simulation-plan"
-      | "rundflug-master-data-template";
-    sourceName: string;
-  }) => {
-    const id = `variant-${crypto.randomUUID()}`;
-    const imported: SimulationVariant = {
-      id,
-      name: nextSimulationVariantName(
-        foundation.sourceName,
-        variants.map((variant) => variant.name),
-      ),
-      config: structuredClone(foundation.config),
-      manualIncidents: [],
-    };
-    setVariants((current) => [...current, imported]);
-    activateVariant(imported);
-    setFoundationOpen(false);
+  const applyImport = (importResult: SimulationImportResult) => {
+    loadSimulation(importResult.config);
+    setImportOpen(false);
+    if (importResult.kind === "CALIBRATION") {
+      setImportMessage(
+        `${importResult.validRows} Umläufe kalibriert, ${importResult.excludedRows} ausgeschlossen. Puffer blieb unverändert.`,
+      );
+      return;
+    }
+    setScenarioName(importResult.sourceName);
     setImportMessage(
-      foundation.format === "rundflug-simulation-scenario"
-        ? `${foundation.sourceName} als neue Variante geladen.`
-        : `${foundation.sourceName} als neue Variante übernommen; keine Tickets, Queues oder Ist-Zustände importiert.`,
+      importResult.format === "rundflug-simulation-scenario"
+        ? `${importResult.sourceName} als aktuelles Szenario geladen.`
+        : `${importResult.sourceName} als aktuelles Szenario übernommen; keine Tickets, Queues oder Ist-Zustände importiert.`,
     );
   };
 
@@ -664,52 +528,10 @@ export function ForecastSimulationView() {
       </header>
       <main className="sim-layout">
         <aside className="sim-sidebar">
-          <section className="sim-variant-manager">
-            <label htmlFor="sim-variant">Variante</label>
-            <select
-              id="sim-variant"
-              onChange={(event) => {
-                const variant = variants.find((entry) => entry.id === event.currentTarget.value);
-                if (variant) activateVariant(variant);
-              }}
-              value={selectedVariantId}
-            >
-              {variants.map((variant) => (
-                <option key={variant.id} value={variant.id}>
-                  {variant.name}
-                </option>
-              ))}
-            </select>
-            <input
-              aria-label="Variantenname"
-              maxLength={80}
-              onChange={(event) => {
-                const name = event.currentTarget.value;
-                setVariants((current) =>
-                  current.map((variant) =>
-                    variant.id === selectedVariantId ? { ...variant, name } : variant,
-                  ),
-                );
-              }}
-              type="text"
-              value={variants.find((variant) => variant.id === selectedVariantId)?.name ?? ""}
-            />
-            <div className="sim-variant-actions">
-              <button aria-label="Variante exportieren" onClick={exportVariant} type="button">
-                <Download aria-hidden="true" /> Export
-              </button>
-              <button aria-label="Variante duplizieren" onClick={duplicateVariant} type="button">
-                <Copy aria-hidden="true" /> Kopie
-              </button>
-              <button
-                aria-label="Variante löschen"
-                disabled={variants.length <= 1}
-                onClick={deleteVariant}
-                type="button"
-              >
-                <Trash2 aria-hidden="true" /> Löschen
-              </button>
-            </div>
+          <section className="sim-current-scenario" aria-labelledby="sim-current-scenario-title">
+            <h2 id="sim-current-scenario-title">Aktuelles Szenario</h2>
+            <strong>{scenarioName}</strong>
+            <small>Nicht gespeichert</small>
           </section>
           <section className="sim-scenario-summary">
             <h2>Szenarioübersicht</h2>
@@ -717,45 +539,11 @@ export function ForecastSimulationView() {
               <div>
                 <dt>Flugzeuge</dt>
                 <dd>
-                  {config.operationalModel ? (
-                    <strong>{config.operationalModel.aircraft.length}</strong>
-                  ) : (
-                    <span className="sim-summary-stepper">
-                      <button
-                        aria-label="Ein Flugzeug entfernen"
-                        disabled={config.adminParameters.aircraftCount <= 1}
-                        onClick={() =>
-                          applyQuickConfig({
-                            ...config,
-                            adminParameters: {
-                              ...config.adminParameters,
-                              aircraftCount: config.adminParameters.aircraftCount - 1,
-                            },
-                          })
-                        }
-                        type="button"
-                      >
-                        −
-                      </button>
-                      <output>{config.adminParameters.aircraftCount}</output>
-                      <button
-                        aria-label="Ein Flugzeug hinzufügen"
-                        disabled={config.adminParameters.aircraftCount >= 12}
-                        onClick={() =>
-                          applyQuickConfig({
-                            ...config,
-                            adminParameters: {
-                              ...config.adminParameters,
-                              aircraftCount: config.adminParameters.aircraftCount + 1,
-                            },
-                          })
-                        }
-                        type="button"
-                      >
-                        <Plus aria-hidden="true" />
-                      </button>
-                    </span>
-                  )}
+                  <strong>
+                    {config.operationalModel
+                      ? config.operationalModel.aircraft.length
+                      : config.adminParameters.aircraftCount}
+                  </strong>
                 </dd>
               </div>
               <div>
@@ -780,6 +568,12 @@ export function ForecastSimulationView() {
                   <strong>4 Phasen · 4 Ereignisse</strong>
                 </dd>
               </div>
+              <div>
+                <dt>Seed</dt>
+                <dd>
+                  <strong>{config.seed}</strong>
+                </dd>
+              </div>
             </dl>
           </section>
           <Button
@@ -792,44 +586,12 @@ export function ForecastSimulationView() {
           >
             <Settings2 aria-hidden="true" /> Konfigurieren
           </Button>
-          <section className="sim-seed-row">
-            <label htmlFor="sim-seed">Seed</label>
-            <input
-              id="sim-seed"
-              min={1}
-              onChange={(event) => {
-                const value = event.currentTarget.valueAsNumber;
-                if (Number.isInteger(value)) applyQuickConfig({ ...config, seed: value });
-              }}
-              type="number"
-              value={config.seed}
-            />
-          </section>
-          <input
-            accept=".csv,text/csv"
-            className="visually-hidden"
-            onChange={(event) => void handleCsv(event.currentTarget.files?.[0])}
-            ref={fileInputRef}
-            type="file"
-          />
-          <section className="sim-sidebar-imports">
-            <span>Import</span>
-            <div>
-              <Button
-                aria-label="Simulationsgrundlage laden"
-                onClick={() => setFoundationOpen(true)}
-              >
-                <FileJson aria-hidden="true" /> Grundlage
-              </Button>
-              <Button
-                aria-label="CSV importieren"
-                busy={importingCsv}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload aria-hidden="true" /> CSV
-              </Button>
-            </div>
-          </section>
+          <Button className="sim-full-button" onClick={() => setImportOpen(true)}>
+            <Upload aria-hidden="true" /> Importieren …
+          </Button>
+          <Button className="sim-full-button" onClick={exportScenario}>
+            <Download aria-hidden="true" /> Szenario exportieren
+          </Button>
           <Button className="sim-full-button" onClick={() => restart(config)} variant="primary">
             <RotateCcw aria-hidden="true" /> Neu starten
           </Button>
@@ -1015,11 +777,11 @@ export function ForecastSimulationView() {
         visibleAt={visibleAt}
       />
 
-      {foundationOpen ? (
-        <SimulationFoundationDialog
+      {importOpen ? (
+        <SimulationImportDialog
           activeConfig={config}
-          onClose={() => setFoundationOpen(false)}
-          onLoad={addFoundationVariant}
+          onClose={() => setImportOpen(false)}
+          onImport={applyImport}
         />
       ) : null}
 

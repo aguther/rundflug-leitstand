@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ForecastSimulationView } from "./ForecastSimulationView";
@@ -89,40 +89,36 @@ vi.mock("./SimulationHistoryDialog", () => ({
       </section>
     ) : null,
 }));
-vi.mock("./SimulationFoundationDialog", async () => {
-  const actual = await vi.importActual<typeof import("./SimulationFoundationDialog")>(
-    "./SimulationFoundationDialog",
-  );
-  return {
-    nextSimulationVariantName: actual.nextSimulationVariantName,
-    SimulationFoundationDialog: ({
-      activeConfig,
-      onLoad,
-    }: {
-      activeConfig: unknown;
-      onLoad: (foundation: {
-        config: unknown;
-        format: "rundflug-simulation-scenario";
-        sourceName: string;
-      }) => void;
-    }) => (
-      <section aria-label="Simulationsgrundlage">
-        <button
-          onClick={() =>
-            onLoad({
-              config: activeConfig,
-              format: "rundflug-simulation-scenario",
-              sourceName: "Importierte Variante",
-            })
-          }
-          type="button"
-        >
-          Grundlage übernehmen
-        </button>
-      </section>
-    ),
-  };
-});
+vi.mock("./SimulationFoundationDialog", () => ({
+  SimulationImportDialog: ({
+    activeConfig,
+    onImport,
+  }: {
+    activeConfig: SimulationConfig;
+    onImport: (result: {
+      kind: "SCENARIO";
+      config: SimulationConfig;
+      format: "rundflug-simulation-scenario";
+      sourceName: string;
+    }) => void;
+  }) => (
+    <section aria-label="Importieren">
+      <button
+        onClick={() =>
+          onImport({
+            kind: "SCENARIO",
+            config: activeConfig,
+            format: "rundflug-simulation-scenario",
+            sourceName: "Importiertes Szenario",
+          })
+        }
+        type="button"
+      >
+        Szenario übernehmen
+      </button>
+    </section>
+  ),
+}));
 vi.mock("./simulation-fids-channel", () => ({
   useSimulationFidsPublisher: () => ({
     fidsHref: "/simulation/fids?source=synthetic-source",
@@ -146,33 +142,31 @@ afterEach(() => {
 });
 
 describe("forecast simulation view", () => {
-  it("manages variants and imports a scenario as an isolated variant", async () => {
+  it("shows one read-only scenario and replaces it through the import flow", async () => {
     const user = userEvent.setup();
     render(<ForecastSimulationView />);
 
+    expect(document.title).toBe("Prognose-Simulation · Rundflug-Leitstand");
     expect(screen.getByText("Nur Simulation – keine Tickets oder Ist-Zustände")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Aktuelles Szenario" })).toBeTruthy();
+    expect(screen.getByText("Normalbetrieb")).toBeTruthy();
+    expect(screen.getByText("Nicht gespeichert")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Szenarioübersicht" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Szenario konfigurieren" }).textContent).toContain(
       "Konfigurieren",
     );
-    const variantSelect = screen.getByLabelText("Variante");
-    expect(within(variantSelect).getAllByRole("option")).toHaveLength(1);
+    expect(screen.queryByLabelText("Variante")).toBeNull();
+    expect(screen.queryByLabelText("Variantenname")).toBeNull();
+    expect(screen.queryByRole("button", { name: /duplizieren|löschen/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Ein Flugzeug hinzufügen|entfernen/ })).toBeNull();
+    expect(screen.queryByRole("spinbutton", { name: "Seed" })).toBeNull();
 
-    await user.click(screen.getByRole("button", { name: /duplizieren/i }));
-    expect(within(variantSelect).getAllByRole("option")).toHaveLength(2);
-    expect((screen.getByLabelText("Variantenname") as HTMLInputElement).value).toBe(
-      "Variante 1 – Kopie",
-    );
+    await user.click(screen.getByRole("button", { name: "Importieren …" }));
+    await user.click(screen.getByRole("button", { name: "Szenario übernehmen" }));
 
-    await user.click(screen.getByRole("button", { name: /löschen/i }));
-    expect(within(variantSelect).getAllByRole("option")).toHaveLength(1);
-
-    await user.click(screen.getByRole("button", { name: /Simulationsgrundlage laden/ }));
-    await user.click(screen.getByRole("button", { name: "Grundlage übernehmen" }));
-
-    expect(within(variantSelect).getAllByRole("option")).toHaveLength(2);
+    expect(screen.getByText("Importiertes Szenario")).toBeTruthy();
     expect(document.querySelector(".sim-import-message")?.textContent).toContain(
-      "Importierte Variante als neue Variante geladen.",
+      "Importiertes Szenario als aktuelles Szenario geladen.",
     );
   }, 30_000);
 
@@ -244,47 +238,15 @@ describe("forecast simulation view", () => {
     expect(screen.getByText(/Median je Kennzahl über 5 Läufe ab Seed 17/)).toBeTruthy();
   });
 
-  it("calibrates a CSV and exposes invalid input without changing the operating system", async () => {
-    render(<ForecastSimulationView />);
-    const input = document.querySelector<HTMLInputElement>('input[type="file"]');
-    expect(input).not.toBeNull();
-
-    const rows = Array.from({ length: 6 }, (_, index) => {
-      const hour = String(8 + index).padStart(2, "0");
-      return `2026-07-22T${hour}:00:00.000Z,2026-07-22T${hour}:07:00.000Z,2026-07-22T${hour}:27:00.000Z,2026-07-22T${hour}:33:00.000Z,false`;
-    });
-    const validFile = {
-      text: async () =>
-        ["called_at,departed_at,landed_at,completed_at,interrupted", ...rows].join("\n"),
-    } as File;
-    fireEvent.change(input as HTMLInputElement, { target: { files: [validFile] } });
-    await waitFor(() =>
-      expect(document.querySelector(".sim-import-message")?.textContent).toMatch(
-        /Umläufe kalibriert/,
-      ),
-    );
-
-    const invalidFile = { text: async () => "invalid" } as File;
-    fireEvent.change(input as HTMLInputElement, { target: { files: [invalidFile] } });
-    await waitFor(() =>
-      expect(document.querySelector(".sim-import-message")?.textContent).toMatch(
-        /CSV|Spalten|Datensätze/,
-      ),
-    );
-  });
-
-  it("exports named variants and result packages entirely in the browser", async () => {
+  it("exports the current scenario and result packages entirely in the browser", async () => {
     const user = userEvent.setup();
     render(<ForecastSimulationView />);
 
-    const name = screen.getByLabelText("Variantenname");
-    await user.clear(name);
-    await user.type(name, "Synthetische Exportvariante");
-    await user.click(screen.getByRole("button", { name: /Variante exportieren/ }));
+    await user.click(screen.getByRole("button", { name: "Szenario exportieren" }));
     expect(URL.createObjectURL).toHaveBeenCalledOnce();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:synthetic-export");
     expect(document.querySelector(".sim-import-message")?.textContent).toContain(
-      "Synthetische Exportvariante als Szenario-Konfiguration exportiert.",
+      "Normalbetrieb als Szenario-Konfiguration exportiert.",
     );
 
     await user.click(screen.getByRole("button", { name: /Ergebnis exportieren/ }));
@@ -296,10 +258,6 @@ describe("forecast simulation view", () => {
     const user = userEvent.setup();
     render(<ForecastSimulationView />);
 
-    await user.click(screen.getByRole("button", { name: "Ein Flugzeug hinzufügen" }));
-    await user.click(screen.getByRole("button", { name: "Ein Flugzeug entfernen" }));
-    await user.clear(screen.getByLabelText("Seed"));
-    await user.type(screen.getByLabelText("Seed"), "23");
     await user.selectOptions(screen.getByLabelText("Simulationsgeschwindigkeit"), "60");
     for (let index = 0; index < 12; index += 1) {
       await user.click(screen.getByRole("button", { name: "+5 Min." }));
@@ -326,6 +284,7 @@ describe("forecast simulation view", () => {
     await user.click(screen.getByRole("button", { name: "Editorwert ändern" }));
     await user.click(screen.getByRole("button", { name: "Editor anwenden" }));
     expect(screen.queryByRole("region", { name: "Szenarioeditor" })).toBeNull();
+    expect(screen.getByText("20260723")).toBeTruthy();
 
     expect(screen.getByRole("link", { name: /FIDS in neuem Tab öffnen/ })).toBeTruthy();
   });

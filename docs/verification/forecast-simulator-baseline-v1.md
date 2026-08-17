@@ -15,7 +15,7 @@ wird über die vorhandene Sitzung auf die Rolle `ADMIN` begrenzt. Die bestehende
 Veranstaltungsauswahl darf beim Einstieg D1 lesen. Zusätzlich kann ein Administrator eine
 eigens dafür begrenzte Simulationsgrundlage herunterladen und anschließend lokal über die
 Dateiauswahl importieren. Die Simulation selbst führt keine API-Abfrage aus. CSV-/JSON-Inhalte,
-Varianten, Konfiguration und Ergebnisse werden nicht an die API übertragen und weder im Browser
+Szenariokonfiguration und Ergebnisse werden nicht an die API übertragen und weder im Browser
 noch serverseitig persistiert. Simulator-Chunks und -Styles sind vom PWA-Precache ausgeschlossen.
 
 Alle hier genannten Läufe verwenden die freigegebenen Standardparameter und Seed `20260722`.
@@ -93,7 +93,7 @@ seedübergreifenden Mediane der wichtigsten Baselinewerte lauten:
 Der Vergleich läuft abbrechbar in einem lokalen Browser-Worker. Er bewertet keine Variante
 automatisch als Gewinner.
 
-## Operative Simulationsgrundlage und Varianten
+## Operative Simulationsgrundlage und Szenario
 
 Unter **Administration → Auswertung** erzeugt
 `GET /api/control/:eventId/exports/simulation-plan.json` das strikt validierte Format
@@ -111,33 +111,40 @@ Operatorenkonten oder Sitzungen. Ein operativer Bezug auf einen aktuellen Umlauf
 exportiert. Stattdessen trägt der Eintrag nur `afterCurrentRotation: true` und bleibt nach dem
 Import ausdrücklich unaufgelöst.
 
-Der gemeinsame Dialog **Simulationsgrundlage laden** akzeptiert das operative Format V1/V2, das
-bestehende `rundflug-master-data-template` Version 1 und das browserlokale
+Der gemeinsame Dialog **Importieren** bündelt eingebaute Szenarien, Simulationsdateien und
+CSV-Kalibrierung. Die JSON-Quelle akzeptiert das operative Format V1/V2, das bestehende
+`rundflug-master-data-template` Version 1 und das browserlokale
 `rundflug-simulation-scenario` Version 1 und 2. Version 1 bleibt als begrenzte Vorlage mit Preset-,
 Zeit-, Nachfrage-, Phasen-, Ereignis- und Prognoseparametern importkompatibel. Version 2 sichert
-zusätzlich die vollständige konfigurierbare Variante: operative Topologie, produktbezogene
+zusätzlich das vollständige konfigurierbare Szenario: operative Topologie, produktbezogene
 Nachfrage, Planeinträge und wiederkehrende Regeln. Tickets, Queues, Ist-Zustände, Ergebnisse,
 manuelle Laufereignisse und die Abspielposition sind weiterhin nicht enthalten.
 
 Das im Dialog gewählte eingebaute Szenario kann als JSON-Vorlage heruntergeladen werden. Zusätzlich
-exportiert **Variante exportieren** die aktuell ausgewählte Variante als strikt validierte
-V2-Szenariodatei. Der erneute Import erzeugt stets eine neue Variante und überschreibt keine bereits
-geöffnete Konfiguration; Namenskollisionen erhalten einen nummerierten Zusatz. Export, Vorschau und
-Import bleiben vollständig browserlokal und führen keine API-Abfrage aus.
+exportiert **Szenario exportieren** die aktuelle Konfiguration als strikt validierte
+V2-Szenariodatei. Ein bestätigter Szenario- oder JSON-Import ersetzt die aktuelle Konfiguration und
+setzt manuelle Ereignisse, Abspielposition und laufende Wiedergabe zurück. Die CSV-Quelle kalibriert
+ausschließlich die Realitätsphasen des aktuellen Szenarios und behält dessen Quellnamen. Export,
+Vorschau und Import bleiben vollständig browserlokal und führen keine API-Abfrage aus.
 
-Alle Dateien sind auf 1 MiB begrenzt und werden vor der Übernahme vollständig gegen ihr striktes
-Vertragsschema geprüft. Die Vorschau nennt Quelle und die jeweils relevanten Parameter oder Anzahlen.
+JSON-Dateien sind auf 1 MiB, CSV-Kalibrierungen auf 2 MiB begrenzt. Die JSON-Inhalte werden vor der
+Übernahme vollständig gegen ihr striktes Vertragsschema geprüft. Die Vorschau nennt Quelle und die
+jeweils relevanten Parameter oder Anzahlen.
 Umlaufgebundene Einträge blockieren den Start, bis sie im Tagesplan in ein Zeitfenster umgewandelt
 oder in der Importvorschau bewusst ausgeschlossen werden. Das Stammdaten-Template behält mangels
 Tagesplan die bisher im Simulator eingestellten Zeiten und enthält keine Planeinträge.
 
-Mehrere Varianten existieren ausschließlich im React-Zustand der geöffneten Simulatorseite. Sie
-können benannt, dupliziert, gewechselt und gelöscht werden. Sowohl Szenarioauswahl als auch
-Dateiimport erzeugen stets eine neue, automatisch ausgewählte Variante; Namenskollisionen erhalten
-einen nummerierten Zusatz. Vorhandene Varianten werden nicht überschrieben. Ein Reload verwirft sie
-weiterhin bewusst; eine benötigte Konfiguration wird vorher über den V2-Export gesichert.
+Die Simulatorseite hält genau ein aktuelles Szenario ausschließlich im React-Zustand. Die Oberfläche
+zeigt dessen automatisch abgeleiteten Quellnamen und den Hinweis **Nicht gespeichert**; eine
+Benennung, Duplizierung oder Auswahl mehrerer Varianten wird nicht angeboten. Ein Reload verwirft die
+Konfiguration weiterhin bewusst; eine benötigte Konfiguration wird vorher über den V2-Export
+gesichert. Szenarioübersicht und Seed sind in der Sidebar rein lesend, Änderungen erfolgen
+ausschließlich im modalen Konfigurationsdialog.
 
-Für importierte Stammdaten erzeugt jede Variante weiterhin ausschließlich synthetische Nachfrage,
+Diese UI-Bündelung ändert weder Systemgrenzen noch Persistenz, Importverträge, Engine-Datenfluss oder
+den flüchtigen Kanal zum Simulations-FIDS und ist daher nicht architekturrelevant.
+
+Für importierte Stammdaten erzeugt das aktuelle Szenario weiterhin ausschließlich synthetische Nachfrage,
 Gruppen, Umläufe und Ist-Ereignisse. Die voreingestellte Gesamtnachfrage von 18 Personen pro
 Stunde wird gleichmäßig über die importierten Produkte verteilt. Anschließend besitzt jedes Produkt
 ein unabhängig konfigurierbares Tagesprofil mit eigener Vorlage, eigenen Zeitfenstern und
@@ -212,7 +219,7 @@ festgeschriebenen Preset- und 25-Seed-Werte.
   rekonstruiert er keinen historischen Veranstaltungstag.
 - Ohne importierte Simulationsgrundlage verwendet die freigegebene Baseline weiterhin genau ein
   synthetisches Produkt, eine Ressourcengruppe und einen einheitlichen Flugzeugtyp. Importierte
-  Varianten modellieren mehrere Produkte, Ressourcengruppen, Gates, Flugzeugtypen und
+  Szenarien modellieren mehrere Produkte, Ressourcengruppen, Gates, Flugzeugtypen und
   Pilotencodes.
 - Operative Planeinträge im Zustand `ACTIVE`, `CLEARED`, `CANCELED` oder der zeitabhängig
   abgeleiteten Fälligkeit werden nicht als Plan exportiert. Der Simulator rekonstruiert damit
@@ -248,7 +255,7 @@ Betriebshinweis, setzt die Prognosequalität auf `UNCERTAIN` und veröffentlicht
 Zeitfenster.
 
 Die Anzeige verwendet ausschließlich synthetische Gruppenkennungen. In der Baseline lauten
-Produkt und Gate `Rundflug Simulation` und `Flight Line 1`; importierte Varianten verwenden die
+Produkt und Gate `Rundflug Simulation` und `Flight Line 1`; importierte Szenarien verwenden die
 importierten Produktcodes, Produktnamen und Gatebezeichnungen. Sie zeigt 20 Einträge in zwei
 Spalten mit jeweils zehn Zeilen und besitzt
 weder Einstellungen noch die für den öffentlichen Betrieb bestimmte Fußzeile. `LIVE-SIMULATION`,

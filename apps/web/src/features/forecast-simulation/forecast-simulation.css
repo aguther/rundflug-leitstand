@@ -1,5 +1,14 @@
 /* biome-ignore-all lint/style/noDescendingSpecificity: feature-scoped component variants intentionally share compact element selectors. */
 .forecast-simulator {
+  --sim-boarding-start: #1a64c7;
+  --sim-boarding-end: #2675dc;
+  --sim-departure: #087f95;
+  --sim-flight-start: #23693b;
+  --sim-flight-end: #2d8247;
+  --sim-ground-start: #4a5259;
+  --sim-ground-end: #596168;
+  --sim-toggle-thumb: #ffffff;
+  --sim-on-accent: #ffffff;
   height: 100dvh;
   min-height: 100dvh;
   display: flex;
@@ -14,6 +23,14 @@
     ),
     var(--ui-bg);
   font-size: 13px;
+}
+
+[data-theme="dark"] .forecast-simulator {
+  --sim-boarding-end: #3489f3;
+  --sim-departure: #22bfd6;
+  --sim-flight-end: #3b9958;
+  --sim-ground-end: #949da4;
+  --sim-toggle-thumb: #f2f3f5;
 }
 
 .forecast-simulator * {
@@ -180,43 +197,39 @@
   background: var(--ui-control);
 }
 
-.sim-variant-manager {
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--ui-border);
-}
-
-.sim-variant-actions {
+.sim-current-scenario {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.sim-variant-actions button {
-  min-width: 0;
-  min-height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 0 6px;
   border: 1px solid var(--ui-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+  overflow: hidden;
+}
+
+.sim-current-scenario h2,
+.sim-current-scenario strong,
+.sim-current-scenario small {
+  margin: 0;
+  padding-inline: 12px;
+}
+
+.sim-current-scenario h2 {
+  padding-top: 11px;
   color: var(--ui-muted);
-  background: var(--ui-control);
-  cursor: pointer;
   font-size: 11px;
-  white-space: nowrap;
+  font-weight: 600;
 }
 
-.sim-variant-actions button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
+.sim-current-scenario strong {
+  padding-top: 2px;
+  font-size: 16px;
+  overflow-wrap: anywhere;
 }
 
-.sim-variant-actions svg {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
+.sim-current-scenario small {
+  padding-top: 1px;
+  padding-bottom: 11px;
+  color: var(--ui-muted);
+  font-size: 10px;
 }
 
 .sim-scenario-summary {
@@ -273,56 +286,6 @@
   white-space: nowrap;
 }
 
-.sim-sidebar input.visually-hidden {
-  position: absolute;
-  width: 1px;
-  min-height: 1px;
-  padding: 0;
-  margin: -1px;
-}
-
-.sim-summary-stepper {
-  display: grid;
-  grid-template-columns: repeat(3, 28px);
-}
-
-.sim-summary-stepper :is(output, button) {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--ui-border);
-  color: var(--ui-text);
-  background: var(--ui-control);
-}
-
-.sim-summary-stepper button:first-child {
-  border-radius: var(--radius-md) 0 0 var(--radius-md);
-}
-
-.sim-summary-stepper button {
-  cursor: pointer;
-  font-size: 16px;
-}
-
-.sim-summary-stepper output,
-.sim-summary-stepper button:last-child {
-  border-left: 0;
-}
-
-.sim-summary-stepper button:last-child {
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
-}
-
-.sim-summary-stepper button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.sim-summary-stepper svg {
-  width: 14px;
-}
-
 .sim-input-unit {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -364,35 +327,6 @@
   color: var(--ui-muted);
   font-size: 11px;
   line-height: 1.4;
-}
-
-.sim-seed-row {
-  grid-template-columns: 52px minmax(0, 1fr);
-  align-items: center;
-}
-
-.sim-sidebar-imports > div {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.sim-sidebar-imports .ds-button {
-  min-width: 0;
-  min-height: 38px;
-  justify-content: center;
-  padding: 6px 8px;
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.sim-sidebar-imports .ds-button-content {
-  gap: 5px;
-}
-
-.sim-sidebar-imports svg {
-  width: 15px;
-  height: 15px;
 }
 
 .sim-workspace {
@@ -459,6 +393,7 @@
 
 .sim-injector > div {
   width: 126px;
+  flex: 0 0 126px;
   display: grid;
   gap: 4px;
 }
@@ -553,17 +488,17 @@
 
 .sim-timeline-legend .sim-legend-boarding::before {
   width: 12px;
-  background: #2675dc;
+  background: var(--sim-boarding-end);
 }
 
 .sim-timeline-legend .sim-legend-flight::before {
   width: 12px;
-  background: #2d8247;
+  background: var(--sim-flight-end);
 }
 
 .sim-timeline-legend .sim-legend-ground::before {
   width: 12px;
-  background: #596168;
+  background: var(--sim-ground-end);
 }
 
 .sim-timeline-legend .sim-legend-plan::before {
@@ -771,16 +706,16 @@
 
 .sim-phase--boarding {
   border-radius: 2px 0 0 2px;
-  background: linear-gradient(90deg, #1a64c7, #3489f3);
+  background: linear-gradient(90deg, var(--sim-boarding-start), var(--sim-boarding-end));
 }
 
 .sim-phase--flight {
-  background: linear-gradient(90deg, #23693b, #3b9958);
+  background: linear-gradient(90deg, var(--sim-flight-start), var(--sim-flight-end));
 }
 
 .sim-phase--ground {
   border-radius: 0 2px 2px 0;
-  background: linear-gradient(90deg, #4a5259, #697178);
+  background: linear-gradient(90deg, var(--sim-ground-start), var(--sim-ground-end));
 }
 
 .sim-future-mask {
@@ -812,7 +747,7 @@
   left: 50%;
   padding: 3px 6px;
   border-radius: 3px 3px 0 0;
-  color: white;
+  color: var(--sim-on-accent);
   background: var(--ui-accent);
   font-size: 10px;
   transform: translateX(-50%);
@@ -1091,14 +1026,17 @@
 }
 
 .sim-metric-card small,
-.sim-metric-card footer {
+.sim-metric-card-source {
   color: var(--ui-muted);
   font-size: 10px;
 }
 
-.sim-metric-card footer {
+.sim-metric-card-source {
+  display: block;
   margin-top: auto;
   padding-top: 15px;
+  background: transparent;
+  text-align: center;
 }
 
 .sim-export-row {
@@ -1278,24 +1216,13 @@
   gap: 14px;
 }
 
-.sim-foundation-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.sim-foundation-title svg {
-  width: 20px;
-  color: var(--ui-accent);
-}
-
 .sim-foundation-dialog {
   padding-top: 16px;
 }
 
 .sim-foundation-tabs {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -1303,6 +1230,11 @@
 
 .sim-foundation-tabs button {
   min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 10px;
   border: 0;
   border-right: 1px solid var(--ui-border);
   border-bottom: 2px solid transparent;
@@ -1310,6 +1242,12 @@
   background: var(--ui-surface);
   cursor: pointer;
   font-size: 13px;
+}
+
+.sim-foundation-tabs button svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
 }
 
 .sim-foundation-tabs button:last-child {
@@ -1409,6 +1347,15 @@
 
 .sim-foundation-change-file {
   justify-self: start;
+}
+
+.sim-import-effect {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-top: 1px solid var(--ui-border);
+  color: var(--ui-muted);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .sim-plan-import-preview > header,
@@ -2287,7 +2234,7 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: white;
+  background: var(--sim-toggle-thumb);
   content: "";
   transition: transform 140ms ease;
 }
@@ -2836,21 +2783,21 @@
 
 .sim-history-chart-legend [data-series="boarding"]::before,
 .sim-aircraft-history-legend [data-phase="boarding"]::before {
-  background: #2f86ff;
+  background: var(--sim-boarding-end);
 }
 
 .sim-history-chart-legend [data-series="departure"]::before {
-  background: #22bfd6;
+  background: var(--sim-departure);
 }
 
 .sim-history-chart-legend [data-series="landing"]::before,
 .sim-aircraft-history-legend [data-phase="flight"]::before {
-  background: #65b64c;
+  background: var(--sim-flight-end);
 }
 
 .sim-history-chart-legend [data-series="completion"]::before,
 .sim-aircraft-history-legend [data-phase="ground"]::before {
-  background: #949da4;
+  background: var(--sim-ground-end);
 }
 
 .sim-history-chart-legend [data-series="cursor"] {
@@ -2889,35 +2836,35 @@
 }
 
 .sim-history-chart-boarding {
-  stroke: #2f86ff;
+  stroke: var(--sim-boarding-end);
 }
 
 .sim-history-chart-departure {
-  stroke: #22bfd6;
+  stroke: var(--sim-departure);
 }
 
 .sim-history-chart-landing {
-  stroke: #65b64c;
+  stroke: var(--sim-flight-end);
 }
 
 .sim-history-chart-completion {
-  stroke: #949da4;
+  stroke: var(--sim-ground-end);
 }
 
 .sim-chart-active-point.sim-history-chart-boarding {
-  fill: #2f86ff;
+  fill: var(--sim-boarding-end);
 }
 
 .sim-chart-active-point.sim-history-chart-departure {
-  fill: #22bfd6;
+  fill: var(--sim-departure);
 }
 
 .sim-chart-active-point.sim-history-chart-landing {
-  fill: #65b64c;
+  fill: var(--sim-flight-end);
 }
 
 .sim-chart-active-point.sim-history-chart-completion {
-  fill: #949da4;
+  fill: var(--sim-ground-end);
 }
 
 .sim-history-chart-stage .sim-chart-tooltip {
@@ -3150,15 +3097,15 @@
 
 .sim-aircraft-phase--boarding {
   left: 0;
-  background: #2f86ff;
+  background: var(--sim-boarding-end);
 }
 
 .sim-aircraft-phase--flight {
-  background: #65b64c;
+  background: var(--sim-flight-end);
 }
 
 .sim-aircraft-phase--ground {
-  background: #6f787f;
+  background: var(--sim-ground-end);
 }
 
 .sim-aircraft-incident-block {
@@ -3208,6 +3155,27 @@
   min-width: 440px;
 }
 
+@media (max-width: 1520px) and (min-width: 981px) {
+  .sim-controls {
+    grid-template-columns: auto 150px;
+    gap: 10px;
+    padding-inline: 12px;
+  }
+
+  .sim-injector {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .sim-clock {
+    border-right: 0;
+  }
+
+  .sim-injector .ds-button {
+    padding-inline: 9px;
+  }
+}
+
 @media (max-width: 1280px) {
   .sim-raw-forecast dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3237,25 +3205,6 @@
 
   .sim-safety-notice {
     min-width: 280px;
-  }
-
-  .sim-controls {
-    grid-template-columns: auto 150px;
-    gap: 10px;
-    padding-inline: 12px;
-  }
-
-  .sim-injector {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
-  }
-
-  .sim-clock {
-    border-right: 0;
-  }
-
-  .sim-injector .ds-button {
-    padding-inline: 9px;
   }
 }
 
@@ -3361,12 +3310,12 @@
     min-height: 32px;
   }
 
-  .sim-variant-manager {
-    padding-bottom: 7px;
+  .sim-current-scenario h2 {
+    padding-top: 8px;
   }
 
-  .sim-variant-actions button {
-    min-height: 32px;
+  .sim-current-scenario small {
+    padding-bottom: 8px;
   }
 
   .sim-scenario-summary h2 {
@@ -3376,10 +3325,6 @@
   .sim-scenario-summary dl > div {
     min-height: 31px;
     padding-block: 4px;
-  }
-
-  .sim-sidebar-imports .ds-button {
-    min-height: 34px;
   }
 
   .sim-full-button.ds-button {
@@ -3476,7 +3421,7 @@
     font-size: 22px;
   }
 
-  .sim-metric-card footer {
+  .sim-metric-card-source {
     padding-top: 4px;
   }
 

@@ -1,7 +1,15 @@
-import { AlertTriangle, Download, FileJson, Upload } from "lucide-react";
-import { type RefObject, useRef, useState } from "react";
+import {
+  AlertTriangle,
+  Download,
+  FileJson,
+  Settings2,
+  TableProperties,
+  Upload,
+} from "lucide-react";
+import { type KeyboardEvent, type RefObject, useRef, useState } from "react";
 
 import { Button, ModalDialog } from "../../design-system/components";
+import { CalibrationCsvError, calibrateFromCsv } from "./csv-calibration";
 import {
   calculateSimulationDemandSummary,
   SIMULATION_PRESET_LABELS,
@@ -21,19 +29,37 @@ import {
   simulationScenarioTemplateFileName,
 } from "./simulation-scenario-template";
 
-type FoundationTab = "SCENARIO" | "JSON";
+type ImportTab = "SCENARIO" | "JSON" | "CSV";
 
-interface LoadedSimulationFoundation {
+interface LoadedSimulationScenario {
+  kind: "SCENARIO";
   config: SimulationConfig;
   format: SimulationPlanImportPreview["format"];
   sourceName: string;
 }
 
-interface SimulationFoundationDialogProps {
+interface LoadedSimulationCalibration {
+  kind: "CALIBRATION";
+  config: SimulationConfig;
+  excludedRows: number;
+  validRows: number;
+}
+
+export type SimulationImportResult = LoadedSimulationScenario | LoadedSimulationCalibration;
+
+interface SimulationImportDialogProps {
   activeConfig: SimulationConfig;
   onClose: () => void;
-  onLoad: (foundation: LoadedSimulationFoundation) => void;
+  onImport: (result: SimulationImportResult) => void;
 }
+
+const IMPORT_TABS = [
+  { id: "SCENARIO", label: "Szenario", Icon: Settings2 },
+  { id: "JSON", label: "Simulationsdatei (JSON)", Icon: FileJson },
+  { id: "CSV", label: "Kalibrierung (CSV)", Icon: TableProperties },
+] as const;
+
+const MAX_CALIBRATION_CSV_FILE_BYTES = 2 * 1024 * 1024;
 
 function downloadJson(value: unknown, fileName: string): void {
   const blob = new Blob([`${JSON.stringify(value, null, 2)}\n`], {
@@ -56,21 +82,6 @@ function prepareImportedConfig(
     return excludeUnresolvedPlannedOperations(preview);
   }
   return preview.config;
-}
-
-export function nextSimulationVariantName(
-  requestedName: string,
-  existingNames: readonly string[],
-): string {
-  const normalized = requestedName.trim().slice(0, 80) || "Neue Variante";
-  const occupied = new Set(existingNames);
-  if (!occupied.has(normalized)) return normalized;
-  for (let suffixNumber = 2; suffixNumber < 10_000; suffixNumber += 1) {
-    const suffix = ` (${suffixNumber})`;
-    const candidate = `${normalized.slice(0, 80 - suffix.length).trimEnd()}${suffix}`;
-    if (!occupied.has(candidate)) return candidate;
-  }
-  return `${normalized.slice(0, 71).trimEnd()} (${crypto.randomUUID().slice(0, 6)})`;
 }
 
 function SimulationScenarioPanel({
@@ -322,9 +333,56 @@ function SimulationJsonPanel({
   );
 }
 
-function SimulationFoundationFooter({
+function SimulationCsvPanel({
+  fileInputRef,
+  importError,
+  onOpenFilePicker,
+  onSelectFile,
+  selectedFile,
+}: Readonly<{
+  fileInputRef: RefObject<HTMLInputElement | null>;
+  importError: string | null;
+  onOpenFilePicker: () => void;
+  onSelectFile: (file: File | null) => void;
+  selectedFile: File | null;
+}>) {
+  return (
+    <div
+      aria-labelledby="sim-foundation-csv-tab"
+      className="sim-foundation-panel"
+      id="sim-foundation-csv"
+      role="tabpanel"
+    >
+      <input
+        accept=".csv,text/csv"
+        className="visually-hidden"
+        onChange={(event) => onSelectFile(event.currentTarget.files?.[0] ?? null)}
+        ref={fileInputRef}
+        type="file"
+      />
+      <div className="sim-foundation-file">
+        <TableProperties aria-hidden="true" />
+        <strong>CSV-Datei auswählen</strong>
+        <p>Abgeschlossene synthetische Umläufe für die Phasenkalibrierung · max. 2 MiB</p>
+        <Button onClick={onOpenFilePicker}>
+          {selectedFile ? "Andere Datei wählen" : "Datei auswählen"}
+        </Button>
+        {selectedFile ? <small>{selectedFile.name}</small> : null}
+      </div>
+      {importError ? (
+        <p className="sim-editor-errors" role="alert">
+          {importError}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function SimulationImportFooter({
   canLoadPreview,
+  importingCsv,
   onClose,
+  onImportCsv,
   onInspectFile,
   onLoadPreview,
   onLoadScenario,
@@ -333,30 +391,47 @@ function SimulationFoundationFooter({
   tab,
 }: Readonly<{
   canLoadPreview: boolean;
+  importingCsv: boolean;
   onClose: () => void;
+  onImportCsv: () => void;
   onInspectFile: () => void;
   onLoadPreview: () => void;
   onLoadScenario: () => void;
   preview: SimulationPlanImportPreview | null;
   selectedFile: File | null;
-  tab: FoundationTab;
+  tab: ImportTab;
 }>) {
   if (tab === "SCENARIO") {
     return (
       <>
         <Button onClick={onClose}>Abbrechen</Button>
         <Button onClick={onLoadScenario} variant="primary">
-          Als neue Variante laden
+          Szenario laden
         </Button>
       </>
     );
   }
-  if (preview) {
+  if (tab === "JSON" && preview) {
     return (
       <>
         <Button onClick={onClose}>Abbrechen</Button>
         <Button disabled={!canLoadPreview} onClick={onLoadPreview} variant="primary">
-          Als neue Variante laden
+          Szenario laden
+        </Button>
+      </>
+    );
+  }
+  if (tab === "CSV") {
+    return (
+      <>
+        <Button onClick={onClose}>Abbrechen</Button>
+        <Button
+          busy={importingCsv}
+          disabled={!selectedFile}
+          onClick={onImportCsv}
+          variant="primary"
+        >
+          Kalibrierung anwenden
         </Button>
       </>
     );
@@ -371,20 +446,22 @@ function SimulationFoundationFooter({
   );
 }
 
-export function SimulationFoundationDialog({
+export function SimulationImportDialog({
   activeConfig,
   onClose,
-  onLoad,
-}: Readonly<SimulationFoundationDialogProps>) {
-  const [tab, setTab] = useState<FoundationTab>("SCENARIO");
+  onImport,
+}: Readonly<SimulationImportDialogProps>) {
+  const [tab, setTab] = useState<ImportTab>("SCENARIO");
   const [selectedPreset, setSelectedPreset] = useState<SimulationPresetId>(activeConfig.preset);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<SimulationPlanImportPreview | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [importingCsv, setImportingCsv] = useState(false);
   const [excludeUnresolvedPlans, setExcludeUnresolvedPlans] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scenarioTabRef = useRef<HTMLButtonElement>(null);
   const jsonTabRef = useRef<HTMLButtonElement>(null);
+  const csvTabRef = useRef<HTMLButtonElement>(null);
   const selectedScenarioConfig = simulationConfigForPreset(selectedPreset);
   const preparedImportedConfig = prepareImportedConfig(preview, excludeUnresolvedPlans);
   const validationErrors = preparedImportedConfig
@@ -397,14 +474,35 @@ export function SimulationFoundationDialog({
       (preview.counts.unresolvedAfterCurrentRotation === 0 || excludeUnresolvedPlans),
   );
 
-  const selectTab = (nextTab: FoundationTab) => {
+  const selectTab = (nextTab: ImportTab) => {
+    if (nextTab === tab) return;
     setTab(nextTab);
+    setSelectedFile(null);
+    setPreview(null);
     setImportError(null);
+    setExcludeUnresolvedPlans(false);
   };
 
-  const selectAndFocusTab = (nextTab: FoundationTab) => {
+  const selectAndFocusTab = (nextTab: ImportTab) => {
     selectTab(nextTab);
-    (nextTab === "SCENARIO" ? scenarioTabRef : jsonTabRef).current?.focus();
+    const target =
+      nextTab === "SCENARIO" ? scenarioTabRef : nextTab === "JSON" ? jsonTabRef : csvTabRef;
+    target.current?.focus();
+  };
+
+  const navigateTabs = (event: KeyboardEvent<HTMLButtonElement>, currentTab: ImportTab) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const currentIndex = IMPORT_TABS.findIndex(({ id }) => id === currentTab);
+    const nextIndex =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? IMPORT_TABS.length - 1
+          : (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + IMPORT_TABS.length) %
+            IMPORT_TABS.length;
+    const nextTab = IMPORT_TABS[nextIndex]?.id;
+    if (nextTab) selectAndFocusTab(nextTab);
   };
 
   const selectFile = (file: File | null) => {
@@ -445,7 +543,8 @@ export function SimulationFoundationDialog({
   };
 
   const loadSelectedScenario = () => {
-    onLoad({
+    onImport({
+      kind: "SCENARIO",
       sourceName: SIMULATION_PRESET_LABELS[selectedPreset],
       format: "rundflug-simulation-scenario",
       config: selectedScenarioConfig,
@@ -454,11 +553,48 @@ export function SimulationFoundationDialog({
 
   const loadPreview = () => {
     if (!preview || !preparedImportedConfig || validationErrors.length > 0) return;
-    onLoad({
+    onImport({
+      kind: "SCENARIO",
       sourceName: preview.sourceName,
       format: preview.format,
       config: preparedImportedConfig,
     });
+  };
+
+  const importCsv = async () => {
+    if (!selectedFile) return;
+    setImportError(null);
+    if (selectedFile.size > MAX_CALIBRATION_CSV_FILE_BYTES) {
+      setImportError("Die CSV-Datei ist größer als 2 MiB.");
+      return;
+    }
+    setImportingCsv(true);
+    try {
+      const calibration = calibrateFromCsv(
+        await selectedFile.text(),
+        activeConfig.realityModel.phases.buffer,
+      );
+      onImport({
+        kind: "CALIBRATION",
+        config: {
+          ...activeConfig,
+          realityModel: {
+            ...activeConfig.realityModel,
+            phases: calibration.suggestedPhases,
+          },
+        },
+        excludedRows: calibration.excludedRows,
+        validRows: calibration.validRows,
+      });
+    } catch (error) {
+      setImportError(
+        error instanceof CalibrationCsvError
+          ? error.message
+          : "Die Datei konnte nicht gelesen werden.",
+      );
+    } finally {
+      setImportingCsv(false);
+    }
   };
 
   const changeFile = () => {
@@ -469,11 +605,13 @@ export function SimulationFoundationDialog({
   return (
     <ModalDialog
       bodyClassName="sim-foundation-dialog"
-      description="Szenario wählen oder JSON-Datei importieren."
+      description="Wählen Sie, was Sie in das aktuelle Szenario übernehmen möchten."
       footer={
-        <SimulationFoundationFooter
+        <SimulationImportFooter
           canLoadPreview={canLoadPreview}
+          importingCsv={importingCsv}
           onClose={onClose}
+          onImportCsv={() => void importCsv()}
           onInspectFile={() => void inspectFile()}
           onLoadPreview={loadPreview}
           onLoadScenario={loadSelectedScenario}
@@ -488,54 +626,26 @@ export function SimulationFoundationDialog({
       size={
         preview?.category === "OPERATIONAL" || preview?.config.operationalModel ? "wide" : "default"
       }
-      title={
-        <span className="sim-foundation-title">
-          <FileJson aria-hidden="true" />
-          Simulationsgrundlage laden
-        </span>
-      }
+      title="Importieren"
     >
-      <div
-        aria-label="Quelle der Simulationsgrundlage"
-        className="sim-foundation-tabs"
-        role="tablist"
-      >
-        <button
-          aria-controls="sim-foundation-scenario"
-          aria-selected={tab === "SCENARIO"}
-          id="sim-foundation-scenario-tab"
-          onKeyDown={(event) => {
-            if (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.key === "End") {
-              event.preventDefault();
-              selectAndFocusTab("JSON");
-            }
-          }}
-          onClick={() => selectTab("SCENARIO")}
-          ref={scenarioTabRef}
-          role="tab"
-          tabIndex={tab === "SCENARIO" ? 0 : -1}
-          type="button"
-        >
-          Szenario
-        </button>
-        <button
-          aria-controls="sim-foundation-json"
-          aria-selected={tab === "JSON"}
-          id="sim-foundation-json-tab"
-          onKeyDown={(event) => {
-            if (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.key === "Home") {
-              event.preventDefault();
-              selectAndFocusTab("SCENARIO");
-            }
-          }}
-          onClick={() => selectTab("JSON")}
-          ref={jsonTabRef}
-          role="tab"
-          tabIndex={tab === "JSON" ? 0 : -1}
-          type="button"
-        >
-          JSON-Datei
-        </button>
+      <div aria-label="Importquelle" className="sim-foundation-tabs" role="tablist">
+        {IMPORT_TABS.map(({ Icon, id, label }) => (
+          <button
+            aria-controls={`sim-foundation-${id.toLowerCase()}`}
+            aria-selected={tab === id}
+            id={`sim-foundation-${id.toLowerCase()}-tab`}
+            key={id}
+            onClick={() => selectTab(id)}
+            onKeyDown={(event) => navigateTabs(event, id)}
+            ref={id === "SCENARIO" ? scenarioTabRef : id === "JSON" ? jsonTabRef : csvTabRef}
+            role="tab"
+            tabIndex={tab === id ? 0 : -1}
+            type="button"
+          >
+            <Icon aria-hidden="true" />
+            {label}
+          </button>
+        ))}
       </div>
 
       {tab === "SCENARIO" ? (
@@ -544,7 +654,7 @@ export function SimulationFoundationDialog({
           onSelectPreset={setSelectedPreset}
           selectedPreset={selectedPreset}
         />
-      ) : (
+      ) : tab === "JSON" ? (
         <SimulationJsonPanel
           excludeUnresolvedPlans={excludeUnresolvedPlans}
           fileInputRef={fileInputRef}
@@ -557,7 +667,20 @@ export function SimulationFoundationDialog({
           selectedFile={selectedFile}
           validationErrors={validationErrors}
         />
+      ) : (
+        <SimulationCsvPanel
+          fileInputRef={fileInputRef}
+          importError={importError}
+          onOpenFilePicker={openFilePicker}
+          onSelectFile={selectFile}
+          selectedFile={selectedFile}
+        />
       )}
+      <p className="sim-import-effect">
+        {tab === "CSV"
+          ? "Die Kalibrierung aktualisiert die Phasen des aktuellen Szenarios. Manuelle Ereignisse und der laufende Simulationsstand werden zurückgesetzt."
+          : "Das geladene Szenario ersetzt die aktuelle Konfiguration. Manuelle Ereignisse und der laufende Simulationsstand werden zurückgesetzt."}
+      </p>
     </ModalDialog>
   );
 }
