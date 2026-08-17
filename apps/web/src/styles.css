@@ -1115,10 +1115,10 @@ input:focus-visible {
 }
 .app-header strong {
   font-size: 1.25rem;
-  color: #14345b;
+  color: var(--ui-text);
 }
 .app-header span {
-  color: #52677f;
+  color: var(--ui-muted);
   font-weight: 650;
 }
 .app-header nav {
@@ -1128,7 +1128,7 @@ input:focus-visible {
 .app-header nav a {
   min-height: 44px;
   padding: 11px 14px;
-  color: #14345b;
+  color: var(--ui-text);
   text-decoration: none;
   font-weight: 700;
 }

@@ -762,12 +762,12 @@ textarea {
 }
 
 .view-switcher-menu small {
-  color: var(--ui-text-muted);
+  color: var(--ui-muted);
   font-size: 0.76rem;
 }
 
 .view-switcher-locked {
-  color: var(--ui-text-muted);
+  color: var(--ui-muted);
   cursor: not-allowed;
   opacity: 0.72;
 }
@@ -780,7 +780,7 @@ textarea {
 }
 
 .app-connection {
-  color: var(--ui-text-muted);
+  color: var(--ui-muted);
   white-space: nowrap;
 }
 
@@ -789,7 +789,7 @@ textarea {
 }
 
 .app-connection.checking {
-  color: var(--ui-text-muted);
+  color: var(--ui-muted);
 }
 
 .app-connection.degraded {
