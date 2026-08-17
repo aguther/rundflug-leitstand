@@ -1,93 +1,85 @@
 import { spawn } from "node:child_process";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-// These suites use repository-local Wrangler state or need an exclusive Worker startup window.
-export const exclusiveSuites = [
-  "test:vertical-slice",
-  "test:master-data",
-  "test:ticket-assignment-concurrency",
-  "test:ticket-deferrals",
-  "test:sale-guards",
-  "test:fleet-operations",
-  "test:recurring-operational-rules",
-  "test:pilot-conflict",
-  "test:emergency-mode",
-  "test:outage-recovery",
-  "test:factory-reset",
-  "test:scale-performance",
+// Each shard runs in its own GitHub job. Suites inside a shard are deliberately serial so that
+// one runner never starts competing Wrangler/workerd processes against the same CPU and filesystem.
+export const integrationShards = [
+  {
+    name: "1",
+    suites: [
+      "test:vertical-slice",
+      "test:ticket-corrections",
+      "test:ticket-group-recall",
+      "test:public-monitors",
+    ],
+  },
+  {
+    name: "2",
+    suites: [
+      "test:master-data",
+      "test:queue-grouping",
+      "test:ticket-deferrals",
+      "test:sale-guards",
+      "test:first-run-setup",
+    ],
+  },
+  {
+    name: "3",
+    suites: [
+      "test:ticket-assignment-concurrency",
+      "test:fleet-operations",
+      "test:recurring-operational-rules",
+      "test:pilot-conflict",
+      "test:emergency-mode",
+    ],
+  },
+  {
+    name: "4",
+    suites: [
+      "test:automatic-precall",
+      "test:outage-recovery",
+      "test:factory-reset",
+      "test:scale-performance",
+    ],
+  },
 ];
 
-// These suites own temporary D1 state and ports and are safe beside the exclusive lane.
-export const isolatedSuites = [
-  "test:queue-grouping",
-  "test:ticket-corrections",
-  "test:ticket-group-recall",
-  "test:public-monitors",
-  "test:first-run-setup",
-];
+export const suites = integrationShards.flatMap((shard) => shard.suites);
 
-// This suite starts workerd only after both concurrent lanes have drained.
-export const serialSuites = ["test:automatic-precall"];
+export function parseShardSelection(argumentsList) {
+  const shardArgument = argumentsList.find((argument) => argument.startsWith("--shard="));
+  const unknownArgument = argumentsList.find((argument) => !argument.startsWith("--shard="));
+  if (unknownArgument) throw new Error(`Unknown V1 integration argument: ${unknownArgument}`);
+  if (!shardArgument) return { name: "all", suites };
 
-export const suites = [
-  "test:vertical-slice",
-  "test:master-data",
-  "test:queue-grouping",
-  "test:ticket-assignment-concurrency",
-  "test:ticket-corrections",
-  "test:ticket-deferrals",
-  "test:ticket-group-recall",
-  "test:automatic-precall",
-  "test:sale-guards",
-  "test:fleet-operations",
-  "test:recurring-operational-rules",
-  "test:pilot-conflict",
-  "test:emergency-mode",
-  "test:outage-recovery",
-  "test:public-monitors",
-  "test:first-run-setup",
-  "test:factory-reset",
-  "test:scale-performance",
-];
-
-export async function runSuiteLanes({ lanes, runSuite }) {
-  let stopRequested = false;
-  const runLane = async ({ name, laneSuites }) => {
-    const results = [];
-    for (const suite of laneSuites) {
-      if (stopRequested) break;
-      try {
-        results.push(await runSuite(suite, name));
-      } catch (error) {
-        stopRequested = true;
-        throw error;
-      }
-    }
-    return results;
-  };
-
-  const outcomes = await Promise.allSettled(lanes.map(runLane));
-  const failure = outcomes.find((outcome) => outcome.status === "rejected");
-  if (failure?.status === "rejected") throw failure.reason;
-  return outcomes.flatMap((outcome) => (outcome.status === "fulfilled" ? outcome.value : []));
-}
-
-export async function runIntegrationSchedule({ lanes, serialSuites: deferredSuites, runSuite }) {
-  const concurrentResults = await runSuiteLanes({ lanes, runSuite });
-  const serialResults = [];
-  for (const suite of deferredSuites) {
-    serialResults.push(await runSuite(suite, "serial"));
+  const match = shardArgument.match(/^--shard=(\d+)\/(\d+)$/);
+  if (!match) throw new Error("--shard must use the form <index>/<total>.");
+  const index = Number(match[1]);
+  const total = Number(match[2]);
+  if (total !== integrationShards.length || index < 1 || index > total) {
+    throw new Error(
+      `--shard must select 1/${integrationShards.length} through ${integrationShards.length}/${integrationShards.length}.`,
+    );
   }
-  return [...concurrentResults, ...serialResults];
+  const selected = integrationShards[index - 1];
+  if (!selected) throw new Error(`V1 integration shard ${index} is not configured.`);
+  return selected;
 }
 
-function runNpmSuite(npmCli, suite, lane) {
+export async function runSequentialSuites({ selectedSuites, shardName, runSuite }) {
+  const results = [];
+  for (const suite of selectedSuites) results.push(await runSuite(suite, shardName));
+  return results;
+}
+
+function runNpmSuite(npmCli, suite, shardName) {
   return new Promise((resolvePromise, reject) => {
     const suiteStartedAt = Date.now();
-    process.stdout.write(`[v1-integrations] start ${suite} (${lane})\n`);
+    process.stdout.write(`[v1-integrations] start ${suite} (shard ${shardName})\n`);
     const child = spawn(process.execPath, [npmCli, "run", "--silent", suite], {
       cwd: root,
       env: process.env,
@@ -105,42 +97,56 @@ function runNpmSuite(npmCli, suite, lane) {
         return;
       }
       process.stdout.write(
-        `[v1-integrations] pass ${suite} (${lane}, ${durationSeconds.toFixed(1)}s)\n`,
+        `[v1-integrations] pass ${suite} (shard ${shardName}, ${durationSeconds.toFixed(1)}s)\n`,
       );
-      resolvePromise({ suite, lane, durationSeconds });
+      resolvePromise({ suite, shard: shardName, durationSeconds });
     });
   });
+}
+
+async function writeReport(report) {
+  const reportPath = process.env.V1_INTEGRATION_REPORT;
+  if (!reportPath) return;
+  const absolutePath = resolve(root, reportPath);
+  await mkdir(dirname(absolutePath), { recursive: true });
+  await writeFile(absolutePath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 }
 
 async function main() {
   const npmCli = process.env.npm_execpath;
   if (!npmCli) throw new Error("The npm execution path is missing.");
 
+  const selection = parseShardSelection(process.argv.slice(2));
   const startedAt = Date.now();
-  const results = await runIntegrationSchedule({
-    lanes: [
-      { name: "exclusive", laneSuites: exclusiveSuites },
-      { name: "isolated", laneSuites: isolatedSuites },
-    ],
-    serialSuites,
-    runSuite: (suite, lane) => runNpmSuite(npmCli, suite, lane),
-  });
-  const order = new Map(suites.map((suite, index) => [suite, index]));
-  results.sort((left, right) => order.get(left.suite) - order.get(right.suite));
-
-  process.stdout.write(
-    `${JSON.stringify({
+  try {
+    const results = await runSequentialSuites({
+      selectedSuites: selection.suites,
+      shardName: selection.name,
+      runSuite: (suite, shardName) => runNpmSuite(npmCli, suite, shardName),
+    });
+    const report = {
       ok: true,
-      maximumParallelSuites: 2,
-      exclusiveSuiteCount: exclusiveSuites.length,
-      isolatedSuiteCount: isolatedSuites.length,
-      serialSuiteCount: serialSuites.length,
+      maximumParallelSuites: 1,
+      shard: selection.name,
+      suiteCount: results.length,
       suites: results,
       totalDurationSeconds: Number(((Date.now() - startedAt) / 1_000).toFixed(1)),
-    })}\n`,
-  );
+    };
+    await writeReport(report);
+    process.stdout.write(`${JSON.stringify(report)}\n`);
+  } catch (error) {
+    await writeReport({
+      ok: false,
+      maximumParallelSuites: 1,
+      shard: selection.name,
+      error:
+        error instanceof Error
+          ? { name: error.name, message: error.message.slice(0, 2_000) }
+          : { name: "UnknownError" },
+      totalDurationSeconds: Number(((Date.now() - startedAt) / 1_000).toFixed(1)),
+    });
+    throw error;
+  }
 }
 
-if (resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
-  await main();
-}
+if (resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) await main();

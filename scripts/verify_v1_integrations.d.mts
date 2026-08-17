@@ -1,20 +1,15 @@
-export const exclusiveSuites: readonly string[];
-export const isolatedSuites: readonly string[];
-export const serialSuites: readonly string[];
-export const suites: readonly string[];
-
-export interface IntegrationSuiteLane {
+export interface IntegrationShard {
   name: string;
-  laneSuites: readonly string[];
+  suites: readonly string[];
 }
 
-export function runIntegrationSchedule<Result>(input: {
-  lanes: readonly IntegrationSuiteLane[];
-  serialSuites: readonly string[];
-  runSuite: (suite: string, lane: string) => Promise<Result>;
-}): Promise<Result[]>;
+export const integrationShards: readonly IntegrationShard[];
+export const suites: readonly string[];
 
-export function runSuiteLanes<Result>(input: {
-  lanes: readonly IntegrationSuiteLane[];
-  runSuite: (suite: string, lane: string) => Promise<Result>;
+export function parseShardSelection(argumentsList: readonly string[]): IntegrationShard;
+
+export function runSequentialSuites<Result>(input: {
+  selectedSuites: readonly string[];
+  shardName: string;
+  runSuite: (suite: string, shardName: string) => Promise<Result>;
 }): Promise<Result[]>;

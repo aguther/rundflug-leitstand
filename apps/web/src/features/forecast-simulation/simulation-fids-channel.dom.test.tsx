@@ -2,8 +2,7 @@
 
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { runSimulation } from "./engine";
-import { simulationConfigForPreset } from "./model";
+import type { SimulationResult } from "./model";
 import {
   SIMULATION_FIDS_CHANNEL_NAME,
   SIMULATION_FIDS_PROTOCOL_VERSION,
@@ -31,7 +30,12 @@ class MockBroadcastChannel extends EventTarget {
   }
 }
 
-const baseline = runSimulation(simulationConfigForPreset("NORMAL"));
+const baseline = {
+  config: { seed: 20260722 },
+  events: [],
+  metrics: {},
+  rotations: [],
+} as unknown as SimulationResult;
 
 function PublisherProbe({
   clockMs,

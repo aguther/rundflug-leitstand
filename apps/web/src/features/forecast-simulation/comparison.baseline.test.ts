@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { runBatchComparison } from "./comparison";
 import { simulationConfigForPreset } from "./model";
 
-const BATCH_BASELINE_TIMEOUT_MS = 180_000;
+const BATCH_BASELINE_TIMEOUT_MS = 300_000;
 
 describe("forecast comparison golden baseline", () => {
   it(

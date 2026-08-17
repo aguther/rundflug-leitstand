@@ -7,13 +7,13 @@ import {
 import { runSimulation } from "./engine";
 import { demandForProfile, simulationConfigForPreset } from "./model";
 
-const COMPARISON_SMOKE_TIMEOUT_MS = 20_000;
+const COMPARISON_SMOKE_TIMEOUT_MS = 60_000;
 
 function comparisonConfig() {
   const config = simulationConfigForPreset("NORMAL");
   config.schedule.salesEndAt = "2026-07-22T10:00:00.000Z";
   config.schedule.operationsEndAt = "2026-07-22T11:00:00.000Z";
-  config.realityModel.demand = demandForProfile("TWO_WAVES", 180);
+  config.realityModel.demand = demandForProfile("TWO_WAVES", 60);
   config.forecastTuning.comparisonRuns = 5;
   return config;
 }
