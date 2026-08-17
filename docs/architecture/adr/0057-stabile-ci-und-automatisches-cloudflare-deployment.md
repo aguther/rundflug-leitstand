@@ -30,6 +30,9 @@ Schemafortschreibung unterschiedliche Risiken besitzen.
   funktionalen Tests; Last- und Baselineprüfungen besitzen eigene Budgets. Die 18 lokalen V1-
   Integrationssuiten laufen in vier parallelen GitHub-Shards, innerhalb jedes Runners jedoch streng
   seriell und mit einem Diagnoseartefakt.
+- Bytebasierte Build-Gates werden gegen beobachtete technisch äquivalente Buildstreuung kalibriert,
+  ohne die fachlich festgelegte Reserve zu unterschreiten. Ein unveränderter Web-Quellstand darf nicht
+  allein wegen weniger abweichender Precache-Bytes zwischen grün und rot wechseln.
 - Ein Push auf `main` deployt erst nach Basisprüfung, Coverage, Worker-Runtime, Forecast-Baseline,
   allen Integrationsshards, Restore-, Dokumentations-, Mutationstest und Sonar-Quality-Gate.
 - Der Deployment-Preflight verifiziert Konto, Namen, unveränderliche D1-ID, EU-Jurisdiktion,

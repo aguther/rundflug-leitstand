@@ -16,6 +16,10 @@
 6. Test-, Lint-, Typ-, Coverage-, Migrations- und Sonarfehler werden nicht automatisch wiederholt.
    Nur erkannte Infrastrukturfehler in Cloudflare-Kommandos dürfen höchstens dreimal versucht werden.
 
+Das aggregierte PWA-Precache-Budget behält seine verpflichtende Zehn-Prozent-Reserve, besitzt aber
+innerhalb dieser Reserve einen kleinen Abstand zur gemessenen Buildstreuung. Unterschiedliche zulässige
+Chunkanordnungen dürfen einen unveränderten Web-Quellstand deshalb nicht abwechselnd grün und rot machen.
+
 ## Ablauf für `main`
 
 1. Der Push auf `main` durchläuft dieselben Prüfungen wie jeder andere Branch.

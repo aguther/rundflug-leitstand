@@ -23,6 +23,17 @@ Baseline aus `web-asset-baseline-5e1dce.json`.
 Alle gemessenen Werte erfüllen das unveränderte Hard Limit und dessen zusätzliche
 Zehn-Prozent-Reserve.
 
+## Stabilitätsnachtrag vom 17. August 2026
+
+Zwei GitHub-Builds mit identischen Web-Quellen erzeugten durch eine technisch äquivalente
+Chunkanordnung PWA-Precache-Summen von 1.255.489 und 1.255.523 Byte. Die bisherige 90-%-Grenze von
+1.255.500 Byte lag mitten in dieser 34-Byte-Streuung und ließ denselben Web-Quellstand deshalb ohne
+fachlichen Unterschied einmal grün und einmal rot werden.
+
+Nur das PWA-Precache-Hard-Limit wurde von 1.395.000 auf 1.396.000 Byte kalibriert. Die verbindliche
+90-%-Grenze liegt damit bei 1.256.400 Byte; selbst der größere beobachtete Build behält 10,06 Prozent
+Reserve. Alle übrigen Hard Limits, Routenratchets und die Precache-Policy bleiben unverändert.
+
 ## Routenratchet
 
 | Route | Vorher Raw | Nachher Raw | Vorher Gzip | Nachher Gzip |

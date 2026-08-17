@@ -16,8 +16,10 @@ Recharts-Laufzeit in Admin- und Analysepfade.
 
 ## Entscheidung
 
-- Die absoluten Assetbudgets aus ADR-0048 bleiben unverändert. Das verbindliche Gate akzeptiert
-  zusätzlich nur Werte, die höchstens 90 Prozent des jeweiligen Raw- und Gzip-Budgets belegen.
+- Die absoluten Assetbudgets aus ADR-0048 bleiben grundsätzlich unverändert. Das PWA-Precache-
+  Hard-Limit wird nach beobachteten Raw-Schwankungen von 34 Byte bei unveränderten Web-Quellen einmalig
+  von 1.395.000 auf 1.396.000 Byte kalibriert. Das verbindliche Gate akzeptiert weiterhin nur Werte,
+  die höchstens 90 Prozent des jeweiligen Raw- und Gzip-Budgets belegen.
 - `npm run web:assets:report` erzeugt vor jeder Messung einen frischen Produktionsbuild. Der Bericht
   nennt Budget, Istwert und verbleibende Reserve in Bytes und Prozent.
 - Die commitgebundene Baseline liegt dauerhaft unter `scripts/data/web-asset-baseline.json`. Für jede
@@ -38,8 +40,8 @@ Recharts-Laufzeit in Admin- und Analysepfade.
 
 ## Konsequenzen
 
-- Assetwachstum kann weder durch das Anheben der Hard Limits noch durch das Ausschöpfen der letzten
-  zehn Prozent unbemerkt integriert werden.
+- Assetwachstum kann weder durch das Ausschöpfen der letzten zehn Prozent noch durch eine
+  undokumentierte Änderung der Hard Limits unbemerkt integriert werden.
 - Rollen- und Online-Grenzen sind gleichzeitig Quelltext-, Bundle- und Precache-Grenzen und werden
   durch automatisierte Tests abgesichert.
 - Die beiden SVG-Diagramme behalten Daten, Kurven, Tooltip, Zoom, Pan, Reset, Referenzlinien,
