@@ -93,7 +93,9 @@ describe("Cloudflare target configuration", () => {
       bucket_name: "rundflug-leitstand-verein-abnahme-backups",
       jurisdiction: "eu",
     });
-    expect(generated.secrets).toEqual({ required: cloudflareTarget.requiredCloudflareSecrets });
+    expect(generated.secrets).toEqual({ required: cloudflareTarget.wranglerDeploymentSecrets });
+    expect(cloudflareTarget.requiredCloudflareSecrets).toContain("DEPLOYMENT_BACKUP_TOKEN_HASH");
+    expect(generated.secrets.required).not.toContain("DEPLOYMENT_BACKUP_TOKEN_HASH");
     expect(generated.vars).toMatchObject({
       PLANNING_DETAIL_RETENTION_HOURS: "24",
       PLANNING_HISTORY_RETENTION_YEARS: "5",

@@ -11,8 +11,10 @@ export const requiredCloudflareSecrets = [
   "VAPID_PRIVATE_KEY",
   "VAPID_SUBJECT",
 ];
+export const wranglerDeploymentSecrets = requiredCloudflareSecrets.filter(
+  (name) => name !== "DEPLOYMENT_BACKUP_TOKEN_HASH",
+);
 export const compatibilityProfileSecrets = [
-  "DEPLOYMENT_BACKUP_TOKEN_HASH",
   "ADMIN_PIN_HASH",
   "BOOTSTRAP_TOKEN",
   "VAPID_PUBLIC_KEY",
@@ -121,7 +123,7 @@ export function targetManifestPath(profile) {
 export function createTargetWranglerConfig(baseConfig, profile, databaseId) {
   const result = structuredClone(baseConfig);
   result.name = profile.workerName;
-  result.secrets = { required: [...requiredCloudflareSecrets] };
+  result.secrets = { required: [...wranglerDeploymentSecrets] };
   result.vars = {
     ...result.vars,
     APP_ENV: profile.appEnv,

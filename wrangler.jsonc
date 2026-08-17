@@ -46,7 +46,6 @@
   },
   "secrets": {
     "required": [
-      "DEPLOYMENT_BACKUP_TOKEN_HASH",
       "ADMIN_PIN_HASH",
       "BOOTSTRAP_TOKEN",
       "VAPID_PUBLIC_KEY",

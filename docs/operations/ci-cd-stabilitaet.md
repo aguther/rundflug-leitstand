@@ -39,6 +39,10 @@ Migration verändert nur das Schema der zuvor eindeutig verifizierten D1.
 - Im geschützten GitHub-Environment `rundflug-leitstand` muss ein zufälliges Secret
   `DEPLOYMENT_BACKUP_TOKEN` mit mindestens 32 Zeichen hinterlegt sein. Cloudflare erhält über den
   Workflow ausschließlich dessen SHA-256-Hash als `DEPLOYMENT_BACKUP_TOKEN_HASH`.
+- Der neue Hash wird bewusst vom GitHub-Preflight und nicht von Wranglers allgemeiner
+  `secrets.required`-Liste erzwungen. Dadurch bleibt der bisherige native Cloudflare-Pfad während der
+  Inbetriebnahme deployfähig, obwohl der Backup-Endpunkt dort bis zur ersten Hash-Synchronisierung
+  noch nicht autorisierbar ist.
 - `CLOUDFLARE_DEPLOYMENT_URL` muss auf den bereits vorhandenen Worker zeigen.
 - Zuerst wird der manuelle Workflow `Cloudflare deployment` mit Bestätigung `DEPLOY` vollständig
   einschließlich Revisionsprüfung ausgeführt.
