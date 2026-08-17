@@ -1,19 +1,19 @@
-name: Cloudflare-Deployment
+name: Cloudflare deployment
 
 on:
+  workflow_call:
+    inputs:
+      target:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       target:
-        description: Zielname wie verein-abnahme oder verein-produktion
+        description: Protected GitHub environment to deploy
         required: true
         type: string
-      apply_migrations:
-        description: Ausstehende additive D1-Migrationen vor dem Deployment anwenden
-        required: true
-        default: false
-        type: boolean
       confirmation:
-        description: Für das Deployment exakt DEPLOY eingeben
+        description: Enter DEPLOY for a manual deployment
         required: true
         type: string
 
@@ -26,46 +26,41 @@ concurrency:
 
 jobs:
   deploy:
-    if: inputs.confirmation == 'DEPLOY'
-    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch' || inputs.confirmation == 'DEPLOY'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     environment: ${{ inputs.target }}
     env:
+      CI: "true"
+      LANG: C.UTF-8
+      TZ: UTC
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_D1_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}
+      DEPLOYMENT_BACKUP_TOKEN: ${{ secrets.DEPLOYMENT_BACKUP_TOKEN }}
       CLOUDFLARE_TARGET: ${{ inputs.target }}
       CLOUDFLARE_WORKER_NAME: ${{ vars.CLOUDFLARE_WORKER_NAME }}
       CLOUDFLARE_D1_NAME: ${{ vars.CLOUDFLARE_D1_NAME }}
       CLOUDFLARE_R2_NAME: ${{ vars.CLOUDFLARE_R2_NAME }}
       CLOUDFLARE_APP_ENV: ${{ vars.CLOUDFLARE_APP_ENV }}
+      CLOUDFLARE_DEPLOYMENT_URL: ${{ vars.CLOUDFLARE_DEPLOYMENT_URL }}
       SOURCE_REVISION: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.13"
-      - name: Install npm 12.0.2
-        run: |
-          npm install --global --prefix "$RUNNER_TEMP/npm" npm@12.0.2
-          echo "$RUNNER_TEMP/npm/bin" >> "$GITHUB_PATH"
-      - name: Install role guide verification dependency
-        run: python -m pip install --disable-pip-version-check pypdf==6.10.0
-      - run: npm ci
-      - run: npm run check
-      - id: config
-        run: echo "path=$(npm run --silent cloudflare:ci-config)" >> "$GITHUB_OUTPUT"
-      - run: npx wrangler d1 migrations list DB --remote --config "${{ steps.config.outputs.path }}"
-      - if: inputs.apply_migrations
-        run: npx wrangler d1 migrations apply DB --remote --config "${{ steps.config.outputs.path }}"
-      - if: inputs.apply_migrations == false
-        run: |
-          if ! npx wrangler d1 migrations list DB --remote --config "${{ steps.config.outputs.path }}" | grep -qi "No migrations to apply"; then
-            echo "Es sind Migrationen offen. Erneut mit apply_migrations starten." >&2
-            exit 1
-          fi
-      - run: npm run build:web
-      - run: npx wrangler deploy --config "${{ steps.config.outputs.path }}"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-project
+      - name: Generate immutable target configuration
+        run: npm run cloudflare:ci-config
+      - name: Build deployment artifacts
+        run: npm run build
+      - name: Verify existing resources before any remote change
+        env:
+          PREFLIGHT_ALLOW_MISSING_DEPLOYMENT_SECRET: "true"
+        run: npm run cloudflare:preflight -- --target "$CLOUDFLARE_TARGET"
+      - name: Synchronize hashed deployment backup credential
+        run: npm run cloudflare:deployment-credential -- --target "$CLOUDFLARE_TARGET"
+      - name: Verify complete target and secrets
+        run: npm run cloudflare:preflight -- --target "$CLOUDFLARE_TARGET"
+      - name: Backup, migrate and deploy
+        run: npm run cloudflare:deploy -- --target "$CLOUDFLARE_TARGET"
+      - name: Verify deployed revision and resources
+        run: npm run cloudflare:verify -- --target "$CLOUDFLARE_TARGET" --url "$CLOUDFLARE_DEPLOYMENT_URL"

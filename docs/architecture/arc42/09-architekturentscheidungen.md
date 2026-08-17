@@ -68,6 +68,7 @@ verlinkt bleiben.
 | [0054](../adr/0054-einheitliche-forecast-und-dispatch-pipeline.md) | Einheitliche Forecast- und Dispatch-Pipeline | aktive Ressourcenprojektion und DRAFT-Scheduler in einem Lauf, eine Dauerbasis, korrigierte Zielordnung und eine operative Simulationsengine |
 | [0055](../adr/0055-web-asset-headroom-and-native-svg.md) | Dauerhafter Web-Asset-Spielraum und native SVG-Diagramme | zehn Prozent Pflichtreserve, rollenbezogene CSS-/Precache-Grenzen und dependency-freie Zeitreihen |
 | [0056](../adr/0056-mutationstests-als-standard-integrationsgate.md) | Mutationstests als Standard-Integrationsgate | 87-Prozent-Gesamtratchet, mindestens 80 Prozent je Modul und vollständiger PR-/Main-Lauf ohne Mutator-Ausschlüsse |
+| [0057](../adr/0057-stabile-ci-und-automatisches-cloudflare-deployment.md) | Stabile Branch-CI und abgesichertes automatisches Cloudflare-Deployment | eine Deployment-Autorität, feste Toolchain, serielle Shards, Backup vor freigegebenen Migrationen und exakte Revisionsprüfung |
 
 ## Entscheidungsstatus und Nachfolger
 
@@ -85,6 +86,7 @@ verlinkt bleiben.
 | 0041 | ersetzt | ADR-0054 schaltet den Legacy-Vergleichspfad und die Worker-Konvergenz ab |
 | 0042 | teilweise ersetzt | ADR-0054 ersetzt die Zwei-Engine-Entscheidung; deterministische Primitive, Tick-Reihenfolge und modulare operative Phasen gelten fort |
 | 0046 | teilweise ersetzt | ADR-0056 ersetzt ausschließlich die Trennung der Mutationstests vom allgemeinen PR-Gate und hebt die Ratchets an |
+| 0056 | teilweise ersetzt | ADR-0057 verschiebt den Standardlauf vom doppelten PR-/Main-Trigger auf jeden Branch-Push; Ratchets und fachliche Mutationsfläche gelten fort |
 
 Historische Begriffe wie „Supervisor“ oder „Assist“ bleiben in den ursprünglichen ADR-Texten
 erhalten. Die aktuelle Architektur verwendet die Rollen und Oberflächen „Flight Director“ und

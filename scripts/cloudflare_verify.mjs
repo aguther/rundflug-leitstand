@@ -99,6 +99,12 @@ if (meta.dataJurisdiction !== "eu") throw new Error("/api/meta meldet keine EU-J
 if (!/^[0-9a-f]{40}$/i.test(meta.sourceRevision ?? "")) {
   throw new Error("/api/meta meldet keine eindeutige Deployment-Revision.");
 }
+const expectedRevision = process.env.SOURCE_REVISION ?? process.env.GITHUB_SHA;
+if (expectedRevision && meta.sourceRevision !== expectedRevision) {
+  throw new Error(
+    `/api/meta meldet Revision ${meta.sourceRevision}, erwartet wurde ${expectedRevision}.`,
+  );
+}
 if (!push.publicKey)
   throw new Error("Web-Push-Konfiguration enthält keinen öffentlichen Schlüssel.");
 

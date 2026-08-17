@@ -15,15 +15,16 @@ describe("Cloudflare migration runbook", () => {
     );
   });
 
-  it("documents backup-first deployment ordering without an implicit build migration", () => {
+  it("documents verified automatic migrations separately from resource provisioning", () => {
     expect(setup).toMatch(/löscht\s+oder leert niemals vorhandene Ressourcen/);
     expect(setup).toContain("wendet alle Migrationen auf die leere D1 an");
     expect(setup).toContain(
-      "Bei offener Migration vor jeder Änderung Backup-/D1-Time-Travel-Punkt",
+      "Bei offener Migration verlangt der automatische Pfad vor jeder Änderung einen belegten",
     );
-    expect(setup).toContain(
-      "bricht bei offenen Migrationen ab, solange `apply_migrations` nicht bewusst gewählt wurde",
-    );
+    expect(setup).toContain("ohne `onlineSafe`-Freigabe bricht er ab");
+    expect(setup).toContain("vorhandenen Worker, D1-ID, EU-R2 und Bindings, ohne");
+    expect(setup).toContain("Ressourcen anzulegen");
+    expect(setup).not.toContain("apply_migrations");
     expect(rootPackage.scripts.build).not.toContain("db:migrate");
   });
 
@@ -32,5 +33,6 @@ describe("Cloudflare migration runbook", () => {
     expect(recovery).toContain("Migrationsnotiz 0031");
     expect(recovery).toContain("D1-Time-Travel-Zeitpunkt");
     expect(recovery).toContain("isolierte Datenbank");
+    expect(recovery).toContain("PRE_DEPLOY");
   });
 });

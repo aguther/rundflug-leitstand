@@ -24,7 +24,7 @@ flowchart TB
         WF["Cloudflare Workflow<br/>PlanningHistoryCompactionWorkflow"]
     end
 
-    GH["GitHub Actions<br/>CI und manuelles Deployment"]
+    GH["GitHub Actions<br/>Branch-/PR-CI und einziges automatisches Deployment"]
     PUSH["Push-Dienste der Browserhersteller"]
 
     TAB & DESK & MON & GAST --> NET --> EDGE --> WK
@@ -72,6 +72,7 @@ flowchart TB
 | Variable | `SOURCE_REVISION` | im Deployment gesetzter Commit; Grundlage für Replay-Vergleiche |
 | Secret | `ADMIN_PIN_HASH` | langsamer, gesalzener Hash der Administrator-PIN |
 | Secret | `BOOTSTRAP_TOKEN` | einmalige Ersteinrichtung; niemals in Rollenunterlagen oder Logs |
+| Secret | `DEPLOYMENT_BACKUP_TOKEN_HASH` | ausschließlich SHA-256-Hash des GitHub-Environment-Tokens für den internen Pre-Deployment-Backup-Endpunkt |
 | Secret | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web-Push-Authentifizierung; der private Schlüssel verlässt Cloudflare Secrets nicht |
 
 Secrets werden ausschließlich über Cloudflare Secrets beziehungsweise `.dev.vars` gesetzt.
@@ -82,27 +83,30 @@ oder Testfixtures auftauchen.
 
 ```mermaid
 flowchart TB
-    PR["Pull Request"] --> CI["CI: npm ci, test:coverage,<br/>check:ci, SonarQube"]
-    CI --> MAIN["Fast-forward nach main"]
-    MAIN --> WD["workflow_dispatch:<br/>target, apply_migrations, Bestätigung DEPLOY"]
-    WD --> FULL["npm run check (vollständig)"]
-    FULL --> MIG{"offene D1-Migrationen?"}
-    MIG -->|"apply_migrations = true"| APPLY["wrangler d1 migrations apply --remote"]
-    MIG -->|"false und offene Migrationen"| STOP["Abbruch mit Hinweis"]
-    APPLY --> BUILD["npm run build:web"]
-    MIG -->|"keine offenen"| BUILD
-    BUILD --> DEP["wrangler deploy"]
-    MAIN --> MON["monatlich: Cloudflare-Maintenance"]
+    PUSH["Push auf jeden Branch"] --> CI["parallele Gates:<br/>Coverage, Runtime, Shards,<br/>Restore, Doku, Mutation"]
+    CI --> SONAR["SonarQube Branch Quality Gate"]
+    PR["Pull Request"] --> PRSONAR["zusätzliche SonarQube-PR-Analyse"]
+    SONAR --> MAIN{"Commit auf main?"}
+    MAIN -->|"nein"| DONE["Prüfergebnis für Arbeitsbranch"]
+    MAIN -->|"ja"| BUILD["commitgebundener Build"]
+    BUILD --> PREFLIGHT["Preflight: vorhandener Worker,<br/>D1-ID, EU-R2, Bindings, Secrets;<br/>Auto-Create aus"]
+    PREFLIGHT --> MIG{"online-sichere Migrationen offen?"}
+    MIG -->|"nein"| DEP["wrangler deploy --strict"]
+    MIG -->|"ja"| BACKUP["D1-Time-Travel-Bookmark<br/>+ portables PRE_DEPLOY-Backup"]
+    BACKUP --> APPLY["freigegebene Migrationen anwenden"]
+    APPLY --> DEP
+    DEP --> VERIFY["Health, Migrationen, Secrets<br/>und exakte SOURCE_REVISION prüfen"]
+    MON["monatlich: Cloudflare-Maintenance"]
     MON --> RUNTIME["Compatibility-Date, Toolchain,<br/>Bindings, Runtime, Logs, Health/Meta"]
 ```
 
-Das Deployment ist bewusst manuell auszulösen und verlangt die exakte Eingabe `DEPLOY` sowie eine
-Zielumgebung. Der einmalige inkompatible Neustart auf `0001_v1_12_baseline.sql` erfolgt ausschließlich
-über den in ADR-0045 beschriebenen vollständigen Neuaufbau. Danach sind Migrationen vorwärtsgerichtet
-und besitzen jeweils eine Wiederherstellungs- oder Forward-Repair-Notiz; ein manueller Spaltenabbau in
-der laufenden Datenbank ist nicht vorgesehen.
+GitHub Actions ist die einzige automatische Deployment-Autorität. Jeder Branch wird unabhängig von
+einem Pull Request geprüft. `main` wird erst nach allen Gates automatisch ausgerollt; der manuelle
+Workflow bleibt als Wiederanlauf mit Bestätigung `DEPLOY` verfügbar. Native automatische
+Cloudflare-Git-Builds sind nach erfolgreicher Inbetriebnahme dieses Pfads deaktiviert.
 
-Der monatliche Workflow läuft gegen das geschützte Ziel `rundflug-leitstand`. Nur dort gilt das
-45-Tage-Ratchet für die Compatibility-Date; normale PR- und Build-Läufe bleiben zeitstabil. Der
-einmalige Baseline-Neuaufbau verwendet das read-only startende CLI aus ADR-0049. Deployment und
-Remote-Seeds sind ausdrücklich kein Bestandteil dieses Löschkommandos.
+Der Preflight legt niemals Ressourcen an. Er verlangt den vorhandenen Worker, die exakte D1-ID und
+den vorhandenen EU-R2-Bucket. Nur unveränderte, per SHA-256 geprüfte und ausdrücklich online-sichere
+Folgemigrationen werden nach D1-Bookmark und portablem Backup automatisch angewendet. Der einmalige
+inkompatible Neustart auf `0001_v1_12_baseline.sql` bleibt ausschließlich dem vollständigen Neuaufbau
+aus ADR-0045 vorbehalten. Details: ADR-0057 und `docs/operations/ci-cd-stabilitaet.md`.

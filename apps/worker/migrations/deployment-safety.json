@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "migrations": [
+    {
+      "file": "0001_v1_12_baseline.sql",
+      "sha256": "c5f5bd30ab6aebe7571c4c08e99a849c4e5ece799d5caa0f4bd0ae4a0ef0ad64",
+      "onlineSafe": false,
+      "initialOnly": true,
+      "recoveryReference": "apps/worker/migrations/README.md#0001--v112-schema-baseline"
+    },
+    {
+      "file": "0002_planning_run_lineage_indexes.sql",
+      "sha256": "c43e45f2fc38cdd7acd72fa86f97f587c4ea6b4b747d136e40015a3d54b39b86",
+      "onlineSafe": true,
+      "initialOnly": false,
+      "recoveryReference": "apps/worker/migrations/README.md#0002--planning-run-lineage-indexes"
+    },
+    {
+      "file": "0003_planning_history_compaction.sql",
+      "sha256": "33f1ed62bfd04e30a0c571224678cc0e473544ba94e0b10b875b9e29862d694d",
+      "onlineSafe": true,
+      "initialOnly": false,
+      "recoveryReference": "apps/worker/migrations/README.md#0003--planning-history-compaction"
+    },
+    {
+      "file": "0004_dispatch_decision_details.sql",
+      "sha256": "23f2e7d125a5794d8df70de2d18402de166be51ae1ee4dde42ba69c284ab2a38",
+      "onlineSafe": true,
+      "initialOnly": false,
+      "recoveryReference": "apps/worker/migrations/README.md#0004--dispatch-decision-details"
+    }
+  ]
+}

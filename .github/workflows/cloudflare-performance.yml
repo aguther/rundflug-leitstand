@@ -35,20 +35,12 @@ concurrency:
 jobs:
   measure:
     if: inputs.confirmation == 'PERFORMANCE'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: ${{ inputs.target }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - name: Install npm 12.0.2
-        run: |
-          npm install --global --prefix "$RUNNER_TEMP/npm" npm@12.0.2
-          echo "$RUNNER_TEMP/npm/bin" >> "$GITHUB_PATH"
-      - run: npm ci
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-project
       - run: npm run test:cloudflare-scale-performance
         env:
           CLOUDFLARE_SCALE_TARGET_ORIGIN: ${{ inputs.target_origin }}

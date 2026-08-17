@@ -106,4 +106,4 @@ flowchart LR
 | Durable-Object-Bindung `EVENT_COORDINATOR` | Cloudflare-Bindung, SQLite-DO | Serialisierung der Kommandos, Realtime-Verteilung, Prognosetakt |
 | R2-Bindung `BACKUPS` (EU) | Cloudflare-Bindung | portable Sicherungen, Veranstaltungslogos und Analysearchive |
 | Cron `15 2 * * *` | Cloudflare Cron Trigger | Sicherung, Push-Löschfrist, Analysearchive |
-| Deployment | GitHub Actions + Wrangler, manuell ausgelöst mit Bestätigungstext | reproduzierbares Deployment inklusive Migrationsprüfung |
+| Deployment | GitHub Actions + Wrangler; automatisch nach grünem `main`, manuell wiederanlaufbar | commitgebundener Preflight, Backup, freigegebene Migrationen und Revisionsprüfung ohne Ressourcenanlage |

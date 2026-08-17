@@ -45,6 +45,10 @@ erst nach reproduzierbarer Evidenz in das aktive Register aufgenommen.
 Die Online-Pflicht der Administration und der inkompatible V1.12-Baseline-Neuaufbau sind bewusste
 Architektur- beziehungsweise Rolloutentscheidungen und werden nicht als technische Schulden geführt.
 
+Flüchtige CI-Last und zwei unabhängige Deployment-Autoritäten werden durch ADR-0057 begrenzt: feste
+Runner- und Toolversionen, serielle Suiten je Runner, keine Test-Retries, GitHub als einzige
+automatische Deploymentquelle sowie commitgebundener Cloudflare-Preflight und Abschlusscheck.
+
 Die vormals getrennten lokalen Simulationsengines sind durch eine operative Pipeline ersetzt. Presets
 werden an der Engine-Grenze in eine synthetische operative Topologie übersetzt, importierte Modelle
 direkt übernommen. Gemeinsame deterministische Primitive und Golden-Seed-Tests verhindern Drift;

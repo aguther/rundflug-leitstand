@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 export const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const requiredCloudflareSecrets = [
+  "DEPLOYMENT_BACKUP_TOKEN_HASH",
   "INSTALLATION_RECOVERY_CODE",
   "RESET_SETUP_SIGNING_KEY",
   "VAPID_PUBLIC_KEY",
@@ -11,6 +12,7 @@ export const requiredCloudflareSecrets = [
   "VAPID_SUBJECT",
 ];
 export const compatibilityProfileSecrets = [
+  "DEPLOYMENT_BACKUP_TOKEN_HASH",
   "ADMIN_PIN_HASH",
   "BOOTSTRAP_TOKEN",
   "VAPID_PUBLIC_KEY",

@@ -15,6 +15,7 @@ import { registerAuthRoutes } from "./auth-routes";
 import { registerControlCoordinationRoutes } from "./control-coordination-routes";
 import { registerControlSessionMiddleware } from "./control-session-middleware";
 import { registerControlTransportRoutes } from "./control-transport-routes";
+import { registerDeploymentBackupRoutes } from "./deployment-backup-routes";
 import { registerDeviceRoutes } from "./device-routes";
 
 export { EventCoordinator } from "./event-coordinator";
@@ -121,6 +122,8 @@ app.get("/api/meta", (context) =>
 );
 
 registerSetupRoutes(app);
+
+registerDeploymentBackupRoutes(app);
 
 registerAuthRoutes(app);
 registerAdminAccountRoutes(app);

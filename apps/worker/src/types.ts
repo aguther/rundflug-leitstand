@@ -6,6 +6,7 @@ export type Env = Omit<
   | "BOOTSTRAP_TOKEN"
   | "INSTALLATION_RECOVERY_CODE"
   | "RESET_SETUP_SIGNING_KEY"
+  | "DEPLOYMENT_BACKUP_TOKEN_HASH"
   | "VAPID_PUBLIC_KEY"
   | "VAPID_PRIVATE_KEY"
   | "VAPID_SUBJECT"
@@ -21,6 +22,7 @@ export type Env = Omit<
   ADMIN_PIN_HASH?: string;
   INSTALLATION_RECOVERY_CODE?: string;
   RESET_SETUP_SIGNING_KEY?: string;
+  DEPLOYMENT_BACKUP_TOKEN_HASH?: string;
   /** @deprecated Use INSTALLATION_RECOVERY_CODE. Kept for one deployment transition. */
   BOOTSTRAP_TOKEN?: string;
   VAPID_PUBLIC_KEY?: string;

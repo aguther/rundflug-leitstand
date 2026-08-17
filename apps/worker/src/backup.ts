@@ -45,7 +45,11 @@ export interface PortableBackupManifestV2 {
   tables: PortableBackupTableManifest[];
 }
 
-export type BackupReason = "DAILY" | "PRE_EVENT" | "FACTORY_RESET";
+export type BackupReason = "DAILY" | "PRE_EVENT" | "PRE_DEPLOY" | "FACTORY_RESET";
+
+interface PortableBackupOptions {
+  objectKey?: string;
+}
 
 export function operationDateInTimeZone(date: Date, timeZone = "Europe/Berlin"): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -122,6 +126,7 @@ export async function createPortableBackup(
   env: Env,
   now = new Date(),
   reason: BackupReason = "DAILY",
+  options: PortableBackupOptions = {},
 ): Promise<{
   key: string;
   checksum: string;
@@ -151,7 +156,7 @@ export async function createPortableBackup(
     tables,
   };
   const day = createdAt.slice(0, 10);
-  const key = `backups/${day}/${createdAt.replaceAll(":", "-")}.zip`;
+  const key = options.objectKey ?? `backups/${day}/${createdAt.replaceAll(":", "-")}.zip`;
   const checksumKey = `${key}.sha256`;
   const writer = new StreamingZipWriter();
   const [uploadStream, digestInput] = writer.readable.tee();

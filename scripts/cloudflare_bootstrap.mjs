@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
@@ -224,12 +224,21 @@ if (
 
 let installationRecoveryCode = null;
 if (configuredRequiredSecrets.length === 0 || profile.rotateSecrets) {
+  const deploymentBackupToken = process.env.DEPLOYMENT_BACKUP_TOKEN;
+  if (!deploymentBackupToken || deploymentBackupToken.length < 32) {
+    throw new Error(
+      "DEPLOYMENT_BACKUP_TOKEN must be provided securely and contain at least 32 characters.",
+    );
+  }
   installationRecoveryCode = randomBytes(24).toString("base64url");
   const resetSigningKey = randomBytes(32).toString("base64url");
   const vapid = generateVapidKeyPair();
   try {
     await runWrangler(["secret", "bulk", "--config", configPath], {
       input: JSON.stringify({
+        DEPLOYMENT_BACKUP_TOKEN_HASH: createHash("sha256")
+          .update(deploymentBackupToken)
+          .digest("hex"),
         INSTALLATION_RECOVERY_CODE: installationRecoveryCode,
         RESET_SETUP_SIGNING_KEY: resetSigningKey,
         VAPID_PUBLIC_KEY: vapid.publicKey,

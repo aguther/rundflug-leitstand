@@ -1,5 +1,6 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { loadMigrationSafety } from "./lib/migration-safety.mjs";
 import { compareTechnicalStrings } from "./lib/technical-order.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -17,6 +18,9 @@ for (const file of files) {
   entries.push(file);
   byNumber.set(number, entries);
 }
+
+const safetyEntries = await loadMigrationSafety(root, files);
+const safetyByFile = new Map(safetyEntries.map((entry) => [entry.file, entry]));
 for (const [number, entries] of byNumber) {
   if (entries.length > 1) {
     throw new Error(`Doppelte Migrationsnummer ${number}: ${entries.join(", ")}`);
@@ -59,14 +63,18 @@ const lines = [
   "umbenannt. Die vorherigen 69 Entwicklungsmigrationen werden nicht unterstützt und bleiben über Git",
   "nachvollziehbar (ADR-0045).",
   "",
-  "| Reihenfolge | Datei | Hinweis |",
-  "| ---: | --- | --- |",
-  ...files.map(
-    (file, index) => `| ${index + 1} | \`${file}\` | eindeutig und lückenlos ab \`0001\` |`,
-  ),
+  "| Reihenfolge | Datei | Deployment | Prüfsumme |",
+  "| ---: | --- | --- | --- |",
+  ...files.map((file, index) => {
+    const safety = safetyByFile.get(file);
+    const deployment = safety.onlineSafe ? "automatisch, online-sicher" : "nur Erstinstallation";
+    return `| ${index + 1} | \`${file}\` | ${deployment} | \`${safety.sha256.slice(0, 12)}…\` |`;
+  }),
   "",
   `Gesamt: ${files.length} Migrationen. Wiederherstellungsnotizen werden gegen SQL und`,
-  "`apps/worker/migrations/README.md` geprüft.",
+  "`apps/worker/migrations/README.md` geprüft. Für automatische Deployments werden zusätzlich die",
+  "vollständigen SHA-256-Prüfsummen und die explizite Online-Sicherheitsfreigabe aus",
+  "`apps/worker/migrations/deployment-safety.json` validiert.",
   "",
 ];
 const expected = lines.join("\n");

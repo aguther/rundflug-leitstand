@@ -323,9 +323,9 @@ werden dadurch nicht in Familiendienste dupliziert; deren D1-Batches bleiben die
 | Fachlogik | Vitest-Zustands-, Grenzwert- und Negativtests neben jedem Domänenmodul; Mutationstests prüfen die Aussagekraft in besonders kritischen Modulen |
 | Verträge | Schema-Tests in `packages/contracts` inklusive Modul-Exportprüfung; Familien-Exhaustiveness hält 57 Schemaoptionen und 59 eindeutige Command-Discriminatoren lückenlos |
 | Datenbank | Gemeinsamer In-Memory-SQLite-Builder führt die produktive Baseline aus, aktiviert Fremdschlüssel und stellt synthetische Fixtures sowie eine D1-kompatible Testbindung bereit |
-| Worker-Laufzeit | `@cloudflare/vitest-pool-workers` über `vitest.worker.config.ts` und echte D1-Testbindungen; Mocks bleiben auf gezielte Fehlerpfade beschränkt; eigener PR-CI-Job |
+| Worker-Laufzeit | `@cloudflare/vitest-pool-workers` über `vitest.worker.config.ts` und echte D1-Testbindungen; Mocks bleiben auf gezielte Fehlerpfade beschränkt; eigener Branch-CI-Job |
 | Oberfläche | Testing Library und jsdom für DOM-Tests, Playwright für Browserläufe |
-| Integration | zahlreiche `scripts/verify_*.mjs`-Läufe; lokale Worker-Verifier erhalten über `scripts/lib/worker-test-harness.mjs` je Instanz freien Port, temporären D1-Zustand und Assets; 18 V1-Kernsuiten und die deterministische 25-Seed-Forecast-Vergleichsbaseline laufen als eigene parallele PR-CI-Jobs, Soak und Abnahmetag als getrennte Langzeitabnahmen |
+| Integration | zahlreiche `scripts/verify_*.mjs`-Läufe; lokale Worker-Verifier erhalten über `scripts/lib/worker-test-harness.mjs` je Instanz freien Port, temporären D1-Zustand und Assets; 18 V1-Kernsuiten verteilen sich auf vier parallele Branch-CI-Shards und laufen innerhalb jedes Runners seriell; die deterministische 25-Seed-Forecast-Vergleichsbaseline besitzt einen eigenen Job, Soak und Abnahmetag bleiben getrennte Langzeitabnahmen |
 | Architekturregeln | `apps/worker/src/maintainability-coverage.test.ts`, `npm run refactor:guardrails` (Dateibudgets, Importverbote, keine Quelltextimporte oder Dateisystem-Lesezugriffe auf produktive `.ts`-/`.tsx`-Dateien in Tests, reine Domain-Abhängigkeiten) |
 | Coverage | expliziter Produktionscode-Nenner für `apps` und `packages`; Ratchets 81 % Statements, 71 % Branches, 80 % Functions und 84 % Lines; zehn kritische Domainmodule jeweils mindestens 90 % Lines und 85 % Branches; 80 % SonarQube-Ziel für neuen Code |
 | Mutation | Stryker mit offiziellem Vitest-Runner für neun fokussierte Module aus Queue, Kapazität, Prognose, Turnaround, Nachruf und Outage Recovery; globales Ratchet `break: 87`, `low: 80`, `high: 90` sowie mindestens 80 Prozent je Modul |
@@ -334,11 +334,12 @@ werden dadurch nicht in Familiendienste dupliziert; deren D1-Batches bleiben die
 | Anforderungen | `npm run requirements:verify` und Traceability-CSV |
 | Statische Analyse | Biome sowie nachgelagerter SonarQube-Scan, der den LCOV-Bericht des Basisjobs übernimmt und auf das Quality Gate wartet |
 
-Der vollständige Gesamtnachweis ist `npm run check`. Die PR-CI führt Basisprüfung/Coverage,
-Worker-Runtime, V1-Kernintegration, Forecast-Vergleichsbaseline, Backup-Restore und Dokumentation
-parallel aus; der Sonar-Job
-folgt abhängig vom erfolgreichen Basisjob und der Verfügbarkeit des geschützten Tokens.
-Der Mutationstest läuft für jeden Pull Request, jeden Push nach `main`, wöchentlich und manuell.
+Der vollständige Gesamtnachweis ist `npm run check`. Jeder Branch-Push führt Basisprüfung/Coverage,
+Worker-Runtime, vier serielle V1-Shards, Forecast-Vergleichsbaseline, Backup-Restore, Dokumentation und
+Mutation parallel aus; danach folgt die SonarQube-Branch-Analyse. Interne Pull Requests erhalten eine
+zusätzliche native PR-Analyse, ohne die übrigen Branch-Prüfungen zu duplizieren. Testfehler werden
+nicht wiederholt; nur klar transiente Cloudflare-Infrastrukturfehler besitzen höchstens drei Versuche.
+Der Mutationstest läuft zusätzlich wöchentlich und manuell.
 HTML-, JSON- und Incremental-Berichte werden als CI-Artefakte veröffentlicht. ADR-0046 begründet
 Auswahl und verhaltensbasierte Grenzen; ADR-0056 begründet das Standard-Gate sowie die globalen und
 modulbezogenen Ratchets.
@@ -352,6 +353,9 @@ modulbezogenen Ratchets.
   der Übergangsfrist weiterhin Format 1.
 - D1 Time Travel ergänzt die Sicherung als kurzfristiger Wiederherstellungspfad; ein Restore erfolgt
   ausschließlich in eine isolierte Datenbank.
+- Vor jeder automatisch freigegebenen Online-Migration erzeugt der Worker nach geschützter,
+  idempotenter Anforderung ein deterministisch benanntes `PRE_DEPLOY`-Archiv samt Sidecar und bindet
+  es über ein privates R2-Receipt an Commit und Time-Travel-Bookmark.
 - Tagesberichte (CSV und PDF) werden bei Abruf aus D1 erzeugt. Portable Sicherungen,
   Veranstaltungslogos, Analysepakete und fünf bis zehn Jahre aufbewahrte Planungshistorienpakete
   liegen in R2; der Bucket besitzt keine öffentliche URL. Analysearchivformat 2 vereinigt kalte

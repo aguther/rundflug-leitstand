@@ -159,6 +159,15 @@ Datenbestand verifiziert.
 7. Der tägliche Cron prüft das nächste Datum in `Europe/Berlin`. Liegt dort eine vorbereitete oder
    aktive Veranstaltung, wird der Export als `PRE_EVENT` in den R2-Metadaten gekennzeichnet.
 8. Der Cron löscht Archiv und Sidecar erst nach Ablauf von 14 vollständigen Tagen.
+9. Vor einer automatisch freigegebenen Online-Migration erzeugt der geschützte interne
+   Deployment-Endpunkt ein portables Archiv mit Grund `PRE_DEPLOY` unter
+   `backups/deployments/<commit>.zip`. Das zugehörige private Receipt bindet Commit,
+   D1-Time-Travel-Bookmark, Archiv, Sidecar und Prüfsumme. Eine Wiederholung desselben Commits
+   verwendet denselben Objektschlüssel und erzeugt nach vorhandenem Receipt kein weiteres Backup.
+
+Der Worker speichert nur den SHA-256-Hash des Deployment-Tokens. Der Klartext liegt ausschließlich
+als geschütztes GitHub-Environment-Secret; Token und Bookmark erscheinen nicht in Logs oder
+Deployment-Ausgaben.
 
 Die portable Tabellensicherung umfasst seit Migration 0057 auch
 `aircraft_product_turnaround_overrides`; die ergänzten Produkt-, Rotations- und Snapshotspalten

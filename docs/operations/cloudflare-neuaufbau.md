@@ -13,7 +13,8 @@ oder leert niemals vorhandene Ressourcen.
   unterstützte Version,
 - `npm install` und ein erfolgreicher Lauf von `npm run check`,
 - interaktive Wrangler-Anmeldung mit `npx wrangler login`,
-- Passwortsafe für den einmalig angezeigten Installations-Notfallcode,
+- Passwortsafe für den einmalig angezeigten Installations-Notfallcode und ein darin erzeugtes,
+  mindestens 32 Zeichen langes `DEPLOYMENT_BACKUP_TOKEN`,
 - erreichbare HTTPS- oder `mailto:`-Adresse als VAPID-Kontakt.
 
 Bei mehreren zugänglichen Cloudflare-Accounts ist zusätzlich `--account-id <ID>` anzugeben. Die ID
@@ -55,7 +56,8 @@ Aktionen. `--dry-run` meldet sich nicht bei Cloudflare an und verändert nichts.
 
 ## 4. Aufbau und sichere Wiederaufnahme
 
-Nach Prüfung denselben Befehl ohne `--dry-run` ausführen. Das Skript:
+Nach Prüfung `DEPLOYMENT_BACKUP_TOKEN` über einen sicheren, nicht protokollierten Prozesskontext
+bereitstellen und denselben Befehl ohne `--dry-run` ausführen. Das Skript:
 
 1. bestimmt den angemeldeten Cloudflare-Account eindeutig,
 2. erkennt D1 und R2 oder legt sie mit Jurisdiktion `eu` an,
@@ -63,13 +65,14 @@ Nach Prüfung denselben Befehl ohne `--dry-run` ausführen. Das Skript:
    Cron und Observability,
 4. schreibt den Fortsetzungsstand nach `.wrangler/targets/<ziel>.json`,
 5. erzeugt Installations-Notfallcode, Reset-Signierschlüssel und VAPID-Schlüsselpaar ausschließlich
-   im Arbeitsspeicher und überträgt sie als Worker-Secrets,
+   im Arbeitsspeicher, bildet den SHA-256-Hash des bereitgestellten Deployment-Tokens und überträgt
+   nur diese Werte als Worker-Secrets,
 6. wendet alle Migrationen auf die leere D1 an, baut die PWA und deployt Worker und Assets,
 7. zeigt den Installations-Notfallcode genau einmal sowie Worker-, Setup- und Prüfbefehl an.
 
 Beide lokalen Dateien sind von Git ausgeschlossen. D1-IDs müssen nicht manuell eingetragen werden.
 Demo-Seeds werden nicht ausgeführt. Jede erzeugte Zielkonfiguration deklariert unter
-`secrets.required` ausschließlich die fünf aktuellen Secret-Namen. Die eingecheckte
+`secrets.required` ausschließlich die sechs aktuellen Secret-Namen. Die eingecheckte
 `wrangler.jsonc` führt die Namen des bestehenden Kompatibilitätsprofils. Dadurch bleiben
 Typgenerierung und CI unabhängig von lokalen `.dev.vars`; Secret-Werte stehen weiterhin nie in
 der Konfiguration oder im Repository.
@@ -86,8 +89,9 @@ npm run cloudflare:bootstrap -- \
 
 Vorhandene Ressourcen werden nur im ausgewählten Account und mit passendem Namen/Typ verwendet.
 Eine nachweislich andere Jurisdiktion oder ein abweichendes Zielmanifest führt zum Abbruch.
-`--rotate-secrets` ist kein normaler Resume-Schritt: Es ersetzt Notfall-, Signier- und
-VAPID-Schlüssel; bestehende Push-Abonnements müssen danach neu aktiviert werden.
+`--rotate-secrets` ist kein normaler Resume-Schritt: Es ersetzt Notfall-, Signier-, Deployment- und
+VAPID-Schlüssel; bestehende Push-Abonnements müssen danach neu aktiviert werden. Derselbe neue
+Klartextwert des Deployment-Tokens muss anschließend als GitHub-Environment-Secret hinterlegt sein.
 
 Produktion benötigt immer beide Angaben:
 
@@ -123,7 +127,7 @@ npm run cloudflare:verify -- \
   --url https://rundflug-leitstand-abnahme.example.workers.dev
 ```
 
-Die Prüfung verlangt: keine offene Migration, alle fünf Secret-Namen, Health- und Metadaten in
+Die Prüfung verlangt: keine offene Migration, alle sechs Secret-Namen, Health- und Metadaten in
 Version 1.12.0, EU-Datenjurisdiktion, eindeutige Deployment-Revision, Setup-Status und einen
 öffentlichen VAPID-Schlüssel. Danach
 werden in einem privaten Browserfenster je ein Rollen-Smoke-Test für Kasse, Flight Line, Flight
@@ -131,23 +135,36 @@ Director, FIDS und Administration sowie ein öffentlicher Gruppenstatus geprüft
 
 ## 7. Versionierter GitHub-Deployment-Workflow
 
-`.github/workflows/deploy-cloudflare.yml` deployt ausschließlich manuell und verwendet eine
-geschützte GitHub-Environment mit demselben Zielnamen. Dort konfigurieren:
+`.github/workflows/deploy-cloudflare.yml` wird nach allen grünen Gates eines Pushes auf `main`
+automatisch aufgerufen, sobald die Repository-Variable
+`CLOUDFLARE_AUTOMATIC_DEPLOYMENT_ENABLED=true` gesetzt ist, und bleibt zusätzlich mit Bestätigung
+`DEPLOY` manuell wiederanlaufbar. Beide Pfade verwenden eine geschützte GitHub-Environment mit
+demselben Zielnamen. Dort konfigurieren:
 
 | GitHub-Wert | Art |
 | --- | --- |
 | `CLOUDFLARE_API_TOKEN` | Secret, minimaler Deployment-/D1-Zugriff |
 | `CLOUDFLARE_ACCOUNT_ID` | Secret |
 | `CLOUDFLARE_D1_DATABASE_ID` | Secret |
+| `DEPLOYMENT_BACKUP_TOKEN` | Secret mit mindestens 32 zufälligen Zeichen; Klartext nur in GitHub |
 | `CLOUDFLARE_WORKER_NAME` | Variable |
 | `CLOUDFLARE_D1_NAME` | Variable |
 | `CLOUDFLARE_R2_NAME` | Variable |
 | `CLOUDFLARE_APP_ENV` | Variable `acceptance` oder `production` |
+| `CLOUDFLARE_DEPLOYMENT_URL` | Variable mit dem HTTPS-Origin des vorhandenen Workers |
 
-Für Produktion sind Environment-Reviewer verpflichtend. Der Workflow verlangt zusätzlich die
-Bestätigung `DEPLOY`, führt `npm run check` aus, rekonstruiert die ignorierte Zielkonfiguration und
-bricht bei offenen Migrationen ab, solange `apply_migrations` nicht bewusst gewählt wurde.
-Anwendungssecrets bleiben direkt am Worker und werden nicht nach GitHub kopiert.
+Für Produktion sind Environment-Reviewer verpflichtend. Die vorgeschaltete CI führt alle Prüfungen
+einschließlich Mutation und Sonar aus. Der Deployment-Workflow rekonstruiert die ignorierte,
+commitgebundene Zielkonfiguration und prüft vorhandenen Worker, D1-ID, EU-R2 und Bindings, ohne
+Ressourcen anzulegen. Er überträgt ausschließlich den SHA-256-Hash des
+`DEPLOYMENT_BACKUP_TOKEN` als Worker-Secret.
+
+Offene Migrationen werden nur angewendet, wenn Dateiprüfsumme und `onlineSafe`-Freigabe in
+`apps/worker/migrations/deployment-safety.json` stimmen. Vorher werden D1-Time-Travel-Bookmark und
+portables `PRE_DEPLOY`-Backup erzeugt. `0001_v1_12_baseline.sql` bleibt dem leeren Neuaufbau
+vorbehalten. Nach dem Deployment muss `/api/meta` exakt den GitHub-Commit melden. Anwendungssecrets
+bleiben direkt am Worker und werden nicht nach GitHub kopiert. Der vollständige Ablauf steht in
+[`ci-cd-stabilitaet.md`](ci-cd-stabilitaet.md) und ADR-0057.
 
 Die harte Performance-SLO ist bewusst kein Bestandteil dieses allgemeinen GitHub-Checks. Für eine
 isolierte Abnahmeumgebung steht der manuelle Workflow `Cloudflare-Performance-SLO` bereit. Er erhält
@@ -215,8 +232,9 @@ Ein fachlich erforderlicher Daten-Restore erfolgt ausschließlich in einer isoli
 - Bei Namens- oder Accountabweichung abbrechen, Namensblatt und
   `.wrangler/targets/<ziel>.json` vergleichen.
 - Bei einer Teilmenge vorhandener Secrets erst Ziel und Account prüfen. Danach entweder fehlende
-  Werte kontrolliert ergänzen oder alle fünf mit `--rotate-secrets` rotieren.
-- Bei offener Migration vor jeder Änderung Backup-/D1-Time-Travel-Punkt prüfen.
+  Werte kontrolliert ergänzen oder den vollständigen Satz mit `--rotate-secrets` rotieren.
+- Bei offener Migration verlangt der automatische Pfad vor jeder Änderung einen belegten
+  Backup-/D1-Time-Travel-Punkt; ohne `onlineSafe`-Freigabe bricht er ab.
 - Bei verlorenem Zielmanifest vorhandene Ressourcen zunächst nur mit Wrangler lesen; anschließend
   Bootstrap mit den exakten Namen und `--resume` starten.
 - Domain-Cutover und Backup-Import sind getrennte, freigabepflichtige Verfahren.

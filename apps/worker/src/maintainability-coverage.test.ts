@@ -1,5 +1,6 @@
 import { commandEnvelopeSchema } from "@rundflug/contracts/operations-dispatch";
 import { describe, expect, it } from "vitest";
+import setupProjectAction from "../../../.github/actions/setup-project/action.yml?raw";
 import ciWorkflow from "../../../.github/workflows/ci.yml?raw";
 import cloudflarePerformanceWorkflow from "../../../.github/workflows/cloudflare-performance.yml?raw";
 import deployCloudflareWorkflow from "../../../.github/workflows/deploy-cloudflare.yml?raw";
@@ -112,15 +113,22 @@ describe("V1 maintainability and portability boundaries", () => {
     );
     expect(ciWorkflow).toContain("npm run check:ci");
     for (const workflow of [ciWorkflow, deployCloudflareWorkflow, cloudflarePerformanceWorkflow]) {
-      expect(workflow).toContain("actions/checkout@v7");
-      expect(workflow).toContain("actions/setup-node@v7");
-      expect(workflow).toContain("node-version-file: .nvmrc");
-      expect(workflow).not.toMatch(/\n\s+node-version: /);
-      expect(workflow).toContain('npm install --global --prefix "$RUNNER_TEMP/npm" npm@12.0.2');
-      expect(workflow).toContain('echo "$RUNNER_TEMP/npm/bin" >> "$GITHUB_PATH"');
+      expect(workflow).toContain("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1");
+      expect(workflow).toContain("uses: ./.github/actions/setup-project");
+      expect(workflow).toContain("runs-on: ubuntu-24.04");
     }
-    expect(ciWorkflow).toContain("actions/setup-python@v7");
-    expect(ciWorkflow).not.toContain("actions/setup-python@v5");
+    expect(setupProjectAction).toContain(
+      "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+    );
+    expect(setupProjectAction).toContain(
+      "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+    );
+    expect(setupProjectAction).toContain("node-version-file: .nvmrc");
+    expect(setupProjectAction).not.toMatch(/\n\s+node-version: /);
+    expect(setupProjectAction).toContain(
+      'npm install --global --prefix "$RUNNER_TEMP/npm" npm@12.0.2',
+    );
+    expect(setupProjectAction).toContain('echo "$RUNNER_TEMP/npm/bin" >> "$GITHUB_PATH"');
     expect(ciWorkflow).toContain("python -m pip install --disable-pip-version-check pypdf==6.10.0");
     const workerRuntimeJob = ciWorkflow.slice(
       ciWorkflow.indexOf("  worker-runtime:"),
@@ -146,14 +154,23 @@ describe("V1 maintainability and portability boundaries", () => {
     expect(sonarProperties).toContain("sonar.javascript.lcov.reportPaths=coverage/lcov.info");
     expect(ciWorkflow).toContain(`SONAR_TOKEN: \${{ secrets.SONAR_TOKEN }}`);
     expect(ciWorkflow).toContain("fetch-depth: 0");
+    expect(ciWorkflow).toContain('branches: ["**"]');
+    expect(ciWorkflow).toContain("-Dsonar.branch.name=$" + "{{ github.ref_name }}");
+    expect(ciWorkflow).toContain(
+      "-Dsonar.pullrequest.key=$" + "{{ github.event.pull_request.number }}",
+    );
     expect(ciWorkflow).toContain(
       "github.event.pull_request.head.repo.full_name == github.repository",
     );
     expect(ciWorkflow).toContain(
       "SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995",
     );
-    expect(ciWorkflow).toContain("actions/upload-artifact@v7");
-    expect(ciWorkflow).toContain("actions/download-artifact@v8");
+    expect(ciWorkflow).toContain(
+      "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    );
+    expect(ciWorkflow).toContain(
+      "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+    );
     expect(ciWorkflow).toContain("npm run test:worker-runtime");
     expect(ciWorkflow).toContain("npm run test:forecast-comparison-baseline");
     expect(ciWorkflow).toContain("npm run test:v1-integrations");
@@ -163,10 +180,11 @@ describe("V1 maintainability and portability boundaries", () => {
     expect(ciWorkflow).not.toContain("npm run test:soak-reliability");
     expect(ciWorkflow).not.toContain("npm run test:cloudflare-scale-performance");
     expect(ciWorkflow).toContain("needs: check");
+    expect(ciWorkflow).toContain("vars.CLOUDFLARE_AUTOMATIC_DEPLOYMENT_ENABLED == 'true'");
     expect(ciWorkflow).toContain("-Dsonar.qualitygate.wait=true");
     expect(ciWorkflow).not.toContain("-Dsonar.qualitygate.wait=false");
-    expect(ciWorkflow.indexOf("name: CI Check")).toBeLessThan(
-      ciWorkflow.indexOf("name: SonarQube Scan"),
+    expect(ciWorkflow.indexOf("name: CI check")).toBeLessThan(
+      ciWorkflow.indexOf("name: SonarQube branch scan"),
     );
   });
 

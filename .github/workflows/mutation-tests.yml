@@ -2,9 +2,6 @@ name: Mutation tests
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-  pull_request:
   schedule:
     - cron: "30 3 * * 1"
 
@@ -14,25 +11,16 @@ permissions:
 jobs:
   domain-mutation-tests:
     name: Critical domain mutation tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - name: Install npm 12.0.2
-        run: |
-          npm install --global --prefix "$RUNNER_TEMP/npm" npm@12.0.2
-          echo "$RUNNER_TEMP/npm/bin" >> "$GITHUB_PATH"
-      - name: Install dependencies
-        run: npm ci
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-project
       - name: Run mutation tests
         run: npm run test:mutation
       - name: Upload mutation reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: mutation-reports
           path: reports/mutation

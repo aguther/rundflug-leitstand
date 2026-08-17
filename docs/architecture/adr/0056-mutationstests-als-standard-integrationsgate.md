@@ -1,6 +1,6 @@
 # ADR-0056: Mutationstests als Standard-Integrationsgate
 
-- Status: Akzeptiert
+- Status: Teilweise ersetzt durch ADR-0057
 - Datum: 2026-08-16
 - Entscheidung: Auftraggeber
 - Betroffene Anforderungen: V1120-QA-010, V1110-QA-010, Q-ZUV-020

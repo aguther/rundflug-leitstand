@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   maintenance:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: rundflug-leitstand
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -28,16 +28,8 @@ jobs:
       CLOUDFLARE_DEPLOYMENT_URL: ${{ vars.CLOUDFLARE_DEPLOYMENT_URL }}
       SOURCE_REVISION: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - name: Install npm 12.0.2
-        run: |
-          npm install --global --prefix "$RUNNER_TEMP/npm" npm@12.0.2
-          echo "$RUNNER_TEMP/npm/bin" >> "$GITHUB_PATH"
-      - run: npm ci
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-project
       - name: Verify compatibility date, toolchain, observability and bindings
         run: npm run cloudflare:maintenance -- --enforce-compatibility-age
       - name: Verify Worker runtime and log privacy
