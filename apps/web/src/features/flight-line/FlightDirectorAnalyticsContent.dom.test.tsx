@@ -222,7 +222,7 @@ describe("FlightDirectorAnalyticsContent resource timeline", () => {
         value: () => ({ left: 100, right: 900, width: 800 }),
       },
     });
-    fireEvent.wheel(viewport, { clientX: 500, deltaY: -1 });
+    fireEvent.wheel(viewport, { clientX: 500, ctrlKey: true, deltaY: -1 });
 
     fireEvent.pointerDown(rotationButton, {
       button: 0,

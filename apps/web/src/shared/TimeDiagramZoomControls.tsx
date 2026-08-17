@@ -1,23 +1,27 @@
 import { Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "../design-system/components";
+import { formatTimeDiagramVisibleSpan } from "./time-diagram-viewport";
 import "./time-diagram-viewport.css";
 
 export function TimeDiagramZoomControls({
   onChange,
   onReset,
   value,
+  visibleSpanMs,
   zoomLevels,
 }: Readonly<{
   onChange: (zoom: number) => void;
   onReset: () => void;
   value: number;
+  visibleSpanMs: number;
   zoomLevels: readonly number[];
 }>) {
   const index = zoomLevels.indexOf(value);
+  const visibleSpanLabel = value === 1 ? "Gesamt" : formatTimeDiagramVisibleSpan(visibleSpanMs);
   return (
     <fieldset className="time-diagram-zoom">
       <legend className="visually-hidden">Diagramm-Zoom</legend>
-      <small>Mausrad: Zoom · Ziehen: Verschieben</small>
+      <small>Mausrad/Ziehen: Verschieben · Strg + Mausrad: Zoom</small>
       <Button
         aria-label="Diagramm verkleinern"
         disabled={index <= 0}
@@ -27,7 +31,9 @@ export function TimeDiagramZoomControls({
       >
         <ZoomOut aria-hidden="true" />
       </Button>
-      <span aria-live="polite">{Math.round(value * 100)} %</span>
+      <span aria-live="polite" title={`Sichtbarer Zeitraum: ${visibleSpanLabel}`}>
+        {visibleSpanLabel}
+      </span>
       <Button
         aria-label="Diagramm vergrößern"
         disabled={index < 0 || index >= zoomLevels.length - 1}

@@ -55,11 +55,11 @@ describe("admin event flow chart", () => {
       },
     });
 
-    fireEvent.wheel(viewport, { clientX: 500, deltaY: -1 });
-    expect(screen.getByText("150 %")).not.toBeNull();
+    fireEvent.wheel(viewport, { clientX: 500, ctrlKey: true, deltaY: -1 });
+    expect(screen.getByText("8 Std.")).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Gesamten Zeitverlauf anzeigen" }));
-    expect(screen.getByText("100 %")).not.toBeNull();
+    expect(screen.getByTitle("Sichtbarer Zeitraum: Gesamt")).not.toBeNull();
     expect(viewport.querySelector(".admin-flow-svg")?.getAttribute("tabindex") ?? null).toBeNull();
   });
 

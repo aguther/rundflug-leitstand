@@ -38,6 +38,7 @@ interface UseTimeDiagramViewportOptions {
 const DEFAULT_INSETS: TimeDiagramInsets = { left: 0, right: 0 };
 const DRAG_THRESHOLD_PX = 4;
 const MINUTE_MS = 60_000;
+const WHEEL_LINE_HEIGHT_PX = 16;
 
 export const DEFAULT_TIME_DIAGRAM_MINIMUM_VISIBLE_SPAN_MS = 15 * MINUTE_MS;
 export const TIME_DIAGRAM_ZOOM_LEVELS = [
@@ -59,6 +60,14 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 export function timeDomainSpan(domain: TimeDomain): number {
   return Math.max(1, domain.until - domain.from);
+}
+
+export function formatTimeDiagramVisibleSpan(spanMs: number): string {
+  const totalMinutes = Math.max(1, Math.round(spanMs / MINUTE_MS));
+  if (totalMinutes < 60) return `${totalMinutes} Min.`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes === 0 ? `${hours} Std.` : `${hours} Std. ${minutes} Min.`;
 }
 
 export function timeDiagramAxisTickValues({
@@ -158,6 +167,13 @@ export function panTimeDomain(input: {
   const maximumFrom = baseDomain.until - span;
   const from = clamp(currentDomain.from + input.deltaRatio * span, baseDomain.from, maximumFrom);
   return { from, until: from + span };
+}
+
+function wheelDeltaInPixels(event: WheelEvent, viewportHeight: number): number {
+  const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+  if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) return delta * WHEEL_LINE_HEIGHT_PX;
+  if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) return delta * Math.max(1, viewportHeight);
+  return delta;
 }
 
 export function useTimeDiagramViewport({
@@ -282,14 +298,39 @@ export function useTimeDiagramViewport({
   );
 
   wheelHandlerRef.current = (event: WheelEvent) => {
-    if (event.deltaY === 0) return;
-    const levels = zoomLevelsRef.current;
-    const currentIndex = levels.indexOf(zoomRef.current);
-    const direction = event.deltaY < 0 ? 1 : -1;
-    const nextIndex = clamp(currentIndex + direction, 0, levels.length - 1);
-    if (nextIndex === currentIndex) return;
+    if (event.ctrlKey) {
+      event.preventDefault();
+      if (event.deltaY === 0) return;
+      const levels = zoomLevelsRef.current;
+      const currentIndex = levels.indexOf(zoomRef.current);
+      const direction = event.deltaY < 0 ? 1 : -1;
+      const nextIndex = clamp(currentIndex + direction, 0, levels.length - 1);
+      if (nextIndex === currentIndex) return;
+      changeZoom(levels[nextIndex] ?? 1, event.clientX);
+      return;
+    }
+    if (event.altKey || event.metaKey || event.shiftKey || zoomRef.current <= 1) return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const delta = wheelDeltaInPixels(event, viewport.clientHeight);
+    if (delta === 0) return;
+    const currentInsets = insetsRef.current;
+    const currentInsetRatios = insetRatiosRef.current;
+    const ratioInsets = viewport.clientWidth * (currentInsetRatios.left + currentInsetRatios.right);
+    const plotWidth = Math.max(
+      1,
+      viewport.clientWidth - currentInsets.left - currentInsets.right - ratioInsets,
+    );
+    const currentDomain = visibleDomainRef.current;
+    const nextDomain = panTimeDomain({
+      baseDomain: baseDomainRef.current,
+      currentDomain,
+      deltaRatio: delta / plotWidth,
+    });
+    if (nextDomain.from === currentDomain.from && nextDomain.until === currentDomain.until) return;
     event.preventDefault();
-    changeZoom(levels[nextIndex] ?? 1, event.clientX);
+    visibleDomainRef.current = nextDomain;
+    setVisibleDomain(nextDomain);
   };
 
   if (!wheelListenerRef.current) {

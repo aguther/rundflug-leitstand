@@ -249,15 +249,15 @@ describe("forecast timeline", () => {
       },
     });
 
-    fireEvent.wheel(viewport, { clientX: 650, deltaY: -1 });
-    expect(screen.getByText("150 %")).not.toBeNull();
+    fireEvent.wheel(viewport, { clientX: 650, ctrlKey: true, deltaY: -1 });
+    expect(screen.getByTitle(/^Sichtbarer Zeitraum:/).textContent).not.toBe("Gesamt");
     const frozenRange = headingRange();
 
     rerender(renderTimeline(currentMs + 30 * 60_000));
     expect(headingRange()).toBe(frozenRange);
 
     fireEvent.click(screen.getByRole("button", { name: "Gesamten Zeitverlauf anzeigen" }));
-    expect(screen.getByText("100 %")).not.toBeNull();
+    expect(screen.getByTitle("Sichtbarer Zeitraum: Gesamt")).not.toBeNull();
     expect(headingRange()).not.toBe(frozenRange);
   });
 });

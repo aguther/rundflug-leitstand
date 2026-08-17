@@ -56,6 +56,7 @@ function DiagramViewportHarness({
 function prepareViewport() {
   const viewport = screen.getByTestId("viewport");
   Object.defineProperties(viewport, {
+    clientHeight: { configurable: true, value: 320 },
     clientWidth: { configurable: true, value: 660 },
     getBoundingClientRect: {
       configurable: true,
@@ -68,6 +69,12 @@ function prepareViewport() {
     setPointerCapture: vi.fn(),
   });
   return viewport;
+}
+
+function dispatchWheel(viewport: HTMLElement, init: WheelEventInit): WheelEvent {
+  const event = new WheelEvent("wheel", { bubbles: true, cancelable: true, ...init });
+  fireEvent(viewport, event);
+  return event;
 }
 
 function renderedDomain() {
@@ -143,14 +150,63 @@ describe("time diagram viewport", () => {
     const viewport = prepareViewport();
     const cursorClientX = 140 + 600 * 0.75;
 
-    fireEvent.wheel(viewport, { clientX: cursorClientX, deltaY: -1 });
+    dispatchWheel(viewport, { clientX: cursorClientX, ctrlKey: true, deltaY: -1 });
     const firstDomain = renderedDomain();
     const firstAnchor = timeAtRatio(firstDomain, 0.75);
-    fireEvent.wheel(viewport, { clientX: cursorClientX, deltaY: -1 });
+    dispatchWheel(viewport, { clientX: cursorClientX, ctrlKey: true, deltaY: -1 });
     const secondDomain = renderedDomain();
 
     expect(screen.getByLabelText("Zoom").textContent).toBe("2");
     expect(timeAtRatio(secondDomain, 0.75)).toBe(firstAnchor);
+  });
+
+  it("zooms only with Ctrl and always suppresses browser zoom", () => {
+    render(<DiagramViewportHarness />);
+    const viewport = prepareViewport();
+    const unmodifiedWheel = dispatchWheel(viewport, { clientX: 440, deltaY: -1 });
+    const shiftedWheel = dispatchWheel(viewport, { clientX: 440, deltaY: -1, shiftKey: true });
+
+    expect(unmodifiedWheel.defaultPrevented).toBe(false);
+    expect(shiftedWheel.defaultPrevented).toBe(false);
+    expect(screen.getByLabelText("Zoom").textContent).toBe("1");
+
+    const ctrlWheel = dispatchWheel(viewport, { clientX: 440, ctrlKey: true, deltaY: -1 });
+    expect(ctrlWheel.defaultPrevented).toBe(true);
+    expect(screen.getByLabelText("Zoom").textContent).toBe("1.5");
+
+    for (let index = 0; index < 20; index += 1) {
+      dispatchWheel(viewport, { clientX: 440, ctrlKey: true, deltaY: -1 });
+    }
+    const maximumZoom = screen.getByLabelText("Zoom").textContent;
+    const wheelAtLimit = dispatchWheel(viewport, { clientX: 440, ctrlKey: true, deltaY: -1 });
+    expect(wheelAtLimit.defaultPrevented).toBe(true);
+    expect(screen.getByLabelText("Zoom").textContent).toBe(maximumZoom);
+  });
+
+  it("pans a zoomed time axis with the unmodified wheel", () => {
+    render(<DiagramViewportHarness />);
+    const viewport = prepareViewport();
+    fireEvent.click(screen.getByRole("button", { name: "Zoom" }));
+    const beforePan = renderedDomain();
+
+    const panWheel = dispatchWheel(viewport, { deltaY: 80 });
+
+    expect(panWheel.defaultPrevented).toBe(true);
+    expect(screen.getByLabelText("Zoom").textContent).toBe("3");
+    expect(renderedDomain().from).toBeGreaterThan(beforePan.from);
+  });
+
+  it("releases the unmodified wheel when the time axis cannot pan farther", () => {
+    render(<DiagramViewportHarness />);
+    const viewport = prepareViewport();
+    fireEvent.click(screen.getByRole("button", { name: "Zoom" }));
+
+    const wheelToEdge = dispatchWheel(viewport, { deltaY: 100_000 });
+    const wheelAtEdge = dispatchWheel(viewport, { deltaY: 80 });
+
+    expect(wheelToEdge.defaultPrevented).toBe(true);
+    expect(wheelAtEdge.defaultPrevented).toBe(false);
+    expect(renderedDomain().until).toBe(24 * HOUR_MS);
   });
 
   it("resets zoom and domain when the reset key changes", () => {

@@ -29,7 +29,7 @@
 }
 
 .time-diagram-zoom > span {
-  min-width: 52px;
+  min-width: 76px;
   color: var(--ui-muted);
   font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
@@ -67,6 +67,6 @@
   }
 
   .time-diagram-zoom > span {
-    min-width: 44px;
+    min-width: 64px;
   }
 }

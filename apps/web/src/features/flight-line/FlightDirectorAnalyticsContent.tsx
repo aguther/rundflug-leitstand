@@ -422,6 +422,7 @@ function ForecastDiagram({
         onChange={changeZoom}
         onReset={reset}
         value={zoom}
+        visibleSpanMs={visibleDomain.until - visibleDomain.from}
         zoomLevels={zoomLevels}
       />
       <div
@@ -436,7 +437,7 @@ function ForecastDiagram({
         ref={setViewportRef}
       >
         <div
-          aria-label="Prognosediagramm; mit dem Mausrad zoomen und durch Ziehen verschieben"
+          aria-label="Prognosediagramm; mit Strg und Mausrad zoomen, mit dem Mausrad oder durch Ziehen verschieben"
           className="flight-director-forecast-chart"
           role="img"
         >
@@ -963,6 +964,7 @@ function ResourcePanel({
             onChange={changeZoom}
             onReset={reset}
             value={zoom}
+            visibleSpanMs={visibleDomain.until - visibleDomain.from}
             zoomLevels={zoomLevels}
           />
           <div
