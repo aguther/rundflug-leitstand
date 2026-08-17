@@ -444,7 +444,9 @@ describe("Flight Director operational coordination", () => {
     await user.click(screen.getByRole("button", { name: "Verfügbar setzen" }));
     expect(onSetAircraftState).toHaveBeenCalledWith("aircraft-3", "AVAILABLE");
 
-    await user.click(screen.getByRole("button", { name: "Umlauf abschließen" }));
+    const turnaroundButton = screen.getByRole("button", { name: "Umlauf abschließen" });
+    expect(turnaroundButton.getAttribute("data-label-density")).toBe("compact");
+    await user.click(turnaroundButton);
     expect(onRunRotation).toHaveBeenCalledWith(landedRotation, "AVAILABLE");
     await user.click(screen.getByRole("button", { name: "D-LAND zum Tanken setzen" }));
     expect(onRunRotation).toHaveBeenCalledWith(landedRotation, "REFUELING");

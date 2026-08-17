@@ -718,6 +718,9 @@ export function FlightLineSupervisorConsole({
                 <span className="flight-director-row-actions">
                   <IconButton
                     className="flight-director-primary-action"
+                    data-label-density={
+                      primaryPresentation.shortLabel.length > 16 ? "compact" : undefined
+                    }
                     label={primaryAircraftActionLabel(entry, rotation)}
                     disabled={rotation?.status === "COMPLETED" || actionBusy}
                     busy={pendingAction === "primary"}

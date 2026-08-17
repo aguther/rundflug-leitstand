@@ -265,6 +265,13 @@
   gap: 7px;
 }
 
+.flight-director-row-actions
+  .flight-director-primary-action[data-label-density="compact"]
+  .ds-button-content {
+  gap: 5px;
+  font-size: 0.84rem;
+}
+
 .flight-director-row-actions .flight-director-primary-action .ds-button-content > span {
   display: block;
   overflow: hidden;
