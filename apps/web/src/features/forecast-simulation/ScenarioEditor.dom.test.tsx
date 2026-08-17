@@ -195,10 +195,14 @@ describe("product demand editor", () => {
     const defectProbability = screen.getByLabelText(
       "Wahrscheinlichkeit Tagesausfall in Prozent",
     ) as HTMLInputElement;
+    expect(defectProbability.closest(".sim-day-out-field")?.parentElement?.className).toContain(
+      "sim-incident-row--defect",
+    );
     fireEvent.change(defectProbability, { target: { value: "25" } });
     expect(defectProbability.value).toBe("25");
 
     const seed = screen.getByLabelText("Seed") as HTMLInputElement;
+    expect(seed.closest(".sim-reproducibility-field")).not.toBeNull();
     fireEvent.change(seed, { target: { value: "42" } });
     expect(seed.value).toBe("42");
   });

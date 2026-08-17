@@ -292,6 +292,7 @@ function renderConsole(overrides: Partial<SupervisorProps> = {}) {
 
 describe("Flight Director analysis snapshot export", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     api.downloadAnalysisSnapshot.mockReset().mockResolvedValue(undefined);
     window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as never;
     Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
@@ -358,6 +359,7 @@ describe("Flight Director analysis snapshot export", () => {
 
 describe("Flight Director operational coordination", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     api.downloadAnalysisSnapshot.mockReset().mockResolvedValue(undefined);
     window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as never;
     Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
@@ -495,6 +497,7 @@ describe("Flight Director operational coordination", () => {
 
     await user.click(screen.getByRole("button", { name: "Verkaufte Tickets einklappen" }));
     expect(bottomGrid?.classList.contains("is-collapsed")).toBe(true);
+    expect(window.localStorage.getItem("flight-director:sold-tickets-collapsed:v1")).toBe("1");
     expect(screen.queryByRole("searchbox", { name: "Verkaufte Tickets suchen" })).toBeNull();
     expect(
       screen
@@ -502,8 +505,14 @@ describe("Flight Director operational coordination", () => {
         .querySelector(".lucide-panel-bottom-open"),
     ).toBeTruthy();
 
+    cleanup();
+    renderConsole();
+    const restoredPanel = screen.getByRole("region", { name: "Verkaufte Tickets" });
+    expect(restoredPanel.parentElement?.classList.contains("is-collapsed")).toBe(true);
+
     await user.click(screen.getByRole("button", { name: "Verkaufte Tickets ausklappen" }));
-    expect(bottomGrid?.classList.contains("is-collapsed")).toBe(false);
+    expect(restoredPanel.parentElement?.classList.contains("is-collapsed")).toBe(false);
     expect(screen.getByRole("searchbox", { name: "Verkaufte Tickets suchen" })).toBeTruthy();
+    expect(window.localStorage.getItem("flight-director:sold-tickets-collapsed:v1")).toBeNull();
   });
 });

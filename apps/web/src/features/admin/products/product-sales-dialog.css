@@ -60,12 +60,6 @@
     background-color 140ms ease;
 }
 
-.product-sales-dialog .localized-picker-control > input:focus {
-  border-color: var(--ui-accent);
-  box-shadow: var(--field-focus-ring);
-  outline: 0;
-}
-
 .product-sales-status {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

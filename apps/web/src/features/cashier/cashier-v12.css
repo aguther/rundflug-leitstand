@@ -397,17 +397,26 @@
   grid-template-rows: auto auto minmax(190px, 0.7fr) minmax(300px, 1.3fr);
 }
 .cashier-ticket-toolbar {
-  --cashier-ticket-control-height: var(--control-touch);
+  --cashier-ticket-control-height: var(--control-default);
 
+  min-height: calc(var(--cashier-ticket-control-height) + 30px);
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 8px;
+  padding-block: 6px;
 }
-.cashier-ticket-toolbar > .ds-search-field {
+.cashier-ticket-toolbar > .cashier-ticket-search {
   min-width: 220px;
   height: var(--cashier-ticket-control-height);
   min-height: var(--cashier-ticket-control-height);
   flex: 1 1 260px;
+}
+.cashier-ticket-search .ds-search-field {
+  min-width: 0;
+  min-height: var(--cashier-ticket-control-height);
+}
+.cashier-ticket-search .ds-search-field input {
+  min-height: calc(var(--cashier-ticket-control-height) - 2px);
 }
 .cashier-ticket-toolbar > .ds-icon-button {
   width: var(--cashier-ticket-control-height);
@@ -989,6 +998,8 @@
     min-height: 48px;
   }
   .cashier-ticket-toolbar {
+    --cashier-ticket-control-height: var(--control-touch);
+
     min-width: 0;
     display: grid;
     grid-template-columns:
@@ -998,7 +1009,7 @@
     gap: 8px;
     flex-wrap: nowrap;
   }
-  .cashier-ticket-toolbar > .ds-search-field {
+  .cashier-ticket-toolbar > .cashier-ticket-search {
     width: auto;
     min-width: 0;
     flex: initial;
@@ -1058,6 +1069,9 @@
   .cashier-ticket-panel {
     min-height: 700px;
   }
+  .cashier-ticket-toolbar {
+    --cashier-ticket-control-height: var(--control-touch);
+  }
 }
 
 @media (max-width: 700px) {
@@ -1112,7 +1126,7 @@
   .cashier-ticket-table .ds-table {
     min-width: 740px;
   }
-  .cashier-ticket-toolbar > .ds-search-field {
+  .cashier-ticket-toolbar > .cashier-ticket-search {
     flex-basis: 100%;
   }
   .cashier-ticket-sale-meta {

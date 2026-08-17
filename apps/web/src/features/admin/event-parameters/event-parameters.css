@@ -185,11 +185,6 @@
   background: var(--ui-control-bg);
 }
 
-.admin-shell .event-parameters-workspace .event-parameter-number-control:focus-within {
-  border-color: var(--ui-accent);
-  box-shadow: var(--field-focus-ring);
-}
-
 .admin-shell .event-parameters-workspace .event-parameter-number-control input {
   width: 100%;
   min-width: 0;

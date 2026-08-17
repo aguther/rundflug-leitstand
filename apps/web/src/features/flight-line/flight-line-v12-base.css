@@ -813,13 +813,13 @@
   height: calc(100% - 39px);
 }
 .flight-director-ticket-overview > header {
-  min-height: 58px;
+  min-height: 50px;
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(240px, 360px) auto;
+  grid-template-columns: minmax(180px, 1fr) minmax(240px, 360px) auto auto;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--ui-border);
 }
 .flight-director-ticket-overview h2 {
@@ -832,16 +832,10 @@
   font-weight: 500;
 }
 
-.flight-director-ticket-heading,
 .flight-director-ticket-size-actions {
   min-width: 0;
   display: flex;
   align-items: center;
-}
-
-.flight-director-ticket-heading {
-  justify-content: space-between;
-  gap: 10px;
 }
 
 .flight-director-ticket-size-actions {
@@ -850,8 +844,8 @@
 }
 
 .flight-director-ticket-overview.is-collapsed > header {
-  min-height: 56px;
-  grid-template-columns: minmax(0, 1fr);
+  min-height: 50px;
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 .flight-director-ticket-overview .flight-director-compact-table {
   height: auto;
@@ -863,8 +857,17 @@
   min-width: 0;
 }
 
+.flight-director-ticket-search .ds-search-field {
+  min-width: 0;
+  min-height: var(--control-compact);
+}
+
+.flight-director-ticket-search .ds-search-field input {
+  min-height: calc(var(--control-compact) - 2px);
+}
+
 .flight-director-open-filter {
-  min-height: 40px;
+  min-height: var(--control-compact);
   display: inline-flex;
   align-items: center;
   justify-content: center;

@@ -185,12 +185,6 @@
   line-height: 1.2;
 }
 
-.operational-plan-dialog .localized-picker-control > input:focus {
-  border-color: var(--ui-accent);
-  box-shadow: var(--field-focus-ring);
-  outline: 0;
-}
-
 .operational-plan-dialog .localized-picker-trigger {
   color: var(--ui-muted);
   background: transparent;

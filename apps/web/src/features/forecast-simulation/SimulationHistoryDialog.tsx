@@ -1,6 +1,6 @@
-import { ArrowUpRight, CheckCircle2, Download, Info, Search } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Download, Info } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Button, ModalDialog } from "../../design-system/components";
+import { Button, ModalDialog, SearchField } from "../../design-system/components";
 import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
 import {
   clipTimeInterval,
@@ -676,16 +676,13 @@ export function SimulationHistoryDialog({
           <div className="sim-group-history-layout">
             <aside className="sim-history-rail">
               <h3>Fluggruppen</h3>
-              <label className="sim-history-search">
-                <Search aria-hidden="true" />
-                <span className="visually-hidden">Fluggruppe suchen</span>
-                <input
-                  onChange={(event) => setQuery(event.currentTarget.value)}
-                  placeholder="Fluggruppe suchen"
-                  type="search"
-                  value={query}
-                />
-              </label>
+              <SearchField
+                className="sim-history-search"
+                label="Fluggruppe suchen"
+                onChange={(event) => setQuery(event.currentTarget.value)}
+                placeholder="Fluggruppe suchen"
+                value={query}
+              />
               <div className="sim-history-rail-list">
                 {filteredRotations.map((rotation) => {
                   const aircraft = result.aircraft.find(

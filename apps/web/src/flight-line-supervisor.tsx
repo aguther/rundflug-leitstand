@@ -33,7 +33,7 @@ import {
   TicketsPlane,
   Users,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { analysisSnapshotRequiresRefresh, downloadAnalysisSnapshot } from "./api";
 import {
   Button,
@@ -76,6 +76,16 @@ type TurnaroundNextState = "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE";
 type TicketPanelSize = "compact" | "balanced" | "expanded";
 
 const ticketPanelSizes: TicketPanelSize[] = ["compact", "balanced", "expanded"];
+const ticketPanelCollapsedStorageKey = "flight-director:sold-tickets-collapsed:v1";
+
+function readStoredTicketPanelCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(ticketPanelCollapsedStorageKey) === "1";
+  } catch {
+    return false;
+  }
+}
 
 function adjacentTicketPanelSize(current: TicketPanelSize, direction: -1 | 1): TicketPanelSize {
   const currentIndex = ticketPanelSizes.indexOf(current);
@@ -316,7 +326,7 @@ export function FlightLineSupervisorConsole({
   const [ticketSearch, setTicketSearch] = useState("");
   const [onlyOpenTickets, setOnlyOpenTickets] = useState(true);
   const [ticketSort, setTicketSort] = useState<TicketSort>(null);
-  const [ticketPanelCollapsed, setTicketPanelCollapsed] = useState(false);
+  const [ticketPanelCollapsed, setTicketPanelCollapsed] = useState(readStoredTicketPanelCollapsed);
   const [ticketPanelSize, setTicketPanelSize] = useState<TicketPanelSize>("balanced");
   const [assignmentOpen, setAssignmentOpen] = useState(false);
   const [pilotOpen, setPilotOpen] = useState(false);
@@ -331,6 +341,18 @@ export function FlightLineSupervisorConsole({
     Record<string, "primary" | "refueling" | "inactive">
   >({});
   const dispatchRecommendation = dispatchLease.lease;
+
+  useEffect(() => {
+    try {
+      if (ticketPanelCollapsed) {
+        window.localStorage.setItem(ticketPanelCollapsedStorageKey, "1");
+      } else {
+        window.localStorage.removeItem(ticketPanelCollapsedStorageKey);
+      }
+    } catch {
+      // The panel remains fully usable when browser storage is unavailable.
+    }
+  }, [ticketPanelCollapsed]);
 
   const filteredAircraft = useMemo(
     () => aircraft.filter((entry) => !resourceGroupId || entry.resourceGroupId === resourceGroupId),
@@ -834,53 +856,9 @@ export function FlightLineSupervisorConsole({
           padding="none"
         >
           <header>
-            <div className="flight-director-ticket-heading">
-              <h2>
-                Verkaufte Tickets <small>alle Flugzeuge</small>
-              </h2>
-              <div className="flight-director-ticket-size-actions">
-                {!ticketPanelCollapsed ? (
-                  <>
-                    <IconButton
-                      disabled={ticketPanelSize === "compact"}
-                      label="Verkaufte Tickets verkleinern"
-                      onClick={() =>
-                        setTicketPanelSize((current) => adjacentTicketPanelSize(current, -1))
-                      }
-                      size="compact"
-                    >
-                      <span aria-hidden="true">−</span>
-                    </IconButton>
-                    <IconButton
-                      disabled={ticketPanelSize === "expanded"}
-                      label="Verkaufte Tickets vergrößern"
-                      onClick={() =>
-                        setTicketPanelSize((current) => adjacentTicketPanelSize(current, 1))
-                      }
-                      size="compact"
-                    >
-                      <span aria-hidden="true">+</span>
-                    </IconButton>
-                  </>
-                ) : null}
-                <IconButton
-                  aria-expanded={!ticketPanelCollapsed}
-                  label={
-                    ticketPanelCollapsed
-                      ? "Verkaufte Tickets ausklappen"
-                      : "Verkaufte Tickets einklappen"
-                  }
-                  onClick={() => setTicketPanelCollapsed((collapsed) => !collapsed)}
-                  size="compact"
-                >
-                  {ticketPanelCollapsed ? (
-                    <PanelBottomOpen aria-hidden="true" />
-                  ) : (
-                    <PanelBottomClose aria-hidden="true" />
-                  )}
-                </IconButton>
-              </div>
-            </div>
+            <h2>
+              Verkaufte Tickets <small>alle Flugzeuge</small>
+            </h2>
             {!ticketPanelCollapsed ? (
               <>
                 <SearchField
@@ -900,6 +878,48 @@ export function FlightLineSupervisorConsole({
                 </label>
               </>
             ) : null}
+            <div className="flight-director-ticket-size-actions">
+              {!ticketPanelCollapsed ? (
+                <>
+                  <IconButton
+                    disabled={ticketPanelSize === "compact"}
+                    label="Verkaufte Tickets verkleinern"
+                    onClick={() =>
+                      setTicketPanelSize((current) => adjacentTicketPanelSize(current, -1))
+                    }
+                    size="compact"
+                  >
+                    <span aria-hidden="true">−</span>
+                  </IconButton>
+                  <IconButton
+                    disabled={ticketPanelSize === "expanded"}
+                    label="Verkaufte Tickets vergrößern"
+                    onClick={() =>
+                      setTicketPanelSize((current) => adjacentTicketPanelSize(current, 1))
+                    }
+                    size="compact"
+                  >
+                    <span aria-hidden="true">+</span>
+                  </IconButton>
+                </>
+              ) : null}
+              <IconButton
+                aria-expanded={!ticketPanelCollapsed}
+                label={
+                  ticketPanelCollapsed
+                    ? "Verkaufte Tickets ausklappen"
+                    : "Verkaufte Tickets einklappen"
+                }
+                onClick={() => setTicketPanelCollapsed((collapsed) => !collapsed)}
+                size="compact"
+              >
+                {ticketPanelCollapsed ? (
+                  <PanelBottomOpen aria-hidden="true" />
+                ) : (
+                  <PanelBottomClose aria-hidden="true" />
+                )}
+              </IconButton>
+            </div>
           </header>
           {!ticketPanelCollapsed ? (
             <CompactTickets

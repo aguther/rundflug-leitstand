@@ -210,7 +210,6 @@
   background: var(--ui-control);
 }
 .ds-search-field:focus-within {
-  border-color: var(--ui-accent);
   box-shadow: var(--field-focus-ring);
 }
 .ds-search-field input {
@@ -823,7 +822,6 @@
 ):not(:disabled, [readonly]):focus {
   position: relative;
   z-index: 1;
-  border-color: var(--ui-accent);
   outline: 0;
   box-shadow: var(--field-focus-ring);
 }
@@ -838,13 +836,20 @@
 
 .ds-control-group:focus-within {
   z-index: 1;
-  border-color: var(--ui-accent);
   outline: 0;
   box-shadow: var(--field-focus-ring);
 }
 
 .ds-control-group
-  > :is(input:not([type="checkbox"], [type="radio"], [type="range"]), select, textarea):focus {
+  :is(input:not([type="checkbox"], [type="radio"], [type="range"]), select, textarea):focus {
+  z-index: auto;
+  border-color: transparent;
+  outline: 0;
+  box-shadow: none;
+}
+
+.ds-search-field > input:focus {
+  position: static;
   z-index: auto;
   border-color: transparent;
   outline: 0;

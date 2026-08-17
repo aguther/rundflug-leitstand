@@ -2117,7 +2117,9 @@
 
 .sim-incident-head,
 .sim-incident-row {
-  grid-template-columns: 96px 56px minmax(0, 1fr);
+  grid-template-columns:
+    112px 64px minmax(148px, 0.55fr) minmax(540px, 2fr)
+    minmax(110px, 0.45fr);
 }
 
 .sim-incident-group + .sim-incident-group {
@@ -2153,17 +2155,12 @@
   border-bottom: 0;
 }
 
-.sim-incident-values {
-  display: grid;
-  gap: 4px;
-  padding: 7px 8px;
-}
-
 .sim-trigger-field,
 .sim-day-out-field {
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 7px 8px;
   color: var(--ui-muted);
   font-size: 10px;
 }
@@ -2172,12 +2169,12 @@
   width: 56px;
 }
 
-.sim-incident-values .sim-distribution-inputs {
-  padding: 0;
+.sim-incident-row > .sim-distribution-inputs {
+  padding: 7px 8px;
 }
 
 .sim-day-out-field {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .sim-day-out-field .sim-number-field {
@@ -2209,7 +2206,7 @@
 .sim-reproducibility-field {
   display: grid;
   gap: 6px;
-  padding: 12px 14px 0;
+  padding: 12px 14px 14px;
   color: var(--ui-muted);
   font-size: 11px;
 }
@@ -2505,28 +2502,23 @@
 }
 
 .sim-history-search {
-  min-height: 38px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-md);
-  background: var(--ui-control);
+  min-width: 0;
 }
 
-.sim-history-search svg {
+.sim-history-search .ds-search-field {
+  min-width: 0;
+  min-height: 38px;
+}
+
+.sim-history-search .ds-search-field svg {
   width: 17px;
   color: var(--ui-muted);
 }
 
-.sim-history-search input {
+.sim-history-search .ds-search-field input {
+  width: 100%;
   min-width: 0;
-  flex: 1 1 auto;
-  border: 0;
-  outline: 0;
-  color: var(--ui-text);
-  background: transparent;
+  min-height: 36px;
 }
 
 .sim-history-rail-list {
@@ -3198,6 +3190,25 @@
 
   .sim-workspace {
     overflow-y: hidden;
+  }
+}
+
+@media (max-width: 1100px) {
+  .sim-incident-head {
+    display: none;
+  }
+
+  .sim-incident-row {
+    grid-template-columns: minmax(0, 1fr) 56px;
+    align-items: center;
+  }
+
+  .sim-incident-row > :is(.sim-trigger-field, .sim-distribution-inputs, .sim-day-out-field) {
+    grid-column: 1 / -1;
+  }
+
+  .sim-incident-empty-cell {
+    display: none;
   }
 }
 

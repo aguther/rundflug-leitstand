@@ -49,6 +49,9 @@ describe("simulation history dialog", () => {
     expect(screen.getByText("Alle Prognose-Snapshots")).toBeTruthy();
 
     const search = screen.getByPlaceholderText("Fluggruppe suchen");
+    expect(search.closest(".ds-search-field")?.parentElement?.className).toContain(
+      "sim-history-search",
+    );
     await user.type(search, "does-not-exist");
     const rail = screen.getByRole("heading", { name: "Fluggruppen" }).parentElement;
     expect(rail).not.toBeNull();

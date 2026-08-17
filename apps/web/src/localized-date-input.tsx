@@ -89,7 +89,7 @@ function GermanDateControl({
   const [displayValue, setDisplayValue] = useState(() => formatGermanDate(value));
   useEffect(() => setDisplayValue(formatGermanDate(value)), [value]);
   return (
-    <div className="localized-picker-control">
+    <div className="localized-picker-control ds-control-group">
       <input
         aria-describedby={describedBy}
         aria-invalid={invalid || undefined}
@@ -147,7 +147,7 @@ function GermanTimeControl({
   const [displayValue, setDisplayValue] = useState(value);
   useEffect(() => setDisplayValue(value), [value]);
   return (
-    <div className="localized-picker-control time">
+    <div className="localized-picker-control ds-control-group time">
       <input
         aria-describedby={describedBy}
         aria-invalid={invalid || undefined}

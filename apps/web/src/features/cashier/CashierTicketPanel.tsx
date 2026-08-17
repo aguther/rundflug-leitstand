@@ -1,7 +1,13 @@
 import type { OperationBoard, TicketSearchResult } from "@rundflug/contracts";
-import { RefreshCw, Search } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import type { RefObject } from "react";
-import { CheckboxField, IconButton, Panel, Tabs } from "../../design-system/components";
+import {
+  CheckboxField,
+  IconButton,
+  Panel,
+  SearchField,
+  Tabs,
+} from "../../design-system/components";
 import type { LoginAccount } from "../auth/api";
 import type { TicketReceipt } from "../operations/operation-types";
 import { CashierTicketDetails } from "./CashierTicketDetails";
@@ -57,18 +63,14 @@ export function CashierTicketPanel(props: Readonly<CashierTicketPanelProps>) {
         ]}
       />
       <div className="ds-toolbar cashier-ticket-toolbar">
-        <label className="ds-search-field">
-          <Search aria-hidden="true" size={18} />
-          <input
-            aria-label="Tickets suchen"
-            value={props.search}
-            onChange={(event) => props.onSearchChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") props.onRunSearch();
-            }}
-            placeholder="Suche (z. B. Gruppe, Produkt)"
-          />
-        </label>
+        <SearchField
+          className="cashier-ticket-search"
+          label="Tickets suchen"
+          onChange={(event) => props.onSearchChange(event.target.value)}
+          onKeyDown={(event) => event.key === "Enter" && props.onRunSearch()}
+          placeholder="Suche (z. B. Gruppe, Produkt)"
+          value={props.search}
+        />
         <label className="cashier-account-filter">
           <span>Kassenkonto</span>
           <select

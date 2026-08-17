@@ -393,7 +393,10 @@ describe("cashier workflows", () => {
       ),
     ).toBeTruthy();
 
-    const search = screen.getByRole("textbox", { name: "Tickets suchen" });
+    const search = screen.getByRole("searchbox", { name: "Tickets suchen" });
+    expect(search.closest(".ds-search-field")?.parentElement?.className).toContain(
+      "cashier-ticket-search",
+    );
     await user.type(search, "P");
     await user.keyboard("{Enter}");
     expect(await screen.findByText("Für die Suche mindestens zwei Zeichen eingeben.")).toBeTruthy();
