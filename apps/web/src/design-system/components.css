@@ -828,6 +828,7 @@
 
 .ds-control-group {
   position: relative;
+  border-radius: 4px;
   transition:
     border-color 140ms ease,
     box-shadow 140ms ease,
