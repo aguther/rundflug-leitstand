@@ -50,7 +50,8 @@ Erst danach in der Administration eine Begründung und die Administrator-PIN ein
 ## 4. Neustart-Stufen
 
 In **Administration → Veranstaltungen und Vorlagen** die neue technische ID, Bezeichnung, Datum und
-den Flugplatz eingeben, eine Stufe wählen und zur Bestätigung exakt `NEUSTART` schreiben.
+den Flugplatz eingeben, eine Datenbasis wählen und die neue Veranstaltung anlegen. Die
+Ausgangsveranstaltung bleibt unverändert erhalten.
 
 ### Betriebsdaten zurücksetzen
 

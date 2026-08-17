@@ -85,7 +85,7 @@ describe("admin event catalog state", () => {
     expect(result.current.visibleEvents.map((entry) => entry.eventId)).toEqual(["zulu-event"]);
   });
 
-  it("keeps creation validation and failures inside the event workflow", async () => {
+  it("creates from valid event fields without a confirmation phrase", async () => {
     mocks.getEventCatalog.mockResolvedValue({ events: [] });
     mocks.cloneEvent.mockRejectedValue(new Error("Synthetic clone conflict"));
     const { result, onViewChange } = renderCatalog();
@@ -97,7 +97,6 @@ describe("admin event catalog state", () => {
       result.current.setName("New synthetic event");
       result.current.setEventDate("2026-08-03");
       result.current.setAerodrome("EDNE");
-      result.current.setConfirmation("NEUSTART");
     });
     expect(result.current.creation.disabled).toBe(false);
 

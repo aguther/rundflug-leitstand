@@ -43,7 +43,6 @@ type EventCreationFormProps = Pick<
   | "currentEventName"
   | "onCreateSubmit"
   | "onSetCreationAerodrome"
-  | "onSetCreationConfirmation"
   | "onSetCreationDate"
   | "onSetCreationId"
   | "onSetCreationName"
@@ -202,7 +201,6 @@ function EventCreationForm({
   currentEventName,
   onCreateSubmit,
   onSetCreationAerodrome,
-  onSetCreationConfirmation,
   onSetCreationDate,
   onSetCreationId,
   onSetCreationName,
@@ -316,27 +314,6 @@ function EventCreationForm({
           </select>
         </div>
         <p className="help-text event-create-mode-help">{restartModeHelp(creation.restartMode)}</p>
-      </section>
-
-      <section className="event-create-section event-create-confirmation">
-        <div className="event-create-section-heading">
-          <h3>Bestätigung</h3>
-          <p>Zum Schutz vor einem versehentlichen Neustart muss NEUSTART eingegeben werden.</p>
-        </div>
-        <div className="field-control">
-          <FieldLabel
-            htmlFor="restart-confirmation"
-            label="Bestätigungstext"
-            help="Exakt NEUSTART in Großbuchstaben eingeben."
-          />
-          <input
-            autoComplete="off"
-            id="restart-confirmation"
-            onChange={(event) => onSetCreationConfirmation(event.target.value)}
-            placeholder="NEUSTART"
-            value={creation.confirmation}
-          />
-        </div>
       </section>
 
       {creation.error ? <ValidationHint tone="error">{creation.error}</ValidationHint> : null}

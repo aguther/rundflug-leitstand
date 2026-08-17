@@ -566,7 +566,6 @@ export function AdminView() {
                 onOpenCreate={eventCatalog.openCreation}
                 onSearchChange={eventCatalog.setSearch}
                 onSetCreationAerodrome={eventCatalog.setAerodrome}
-                onSetCreationConfirmation={eventCatalog.setConfirmation}
                 onSetCreationDate={eventCatalog.setEventDate}
                 onSetCreationId={eventCatalog.setEventId}
                 onSetCreationName={eventCatalog.setName}

@@ -12,7 +12,6 @@ export interface EventSortState {
 
 export interface EventCreationDraft {
   aerodrome: string;
-  confirmation: string;
   date: string;
   disabled: boolean;
   error: string | null;
@@ -38,7 +37,6 @@ export interface EventCatalogDialogProps {
   onOpenCreate: () => void;
   onSearchChange: (value: string) => void;
   onSetCreationAerodrome: (value: string) => void;
-  onSetCreationConfirmation: (value: string) => void;
   onSetCreationDate: (value: string) => void;
   onSetCreationId: (value: string) => void;
   onSetCreationName: (value: string) => void;
@@ -68,7 +66,7 @@ const CATALOG_PRESENTATION: EventDialogPresentation = {
 const CREATION_PRESENTATION: EventDialogPresentation = {
   bodyClassName: "event-create-dialog-body",
   closeLabel: "Veranstaltungsanlage schließen",
-  description: "Veranstaltungsdaten, Datenbasis und Bestätigung in einem Schritt erfassen.",
+  description: "Veranstaltungsdaten und Datenbasis in einem Schritt erfassen.",
   initialFocusSelector: "#new-event-id",
   title: "Neue Veranstaltung anlegen",
 };

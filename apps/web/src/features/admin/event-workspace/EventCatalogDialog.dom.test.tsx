@@ -33,7 +33,6 @@ function properties(overrides: Partial<EventCatalogDialogProps> = {}): EventCata
     canManage: true,
     creation: {
       aerodrome: "EDXX",
-      confirmation: "NEUSTART",
       date: "2027-08-10",
       disabled: false,
       error: null,
@@ -53,7 +52,6 @@ function properties(overrides: Partial<EventCatalogDialogProps> = {}): EventCata
     onOpenCreate: vi.fn(),
     onSearchChange: vi.fn(),
     onSetCreationAerodrome: vi.fn(),
-    onSetCreationConfirmation: vi.fn(),
     onSetCreationDate: vi.fn(),
     onSetCreationId: vi.fn(),
     onSetCreationName: vi.fn(),
@@ -141,6 +139,8 @@ describe("event catalog dialog", () => {
     render(<EventCatalogDialog {...props} />);
 
     expect(screen.getByRole("dialog", { name: "Neue Veranstaltung anlegen" })).toBeTruthy();
+    expect(screen.queryByLabelText("Bestätigungstext")).toBeNull();
+    expect(screen.queryByText(/NEUSTART/)).toBeNull();
     fireEvent.change(screen.getByLabelText("Technische ID"), {
       target: { value: "DEMO-2028" },
     });

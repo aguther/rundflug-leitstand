@@ -39,7 +39,6 @@ export function useAdminEventCatalog({
   const [eventDate, setEventDate] = useState("");
   const [aerodrome, setAerodrome] = useState("");
   const [restartMode, setRestartMode] = useState<"KEEP_MASTER_DATA" | "EMPTY">("KEEP_MASTER_DATA");
-  const [confirmation, setConfirmation] = useState("");
   const [creationError, setCreationError] = useState<string | null>(null);
 
   const refreshEvents = useCallback(async () => {
@@ -150,7 +149,6 @@ export function useAdminEventCatalog({
 
   function openCreation() {
     setRestartMode("EMPTY");
-    setConfirmation("");
     setCreationError(null);
     onViewChange("create");
   }
@@ -165,11 +163,9 @@ export function useAdminEventCatalog({
     createEvent,
     creation: {
       aerodrome,
-      confirmation,
       date: eventDate,
       disabled:
         !administrator ||
-        confirmation !== "NEUSTART" ||
         !/^[a-z0-9-]{3,64}$/.test(eventId.trim()) ||
         name.trim().length < 3 ||
         !eventDate ||
@@ -185,7 +181,6 @@ export function useAdminEventCatalog({
     removeEvent,
     search,
     setAerodrome,
-    setConfirmation,
     setEventDate,
     setEventId,
     setName,

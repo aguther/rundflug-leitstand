@@ -229,7 +229,6 @@ vi.mock("./features/admin/event-workspace/useAdminEventCatalog", () => ({
     removeEvent: actions.removeEvent,
     search: "",
     setAerodrome: vi.fn(),
-    setConfirmation: vi.fn(),
     setEventDate: vi.fn(),
     setEventId: vi.fn(),
     setName: vi.fn(),

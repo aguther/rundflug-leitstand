@@ -202,12 +202,6 @@
   min-height: var(--control-default);
 }
 
-.admin-shell .event-create-confirmation {
-  grid-template-columns: minmax(0, 1fr) minmax(250px, 0.48fr);
-  align-items: end;
-  gap: 24px;
-}
-
 .admin-shell .event-create-dialog-footer {
   justify-content: space-between;
 }
@@ -645,8 +639,7 @@
     padding: 18px 14px;
   }
 
-  .admin-shell .event-create-form-grid,
-  .admin-shell .event-create-confirmation {
+  .admin-shell .event-create-form-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
