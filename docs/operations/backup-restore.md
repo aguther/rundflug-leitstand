@@ -167,7 +167,10 @@ Datenbestand verifiziert.
 
 Der Worker speichert nur den SHA-256-Hash des Deployment-Tokens. Der Klartext liegt ausschließlich
 als geschütztes GitHub-Environment-Secret; Token und Bookmark erscheinen nicht in Logs oder
-Deployment-Ausgaben.
+Deployment-Ausgaben. Beim normalen Rollout wird der Hash über Wranglers `--secrets-file` gemeinsam
+mit dem neuen Worker-Code in einer Version aktiviert. Eine bewusste Rotation verwendet den getrennten
+Betriebsbefehl aus `ci-cd-stabilitaet.md`; stimmen GitHub-Token und bereits aktiver Cloudflare-Hash bei
+einer offenen Migration nicht überein, bricht das portable Backup vor der Schemaänderung ab.
 
 Die portable Tabellensicherung umfasst seit Migration 0057 auch
 `aircraft_product_turnaround_overrides`; die ergänzten Produkt-, Rotations- und Snapshotspalten

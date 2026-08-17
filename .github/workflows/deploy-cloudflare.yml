@@ -52,13 +52,9 @@ jobs:
         run: npm run cloudflare:ci-config
       - name: Build deployment artifacts
         run: npm run build
-      - name: Verify existing resources before any remote change
+      - name: Verify existing resources and long-lived secrets before any remote change
         env:
           PREFLIGHT_ALLOW_MISSING_DEPLOYMENT_SECRET: "true"
-        run: npm run cloudflare:preflight -- --target "$CLOUDFLARE_TARGET"
-      - name: Synchronize hashed deployment backup credential
-        run: npm run cloudflare:deployment-credential -- --target "$CLOUDFLARE_TARGET"
-      - name: Verify complete target and secrets
         run: npm run cloudflare:preflight -- --target "$CLOUDFLARE_TARGET"
       - name: Backup, migrate and deploy
         run: npm run cloudflare:deploy -- --target "$CLOUDFLARE_TARGET"

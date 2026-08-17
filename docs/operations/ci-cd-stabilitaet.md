@@ -22,14 +22,19 @@
 3. Der Workflow erzeugt aus den geschützten Environment-Werten eine commitgebundene Wrangler-
    Konfiguration und baut Web und Worker ohne erneuten Testlauf.
 4. Der Preflight prüft ausschließlich vorhandene Ressourcen: Account, Worker, D1-Name und -ID,
-   EU-Jurisdiktion, R2-Bucket, Bindings und Secrets. Wrangler-Autokonfiguration und automatische
-   Ressourcenanlage sind ausgeschaltet.
+   EU-Jurisdiktion, R2-Bucket, Bindings und die bereits vorhandenen langlebigen Secrets. Wrangler-
+   Autokonfiguration und automatische Ressourcenanlage sind ausgeschaltet.
 5. Gibt es keine Migration, wird direkt deployt.
 6. Gibt es Migrationen, müssen Dateiprüfsumme und `onlineSafe`-Freigabe stimmen. Dann werden zuerst
    D1-Time-Travel-Bookmark und portables R2-Backup samt SHA-256-Sidecar erzeugt, anschließend alle
    freigegebenen Migrationen angewendet.
-7. Wrangler deployt exakt den geprüften Commit. Der Abschlusscheck verlangt dieselbe Revision in
-   `/api/meta`, aktuelle Migrationen, vollständige Secrets und erfolgreiche Healthchecks.
+7. Wrangler deployt exakt den geprüften Commit und den SHA-256-Hash des Backup-Tokens gemeinsam über
+   `--secrets-file` als eine Worker-Version. Die übrigen Cloudflare-Secrets bleiben erhalten. Der
+   normale Commit-Deploy erzeugt deshalb keine vorgezogene Zwischenversion mehr.
+8. Der Abschlusscheck verlangt dieselbe Revision in `/api/meta`, aktuelle Migrationen, vollständige
+   Secrets und erfolgreiche Healthchecks. Wegen der verteilten Worker-Aktivierung wird die Revision
+   höchstens etwa 90 Sekunden beobachtet und muss zweimal hintereinander mit deaktiviertem Cache und
+   wechselnder Prüf-URL übereinstimmen. Eine dauerhaft falsche Revision bleibt ein harter Fehler.
 
 Damit bleibt die Ressourcenanlage eine bewusste Bootstrap-/Neuaufbauhandlung. Die automatische
 Migration verändert nur das Schema der zuvor eindeutig verifizierten D1.
@@ -38,11 +43,12 @@ Migration verändert nur das Schema der zuvor eindeutig verifizierten D1.
 
 - Im geschützten GitHub-Environment `rundflug-leitstand` muss ein zufälliges Secret
   `DEPLOYMENT_BACKUP_TOKEN` mit mindestens 32 Zeichen hinterlegt sein. Cloudflare erhält über den
-  Workflow ausschließlich dessen SHA-256-Hash als `DEPLOYMENT_BACKUP_TOKEN_HASH`.
-- Der neue Hash wird bewusst vom GitHub-Preflight und nicht von Wranglers allgemeiner
+  eigentlichen Worker-Upload ausschließlich dessen SHA-256-Hash als
+  `DEPLOYMENT_BACKUP_TOKEN_HASH`. Der Klartext wird nicht in eine Datei geschrieben.
+- Der neue Hash wird bewusst vom abschließenden GitHub-Check und nicht von Wranglers allgemeiner
   `secrets.required`-Liste erzwungen. Dadurch bleibt der bisherige native Cloudflare-Pfad während der
-  Inbetriebnahme deployfähig, obwohl der Backup-Endpunkt dort bis zur ersten Hash-Synchronisierung
-  noch nicht autorisierbar ist.
+  Inbetriebnahme deployfähig, obwohl der Backup-Endpunkt dort bis zum ersten GitHub-Deployment noch
+  nicht autorisierbar ist.
 - `CLOUDFLARE_DEPLOYMENT_URL` muss auf den bereits vorhandenen Worker zeigen.
 - Zuerst wird der manuelle Workflow `Cloudflare deployment` mit Bestätigung `DEPLOY` vollständig
   einschließlich Revisionsprüfung ausgeführt.
@@ -53,3 +59,14 @@ Migration verändert nur das Schema der zuvor eindeutig verifizierten D1.
   der native Pfad wieder aktiviert und danach die Repository-Variable entfernt oder auf `false` gesetzt.
 - Bei einem manuellen Wiederanlauf wird `Cloudflare deployment` mit demselben Environment und der
   Bestätigung `DEPLOY` gestartet; es gelten dieselben Sicherheitsprüfungen.
+
+## Rotation des Deployment-Backup-Tokens
+
+`DEPLOYMENT_BACKUP_TOKEN` ist langlebig und wird nicht bei jedem Commit rotiert. Bei einer bewussten
+Rotation werden automatisches Deployment und Migrationen zunächst angehalten. Der neue Klartext wird
+im geschützten GitHub-Environment hinterlegt und sein Hash mit demselben Wert einmalig über
+`npm run cloudflare:deployment-credential -- --target <ziel>` an den bestehenden Worker übertragen.
+Dieser ausdrückliche Rotationsschritt darf eine eigene Worker-Version erzeugen. Anschließend wird der
+manuelle Deployment-Workflow vollständig ausgeführt und erst nach grüner Revisionsprüfung wieder auf
+automatische Deployments umgestellt. Bei einer Abweichung zwischen GitHub-Token und Cloudflare-Hash
+scheitert ein erforderliches Pre-Deployment-Backup vor jeder Migration.

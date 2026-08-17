@@ -40,9 +40,15 @@ Schemafortschreibung unterschiedliche Risiken besitzen.
   über einen geschützten, idempotenten Worker-Endpunkt ein portables R2-Backup mit SHA-256-Sidecar
   an. Cloudflare speichert nur den Hash des GitHub-Environment-Secrets
   `DEPLOYMENT_BACKUP_TOKEN`; Token, Request-Body und Bookmark werden nicht protokolliert.
-- Erst danach folgen Migrationen, Deployment und die Prüfung, dass `/api/meta` exakt den erwarteten
-  Commit meldet. Wiederholungen sind auf drei Versuche begrenzt und ausschließlich für klar
-  transiente Infrastrukturfehler wie HTTP 429/5xx, Timeouts oder Verbindungsabbrüche zulässig.
+- Beim normalen Rollout lädt `wrangler deploy --secrets-file` Code, `SOURCE_REVISION` und den Hash des
+  Deployment-Backup-Tokens gemeinsam als eine Version hoch. `wrangler secret put` bleibt einer
+  ausdrücklichen Tokenrotation vorbehalten und erzeugt nicht mehr bei jedem Commit eine vorgezogene
+  Zwischenversion.
+- Erst danach folgen die Prüfung von Health, Migrationen und Secrets sowie eine zeitlich begrenzte
+  Beobachtung von `/api/meta`. Die erwartete Revision muss mit deaktiviertem Cache und wechselnder
+  Prüf-URL zweimal hintereinander erscheinen. Wiederholungen von mutierenden Cloudflare-Kommandos
+  bleiben auf drei Versuche begrenzt und ausschließlich für klar transiente Infrastrukturfehler wie
+  HTTP 429/5xx, Timeouts oder Verbindungsabbrüche zulässig.
 
 ## Folgen
 
@@ -55,6 +61,9 @@ Schemafortschreibung unterschiedliche Risiken besitzen.
   Schemafortschreibung ist automatisiert.
 - Ein fehlendes Secret, eine abweichende Ressourcen-ID, eine ungeprüfte Migration, ein fehlendes
   Backup oder eine falsche Deployment-Revision stoppt den Rollout vor dem nächsten Schritt.
+- Eine noch nicht überall sichtbare neue Worker-Version macht den Rollout nicht vorschnell rot; eine
+  dauerhaft alte oder wechselnde Revision überschreitet dagegen das feste Beobachtungsfenster und
+  bleibt ein Fehler.
 - Die manuelle Workflow-Auslösung bleibt als kontrollierter Wiederanlauf verfügbar, verwendet aber
   exakt denselben Preflight-, Backup-, Migrations- und Verifikationspfad.
 

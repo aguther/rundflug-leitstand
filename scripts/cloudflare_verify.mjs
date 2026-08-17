@@ -9,6 +9,7 @@ import {
   requiredCloudflareSecrets,
   targetManifestPath,
 } from "./cloudflare-target.mjs";
+import { waitForExpectedRevision } from "./lib/deployment-verification.mjs";
 
 const profile = parseCloudflareTargetArguments(process.argv.slice(2));
 const wrangler = resolve(repositoryRoot, "node_modules", "wrangler", "bin", "wrangler.js");
@@ -83,8 +84,22 @@ async function getJson(path) {
   return response.json();
 }
 
+const expectedRevision = process.env.SOURCE_REVISION ?? process.env.GITHUB_SHA;
 const health = await getJson("/api/health");
-const meta = await getJson("/api/meta");
+const meta = expectedRevision
+  ? await waitForExpectedRevision({
+      baseUrl,
+      expectedRevision,
+      onRetry: ({ attempt, delayMs, lastObservedRevision, error }) => {
+        const observation = error
+          ? `request failed: ${String(error)}`
+          : `observed revision ${lastObservedRevision ?? "unknown"}`;
+        process.stderr.write(
+          `Deployment revision is not stable after attempt ${attempt} (${observation}); retrying in ${delayMs} ms.\n`,
+        );
+      },
+    })
+  : await getJson("/api/meta");
 const setup = await getJson("/api/setup/status");
 const push = await getJson("/api/public/push/config");
 if (
@@ -99,7 +114,6 @@ if (meta.dataJurisdiction !== "eu") throw new Error("/api/meta meldet keine EU-J
 if (!/^[0-9a-f]{40}$/i.test(meta.sourceRevision ?? "")) {
   throw new Error("/api/meta meldet keine eindeutige Deployment-Revision.");
 }
-const expectedRevision = process.env.SOURCE_REVISION ?? process.env.GITHUB_SHA;
 if (expectedRevision && meta.sourceRevision !== expectedRevision) {
   throw new Error(
     `/api/meta meldet Revision ${meta.sourceRevision}, erwartet wurde ${expectedRevision}.`,

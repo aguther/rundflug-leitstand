@@ -1,5 +1,7 @@
-import { readdir, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   generatedConfigPath,
@@ -9,6 +11,7 @@ import {
   targetManifestPath,
 } from "./cloudflare-target.mjs";
 import { runWrangler } from "./lib/cloudflare-command.mjs";
+import { waitForExpectedRevision } from "./lib/deployment-verification.mjs";
 import {
   isTransientInfrastructureFailure,
   withInfrastructureRetry,
@@ -30,6 +33,22 @@ export function findTimeTravelBookmark(payload) {
     if (bookmark) return bookmark;
   }
   return null;
+}
+
+export async function withDeploymentSecretsFile(deploymentToken, operation) {
+  const directory = await mkdtemp(join(tmpdir(), "rundflug-deployment-secrets-"));
+  const secretsFilePath = join(directory, "secrets.json");
+  const deploymentTokenHash = createHash("sha256").update(deploymentToken).digest("hex");
+  try {
+    await writeFile(
+      secretsFilePath,
+      JSON.stringify({ DEPLOYMENT_BACKUP_TOKEN_HASH: deploymentTokenHash }),
+      { encoding: "utf8", mode: 0o600 },
+    );
+    return await operation(secretsFilePath);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 }
 
 export async function main(argumentsList = process.argv.slice(2)) {
@@ -153,7 +172,12 @@ export async function main(argumentsList = process.argv.slice(2)) {
 
   async function deployedRevisionMatches() {
     try {
-      const response = await fetch(`${baseUrl}/api/meta`, {
+      const verificationUrl = new URL("/api/meta", `${baseUrl}/`);
+      verificationUrl.searchParams.set(
+        "deployment-verification",
+        `${sourceRevision}-${Date.now()}`,
+      );
+      const response = await fetch(verificationUrl, {
         headers: { "cache-control": "no-store" },
       });
       if (!response.ok) return false;
@@ -163,7 +187,7 @@ export async function main(argumentsList = process.argv.slice(2)) {
     }
   }
 
-  async function deployRevision() {
+  async function deployRevision(secretsFilePath) {
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
         await runWrangler(
@@ -172,6 +196,8 @@ export async function main(argumentsList = process.argv.slice(2)) {
             "--strict",
             "--autoconfig=false",
             "--x-auto-create=false",
+            "--secrets-file",
+            secretsFilePath,
             "--config",
             configPath,
           ],
@@ -191,10 +217,21 @@ export async function main(argumentsList = process.argv.slice(2)) {
   }
 
   const appliedMigrations = await applyPendingMigrations();
-  await deployRevision();
-  if (!(await deployedRevisionMatches())) {
-    throw new Error("Deployed Worker does not report the expected source revision.");
-  }
+  await withDeploymentSecretsFile(deploymentToken, async (secretsFilePath) => {
+    await deployRevision(secretsFilePath);
+    await waitForExpectedRevision({
+      baseUrl,
+      expectedRevision: sourceRevision,
+      onRetry: ({ attempt, delayMs, lastObservedRevision, error }) => {
+        const observation = error
+          ? `request failed: ${String(error)}`
+          : `observed revision ${lastObservedRevision ?? "unknown"}`;
+        process.stderr.write(
+          `Deployment revision is not stable after attempt ${attempt} (${observation}); retrying in ${delayMs} ms.\n`,
+        );
+      },
+    });
+  });
   process.stdout.write(
     `${JSON.stringify({ ok: true, sourceRevision, appliedMigrations, deployment: "verified" })}\n`,
   );

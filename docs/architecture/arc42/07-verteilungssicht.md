@@ -91,11 +91,11 @@ flowchart TB
     MAIN -->|"ja"| BUILD["commitgebundener Build"]
     BUILD --> PREFLIGHT["Preflight: vorhandener Worker,<br/>D1-ID, EU-R2, Bindings, Secrets;<br/>Auto-Create aus"]
     PREFLIGHT --> MIG{"online-sichere Migrationen offen?"}
-    MIG -->|"nein"| DEP["wrangler deploy --strict"]
+    MIG -->|"nein"| DEP["wrangler deploy --strict<br/>Code + Backup-Hash atomar"]
     MIG -->|"ja"| BACKUP["D1-Time-Travel-Bookmark<br/>+ portables PRE_DEPLOY-Backup"]
     BACKUP --> APPLY["freigegebene Migrationen anwenden"]
     APPLY --> DEP
-    DEP --> VERIFY["Health, Migrationen, Secrets<br/>und exakte SOURCE_REVISION prüfen"]
+    DEP --> VERIFY["Health, Migrationen, Secrets<br/>und SOURCE_REVISION zweimal stabil prüfen"]
     MON["monatlich: Cloudflare-Maintenance"]
     MON --> RUNTIME["Compatibility-Date, Toolchain,<br/>Bindings, Runtime, Logs, Health/Meta"]
 ```
@@ -104,6 +104,10 @@ GitHub Actions ist die einzige automatische Deployment-Autorität. Jeder Branch 
 einem Pull Request geprüft. `main` wird erst nach allen Gates automatisch ausgerollt; der manuelle
 Workflow bleibt als Wiederanlauf mit Bestätigung `DEPLOY` verfügbar. Native automatische
 Cloudflare-Git-Builds sind nach erfolgreicher Inbetriebnahme dieses Pfads deaktiviert.
+
+Im normalen Rollout aktiviert `--secrets-file` Code, `SOURCE_REVISION` und den Backup-Token-Hash in
+einer Version. Der Abschlusscheck verlangt mit Cache-Busting zwei aufeinanderfolgende
+Revisionsantworten; Tokenrotation bleibt ein getrennter Betriebsschritt.
 
 Der Preflight legt niemals Ressourcen an. Er verlangt den vorhandenen Worker, die exakte D1-ID und
 den vorhandenen EU-R2-Bucket. Nur unveränderte, per SHA-256 geprüfte und ausdrücklich online-sichere
