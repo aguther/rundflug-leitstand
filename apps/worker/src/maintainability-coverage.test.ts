@@ -143,7 +143,8 @@ describe("V1 maintainability and portability boundaries", () => {
     const rootManifest = JSON.parse(rootManifestRaw) as Manifest;
 
     expect(rootManifest.scripts).toMatchObject({
-      sonar: "npm run test:coverage && sonar-scanner-npm",
+      sonar: "npm run test:coverage && npm run sonar:scan",
+      "sonar:scan": "sonar-scanner-npm",
       "test:coverage":
         'vitest run --coverage --testNamePattern="^(?!.*projects all 300 eligible groups beyond the bounded dispatch horizon).*$" && node scripts/verify_domain_coverage.mjs',
       "test:forecast-comparison-baseline": "vitest run --config vitest.forecast-baseline.config.ts",
@@ -162,15 +163,12 @@ describe("V1 maintainability and portability boundaries", () => {
     expect(ciWorkflow).toContain(
       "github.event.pull_request.head.repo.full_name == github.repository",
     );
-    expect(ciWorkflow).toContain(
-      "SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995",
-    );
+    expect(ciWorkflow).not.toContain("SonarSource/sonarqube-scan-action");
+    expect(ciWorkflow).toContain("npm run sonar:scan --");
     expect(ciWorkflow).toContain(
       "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
     );
-    expect(ciWorkflow).toContain(
-      "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
-    );
+    expect(ciWorkflow).not.toContain("actions/download-artifact");
     expect(ciWorkflow).toContain("npm run test:worker-runtime");
     expect(ciWorkflow).toContain("npm run test:forecast-comparison-baseline");
     expect(ciWorkflow).toContain("npm run test:v1-integrations");
@@ -179,7 +177,7 @@ describe("V1 maintainability and portability boundaries", () => {
     expect(ciWorkflow).not.toContain("npm run test:v1-acceptance-day");
     expect(ciWorkflow).not.toContain("npm run test:soak-reliability");
     expect(ciWorkflow).not.toContain("npm run test:cloudflare-scale-performance");
-    expect(ciWorkflow).toContain("needs: check");
+    expect(ciWorkflow).toContain("needs:\n      - check");
     expect(ciWorkflow).toContain("vars.CLOUDFLARE_AUTOMATIC_DEPLOYMENT_ENABLED == 'true'");
     expect(ciWorkflow).toContain("-Dsonar.qualitygate.wait=true");
     expect(ciWorkflow).not.toContain("-Dsonar.qualitygate.wait=false");

@@ -22,7 +22,10 @@ Schemafortschreibung unterschiedliche Risiken besitzen.
   Branch-Analyse aus. Pull Requests aus demselben Repository erhalten zusätzlich eine native
   SonarQube-PR-Analyse; die übrigen Jobs werden für denselben Commit nicht doppelt ausgeführt.
 - Runner-Image, Node-/npm-Version und alle externen GitHub Actions sind festgelegt. Ein gemeinsamer
-  Composite-Step installiert die Toolchain mit begrenzten Download-Retries.
+  Composite-Step installiert die Toolchain mit begrenzten Download-Retries. Die SonarQube-Analyse
+  verwendet den über `package-lock.json` gepinnten npm-Scanner direkt im Quality-/Coverage-Runner.
+  Damit sind nach den Qualitätsprüfungen weder ein zusätzlicher Runner noch weitere Downloads von
+  `checkout`, `setup-node`, `download-artifact` oder einer SonarSource-Action erforderlich.
 - Fachliche Tests werden niemals automatisch wiederholt. Absolute Laufzeitassertions entfallen aus
   funktionalen Tests; Last- und Baselineprüfungen besitzen eigene Budgets. Die 18 lokalen V1-
   Integrationssuiten laufen in vier parallelen GitHub-Shards, innerhalb jedes Runners jedoch streng

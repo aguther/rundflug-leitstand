@@ -36,6 +36,15 @@ jobs:
         run: npm run test:coverage
       - name: CI check
         run: npm run check:ci
+      - name: SonarQube branch scan
+        if: github.event_name == 'push' && github.actor != 'dependabot[bot]'
+        run: >-
+          npm run sonar:scan --
+          -Dsonar.branch.name=${{ github.ref_name }}
+          -Dsonar.qualitygate.wait=true
+          -Dsonar.qualitygate.timeout=300
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       - name: Upload LCOV report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -144,31 +153,6 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  sonar-branch:
-    name: SonarQube branch quality gate
-    needs: check
-    if: github.event_name == 'push' && github.actor != 'dependabot[bot]'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-      - name: Download LCOV report
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: coverage-lcov
-          path: coverage
-      - name: SonarQube branch scan
-        uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
-        with:
-          args: >-
-            -Dsonar.branch.name=${{ github.ref_name }}
-            -Dsonar.qualitygate.wait=true
-            -Dsonar.qualitygate.timeout=300
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
   sonar-pull-request:
     name: SonarQube pull request quality gate
     if: >-
@@ -185,14 +169,13 @@ jobs:
       - name: Test coverage
         run: npm run test:coverage
       - name: SonarQube pull request scan
-        uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
-        with:
-          args: >-
-            -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
-            -Dsonar.pullrequest.branch=${{ github.head_ref }}
-            -Dsonar.pullrequest.base=${{ github.base_ref }}
-            -Dsonar.qualitygate.wait=true
-            -Dsonar.qualitygate.timeout=300
+        run: >-
+          npm run sonar:scan --
+          -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
+          -Dsonar.pullrequest.branch=${{ github.head_ref }}
+          -Dsonar.pullrequest.base=${{ github.base_ref }}
+          -Dsonar.qualitygate.wait=true
+          -Dsonar.qualitygate.timeout=300
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
@@ -210,7 +193,6 @@ jobs:
       - backup-restore
       - documentation
       - mutation
-      - sonar-branch
     uses: ./.github/workflows/deploy-cloudflare.yml
     with:
       target: rundflug-leitstand

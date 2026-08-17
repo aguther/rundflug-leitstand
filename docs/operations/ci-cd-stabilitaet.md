@@ -7,7 +7,10 @@
    Backup-Restore, Dokumentation und Mutationstests laufen als getrennte Jobs.
 3. Die vier V1-Shards laufen parallel. Innerhalb eines Shards läuft immer nur eine Suite und damit
    höchstens ein lokaler Wrangler-/workerd-Prozess gleichzeitig.
-4. Nach erfolgreicher Coverage analysiert SonarQube Cloud den Branch und wartet auf das Quality Gate.
+4. Nach erfolgreicher Coverage analysiert SonarQube Cloud im selben Quality-Runner den Branch und
+   wartet auf das Quality Gate. Der Scanner stammt aus der mit `package-lock.json` installierten
+   Projektabhängigkeit. Dadurch entfallen ein zusätzlicher Runner sowie weitere Downloads von
+   `checkout`, `setup-node`, `download-artifact` und einer SonarSource-Action.
 5. Ein Pull Request aus demselben Repository erhält zusätzlich eine PR-Analyse. Die bereits für den
    Branch-Commit ausgeführten übrigen Jobs werden im PR-Ereignis übersprungen.
 6. Test-, Lint-, Typ-, Coverage-, Migrations- und Sonarfehler werden nicht automatisch wiederholt.
