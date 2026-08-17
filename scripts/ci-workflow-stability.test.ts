@@ -5,6 +5,7 @@ const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta
 const packageManifest = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 ) as { scripts?: Record<string, string> };
+const verticalSlice = readFileSync(new URL("./verify_vertical_slice.mjs", import.meta.url), "utf8");
 
 function workflowJob(name: string, nextName: string): string {
   const startMarker = `  ${name}:`;
@@ -37,5 +38,11 @@ describe("CI workflow dependency stability", () => {
   it("does not depend on the separately downloaded SonarSource action", () => {
     expect(workflow).not.toContain("SonarSource/sonarqube-scan-action");
     expect(packageManifest.scripts?.["sonar:scan"]).toBe("sonar-scanner-npm");
+  });
+
+  it("keeps functional realtime synchronization separate from latency budgets", () => {
+    expect(verticalSlice).toContain('VERTICAL_SLICE_REALTIME_TIMEOUT_MS ?? "10000"');
+    expect(verticalSlice).not.toContain("twoDevicesRealtimeUnderTwoSeconds");
+    expect(verticalSlice).not.toContain("twoDevicesForecastUnderTwoSeconds");
   });
 });

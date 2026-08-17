@@ -20,6 +20,11 @@ Das aggregierte PWA-Precache-Budget behält seine verpflichtende Zehn-Prozent-Re
 innerhalb dieser Reserve einen kleinen Abstand zur gemessenen Buildstreuung. Unterschiedliche zulässige
 Chunkanordnungen dürfen einen unveränderten Web-Quellstand deshalb nicht abwechselnd grün und rot machen.
 
+Funktionale Realtime-Integrationen warten auf die erwartete Ereignisversion innerhalb eines festen
+Sicherheitsfensters und wiederholen keine Kommandos. Absolute Latenzbudgets gehören ausschließlich in
+die getrennten Baseline- und Skalierungsläufe; schwankende Runner-Zeit darf einen fachlich korrekten
+Vertical-Slice nicht rot machen.
+
 ## Ablauf für `main`
 
 1. Der Push auf `main` durchläuft dieselben Prüfungen wie jeder andere Branch.

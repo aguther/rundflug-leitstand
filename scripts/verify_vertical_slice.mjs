@@ -7,6 +7,15 @@ import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const port = Number(process.env.VERTICAL_SLICE_TEST_PORT ?? "18786");
+const realtimeSynchronizationTimeoutMs = Number(
+  process.env.VERTICAL_SLICE_REALTIME_TIMEOUT_MS ?? "10000",
+);
+if (
+  !Number.isSafeInteger(realtimeSynchronizationTimeoutMs) ||
+  realtimeSynchronizationTimeoutMs < 1_000
+) {
+  throw new Error("VERTICAL_SLICE_REALTIME_TIMEOUT_MS must be an integer of at least 1000 ms.");
+}
 const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
@@ -101,8 +110,12 @@ const connectRealtime = () =>
     const socket = new WebSocket(`${wsBase}/api/public/events/demo-2026/live`);
     const timeout = setTimeout(() => {
       socket.close();
-      reject(new Error("Realtime-Verbindung wurde nicht rechtzeitig hergestellt."));
-    }, 2_000);
+      reject(
+        new Error(
+          `Realtime connection was not established within ${realtimeSynchronizationTimeoutMs} ms.`,
+        ),
+      );
+    }, realtimeSynchronizationTimeoutMs);
     socket.addEventListener("message", (event) => {
       const message = JSON.parse(String(event.data));
       if (message.type !== "connected") return;
@@ -122,8 +135,12 @@ const nextRealtimeVersion = (socket, expectedVersion) =>
     const startedAt = Date.now();
     const timeout = setTimeout(() => {
       socket.removeEventListener("message", onMessage);
-      reject(new Error("Paralleles Gerät erhielt die Änderung nicht innerhalb von zwei Sekunden."));
-    }, 2_000);
+      reject(
+        new Error(
+          `Realtime event version ${expectedVersion} was not observed within ${realtimeSynchronizationTimeoutMs} ms.`,
+        ),
+      );
+    }, realtimeSynchronizationTimeoutMs);
     const onMessage = (event) => {
       const message = JSON.parse(String(event.data));
       if (
@@ -143,8 +160,12 @@ const nextForecastVersion = (socket, expectedVersion) =>
     const startedAt = Date.now();
     const timeout = setTimeout(() => {
       socket.removeEventListener("message", onMessage);
-      reject(new Error("Gerät erhielt die neue Prognose nicht innerhalb von zwei Sekunden."));
-    }, 2_000);
+      reject(
+        new Error(
+          `Forecast event version ${expectedVersion} was not observed within ${realtimeSynchronizationTimeoutMs} ms.`,
+        ),
+      );
+    }, realtimeSynchronizationTimeoutMs);
     const onMessage = (event) => {
       const message = JSON.parse(String(event.data));
       if (message.type !== "forecast-updated" || Number(message.eventVersion) < expectedVersion) {
@@ -591,9 +612,10 @@ try {
       staleRejected: true,
       unpairedRejected: true,
       wrongRoleRejected: true,
-      twoDevicesRealtimeUnderTwoSeconds: true,
-      twoDevicesForecastUnderTwoSeconds: true,
+      twoDevicesRealtimeDelivered: true,
+      twoDevicesForecastDelivered: true,
       persistedForecastVersionConsistent: true,
+      realtimeSynchronizationTimeoutMs,
       maximumRealtimeMilliseconds: Math.max(
         cashierRealtime.elapsedMs,
         flightLineRealtime.elapsedMs,
