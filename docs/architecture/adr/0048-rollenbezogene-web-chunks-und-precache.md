@@ -25,10 +25,15 @@ administrative Aktionen stets eine bestätigte Backend-Verbindung benötigen.
   responsive und Assist-Styles; reine Supervisor-Styles bleiben dem Flight Director vorbehalten.
 - Vite minifiziert CSS explizit mit Lightning CSS. Harte Assetbudgets und ein manifestbasiertes
   Route-Ratchet erlauben höchstens zwei Prozent Regression gegenüber dem gemessenen Stand.
-- Der Administrations-Entry, die Simulator- und Vergleichs-Worker-Chunks sowie die ausschließlich mit
-  live verfügbaren History-Endpunkten nutzbaren Flight-Director-Analyse-Chunks bleiben lazy und werden
-  nicht vorab im Service Worker gespeichert. Operative Kassen-, Flight-Line-, Flight-Director- und
-  FIDS-Grundfunktionen bleiben Bestandteil des Precache.
+- Der Administrations- und Setup-Entry, die Simulator- und Vergleichs-Worker-Chunks sowie die
+  ausschließlich mit live verfügbaren History-Endpunkten nutzbaren Flight-Director-Analyse-Chunks
+  bleiben lazy und werden nicht vorab im Service Worker gespeichert. Operative Kassen-, Flight-Line-,
+  Flight-Director- und FIDS-Grundfunktionen bleiben Bestandteil des Precache.
+- Navigationspfade zu online-only Chunks dürfen nicht durch den gecachten `navigateFallback` des
+  Service Workers auf eine ältere `index.html` aufgelöst werden. Insbesondere `/simulation`, seine
+  Unteransichten und das online abhängige `/setup` beziehen den Anwendungseinstieg bei jeder
+  Navigation beziehungsweise Aktualisierung vom Netz. Eine gemeinsame, getestete
+  PWA-Navigationsrichtlinie hält diese Pfade mit der Vite-/Workbox-Konfiguration synchron.
 - Die Kassen- und Flight-Line-Orchestratoren werden in spezialisierte Zustands-, Kommando-, Listen-,
   Beleg- und Darstellungsbausteine zerlegt. Neue extrahierte Komponenten und Hooks besitzen fallende
   Größenratchets von höchstens 300 Zeilen; Fachregeln wandern dafür nicht in Präsentationscode.
@@ -41,9 +46,11 @@ administrative Aktionen stets eine bestätigte Backend-Verbindung benötigen.
 - Ein bereits geladener Administrationsbereich kann den normalen Browsercache verwenden, ist aber
   kein zugesicherter Offline-Einstieg. Das ist konsistent mit der bestehenden Sperre sämtlicher
   administrativer Schreibaktionen ohne Serverbestätigung.
-- Simulator und Verlaufsanalyse benötigen beim ersten Öffnen ebenfalls eine Verbindung. Die
+- Setup, Simulator und Verlaufsanalyse benötigen beim ersten Öffnen ebenfalls eine Verbindung. Die
   bestätigten operativen Snapshots, Standardaktionen und lokalen Kassenentwürfe bleiben davon
   unberührt.
+- Nach einem Deployment kann eine normale Aktualisierung des Simulators deshalb keinen veralteten
+  HTML-Einstieg mehr mit einem bereits entfernten, gehashten Simulator-Chunk kombinieren.
 - Die Budgets werden durch `npm run web:assets:verify` und die Modulgrenzen durch
   `npm run refactor:guardrails` geprüft.
 

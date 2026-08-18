@@ -35,6 +35,12 @@ describe("PwaUpdateNotice", () => {
 
     await waitFor(() => expect(updateServiceWorker).toHaveBeenCalledWith(true));
     expect(screen.getByText("Aktualisierung wird vorbereitet …")).toBeTruthy();
+    const applyingButton = screen.getByRole("button", {
+      name: "Aktualisierung wird vorbereitet",
+    });
+    expect(applyingButton.getAttribute("aria-busy")).toBe("true");
+    expect(applyingButton.querySelector(".ds-busy-indicator")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Später" })).toBeNull();
   });
 
   it("shows the deferred action until dirty work has finished", async () => {

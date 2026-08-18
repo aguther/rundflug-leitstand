@@ -39,6 +39,13 @@ Flight-Line-Übernahmefreigabe dürfen durch die Korrektur nicht neu interpretie
   genau einmal neu und entfernt beide Listener. Bleiben beide Signale aus, erzwingt ein
   Vier-Sekunden-Watchdog einen normalen Seiten-Reload. Ein abgewiesener Updateversuch entfernt
   Listener und Watchdog und wechselt in `failed`.
+- Die Updateaktion verwendet während `applying` den gemeinsamen Busy-Indikator des Designsystems.
+  Beschriftung und Inhalt werden dabei visuell ersetzt, die Buttongeometrie bleibt erhalten und der
+  Fortschrittszustand wird über `aria-busy` zugänglich ausgegeben.
+- Die explizite Aktion „Neu laden“ beider React-Fehlergrenzen prüft vor dem Reload auf allen
+  Oberflächen die Service-Worker-Registrierung. Ein bereits wartender oder gerade installierter neuer
+  Stand wird zeitlich begrenzt aktiviert; bei fehlender Registrierung, Fehler oder Timeout erfolgt
+  weiterhin der normale Reload. Es werden weder Caches noch Push-Registrierungen pauschal gelöscht.
 - Die zustandsabhängige Standardaktion von Flight Line und Flight Director behält Icon, Position und
   Zustandslogik und erhält lediglich ein sichtbares deutsches Textlabel in einem je Breakpoint festen
   Slot. `Flugzeug freigeben` bleibt davon getrennt und ändert keinen Flugzeugzustand.
@@ -54,6 +61,8 @@ Flight-Line-Übernahmefreigabe dürfen durch die Korrektur nicht neu interpretie
 - Ein Update kann länger angeboten werden, wenn auf dem Gerät noch lokale Arbeit offen ist. Der
   Bediener behält die Entscheidung über den Reload; ein fehlgeschlagener Versuch lässt die aktuelle
   Oberfläche bedienbar.
+- Auch die Wiederherstellung nach einem lazy Chunk-Fehler bleibt eine bewusste Bedienhandlung, kann
+  aber einen bereits ausgerollten Stand ohne manuellen Hard Reload übernehmen.
 - ADR-0020 bleibt als Entscheidungshistorie für die Trennung transienter und persistenter Meldungen
   erhalten. Seine gemeinsame Overlay-Fläche ist durch diese Entscheidung ersetzt.
 

@@ -1,4 +1,5 @@
 import { Component, createRef, type ReactNode } from "react";
+import { recoverApplicationVersion } from "./application-version-recovery";
 
 export type AppErrorBoundaryScope = "application" | "route";
 
@@ -11,6 +12,7 @@ interface AppErrorBoundaryProps {
 
 interface AppErrorBoundaryState {
   failed: boolean;
+  recovering: boolean;
 }
 
 const FALLBACK_COPY: Record<AppErrorBoundaryScope, { heading: string }> = {
@@ -23,12 +25,12 @@ const FALLBACK_COPY: Record<AppErrorBoundaryScope, { heading: string }> = {
 };
 
 export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
-  public state: AppErrorBoundaryState = { failed: false };
+  public state: AppErrorBoundaryState = { failed: false, recovering: false };
 
   private readonly headingRef = createRef<HTMLHeadingElement>();
 
   public static getDerivedStateFromError(): AppErrorBoundaryState {
-    return { failed: true };
+    return { failed: true, recovering: false };
   }
 
   public componentDidCatch(): void {
@@ -37,7 +39,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
 
   public componentDidUpdate(previousProps: AppErrorBoundaryProps): void {
     if (this.state.failed && previousProps.resetKey !== this.props.resetKey) {
-      this.setState({ failed: false });
+      this.setState({ failed: false, recovering: false });
     }
   }
 
@@ -46,7 +48,8 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
       this.props.reload();
       return;
     }
-    window.location.reload();
+    this.setState({ recovering: true });
+    void recoverApplicationVersion();
   };
 
   public render(): ReactNode {
@@ -67,8 +70,14 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
             {copy.heading}
           </h1>
           <p>Der letzte bestätigte Stand wurde nicht verändert. Laden Sie die Anwendung neu.</p>
-          <button className="app-error-boundary__reload" type="button" onClick={this.reload}>
-            Neu laden
+          <button
+            aria-busy={this.state.recovering || undefined}
+            className="app-error-boundary__reload"
+            disabled={this.state.recovering}
+            type="button"
+            onClick={this.reload}
+          >
+            {this.state.recovering ? "Aktualisierung wird vorbereitet …" : "Neu laden"}
           </button>
         </section>
       </main>

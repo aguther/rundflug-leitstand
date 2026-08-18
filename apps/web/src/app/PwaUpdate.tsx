@@ -1,5 +1,6 @@
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { BusyIndicator } from "../design-system/components/BusyIndicator";
 import { PageNotice } from "./PageNotifications";
 import { PWA_UPDATE_CONTROLLER_READY_EVENT } from "./pwa-update-events";
 
@@ -266,15 +267,21 @@ export function PwaUpdateNotice() {
         </span>
         <span className="pwa-update-actions">
           <button
+            aria-busy={applying || undefined}
+            aria-label={applying ? "Aktualisierung wird vorbereitet" : undefined}
+            className="ds-button"
             disabled={applying || (blocked && update.applyRequested)}
             onClick={() => void requestPwaUpdate()}
             type="button"
           >
-            <RefreshCw aria-hidden="true" size={16} />
-            {updateActionLabel(update)}
+            <span className={`ds-button-content${applying ? " ds-button-content--hidden" : ""}`}>
+              <RefreshCw aria-hidden="true" size={16} />
+              {updateActionLabel(update)}
+            </span>
+            {applying ? <BusyIndicator label="Aktualisierung wird vorbereitet" /> : null}
           </button>
           {!applying ? (
-            <button onClick={deferPwaUpdate} type="button">
+            <button className="ds-button" onClick={deferPwaUpdate} type="button">
               Später
             </button>
           ) : null}

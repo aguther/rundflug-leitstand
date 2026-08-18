@@ -245,6 +245,10 @@ Reset, `DISPLAY` besitzt ausschließlich Lesezugriff auf die Boardprojektion.
   außerhalb der Context-Provider, eine zweite umschließt jeden lazy geladenen Rollenbereich. Beide
   zeigen ausschließlich neutrale Texte ohne technische oder sensitive Fehlerdetails und bieten eine
   explizite Aktion „Neu laden“.
+- Diese Wiederherstellungsaktion prüft vor dem Reload die Service-Worker-Registrierung und aktiviert
+  einen wartenden oder gerade installierten neuen Stand innerhalb eines begrenzten Zeitfensters. Ohne
+  verfügbares Update oder bei einem Fehler bleibt der normale Reload erhalten; Cache- und
+  Push-Registrierungen werden nicht pauschal entfernt.
 - Beim Fehler erhält die Überschrift den Fokus. Ein Routenwechsel setzt nur die routenbezogene
   Fehlergrenze zurück; die globale Fehlergrenze bleibt der letzte Rückfall für Provider- und
   Initialisierungsfehler. DOM- und Browser-Tests prüfen Darstellung und Wiederherstellung in hellem
@@ -268,15 +272,19 @@ Reset, `DISPLAY` besitzt ausschließlich Lesezugriff auf die Boardprojektion.
   Aktion. Tokenbasierte Dirty-/Pending-Blocker verhindern den Reload während offener Arbeit. Nach
   Übergabe an den Service Worker führen Plugin-Bestätigung und natives `controllerchange` in denselben
   einmaligen Reload-Handler. Bleiben beide Signale aus, erzwingt ein Vier-Sekunden-Watchdog den
-  Reload; ein gemeldeter Updatefehler entfernt Listener und Watchdog.
+  Reload; ein gemeldeter Updatefehler entfernt Listener und Watchdog. Während `applying` ersetzt der
+  zugängliche Busy-Indikator den Buttoninhalt bei stabiler Buttongeometrie.
 - Unbekannte Frontendpfade zeigen eine eigene Not-found-Seite und mounten keine Kassenansicht;
   unbekannte API-Pfade behalten ihre 404-Semantik.
 - Je Rolle existiert ein eigenes Web-App-Manifest mit eigenem Icon-Satz, damit installierte Geräte
   eindeutig erkennbar bleiben.
 - Rollenansichten werden lazy geladen; Flight Line und Flight Director besitzen getrennte
-  CSS-Einstiege, und die Verlaufsanalyse lädt ihre CSS erst beim Öffnen. Administration, Simulation,
-  Vergleich und Analytics bleiben wegen ihrer Online-Abhängigkeit außerhalb des Precache. Kasse,
-  FIDS, Flight Line und Flight Director einschließlich Entry-CSS werden dagegen vorgehalten.
+  CSS-Einstiege, und die Verlaufsanalyse lädt ihre CSS erst beim Öffnen. Administration, Setup,
+  Simulation, Vergleich und Analytics bleiben wegen ihrer Online-Abhängigkeit außerhalb des Precache.
+  Kasse, FIDS, Flight Line und Flight Director einschließlich Entry-CSS werden dagegen vorgehalten.
+  Navigationspfade zu online-only Chunks, insbesondere `/simulation` mit Unteransichten und `/setup`,
+  sind vom gecachten Workbox-`navigateFallback` ausgenommen und laden dadurch den aktuellen
+  HTML-Einstieg.
   `npm run web:assets:verify` erzwingt neben unveränderten Hard Limits mindestens zehn Prozent
   Raw-/Gzip-Reserve und das Zwei-Prozent-Routenratchet; `npm run web:assets:report` baut vor jeder
   Messung neu. Zeitreihen werden durch den gemeinsamen dependency-freien React-/SVG-Renderer gezeichnet.

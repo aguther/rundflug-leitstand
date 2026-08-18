@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { GIT_EXECUTABLE } from "./build-tool-executables.ts";
+import { PWA_NETWORK_NAVIGATION_DENYLIST } from "./pwa-policy.ts";
 import { resolveSourceRevision } from "./source-revision.ts";
 
 const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
@@ -49,17 +50,14 @@ const operationalPwa = VitePWA({
   },
   workbox: {
     navigateFallback: "/index.html",
-    navigateFallbackDenylist: [
-      /^\/api(?:\/|$)/,
-      /^\/(?:ticket|gruppe)\//,
-      /^\/(?:kasse|admin|fids)(?:\/|$)/,
-      /^\/(?:flight-director|flight-line)(?:\/|$)/,
-    ],
+    navigateFallbackDenylist: PWA_NETWORK_NAVIGATION_DENYLIST,
     importScripts: ["/push-sw.js"],
     globIgnores: [
       // Administration requires a confirmed backend connection and is loaded on demand.
       "**/admin-view-*.js",
       "**/admin-view-*.css",
+      "**/setup-view-*.js",
+      "**/setup-view-*.css",
       "**/ForecastSimulationView-*.js",
       "**/ForecastSimulationView-*.css",
       "**/comparison-worker-*.js",

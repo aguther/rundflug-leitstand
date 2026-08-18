@@ -167,7 +167,7 @@ flowchart TB
     APP["App.tsx<br/>nur Komposition und Routing"]
     PROV["AuthProvider,<br/>ActionNotificationProvider"]
     ROUTER["FeatureRouter<br/>lazy geladene Route-Shells,<br/>explizite Not-found-Seite"]
-    SHELLM["app/<br/>AppShell, AppHeader, Navigation,<br/>PageNotifications, PwaUpdate,<br/>Realtime-Refresh-Scheduler"]
+    SHELLM["app/<br/>AppShell, AppHeader, Navigation,<br/>PageNotifications, PwaUpdate,<br/>Application-Version-Recovery,<br/>Realtime-Refresh-Scheduler"]
     FEAT["features/<br/>auth, cashier, flight-line, admin, fids,<br/>public-status, analysis, forecast-simulation"]
     DS["design-system/<br/>Tokens, Themes, Button, DataTable,<br/>ModalDialog, SidePanel, StatusPill"]
     CHART["shared/time-series-svg-chart<br/>dependency-freie SVG-Zeitreihen"]
@@ -214,7 +214,10 @@ Darstellungsbaustein zu verlagern.
 Hinweise liegen inline unter dem Header; `PwaUpdate` koordiniert den expliziten Service-Worker-Reload
 über eine Dirty-/Pending-Registry. Plugin-Bestätigung und native `controllerchange`-Benachrichtigung
 laufen in denselben einmaligen Reload-Handler; bleiben beide aus, erzwingt ein zeitlich begrenzter
-Watchdog denselben Seiten-Reload. Der Catch-all des `FeatureRouter`
+Watchdog denselben Seiten-Reload. Der Busy-Indikator des Updatebuttons hält die Controlgeometrie beim
+Aktivieren stabil. Die gemeinsame Application-Version-Recovery der globalen und routenbezogenen
+Fehlergrenzen aktualisiert und aktiviert vor dem expliziten Reload zeitlich begrenzt einen verfügbaren
+Service Worker. Der Catch-all des `FeatureRouter`
 rendert `NotFoundPage`, ohne eine Rollenansicht und deren Datenzugriffe als vermeintlichen Standard zu
 mounten.
 
