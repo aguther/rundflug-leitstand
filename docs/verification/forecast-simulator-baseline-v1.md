@@ -46,6 +46,8 @@ letzten verfügbaren DRAFT-Snapshot vor dem tatsächlichen Boarding. Die Erstpro
 dagegen genau den frühesten verfügbaren DRAFT-Snapshot und verwirft Snapshots ohne veröffentlichbare
 Prognose. Ihr Tageswert ist der Median der absoluten Abweichungen; im Gruppenverlauf bleibt das
 Vorzeichen sichtbar, wobei positive Werte eine gegenüber dem Ist spätere Prognose bedeuten.
+Zwei getrennte Tagesverläufe stellen den signierten Fehler des letzten Snapshots und der ersten
+verfügbaren Prognose jeweils entlang des tatsächlichen Boardingzeitpunkts der Fluggruppen dar.
 
 Alle vier Presets weisen `0` dargestellte Countdowns während `UNCERTAIN` aus. Ereignisbedingte
 Neuberechnungen erfolgen im 30-Sekunden-Raster und liegen mit maximal 29,648 Sekunden innerhalb des
@@ -279,10 +281,12 @@ Vite-Modus mit dem In-App-Browser gegen die gerenderte Anwendung verglichen. Die
 erfolgte bei 1280×720; ergänzende Headless-Aufnahmen belegen das Layout bei 1536×1024 und 1280×800.
 Light und Dark Mode wurden jeweils im In-App-Browser geprüft:
 
-- die ergänzende Erstprognoseabnahme vom 18. August 2026 prüft mit Headless Chromium die fünf
-  Kennzahlenkarten bei 1600×1000 im Dark Mode und 1280×900 im Light Mode. Alle Karten und Werte
-  bleiben innerhalb ihrer Gridspalten; der Gruppenverlauf zeigt ersten Snapshot, erste
-  Boardingprognose, Boarding-Ist und signierte Abweichung ohne Überlauf oder Konsolenmeldung;
+- die ergänzende Erstprognoseabnahme vom 18. August 2026 prüft mit Headless Chromium bei 1600×1000
+  im Dark Mode und 1280×900 im Light Mode zwei getrennte Tagesverläufe für den letzten und ersten
+  Boarding-Prognosefehler. Beide Diagramme enthalten je 22 Fluggruppenpunkte und ihre spezifischen
+  Snapshot-Tooltips. Die fünf kompakten Kennzahlenkarten bleiben ohne den wiederholten Quellenhinweis
+  innerhalb ihrer Gridspalten; Werte, Tooltips und Gruppenverlauf erscheinen ohne Überlauf oder
+  Konsolenmeldung;
 - die ergänzende Nachfrageabnahme vom 26. Juli 2026 prüft das freigegebene Konzept
   die Nachfrageansicht nativ bei 1536×1024 und 1280×800, jeweils in
   Light und Dark Mode;

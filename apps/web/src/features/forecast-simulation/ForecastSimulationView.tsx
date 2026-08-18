@@ -37,6 +37,10 @@ import { ScenarioEditor } from "./ScenarioEditor";
 import { SimulationComparisonDialog } from "./SimulationComparisonDialog";
 import { SimulationImportDialog, type SimulationImportResult } from "./SimulationFoundationDialog";
 import { SimulationHistoryDialog } from "./SimulationHistoryDialog";
+import {
+  type BoardingErrorTrendBasis,
+  buildBoardingErrorTrendPoints,
+} from "./simulation-error-trend";
 import { createSimulationExport } from "./simulation-export";
 import { useSimulationFidsPublisher } from "./simulation-fids-channel";
 import {
@@ -98,47 +102,26 @@ function rotationsAt(
   }));
 }
 
-function latestSnapshotBefore(
-  snapshots: readonly SimulationForecastSnapshot[],
-  rotationId: string,
-  before: string,
-  status: SimulationForecastSnapshot["status"],
-) {
-  return snapshots.findLast(
-    (snapshot) =>
-      snapshot.rotationId === rotationId &&
-      snapshot.status === status &&
-      Date.parse(snapshot.capturedAt) < Date.parse(before),
-  );
-}
-
 function ErrorChart({
+  ariaLabel,
+  basis,
   resetKey,
   rotations,
+  snapshotLabel,
   snapshots,
 }: Readonly<{
+  ariaLabel: string;
+  basis: BoardingErrorTrendBasis;
   resetKey: unknown;
   rotations: readonly SimulationRotation[];
+  snapshotLabel: string;
   snapshots: readonly SimulationForecastSnapshot[];
 }>) {
   const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
-  const points = rotations
-    .flatMap((rotation) => {
-      if (!rotation.calledAt) return [];
-      const snapshot = latestSnapshotBefore(snapshots, rotation.id, rotation.calledAt, "DRAFT");
-      if (!snapshot) return [];
-      return [
-        {
-          at: Date.parse(rotation.calledAt),
-          capturedAt: Date.parse(snapshot.capturedAt),
-          predictedBoardingAt: Date.parse(snapshot.predictedBoardingAt),
-          communicationNumber: rotation.communicationNumber,
-          error:
-            (Date.parse(snapshot.predictedBoardingAt) - Date.parse(rotation.calledAt)) / MINUTE_MS,
-        },
-      ];
-    })
-    .sort((left, right) => left.at - right.at);
+  const points = useMemo(
+    () => buildBoardingErrorTrendPoints(rotations, snapshots, basis),
+    [basis, rotations, snapshots],
+  );
   const minimumTime = points.length > 0 ? Math.min(...points.map((point) => point.at)) : 0;
   const maximumTime = points.length > 0 ? Math.max(...points.map((point) => point.at)) : 1;
   const {
@@ -208,8 +191,9 @@ function ErrorChart({
         ref={setViewportRef}
       >
         <svg
-          aria-label="Interaktiver Verlauf des Boarding-Prognosefehlers"
+          aria-label={ariaLabel}
           className="sim-error-chart"
+          data-basis={basis.toLowerCase()}
           onPointerLeave={() => setActivePointIndex(null)}
           onPointerMove={(event) => {
             const matrix = event.currentTarget.getScreenCTM();
@@ -280,7 +264,7 @@ function ErrorChart({
             <strong>Fluggruppe {activePoint.communicationNumber}</strong>
             <dl>
               <div>
-                <dt>Letzter Snapshot</dt>
+                <dt>{snapshotLabel}</dt>
                 <dd>{formatTime(activePoint.capturedAt)}</dd>
               </div>
               <div>
@@ -316,7 +300,6 @@ function MetricCard({
       <span>{label}</span>
       <strong>{value}</strong>
       <small>{hint}</small>
-      <small className="sim-metric-card-source">Synthetischer Lauf</small>
     </article>
   );
 }
@@ -712,8 +695,25 @@ export function ForecastSimulationView() {
                 <span>Je Fluggruppe · letzter auswertbarer Snapshot · signierter Fehler</span>
               </header>
               <ErrorChart
+                ariaLabel="Interaktiver Verlauf des letzten Boarding-Prognosefehlers"
+                basis="LATEST"
                 resetKey={result}
                 rotations={visibleRotations}
+                snapshotLabel="Letzter Snapshot"
+                snapshots={visibleSnapshots}
+              />
+            </div>
+            <div className="sim-chart-panel">
+              <header>
+                <strong>Erste Boardingprognose vs. Ist im Tagesverlauf</strong>
+                <span>Je Fluggruppe · erster verfügbarer Snapshot · signierter Fehler</span>
+              </header>
+              <ErrorChart
+                ariaLabel="Interaktiver Verlauf des ersten Boarding-Prognosefehlers"
+                basis="INITIAL"
+                resetKey={result}
+                rotations={visibleRotations}
+                snapshotLabel="Erster Snapshot"
                 snapshots={visibleSnapshots}
               />
             </div>

@@ -154,6 +154,12 @@ describe("forecast simulation view", () => {
     expect(screen.getByRole("heading", { name: "Szenarioübersicht" })).toBeTruthy();
     expect(screen.getByText("Letztes Boardingfenster getroffen")).toBeTruthy();
     expect(screen.getByText("Erstprognose Boarding")).toBeTruthy();
+    expect(screen.getByText("Letzter Boarding-Prognosefehler vor Ist")).toBeTruthy();
+    expect(screen.getByText("Erste Boardingprognose vs. Ist im Tagesverlauf")).toBeTruthy();
+    expect(
+      screen.getAllByText("Noch nicht genügend abgeschlossene Prognosevergleiche."),
+    ).toHaveLength(2);
+    expect(document.querySelector(".sim-metric-card-source")).toBeNull();
     expect(screen.getByRole("button", { name: "Szenario konfigurieren" }).textContent).toContain(
       "Konfigurieren",
     );
