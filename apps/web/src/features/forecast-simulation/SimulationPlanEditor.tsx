@@ -435,7 +435,7 @@ export function SimulationPlanEditor({
             );
           })}
         </div>
-        <Button onClick={addOperation}>
+        <Button className="sim-add-plan-entry" onClick={addOperation}>
           <Plus aria-hidden="true" /> Planeintrag hinzufügen
         </Button>
       </section>

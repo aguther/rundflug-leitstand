@@ -29,6 +29,13 @@
   box-sizing: border-box;
 }
 
+:is(.forecast-simulator, .sim-editor-dialog, .sim-foundation-dialog) :is(input, select, textarea) {
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease;
+}
+
 .sim-app-header {
   min-height: 60px;
   display: flex;
@@ -1118,6 +1125,10 @@
   padding: 14px;
 }
 
+.sim-add-plan-entry.ds-button {
+  margin: 0 14px 14px;
+}
+
 .sim-plan-entry {
   display: grid;
   gap: 12px;
@@ -1587,6 +1598,16 @@
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--radius-md);
   background: var(--ui-control);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease;
+}
+
+.sim-time-control:focus-within {
+  position: relative;
+  z-index: 1;
+  box-shadow: var(--field-focus-ring);
 }
 
 .sim-time-control input {
@@ -1600,6 +1621,12 @@
   font: inherit;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+}
+
+.sim-time-control input:focus {
+  position: static;
+  z-index: auto;
+  box-shadow: none;
 }
 
 .sim-time-control input::-webkit-calendar-picker-indicator {
@@ -3397,5 +3424,12 @@
 
   .sim-export-row {
     padding: 4px 12px 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.forecast-simulator, .sim-editor-dialog, .sim-foundation-dialog) :is(input, select, textarea),
+  :is(.forecast-simulator, .sim-editor-dialog, .sim-foundation-dialog) .sim-time-control {
+    transition: none;
   }
 }

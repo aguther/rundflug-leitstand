@@ -76,7 +76,9 @@ describe("simulation plan editor", () => {
     render(<PlanHarness />);
 
     expect(screen.getByText("Noch keine Planeinträge vorhanden.")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: /Planeintrag hinzufügen/ }));
+    const addButton = screen.getByRole("button", { name: /Planeintrag hinzufügen/ });
+    expect(addButton.classList.contains("sim-add-plan-entry")).toBe(true);
+    await user.click(addButton);
     expect(screen.getByText("sim-plan-001")).toBeTruthy();
 
     await user.selectOptions(screen.getByLabelText("Art"), "WEATHER");
