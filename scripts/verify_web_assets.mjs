@@ -48,6 +48,13 @@ const EXCLUDED_PRECACHE_ENTRIES = {
 const EXCLUDED_PRECACHE_FILE_PATTERNS = {
   analyticsModel: /^assets\/flight-director-analytics-model-.*\.js$/,
   comparisonWorker: /^assets\/comparison-worker-.*\.js$/,
+  simulationEngine: /^assets\/engine-.*\.js$/,
+  simulationModel: /^assets\/model-.*\.js$/,
+  scenarioEditor: /^assets\/ScenarioEditor-.*\.js$/,
+  simulationComparisonDialog: /^assets\/SimulationComparisonDialog-.*\.js$/,
+  seedBatchDialog: /^assets\/SimulationSeedBatchDialog-.*\.js$/,
+  seedBatchWorker: /^assets\/seed-batch-worker-.*\.js$/,
+  stabilityHistogram: /^assets\/ForecastStabilityHistogram-.*\.js$/,
 };
 const defaultDistDirectory = resolve(repositoryRoot, "apps/web/dist");
 const defaultBaselinePath = resolve(repositoryRoot, "scripts/data/web-asset-baseline.json");

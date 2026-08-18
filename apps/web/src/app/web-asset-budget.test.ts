@@ -94,12 +94,26 @@ describe("web asset budgets", () => {
       "assets/admin.js",
       "assets/FlightDirectorAnalyticsContent.css",
       "assets/comparison-worker-abc.js",
+      "assets/engine-abc.js",
+      "assets/model-abc.js",
+      "assets/ScenarioEditor-abc.js",
+      "assets/SimulationComparisonDialog-abc.js",
+      "assets/SimulationSeedBatchDialog-abc.js",
+      "assets/seed-batch-worker-abc.js",
+      "assets/ForecastStabilityHistogram-abc.js",
     ];
 
     expect(verifyPrecachePolicy(manifest, precacheFiles)).toEqual([
       "Online-only PWA file is precached for admin: assets/admin.js",
       "Online-only PWA file is precached for analytics: assets/FlightDirectorAnalyticsContent.css",
       "Online-only PWA file is precached for comparisonWorker: assets/comparison-worker-abc.js",
+      "Online-only PWA file is precached for simulationEngine: assets/engine-abc.js",
+      "Online-only PWA file is precached for simulationModel: assets/model-abc.js",
+      "Online-only PWA file is precached for scenarioEditor: assets/ScenarioEditor-abc.js",
+      "Online-only PWA file is precached for simulationComparisonDialog: assets/SimulationComparisonDialog-abc.js",
+      "Online-only PWA file is precached for seedBatchDialog: assets/SimulationSeedBatchDialog-abc.js",
+      "Online-only PWA file is precached for seedBatchWorker: assets/seed-batch-worker-abc.js",
+      "Online-only PWA file is precached for stabilityHistogram: assets/ForecastStabilityHistogram-abc.js",
     ]);
   });
 });

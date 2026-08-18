@@ -224,7 +224,7 @@ describe("forecast simulation view", () => {
     expect(fidsLink.getAttribute("rel")).toBe("noopener");
 
     await user.click(screen.getByRole("button", { name: /Szenario konfigurieren/ }));
-    expect(screen.getByRole("region", { name: "Szenarioeditor" })).toBeTruthy();
+    expect(await screen.findByRole("region", { name: "Szenarioeditor" })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Editor schließen" }));
     expect(screen.queryByRole("region", { name: "Szenarioeditor" })).toBeNull();
 
@@ -238,13 +238,15 @@ describe("forecast simulation view", () => {
     expect(screen.getByRole("dialog", { name: "Prognosegüte im Detail" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Prognosestabilität" })).toBeTruthy();
     expect(
-      screen.getByRole("img", { name: "Histogramm der absoluten Boarding-Prognoseänderungen" }),
+      await screen.findByRole("img", {
+        name: "Histogramm der absoluten Boarding-Prognoseänderungen",
+      }),
     ).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Schließen" }));
     expect(screen.queryByRole("dialog", { name: "Prognosegüte im Detail" })).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Mehrfachlauf" }));
-    expect(screen.getByRole("dialog", { name: "Mehrfachlauf vergleichen" })).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: "Mehrfachlauf vergleichen" })).toBeTruthy();
     expect(screen.getByRole("spinbutton", { name: "Anzahl Läufe" })).toBeTruthy();
     expect((screen.getByLabelText("Start-Seed") as HTMLInputElement).readOnly).toBe(true);
     await user.click(screen.getByRole("button", { name: "Schließen" }));
@@ -374,7 +376,7 @@ describe("forecast simulation view", () => {
     render(<ForecastSimulationView />);
 
     await user.click(screen.getByRole("button", { name: /Szenario konfigurieren/ }));
-    await user.click(screen.getByRole("button", { name: "Editorwert ändern" }));
+    await user.click(await screen.findByRole("button", { name: "Editorwert ändern" }));
     await user.click(screen.getByRole("button", { name: "Editor anwenden" }));
     expect(screen.queryByRole("region", { name: "Szenarioeditor" })).toBeNull();
     expect(screen.getByText("20260723")).toBeTruthy();

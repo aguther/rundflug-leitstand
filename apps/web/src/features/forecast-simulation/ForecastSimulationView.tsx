@@ -21,7 +21,7 @@ import {
   Upload,
   Wrench,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Button, ModalDialog } from "../../design-system/components";
 import { ThemeToggle } from "../../design-system/ThemeToggle";
 import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
@@ -30,7 +30,6 @@ import {
   useTimeDiagramViewport,
 } from "../../shared/time-diagram-viewport";
 import { calculateSimulationMetrics, runSimulation } from "./engine";
-import { ForecastStabilityHistogram } from "./ForecastStabilityHistogram";
 import { ForecastTimeline } from "./ForecastTimeline";
 import {
   calculateSimulationDemandSummary,
@@ -42,11 +41,8 @@ import {
   simulationConfigForPreset,
   validateSimulationConfig,
 } from "./model";
-import { ScenarioEditor } from "./ScenarioEditor";
-import { SimulationComparisonDialog } from "./SimulationComparisonDialog";
 import { SimulationImportDialog, type SimulationImportResult } from "./SimulationFoundationDialog";
 import { SimulationHistoryDialog } from "./SimulationHistoryDialog";
-import { SimulationSeedBatchDialog } from "./SimulationSeedBatchDialog";
 import {
   type BoardingErrorTrendBasis,
   buildBoardingErrorTrendPoints,
@@ -68,6 +64,24 @@ const MINUTE_MS = 60_000;
 const TICK_MS = 30_000;
 export const SIMULATION_SPEEDS = [1, 2, 5, 10, 30, 60, 120, 300, 600] as const;
 const HOSTED_SIMULATOR = import.meta.env.MODE !== "simulator";
+const ForecastStabilityHistogram = lazy(() =>
+  import("./ForecastStabilityHistogram").then((module) => ({
+    default: module.ForecastStabilityHistogram,
+  })),
+);
+const SimulationSeedBatchDialog = lazy(() =>
+  import("./SimulationSeedBatchDialog").then((module) => ({
+    default: module.SimulationSeedBatchDialog,
+  })),
+);
+const SimulationComparisonDialog = lazy(() =>
+  import("./SimulationComparisonDialog").then((module) => ({
+    default: module.SimulationComparisonDialog,
+  })),
+);
+const ScenarioEditor = lazy(() =>
+  import("./ScenarioEditor").then((module) => ({ default: module.ScenarioEditor })),
+);
 
 const timeFormatter = new Intl.DateTimeFormat("de-DE", {
   hour: "2-digit",
@@ -846,18 +860,22 @@ export function ForecastSimulationView() {
         besitzen keine operative Wirkung.
       </footer>
 
-      <ScenarioEditor
-        config={editorConfig}
-        errors={editorErrors}
-        onApply={() => {
-          restart(editorConfig);
-          setEditorOpen(false);
-        }}
-        onChange={setEditorConfig}
-        onClose={() => setEditorOpen(false)}
-        open={editorOpen}
-        rotations={result.rotations}
-      />
+      {editorOpen ? (
+        <Suspense fallback={null}>
+          <ScenarioEditor
+            config={editorConfig}
+            errors={editorErrors}
+            onApply={() => {
+              restart(editorConfig);
+              setEditorOpen(false);
+            }}
+            onChange={setEditorConfig}
+            onClose={() => setEditorOpen(false)}
+            open={editorOpen}
+            rotations={result.rotations}
+          />
+        </Suspense>
+      ) : null}
 
       <SimulationHistoryDialog
         initialAircraftId={selectedAircraftId}
@@ -961,7 +979,9 @@ export function ForecastSimulationView() {
               <dd>{metric(visibleMetrics.stability.maximumWindowWidthMinutes, " Min.")}</dd>
             </div>
           </dl>
-          <ForecastStabilityHistogram values={visibleForecastChanges} />
+          <Suspense fallback={<p>Stabilitätshistogramm wird geladen …</p>}>
+            <ForecastStabilityHistogram values={visibleForecastChanges} />
+          </Suspense>
         </section>
         {selectedSnapshot ? (
           <section className="sim-raw-forecast" aria-label="Diagnostischer Prognose-Snapshot">
@@ -1102,29 +1122,37 @@ export function ForecastSimulationView() {
         </div>
       </ModalDialog>
 
-      <SimulationComparisonDialog
-        error={comparison.error}
-        onCancel={comparison.cancel}
-        onClose={closeComparison}
-        onRestart={startComparison}
-        open={comparison.open}
-        progress={comparison.progress}
-        result={comparison.result}
-        running={comparison.running}
-      />
-      <SimulationSeedBatchDialog
-        defaultRunCount={config.forecastTuning.comparisonRuns}
-        error={seedBatch.error}
-        onCancel={seedBatch.cancel}
-        onClose={seedBatch.close}
-        onExport={exportResult}
-        onStart={seedBatch.start}
-        open={seedBatch.open}
-        progress={seedBatch.progress}
-        result={seedBatch.result}
-        running={seedBatch.running}
-        seedStart={config.seed}
-      />
+      {comparison.open ? (
+        <Suspense fallback={null}>
+          <SimulationComparisonDialog
+            error={comparison.error}
+            onCancel={comparison.cancel}
+            onClose={closeComparison}
+            onRestart={startComparison}
+            open={comparison.open}
+            progress={comparison.progress}
+            result={comparison.result}
+            running={comparison.running}
+          />
+        </Suspense>
+      ) : null}
+      {seedBatch.open ? (
+        <Suspense fallback={null}>
+          <SimulationSeedBatchDialog
+            defaultRunCount={config.forecastTuning.comparisonRuns}
+            error={seedBatch.error}
+            onCancel={seedBatch.cancel}
+            onClose={seedBatch.close}
+            onExport={exportResult}
+            onStart={seedBatch.start}
+            open={seedBatch.open}
+            progress={seedBatch.progress}
+            result={seedBatch.result}
+            running={seedBatch.running}
+            seedStart={config.seed}
+          />
+        </Suspense>
+      ) : null}
     </div>
   );
 }
