@@ -562,6 +562,7 @@
 .sim-timeline-lanes {
   position: relative;
   min-height: 0;
+  overflow-x: clip;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -758,6 +759,10 @@
   pointer-events: none;
 }
 
+.sim-now-line[data-edge="end"] {
+  transform: translateX(-1px);
+}
+
 .sim-now-line time {
   position: absolute;
   bottom: 100%;
@@ -768,6 +773,16 @@
   background: var(--ui-accent);
   font-size: 10px;
   transform: translateX(-50%);
+}
+
+.sim-now-line[data-edge="start"] time {
+  left: 0;
+  transform: none;
+}
+
+.sim-now-line[data-edge="end"] time {
+  left: 100%;
+  transform: translateX(-100%);
 }
 
 .sim-queue-row {

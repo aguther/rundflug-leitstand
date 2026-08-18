@@ -275,6 +275,25 @@ describe("forecast timeline", () => {
     );
   });
 
+  it("keeps the overall-zoom end marker inside the plot boundary", () => {
+    const { container } = render(
+      <ForecastTimeline
+        currentMs={Date.parse(result.runWindow.endAt)}
+        onSelectRotation={vi.fn()}
+        result={result}
+        selectedRotationId={null}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Gesamten Zeitverlauf anzeigen" }));
+
+    const lanes = screen.getByRole("region", { name: "Tagesplan und Flugzeuge" });
+    const marker = container.querySelector<HTMLElement>(".sim-now-line");
+    expect(marker?.style.left).toBe("100%");
+    expect(marker?.dataset.edge).toBe("end");
+    expect(lanes.dataset.horizontalOverflow).toBe("clipped");
+  });
+
   it("shows tooltip details on keyboard focus, including available actual boarding", () => {
     render(
       <ForecastTimeline

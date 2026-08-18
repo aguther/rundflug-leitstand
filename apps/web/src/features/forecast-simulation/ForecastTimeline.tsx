@@ -347,6 +347,7 @@ export function ForecastTimeline({
     setTooltip((current) => (current?.rotationId === rotationId ? null : current));
   };
   const nowPosition = clampPercent(percent(currentMs, viewStart, viewEnd));
+  const nowEdge = nowPosition <= 0 ? "start" : nowPosition >= 100 ? "end" : "inside";
   const showNow = currentMs >= viewStart && currentMs <= viewEnd;
   const plannedSegments = buildPlannedSegments({
     events: result.events,
@@ -412,10 +413,15 @@ export function ForecastTimeline({
           {...keyboardScrollableRegionProps}
           aria-label="Tagesplan und Flugzeuge"
           className="sim-timeline-lanes"
+          data-horizontal-overflow="clipped"
         >
           {showNow ? (
             <div className="sim-now-track">
-              <div className="sim-now-line" style={{ left: `${nowPosition}%` }}>
+              <div
+                className="sim-now-line"
+                data-edge={nowEdge}
+                style={{ left: `${nowPosition}%` }}
+              >
                 <time>{formatTime(currentMs)}</time>
               </div>
             </div>
