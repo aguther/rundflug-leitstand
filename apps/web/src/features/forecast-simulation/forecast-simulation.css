@@ -48,7 +48,6 @@
 }
 
 .sim-brand,
-.sim-run-label,
 .sim-safety-notice {
   display: flex;
   align-items: center;
@@ -92,13 +91,8 @@
   font-weight: 650;
 }
 
-.sim-safety-notice svg,
-.sim-run-label svg {
+.sim-safety-notice svg {
   width: 18px;
-}
-
-.sim-run-label {
-  color: var(--ui-muted);
 }
 
 .sim-app-header .theme-toggle {
@@ -320,9 +314,27 @@
 
 .sim-full-button svg,
 .sim-controls .ds-button svg,
-.sim-export-row .ds-button svg {
+.sim-sidebar-analysis-actions .ds-button svg {
   width: 17px;
   height: 17px;
+}
+
+.sim-sidebar-analysis-actions {
+  display: grid;
+  gap: 6px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.sim-sidebar-analysis-actions .ds-button {
+  width: 100%;
+  min-height: 34px;
+  justify-content: flex-start;
+  padding: 5px 9px;
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: left;
 }
 
 .sim-import-message {
@@ -337,7 +349,7 @@
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow-x: auto;
   overflow-y: hidden;
   background: color-mix(in srgb, var(--ui-bg) 82%, var(--ui-surface));
@@ -413,10 +425,11 @@
 }
 
 .sim-timeline-panel {
+  position: relative;
   min-width: 940px;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   overflow: hidden;
   border-bottom: 1px solid var(--ui-border);
   background: var(--ui-surface);
@@ -435,7 +448,7 @@
 }
 
 .sim-timeline-heading {
-  min-height: 48px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -758,7 +771,7 @@
 }
 
 .sim-queue-row {
-  min-height: 74px;
+  min-height: 64px;
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
   border-bottom: 1px solid var(--ui-border);
@@ -786,7 +799,7 @@
 
 .sim-queue-list button {
   width: 64px;
-  height: 54px;
+  height: 46px;
   display: grid;
   flex: 0 0 auto;
   place-items: center;
@@ -824,33 +837,32 @@
   font-size: 12px;
 }
 
-.sim-selection-summary {
-  min-height: 58px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin: 10px 16px;
-  padding: 10px 14px;
-  border: 1px solid var(--ui-border);
-  border-left: 3px solid var(--ui-accent);
-  border-radius: var(--radius-md);
-  background: var(--ui-surface-subtle);
-}
-
-.sim-selection-summary i {
-  color: var(--ui-muted);
-}
-
-.sim-selection-summary > button {
-  min-height: 34px;
-  margin-left: auto;
-  padding: 0 12px;
-  border: 1px solid var(--ui-border);
+.sim-group-tooltip {
+  position: absolute;
+  z-index: 30;
+  min-width: 238px;
+  max-width: 310px;
+  display: grid;
+  gap: 3px;
+  padding: 9px 11px;
+  border: 1px solid var(--ui-border-strong);
   border-radius: var(--radius-md);
   color: var(--ui-text);
-  background: var(--ui-control);
-  cursor: pointer;
+  background: color-mix(in srgb, var(--ui-surface) 97%, transparent);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 30%);
+  font-size: 10px;
+  line-height: 1.35;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+}
+
+.sim-group-tooltip strong {
+  margin-bottom: 2px;
+  font-size: 11px;
+}
+
+.sim-group-tooltip span {
+  color: var(--ui-muted);
 }
 
 .sim-analysis {
@@ -863,7 +875,7 @@
 
 .sim-chart-panel {
   min-height: 210px;
-  padding: 14px;
+  padding: 10px 12px;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-lg);
   background: var(--ui-surface);
@@ -890,7 +902,7 @@
 }
 
 .sim-time-chart-stack > .time-diagram-zoom {
-  margin-top: 6px;
+  margin-top: 2px;
 }
 
 .sim-error-chart {
@@ -919,6 +931,15 @@
 .sim-chart-grid {
   stroke: var(--ui-border);
   stroke-dasharray: 3 4;
+}
+
+.sim-chart-axis-label,
+.sim-chart-x-tick text {
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-chart-x-tick line {
+  stroke: var(--ui-border-strong);
 }
 
 .sim-chart-line {
@@ -1014,12 +1035,12 @@
 
 .sim-metric-card {
   min-width: 0;
-  min-height: 106px;
+  height: 82px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-content: center;
-  gap: 4px;
-  padding: 10px 12px;
+  gap: 2px;
+  padding: 6px 9px;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-lg);
   background: var(--ui-surface);
@@ -1027,7 +1048,8 @@
 }
 
 .sim-metric-card > span {
-  min-height: 32px;
+  min-height: 26px;
+  font-size: 11px;
   color: var(--ui-muted);
   line-height: 1.25;
 }
@@ -1036,7 +1058,7 @@
   width: 100%;
   min-width: 0;
   margin-top: 0;
-  font-size: clamp(22px, 1.8vw, 28px);
+  font-size: clamp(19px, 1.55vw, 24px);
   font-variant-numeric: tabular-nums;
   font-weight: 520;
   white-space: nowrap;
@@ -1044,16 +1066,7 @@
 
 .sim-metric-card small {
   color: var(--ui-muted);
-  font-size: 10px;
-}
-
-.sim-export-row {
-  min-width: 940px;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 6px 16px 14px;
+  font-size: 9px;
 }
 
 .sim-app-footer {
@@ -3439,17 +3452,6 @@
     height: 38px;
   }
 
-  .sim-selection-summary {
-    min-height: 42px;
-    gap: 8px;
-    margin: 6px 12px;
-    padding: 6px 10px;
-  }
-
-  .sim-selection-summary > button {
-    min-height: 30px;
-  }
-
   .sim-aircraft-lane {
     min-height: 86px;
   }
@@ -3471,7 +3473,7 @@
   }
 
   .sim-metric-card {
-    min-height: 0;
+    height: 76px;
     gap: 3px;
     padding: 8px;
   }
@@ -3483,10 +3485,6 @@
   .sim-metric-card strong {
     margin-top: 0;
     font-size: 22px;
-  }
-
-  .sim-export-row {
-    padding: 4px 12px 8px;
   }
 }
 

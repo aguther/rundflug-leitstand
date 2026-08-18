@@ -15,15 +15,22 @@ const HOUR_MS = 60 * 60_000;
 
 function DiagramViewportHarness({
   domainUntil = 24 * HOUR_MS,
+  followFrom,
+  followUntil,
   freezeDomainWhileZoomed = false,
   resetKey = "one",
 }: {
   domainUntil?: number;
+  followFrom?: number;
+  followUntil?: number;
   freezeDomainWhileZoomed?: boolean;
   resetKey?: string;
 }) {
   const viewport = useTimeDiagramViewport({
     domain: { from: 0, until: domainUntil },
+    ...(followFrom === undefined || followUntil === undefined
+      ? {}
+      : { followDomain: { from: followFrom, until: followUntil } }),
     freezeDomainWhileZoomed,
     insets: { left: 40, right: 20 },
     resetKey,
@@ -36,10 +43,14 @@ function DiagramViewportHarness({
       <button onClick={viewport.reset} type="button">
         Gesamt
       </button>
+      <button onClick={viewport.resumeFollowing} type="button">
+        Aktuell folgen
+      </button>
       <output aria-label="Zoom">{viewport.zoom}</output>
       <output aria-label="Von">{viewport.visibleDomain.from}</output>
       <output aria-label="Bis">{viewport.visibleDomain.until}</output>
       <output aria-label="Drag">{String(viewport.dragging)}</output>
+      <output aria-label="Folgt">{String(viewport.following)}</output>
       <div
         data-testid="viewport"
         onClickCapture={viewport.onClickCapture}
@@ -219,6 +230,91 @@ describe("time diagram viewport", () => {
 
     expect(screen.getByLabelText("Zoom").textContent).toBe("1");
     expect(renderedDomain()).toEqual({ from: 0, until: 12 * HOUR_MS });
+  });
+
+  it("follows a rolling domain until the first manual pan and resumes on demand", () => {
+    const { rerender } = render(
+      <DiagramViewportHarness followFrom={6 * HOUR_MS} followUntil={9 * HOUR_MS} />,
+    );
+    const viewport = prepareViewport();
+
+    expect(renderedDomain()).toEqual({ from: 6 * HOUR_MS, until: 9 * HOUR_MS });
+    expect(screen.getByLabelText("Folgt").textContent).toBe("true");
+
+    rerender(<DiagramViewportHarness followFrom={7 * HOUR_MS} followUntil={10 * HOUR_MS} />);
+    expect(renderedDomain()).toEqual({ from: 7 * HOUR_MS, until: 10 * HOUR_MS });
+
+    dispatchWheel(viewport, { deltaY: -100_000 });
+    expect(renderedDomain()).toEqual({ from: 0, until: 3 * HOUR_MS });
+    expect(screen.getByLabelText("Folgt").textContent).toBe("false");
+
+    rerender(<DiagramViewportHarness followFrom={8 * HOUR_MS} followUntil={11 * HOUR_MS} />);
+    expect(renderedDomain()).toEqual({ from: 0, until: 3 * HOUR_MS });
+
+    fireEvent.click(screen.getByRole("button", { name: "Aktuell folgen" }));
+    expect(renderedDomain()).toEqual({ from: 8 * HOUR_MS, until: 11 * HOUR_MS });
+    expect(screen.getByLabelText("Folgt").textContent).toBe("true");
+
+    rerender(<DiagramViewportHarness followFrom={9 * HOUR_MS} followUntil={12 * HOUR_MS} />);
+    expect(renderedDomain()).toEqual({ from: 9 * HOUR_MS, until: 12 * HOUR_MS });
+
+    fireEvent.pointerDown(viewport, {
+      button: 0,
+      clientX: 500,
+      pointerId: 9,
+      pointerType: "mouse",
+    });
+    fireEvent.pointerMove(viewport, {
+      clientX: 560,
+      pointerId: 9,
+      pointerType: "mouse",
+    });
+    fireEvent.pointerUp(viewport, { clientX: 560, pointerId: 9, pointerType: "mouse" });
+    expect(screen.getByLabelText("Folgt").textContent).toBe("false");
+    expect(renderedDomain().from).toBeLessThan(9 * HOUR_MS);
+  });
+
+  it("stops rolling following when a zoom control changes the viewport", () => {
+    render(<DiagramViewportHarness followFrom={6 * HOUR_MS} followUntil={9 * HOUR_MS} />);
+    prepareViewport();
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom" }));
+
+    expect(screen.getByLabelText("Folgt").textContent).toBe("false");
+    expect(screen.getByLabelText("Zoom").textContent).toBe("3");
+  });
+
+  it("clamps manual navigation and resumed following to both full-day edges", () => {
+    const { rerender } = render(
+      <DiagramViewportHarness followFrom={10 * HOUR_MS} followUntil={13 * HOUR_MS} />,
+    );
+    const viewport = prepareViewport();
+
+    dispatchWheel(viewport, { deltaY: 100_000 });
+    expect(renderedDomain()).toEqual({ from: 21 * HOUR_MS, until: 24 * HOUR_MS });
+
+    rerender(<DiagramViewportHarness followFrom={23 * HOUR_MS} followUntil={26 * HOUR_MS} />);
+    fireEvent.click(screen.getByRole("button", { name: "Aktuell folgen" }));
+    expect(renderedDomain()).toEqual({ from: 21 * HOUR_MS, until: 24 * HOUR_MS });
+
+    fireEvent.click(screen.getByRole("button", { name: "Gesamt" }));
+    expect(renderedDomain()).toEqual({ from: 0, until: 24 * HOUR_MS });
+    expect(screen.getByLabelText("Folgt").textContent).toBe("false");
+  });
+
+  it("reactivates rolling following for a new reset key", () => {
+    const { rerender } = render(
+      <DiagramViewportHarness followFrom={6 * HOUR_MS} followUntil={9 * HOUR_MS} resetKey="one" />,
+    );
+    const viewport = prepareViewport();
+    dispatchWheel(viewport, { deltaY: -100_000 });
+    expect(screen.getByLabelText("Folgt").textContent).toBe("false");
+
+    rerender(
+      <DiagramViewportHarness followFrom={9 * HOUR_MS} followUntil={12 * HOUR_MS} resetKey="two" />,
+    );
+    expect(renderedDomain()).toEqual({ from: 9 * HOUR_MS, until: 12 * HOUR_MS });
+    expect(screen.getByLabelText("Folgt").textContent).toBe("true");
   });
 
   it("freezes a zoomed domain until reset and then follows the latest full domain", () => {

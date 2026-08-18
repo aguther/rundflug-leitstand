@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ForecastSimulationView } from "./ForecastSimulationView";
@@ -34,19 +34,14 @@ vi.mock("./engine", async () => {
 vi.mock("./ForecastTimeline", () => ({
   ForecastTimeline: ({
     onSelectRotation,
-    onShowHistory,
     result,
   }: {
     onSelectRotation: (rotationId: string) => void;
-    onShowHistory: () => void;
     result: { rotations: Array<{ id: string }> };
   }) => (
     <section aria-label="Simulationsverlauf">
       <button onClick={() => onSelectRotation(result.rotations[0]?.id ?? "")} type="button">
         Ersten Umlauf auswählen
-      </button>
-      <button onClick={onShowHistory} type="button">
-        Historie öffnen
       </button>
     </section>
   ),
@@ -156,10 +151,19 @@ describe("forecast simulation view", () => {
     expect(screen.getByText("Erstprognose Boarding")).toBeTruthy();
     expect(screen.getByText("Letzter Boarding-Prognosefehler vor Ist")).toBeTruthy();
     expect(screen.getByText("Erste Boardingprognose vs. Ist im Tagesverlauf")).toBeTruthy();
+    expect(screen.queryByText("Synthetischer Lauf")).toBeNull();
+    expect(screen.queryByText(/Je Fluggruppe ·/)).toBeNull();
+    expect(screen.queryByText(/Mausrad\/Ziehen/)).toBeNull();
     expect(
       screen.getAllByText("Noch nicht genügend abgeschlossene Prognosevergleiche."),
     ).toHaveLength(2);
     expect(document.querySelector(".sim-metric-card-source")).toBeNull();
+    expect(document.querySelectorAll(".sim-metric-card")).toHaveLength(5);
+    expect(screen.getByText(/Fluggruppen · letzter Snapshot/)).toBeTruthy();
+    expect(screen.getByText(/Fluggruppen · Median absolut/)).toBeTruthy();
+    const analysisNavigation = screen.getByRole("navigation", { name: "Simulationsauswertung" });
+    expect(analysisNavigation.closest("aside")).not.toBeNull();
+    expect(document.querySelector(".sim-export-row")).toBeNull();
     expect(screen.getByRole("button", { name: "Szenario konfigurieren" }).textContent).toContain(
       "Konfigurieren",
     );
@@ -192,7 +196,8 @@ describe("forecast simulation view", () => {
     await user.click(screen.getByRole("button", { name: "Editor schließen" }));
     expect(screen.queryByRole("region", { name: "Szenarioeditor" })).toBeNull();
 
-    await user.click(screen.getByRole("button", { name: "Historie öffnen" }));
+    await user.click(screen.getByRole("button", { name: "Ersten Umlauf auswählen" }));
+    await user.click(screen.getByRole("button", { name: "Lauf auswerten" }));
     expect(screen.getByRole("region", { name: "Laufauswertung" })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Historie schließen" }));
     expect(screen.queryByRole("region", { name: "Laufauswertung" })).toBeNull();
@@ -202,6 +207,24 @@ describe("forecast simulation view", () => {
     await user.click(screen.getByRole("button", { name: "Schließen" }));
     expect(screen.queryByRole("dialog", { name: "Prognosegüte im Detail" })).toBeNull();
   });
+
+  it("renders adaptive time ticks and symmetric minute scales in both error charts", () => {
+    const { container } = render(<ForecastSimulationView />);
+    const advance = screen.getByRole("button", { name: "+5 Min." });
+    for (let index = 0; index < 200; index += 1) fireEvent.click(advance);
+
+    const charts = container.querySelectorAll(".sim-error-chart");
+    expect(charts).toHaveLength(2);
+    for (const chart of charts) {
+      const yLabels = [...chart.querySelectorAll(".sim-chart-axis-label")].map(
+        (label) => label.textContent,
+      );
+      expect(yLabels[0]).toMatch(/^\+\d+ Min\.$/);
+      expect(yLabels[1]).toBe("0");
+      expect(yLabels[2]).toMatch(/^−\d+ Min\.$/);
+      expect(chart.querySelectorAll(".sim-chart-x-tick text").length).toBeGreaterThan(2);
+    }
+  }, 15_000);
 
   it("reports comparison progress and presents a completed result", async () => {
     const user = userEvent.setup();

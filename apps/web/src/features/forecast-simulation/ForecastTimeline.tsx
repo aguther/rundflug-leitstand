@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import { type FocusEvent, type KeyboardEvent, type MouseEvent, useRef, useState } from "react";
 import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
 import {
   timeDiagramAxisTickValues,
@@ -244,12 +244,14 @@ function queueRotationLabel(
 
 function selectedForecastLabel(snapshot: SimulationForecastSnapshot | undefined): string {
   if (!snapshot) return "Noch keine Prognose";
+  if (snapshot.forecastState === "UNAVAILABLE") return "Boardingprognose nicht verfügbar";
   const boarding = formatTime(snapshot.predictedBoardingAt);
   if (snapshot.quality !== "UNCERTAIN") return `Prognose Boarding ${boarding}`;
   return `Rohprognose Boarding ${boarding} · nicht freigegeben · ${forecastUncertaintyLabel(snapshot.uncertaintyReasons)}`;
 }
 
 function forecastQualityLabel(quality: SimulationForecastSnapshot["quality"] | undefined): string {
+  if (!quality) return "nicht verfügbar";
   if (quality === "STABLE") return "stabil";
   if (quality === "CHANGING") return "veränderlich";
   return "unsicher";
@@ -260,13 +262,11 @@ export function ForecastTimeline({
   result,
   selectedRotationId,
   onSelectRotation,
-  onShowHistory,
 }: Readonly<{
   currentMs: number;
   result: SimulationResult;
   selectedRotationId: string | null;
   onSelectRotation: (rotationId: string) => void;
-  onShowHistory: () => void;
 }>) {
   const simulationStart = Date.parse(result.runWindow.startAt);
   const simulationEnd = Date.parse(result.runWindow.endAt);
@@ -279,20 +279,22 @@ export function ForecastTimeline({
   const {
     changeZoom,
     dragging,
+    following,
     onClickCapture,
     onPointerCancel,
     onPointerDown,
     onPointerMove,
     onPointerUp,
     reset,
+    resumeFollowing,
     setViewportRef,
     viewportWidth,
     visibleDomain,
     zoom,
     zoomLevels,
   } = useTimeDiagramViewport({
-    domain: { from: windowStart, until: windowEnd },
-    freezeDomainWhileZoomed: true,
+    domain: { from: simulationStart, until: simulationEnd },
+    followDomain: { from: windowStart, until: windowEnd },
     insets: { left: 112, right: 0 },
     resetKey: result,
   });
@@ -311,10 +313,39 @@ export function ForecastTimeline({
       Date.parse(rotation.createdAt) <= currentMs &&
       (!rotation.calledAt || Date.parse(rotation.calledAt) > currentMs),
   );
-  const selected = result.rotations.find((rotation) => rotation.id === selectedRotationId) ?? null;
-  const selectedSnapshot = selected
-    ? latestSnapshot(result.snapshots, selected.id, currentMs)
+  const panelRef = useRef<HTMLElement | null>(null);
+  const [tooltip, setTooltip] = useState<{
+    left: number;
+    rotationId: string;
+    top: number;
+  } | null>(null);
+  const tooltipRotation = tooltip
+    ? (result.rotations.find((rotation) => rotation.id === tooltip.rotationId) ?? null)
+    : null;
+  const tooltipSnapshot = tooltipRotation
+    ? latestSnapshot(result.snapshots, tooltipRotation.id, currentMs)
     : undefined;
+  const showTooltip = (
+    rotationId: string,
+    event: MouseEvent<HTMLElement> | FocusEvent<HTMLElement>,
+  ) => {
+    const panelBounds = panelRef.current?.getBoundingClientRect();
+    const anchorBounds = event.currentTarget.getBoundingClientRect();
+    if (!panelBounds) return;
+    const rawLeft = anchorBounds.left - panelBounds.left + anchorBounds.width / 2;
+    const left =
+      panelBounds.width > 360
+        ? Math.min(panelBounds.width - 170, Math.max(170, rawLeft))
+        : Math.max(0, rawLeft);
+    setTooltip({
+      left,
+      rotationId,
+      top: Math.max(8, anchorBounds.top - panelBounds.top - 8),
+    });
+  };
+  const hideTooltip = (rotationId: string) => {
+    setTooltip((current) => (current?.rotationId === rotationId ? null : current));
+  };
   const nowPosition = clampPercent(percent(currentMs, viewStart, viewEnd));
   const showNow = currentMs >= viewStart && currentMs <= viewEnd;
   const plannedSegments = buildPlannedSegments({
@@ -333,7 +364,7 @@ export function ForecastTimeline({
   ).filter(({ start, end }) => start < viewEnd && end >= viewStart);
 
   return (
-    <section className="sim-timeline-panel" aria-label="Simulationszeitachse">
+    <section className="sim-timeline-panel" aria-label="Simulationszeitachse" ref={panelRef}>
       <header className="sim-timeline-heading">
         <div>
           <strong>Zeitleiste</strong>
@@ -353,7 +384,9 @@ export function ForecastTimeline({
         </fieldset>
       </header>
       <TimeDiagramZoomControls
+        following={following}
         onChange={changeZoom}
+        onResumeFollowing={resumeFollowing}
         onReset={reset}
         value={zoom}
         visibleSpanMs={visibleDomain.until - visibleDomain.from}
@@ -493,10 +526,17 @@ export function ForecastTimeline({
                     return (
                       <button
                         aria-label={`Fluggruppe ${rotation.communicationNumber}, ${currentStatus}`}
+                        aria-describedby={
+                          tooltip?.rotationId === rotation.id ? "sim-group-tooltip" : undefined
+                        }
                         className="sim-rotation-bar"
                         data-selected={rotation.id === selectedRotationId}
                         key={rotation.id}
+                        onBlur={() => hideTooltip(rotation.id)}
                         onClick={() => onSelectRotation(rotation.id)}
+                        onFocus={(event) => showTooltip(rotation.id, event)}
+                        onMouseEnter={(event) => showTooltip(rotation.id, event)}
+                        onMouseLeave={() => hideTooltip(rotation.id)}
                         style={{ left: `${left}%`, width: `${Math.max(1.8, right - left)}%` }}
                         type="button"
                       >
@@ -574,10 +614,17 @@ export function ForecastTimeline({
           ) : null}
           {queue.slice(0, 20).map((rotation, index) => (
             <button
+              aria-describedby={
+                tooltip?.rotationId === rotation.id ? "sim-group-tooltip" : undefined
+              }
               data-precalled={isPrecalled(rotation, currentMs) ? "true" : undefined}
               data-selected={rotation.id === selectedRotationId}
               key={rotation.id}
+              onBlur={() => hideTooltip(rotation.id)}
               onClick={() => onSelectRotation(rotation.id)}
+              onFocus={(event) => showTooltip(rotation.id, event)}
+              onMouseEnter={(event) => showTooltip(rotation.id, event)}
+              onMouseLeave={() => hideTooltip(rotation.id)}
               type="button"
             >
               <strong>{rotation.communicationNumber}</strong>
@@ -586,32 +633,34 @@ export function ForecastTimeline({
           ))}
         </div>
       </div>
-      <div className="sim-selection-summary">
-        {selected ? (
-          <>
-            <strong>Fluggruppe {selected.communicationNumber}</strong>
-            <i>·</i>
-            <span>{selectedForecastLabel(selectedSnapshot)}</span>
-            <i>·</i>
-            <span>
-              Ist {statusAt(selected, currentMs) === "COMPLETED" ? "abgeschlossen" : "noch offen"}
-            </span>
-            {selected.precalledAt && Date.parse(selected.precalledAt) <= currentMs ? (
-              <>
-                <i>·</i>
-                <span>GO TO GATE {formatTime(selected.precalledAt)} · systemseitig</span>
-              </>
-            ) : null}
-            <i>·</i>
-            <span>Qualität {forecastQualityLabel(selectedSnapshot?.quality)}</span>
-          </>
-        ) : (
-          <span>Fluggruppe auswählen, um Prognose und Ist-Verlauf zu vergleichen.</span>
-        )}
-        <button disabled={!selected} onClick={onShowHistory} type="button">
-          Verlauf anzeigen
-        </button>
-      </div>
+      {tooltipRotation && tooltip ? (
+        <aside
+          className="sim-group-tooltip"
+          id="sim-group-tooltip"
+          role="tooltip"
+          style={{ left: tooltip.left, top: tooltip.top }}
+        >
+          <strong>Fluggruppe {tooltipRotation.communicationNumber}</strong>
+          <span>{selectedForecastLabel(tooltipSnapshot)}</span>
+          <span>
+            Boarding (Ist){" "}
+            {tooltipRotation.calledAt && Date.parse(tooltipRotation.calledAt) <= currentMs
+              ? formatTime(tooltipRotation.calledAt)
+              : "noch offen"}
+          </span>
+          <span>
+            Qualität{" "}
+            {forecastQualityLabel(
+              tooltipSnapshot?.forecastState === "UNAVAILABLE"
+                ? undefined
+                : tooltipSnapshot?.quality,
+            )}
+          </span>
+          {tooltipRotation.precalledAt && Date.parse(tooltipRotation.precalledAt) <= currentMs ? (
+            <span>GO TO GATE {formatTime(tooltipRotation.precalledAt)} · systemseitig</span>
+          ) : null}
+        </aside>
+      ) : null}
     </section>
   );
 }

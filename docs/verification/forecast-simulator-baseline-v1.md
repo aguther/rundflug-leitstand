@@ -150,8 +150,9 @@ Konfiguration weiterhin bewusst; eine benötigte Konfiguration wird vorher über
 gesichert. Szenarioübersicht und Seed sind in der Sidebar rein lesend, Änderungen erfolgen
 ausschließlich im modalen Konfigurationsdialog.
 
-Diese UI-Bündelung ändert weder Systemgrenzen noch Persistenz, Importverträge, Engine-Datenfluss oder
-den flüchtigen Kanal zum Simulations-FIDS und ist daher nicht architekturrelevant.
+Diese UI-Bündelung einschließlich der rein lokalen Timeline-Navigation ändert weder Systemgrenzen
+noch Persistenz, Importverträge, Engine-Datenfluss oder den flüchtigen Kanal zum Simulations-FIDS
+und ist daher nicht architekturrelevant.
 
 Für importierte Stammdaten erzeugt das aktuelle Szenario weiterhin ausschließlich synthetische Nachfrage,
 Gruppen, Umläufe und Ist-Ereignisse. Die voreingestellte Gesamtnachfrage von 18 Personen pro
@@ -177,6 +178,16 @@ erscheinen auf der jeweiligen Flugzeugspur; globale Unterbrechungen erscheinen a
 gemeinsamen Betriebsspur. Eine noch offene Sperre endet in der Darstellung an der aktuell
 sichtbaren Simulationszeit, sodass kein zukünftiges Rückkehrereignis vorweggenommen wird.
 
+Der navigierbare Zeitbereich entspricht dem vollständigen Simulationsfenster. Standardmäßig folgt
+ein an den Tagesgrenzen geklemmter 180-Minuten-Ausschnitt der virtuellen Zeit. Der erste manuelle
+Drag-, Rad- oder Zoomeingriff friert den Ausschnitt ein; er kann anschließend bis exakt zum
+Simulationsanfang und -ende verschoben werden. **Gesamt** zeigt den ganzen Tag ohne automatisches
+Folgen. **Aktuell folgen** verwirft den manuellen Zoom, springt unmittelbar zum rollenden
+180-Minuten-Ausschnitt und aktiviert das Folgen erneut. Ein Neustart oder neu berechnetes Ergebnis
+stellt denselben Ausgangszustand wieder her. Die Auswahl einer Fluggruppe bleibt per Klick erhalten;
+ihre Prognose, Ist-Boardingzeit, Prognosequalität und ein möglicher systemseitiger Voraufruf werden
+platzsparend in einem Hover- und Fokus-Tooltip außerhalb des Queue-Scrollbereichs erläutert.
+
 Der Editor **Simulierte Realität → Betriebsereignisse** trennt wiederkehrende Standards von
 zufälligen Pausen und Defekten. Bei importierten Stammdaten erscheinen zielbezogene Tank- und
 Pausenregeln im selben Abschnitt. Gemäß ADR-0028 ersetzt eine solche Regel nur für das gewählte
@@ -189,6 +200,12 @@ Messpunkt nennt der Tagesfehlerverlauf Snapshotzeit, damalige Boarding-Prognose,
 Fehler. Die Gruppenauswertung zeigt für den gewählten Snapshot dessen Erfassungszeit sowie die
 damals gültigen Prognosen für Boarding, Off-Block, On-Block und Abschluss. Die Messpunkte werden
 vor dem Verbinden chronologisch sortiert.
+Beide Diagramme besitzen getrennte, symmetrische und auf Fünf-Minuten-Schritte gerundete Y-Skalen.
+Die X-Achsen ergänzen Anfang und Ende abhängig von Zeitraum, Zoom und verfügbarer Breite um
+beschriftete volle Zeitmarken; kurze Tickmarken ersetzen zusätzliche vertikale Vollrasterlinien.
+Die fünf Kennzahlen bleiben mit Label, Wert und Stichprobenhinweis in einer 82 Pixel hohen Zeile.
+Die vier Auswertungsaktionen stehen gestapelt in der Sidebar, damit unterhalb der Kennzahlen keine
+weitere Aktionszeile Höhe belegt.
 
 ## Korrektur der falschen Unterdrückung
 
@@ -281,6 +298,22 @@ Vite-Modus mit dem In-App-Browser gegen die gerenderte Anwendung verglichen. Die
 erfolgte bei 1280×720; ergänzende Headless-Aufnahmen belegen das Layout bei 1536×1024 und 1280×800.
 Light und Dark Mode wurden jeweils im In-App-Browser geprüft:
 
+- die ergänzende Timeline-Abnahme vom 18. August 2026 verwendet nach einem lokalen
+  Trusted-Code-Pfadfehler der In-App-Browser-Verbindung das bereits vorhandene Headless Chromium.
+  Das synthetische Fünf-Flugzeug-Szenario zeigt bei 2160×1080 im Dark Mode vier vollständige
+  Flugzeugzeilen gleichzeitig; bei 1280×900 im Light Mode bleiben weitere Zeilen ausschließlich
+  über den einen internen Timeline-Scrollbereich erreichbar. Dokumentbreite und -höhe entsprechen
+  in beiden Fällen exakt dem Viewport;
+- derselbe Lauf verschiebt das rollende 180-Minuten-Fenster per Mausrad bis `09:00–12:00`, hält den
+  Ausschnitt während eines weiteren Simulationsschritts stabil, schaltet über **Gesamt** das Folgen
+  aus und stellt es über **Aktuell folgen** mit unmittelbarem Sprung wieder her. Der Gruppentooltip
+  bleibt in Timeline und Viewport vollständig sichtbar und enthält Prognose, Ist, Qualität und
+  systemseitigen Voraufruf;
+- alle fünf Kennzahlenkarten messen in beiden Viewports 82 Pixel Höhe und besitzen weder horizontalen
+  noch vertikalen Inhaltsüberlauf. Die zwei Diagramme zeigen bei 2160 Pixel Breite acht und bei
+  1280 Pixel Breite fünf X-Achsenbeschriftungen sowie jeweils drei symmetrische Y-Werte. Die vier
+  Auswertungsaktionen liegen in der Sidebar; eine untere Aktionszeile existiert nicht. Die
+  Browserkonsole enthält keine Warnung oder Fehlermeldung;
 - die ergänzende Erstprognoseabnahme vom 18. August 2026 prüft mit Headless Chromium bei 1600×1000
   im Dark Mode und 1280×900 im Light Mode zwei getrennte Tagesverläufe für den letzten und ersten
   Boarding-Prognosefehler. Beide Diagramme enthalten je 22 Fluggruppenpunkte und ihre spezifischen

@@ -154,12 +154,10 @@ afterEach(cleanup);
 describe("forecast timeline", () => {
   it("renders planned operations, interruptions, rotations, and the live queue", () => {
     const onSelectRotation = vi.fn();
-    const onShowHistory = vi.fn();
     const { container } = render(
       <ForecastTimeline
         currentMs={currentMs}
         onSelectRotation={onSelectRotation}
-        onShowHistory={onShowHistory}
         result={result}
         selectedRotationId="rotation-queue"
       />,
@@ -174,27 +172,29 @@ describe("forecast timeline", () => {
     expect(screen.getByRole("button", { name: "Fluggruppe 101, COMPLETED" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Fluggruppe 102, IN_FLIGHT" })).not.toBeNull();
     expect(screen.getByText("Gate B")).not.toBeNull();
+    const queueGroup = screen.getByRole("button", { name: "103Gate B" });
+    fireEvent.mouseEnter(queueGroup);
     expect(screen.getByText(/Rohprognose Boarding/).textContent).toContain("nicht freigegeben");
     expect(screen.getByText(/Rohprognose Boarding/).textContent).toContain(
       "keine aktive Kapazität",
     );
     expect(screen.getByText(/GO TO GATE/).textContent).toContain("systemseitig");
     expect(screen.getByText("Qualität unsicher")).not.toBeNull();
+    expect(screen.getByText("Boarding (Ist) noch offen")).not.toBeNull();
+    expect(screen.getByRole("tooltip").parentElement?.className).toContain("sim-timeline-panel");
     expect(container.querySelectorAll(".sim-future-mask")).toHaveLength(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Fluggruppe 102, IN_FLIGHT" }));
-    fireEvent.click(screen.getByRole("button", { name: "103Gate B" }));
+    fireEvent.click(queueGroup);
     expect(onSelectRotation.mock.calls).toEqual([["rotation-flight"], ["rotation-queue"]]);
-    fireEvent.click(screen.getByRole("button", { name: "Verlauf anzeigen" }));
-    expect(onShowHistory).toHaveBeenCalledOnce();
+    expect(container.querySelector(".sim-selection-summary")).toBeNull();
   });
 
-  it("supports keyboard scrolling and the unselected empty summary", () => {
+  it("supports keyboard scrolling without rendering the removed selection strip", () => {
     const { container } = render(
       <ForecastTimeline
         currentMs={Date.parse("2026-07-24T08:00:00.000Z")}
         onSelectRotation={vi.fn()}
-        onShowHistory={vi.fn()}
         result={{ ...result, events: [], plannedOperations: [], rotations: [] }}
         selectedRotationId={null}
       />,
@@ -218,19 +218,16 @@ describe("forecast timeline", () => {
     expect(scrollBy.mock.calls).toEqual([[{ top: 80 }], [{ top: -80 }]]);
     expect(scrollTo.mock.calls).toEqual([[{ top: 0 }], [{ top: 900 }]]);
     expect(screen.getByText("Keine wartenden Gruppen")).not.toBeNull();
-    expect(screen.getByText(/Fluggruppe auswählen/)).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Verlauf anzeigen" }).hasAttribute("disabled")).toBe(
-      true,
-    );
+    expect(screen.queryByText(/Fluggruppe auswählen/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Verlauf anzeigen" })).toBeNull();
     expect(container.querySelector(".sim-plan-lane")).toBeNull();
   });
 
-  it("freezes the zoomed window during playback and resumes following after reset", () => {
+  it("follows playback, navigates to the day start, and resumes the rolling window", () => {
     const renderTimeline = (playbackTime: number) => (
       <ForecastTimeline
         currentMs={playbackTime}
         onSelectRotation={vi.fn()}
-        onShowHistory={vi.fn()}
         result={result}
         selectedRotationId="rotation-queue"
       />
@@ -249,15 +246,77 @@ describe("forecast timeline", () => {
       },
     });
 
-    fireEvent.wheel(viewport, { clientX: 650, ctrlKey: true, deltaY: -1 });
-    expect(screen.getByTitle(/^Sichtbarer Zeitraum:/).textContent).not.toBe("Gesamt");
-    const frozenRange = headingRange();
-
+    expect(screen.getByRole("button", { name: "Aktuell folgen" }).hasAttribute("disabled")).toBe(
+      true,
+    );
+    const initialRange = headingRange();
     rerender(renderTimeline(currentMs + 30 * 60_000));
+    expect(headingRange()).not.toBe(initialRange);
+
+    fireEvent.wheel(viewport, { deltaY: -100_000 });
+    expect(headingRange()).toContain("10:00");
+    const frozenRange = headingRange();
+    expect(screen.getByRole("button", { name: "Aktuell folgen" }).hasAttribute("disabled")).toBe(
+      false,
+    );
+
+    rerender(renderTimeline(Date.parse(result.runWindow.endAt)));
     expect(headingRange()).toBe(frozenRange);
 
     fireEvent.click(screen.getByRole("button", { name: "Gesamten Zeitverlauf anzeigen" }));
     expect(screen.getByTitle("Sichtbarer Zeitraum: Gesamt")).not.toBeNull();
     expect(headingRange()).not.toBe(frozenRange);
+
+    fireEvent.click(screen.getByRole("button", { name: "Aktuell folgen" }));
+    expect(headingRange()).toContain("13:00");
+    expect(headingRange()).toContain("16:00");
+    expect(screen.getByRole("button", { name: "Aktuell folgen" }).hasAttribute("disabled")).toBe(
+      true,
+    );
+  });
+
+  it("shows tooltip details on keyboard focus, including available actual boarding", () => {
+    render(
+      <ForecastTimeline
+        currentMs={currentMs}
+        onSelectRotation={vi.fn()}
+        result={result}
+        selectedRotationId="rotation-completed"
+      />,
+    );
+
+    const rotation = screen.getByRole("button", { name: "Fluggruppe 101, COMPLETED" });
+    fireEvent.focus(rotation);
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip.textContent).toContain("Fluggruppe 101");
+    expect(tooltip.textContent).toContain("Boarding (Ist) 11:30");
+    expect(tooltip.textContent).toContain("GO TO GATE 11:20 · systemseitig");
+    fireEvent.blur(rotation);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("labels an unavailable boarding forecast without presenting snapshot quality", () => {
+    const unavailableResult = {
+      ...result,
+      snapshots: result.snapshots.map((snapshot) =>
+        snapshot.rotationId === "rotation-queue" &&
+        snapshot.capturedAt === "2026-07-24T10:39:00.000Z"
+          ? { ...snapshot, forecastState: "UNAVAILABLE" as const }
+          : snapshot,
+      ),
+    };
+    render(
+      <ForecastTimeline
+        currentMs={currentMs}
+        onSelectRotation={vi.fn()}
+        result={unavailableResult}
+        selectedRotationId="rotation-queue"
+      />,
+    );
+
+    fireEvent.focus(screen.getByRole("button", { name: "103Gate B" }));
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip.textContent).toContain("Boardingprognose nicht verfügbar");
+    expect(tooltip.textContent).toContain("Qualität nicht verfügbar");
   });
 });

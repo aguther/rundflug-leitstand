@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   ArrowLeft,
-  Clock3,
   Coffee,
   Download,
   Fuel,
@@ -20,7 +19,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, ModalDialog } from "../../design-system/components";
 import { ThemeToggle } from "../../design-system/ThemeToggle";
 import { TimeDiagramZoomControls } from "../../shared/TimeDiagramZoomControls";
-import { useTimeDiagramViewport } from "../../shared/time-diagram-viewport";
+import {
+  timeDiagramAxisTickValues,
+  useTimeDiagramViewport,
+} from "../../shared/time-diagram-viewport";
 import { calculateSimulationMetrics, runSimulation } from "./engine";
 import { ForecastTimeline } from "./ForecastTimeline";
 import {
@@ -134,12 +136,13 @@ function ErrorChart({
     onPointerUp,
     reset,
     setViewportRef,
+    viewportWidth,
     visibleDomain,
     zoom,
     zoomLevels,
   } = useTimeDiagramViewport({
     domain: { from: minimumTime, until: maximumTime },
-    insetRatios: { left: 26 / 720, right: 26 / 720 },
+    insetRatios: { left: 54 / 720, right: 18 / 720 },
     resetKey,
   });
   if (points.length < 2) {
@@ -149,14 +152,29 @@ function ErrorChart({
   }
   const width = 720;
   const height = 170;
-  const padding = 26;
-  const maxError = Math.max(10, ...points.map((point) => Math.abs(point.error)));
+  const plotLeft = 54;
+  const plotRight = 18;
+  const plotTop = 14;
+  const plotBottom = 28;
+  const plotUntil = width - plotRight;
+  const axisY = height - plotBottom;
+  const zeroY = plotTop + (axisY - plotTop) / 2;
+  const maxError = Math.ceil(Math.max(5, ...points.map((point) => Math.abs(point.error))) / 5) * 5;
+  const visibleSpan = Math.max(1, visibleDomain.until - visibleDomain.from);
+  const plotPixelWidth = Math.max(240, (viewportWidth || width) - plotLeft - plotRight);
+  const endpointClearance = (visibleSpan * 56) / plotPixelWidth;
+  const axisTicks = timeDiagramAxisTickValues({
+    domain: visibleDomain,
+    minimumLabelSpacing: 82,
+    pixelWidth: plotPixelWidth,
+  }).filter(
+    (tick) =>
+      tick - visibleDomain.from > endpointClearance &&
+      visibleDomain.until - tick > endpointClearance,
+  );
   const plottedPoints = points.map((point) => {
-    const x =
-      padding +
-      ((point.at - visibleDomain.from) / Math.max(1, visibleDomain.until - visibleDomain.from)) *
-        (width - padding * 2);
-    const y = height / 2 - (point.error / maxError) * (height / 2 - padding);
+    const x = plotLeft + ((point.at - visibleDomain.from) / visibleSpan) * (plotUntil - plotLeft);
+    const y = zeroY - (point.error / maxError) * ((axisY - plotTop) / 2);
     return { ...point, x, y };
   });
   const activePoint = activePointIndex === null ? null : plottedPoints[activePointIndex];
@@ -177,6 +195,7 @@ function ErrorChart({
       <TimeDiagramZoomControls
         onChange={changeZoom}
         onReset={reset}
+        showInteractionHint={false}
         value={zoom}
         visibleSpanMs={visibleDomain.until - visibleDomain.from}
         zoomLevels={zoomLevels}
@@ -206,22 +225,48 @@ function ErrorChart({
           role="img"
           viewBox={`0 0 ${width} ${height}`}
         >
-          <line
-            className="sim-chart-axis"
-            x1={padding}
-            x2={width - padding}
-            y1={height / 2}
-            y2={height / 2}
-          />
-          {[0.25, 0.75].map((position) => (
+          {[plotTop, zeroY, axisY].map((position) => (
             <line
-              className="sim-chart-grid"
+              className={position === zeroY ? "sim-chart-axis" : "sim-chart-grid"}
               key={position}
-              x1={padding}
-              x2={width - padding}
-              y1={height * position}
-              y2={height * position}
+              x1={plotLeft}
+              x2={plotUntil}
+              y1={position}
+              y2={position}
             />
+          ))}
+          {[
+            { label: `+${maxError} Min.`, y: plotTop },
+            { label: "0", y: zeroY },
+            { label: `−${maxError} Min.`, y: axisY },
+          ].map((entry) => (
+            <text
+              className="sim-chart-axis-label"
+              dominantBaseline="middle"
+              key={entry.label}
+              textAnchor="end"
+              x={plotLeft - 8}
+              y={entry.y}
+            >
+              {entry.label}
+            </text>
+          ))}
+          {[visibleDomain.from, ...axisTicks, visibleDomain.until].map((tick, index, ticks) => (
+            <g className="sim-chart-x-tick" key={tick}>
+              <line
+                x1={plotLeft + ((tick - visibleDomain.from) / visibleSpan) * (plotUntil - plotLeft)}
+                x2={plotLeft + ((tick - visibleDomain.from) / visibleSpan) * (plotUntil - plotLeft)}
+                y1={axisY}
+                y2={axisY + 4}
+              />
+              <text
+                textAnchor={index === 0 ? "start" : index === ticks.length - 1 ? "end" : "middle"}
+                x={plotLeft + ((tick - visibleDomain.from) / visibleSpan) * (plotUntil - plotLeft)}
+                y={height - 4}
+              >
+                {formatTime(tick)}
+              </text>
+            </g>
           ))}
           <polyline
             className="sim-chart-line"
@@ -234,8 +279,8 @@ function ErrorChart({
                 className="sim-chart-cursor"
                 x1={activePoint.x}
                 x2={activePoint.x}
-                y1={padding / 2}
-                y2={height - padding}
+                y1={plotTop}
+                y2={axisY}
               />
               <circle
                 className="sim-chart-active-point"
@@ -245,15 +290,6 @@ function ErrorChart({
               />
             </>
           ) : null}
-          <text x={2} y={height / 2 - 5}>
-            0
-          </text>
-          <text x={padding} y={height - 4}>
-            {formatTime(visibleDomain.from)}
-          </text>
-          <text textAnchor="end" x={width - padding} y={height - 4}>
-            {formatTime(visibleDomain.until)}
-          </text>
         </svg>
         {activePoint ? (
           <output
@@ -498,10 +534,6 @@ export function ForecastSimulationView() {
           <Monitor aria-hidden="true" />
           FIDS in neuem Tab öffnen
         </a>
-        <div className="sim-run-label">
-          <Clock3 aria-hidden="true" />
-          Synthetischer Lauf
-        </div>
         {HOSTED_SIMULATOR ? (
           <a className="sim-admin-return" href="/admin?area=evaluation">
             <ArrowLeft aria-hidden="true" />
@@ -579,6 +611,14 @@ export function ForecastSimulationView() {
           <Button className="sim-full-button" onClick={() => restart(config)} variant="primary">
             <RotateCcw aria-hidden="true" /> Neu starten
           </Button>
+          <nav aria-label="Simulationsauswertung" className="sim-sidebar-analysis-actions">
+            <Button onClick={() => setDetailsOpen(true)}>Kennzahlen im Detail</Button>
+            <Button onClick={() => setHistoryOpen(true)}>Lauf auswerten</Button>
+            <Button onClick={startComparison}>Baseline und Kandidat vergleichen</Button>
+            <Button onClick={exportResult}>
+              <Download aria-hidden="true" /> Ergebnis exportieren
+            </Button>
+          </nav>
           {importMessage ? <output className="sim-import-message">{importMessage}</output> : null}
         </aside>
 
@@ -683,7 +723,6 @@ export function ForecastSimulationView() {
               const rotation = result.rotations.find((entry) => entry.id === rotationId);
               if (rotation?.aircraftId) setSelectedAircraftId(rotation.aircraftId);
             }}
-            onShowHistory={() => setHistoryOpen(true)}
             result={result}
             selectedRotationId={selectedRotationId}
           />
@@ -692,7 +731,6 @@ export function ForecastSimulationView() {
             <div className="sim-chart-panel">
               <header>
                 <strong>Letzter Boarding-Prognosefehler vor Ist</strong>
-                <span>Je Fluggruppe · letzter auswertbarer Snapshot · signierter Fehler</span>
               </header>
               <ErrorChart
                 ariaLabel="Interaktiver Verlauf des letzten Boarding-Prognosefehlers"
@@ -706,7 +744,6 @@ export function ForecastSimulationView() {
             <div className="sim-chart-panel">
               <header>
                 <strong>Erste Boardingprognose vs. Ist im Tagesverlauf</strong>
-                <span>Je Fluggruppe · erster verfügbarer Snapshot · signierter Fehler</span>
               </header>
               <ErrorChart
                 ariaLabel="Interaktiver Verlauf des ersten Boarding-Prognosefehlers"
@@ -745,14 +782,6 @@ export function ForecastSimulationView() {
               />
             </div>
           </section>
-          <div className="sim-export-row">
-            <Button onClick={() => setDetailsOpen(true)}>Kennzahlen im Detail</Button>
-            <Button onClick={() => setHistoryOpen(true)}>Lauf auswerten</Button>
-            <Button onClick={startComparison}>Baseline und Kandidat vergleichen</Button>
-            <Button onClick={exportResult}>
-              <Download aria-hidden="true" /> Ergebnis exportieren
-            </Button>
-          </div>
         </div>
       </main>
       <footer className="sim-app-footer">

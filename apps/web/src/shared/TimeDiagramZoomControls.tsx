@@ -1,17 +1,23 @@
-import { Maximize2, ZoomIn, ZoomOut } from "lucide-react";
+import { LocateFixed, Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "../design-system/components";
 import { formatTimeDiagramVisibleSpan } from "./time-diagram-viewport";
 import "./time-diagram-viewport.css";
 
 export function TimeDiagramZoomControls({
   onChange,
+  onResumeFollowing,
   onReset,
+  following,
+  showInteractionHint = true,
   value,
   visibleSpanMs,
   zoomLevels,
 }: Readonly<{
   onChange: (zoom: number) => void;
+  onResumeFollowing?: () => void;
   onReset: () => void;
+  following?: boolean;
+  showInteractionHint?: boolean;
   value: number;
   visibleSpanMs: number;
   zoomLevels: readonly number[];
@@ -21,7 +27,9 @@ export function TimeDiagramZoomControls({
   return (
     <fieldset className="time-diagram-zoom">
       <legend className="visually-hidden">Diagramm-Zoom</legend>
-      <small>Mausrad/Ziehen: Verschieben · Strg + Mausrad: Zoom</small>
+      {showInteractionHint ? (
+        <small>Mausrad/Ziehen: Verschieben · Strg + Mausrad: Zoom</small>
+      ) : null}
       <Button
         aria-label="Diagramm verkleinern"
         disabled={index <= 0}
@@ -45,7 +53,7 @@ export function TimeDiagramZoomControls({
       </Button>
       <Button
         aria-label="Gesamten Zeitverlauf anzeigen"
-        disabled={value === 1}
+        disabled={value === 1 && !following}
         onClick={onReset}
         type="button"
         variant="secondary"
@@ -53,6 +61,12 @@ export function TimeDiagramZoomControls({
         <Maximize2 aria-hidden="true" />
         Gesamt
       </Button>
+      {onResumeFollowing ? (
+        <Button disabled={following} onClick={onResumeFollowing} type="button" variant="secondary">
+          <LocateFixed aria-hidden="true" />
+          Aktuell folgen
+        </Button>
+      ) : null}
     </fieldset>
   );
 }

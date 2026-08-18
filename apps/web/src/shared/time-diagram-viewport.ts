@@ -28,6 +28,7 @@ interface DragState {
 
 interface UseTimeDiagramViewportOptions {
   domain: TimeDomain;
+  followDomain?: TimeDomain;
   freezeDomainWhileZoomed?: boolean;
   insets?: Partial<TimeDiagramInsets>;
   insetRatios?: Partial<TimeDiagramInsets>;
@@ -56,6 +57,22 @@ function normalizeDomain(domain: TimeDomain): TimeDomain {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+function clampTimeDomain(baseDomain: TimeDomain, requestedDomain: TimeDomain): TimeDomain {
+  const normalizedBaseDomain = normalizeDomain(baseDomain);
+  const normalizedRequestedDomain = normalizeDomain(requestedDomain);
+  const span = Math.min(
+    timeDomainSpan(normalizedBaseDomain),
+    timeDomainSpan(normalizedRequestedDomain),
+  );
+  const maximumFrom = normalizedBaseDomain.until - span;
+  const from = clamp(normalizedRequestedDomain.from, normalizedBaseDomain.from, maximumFrom);
+  return { from, until: from + span };
+}
+
+function zoomForDomains(baseDomain: TimeDomain, visibleDomain: TimeDomain): number {
+  return timeDomainSpan(baseDomain) / timeDomainSpan(visibleDomain);
 }
 
 export function timeDomainSpan(domain: TimeDomain): number {
@@ -178,6 +195,7 @@ function wheelDeltaInPixels(event: WheelEvent, viewportHeight: number): number {
 
 export function useTimeDiagramViewport({
   domain,
+  followDomain,
   freezeDomainWhileZoomed = false,
   insetRatios: partialInsetRatios,
   insets: partialInsets,
@@ -189,6 +207,18 @@ export function useTimeDiagramViewport({
   const externalDomain = useMemo(
     () => normalizeDomain({ from: domainFrom, until: domainUntil }),
     [domainFrom, domainUntil],
+  );
+  const followDomainFrom = followDomain?.from;
+  const followDomainUntil = followDomain?.until;
+  const externalFollowDomain = useMemo(
+    () =>
+      followDomainFrom === undefined || followDomainUntil === undefined
+        ? null
+        : clampTimeDomain(externalDomain, {
+            from: followDomainFrom,
+            until: followDomainUntil,
+          }),
+    [externalDomain, followDomainFrom, followDomainUntil],
   );
   const insets = useMemo(
     () => ({
@@ -204,33 +234,41 @@ export function useTimeDiagramViewport({
     }),
     [partialInsetRatios?.left, partialInsetRatios?.right],
   );
+  const initialVisibleDomain = externalFollowDomain ?? externalDomain;
   const [baseDomain, setBaseDomain] = useState(externalDomain);
-  const [visibleDomain, setVisibleDomain] = useState(externalDomain);
+  const [visibleDomain, setVisibleDomain] = useState(initialVisibleDomain);
   const [dragging, setDragging] = useState(false);
+  const [following, setFollowing] = useState(externalFollowDomain !== null);
   const [viewportWidth, setViewportWidth] = useState(0);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(() => zoomForDomains(externalDomain, initialVisibleDomain));
   const baseDomainRef = useRef(baseDomain);
   const visibleDomainRef = useRef(visibleDomain);
   const dragRef = useRef<DragState | null>(null);
   const insetsRef = useRef(insets);
   const insetRatiosRef = useRef(insetRatios);
   const latestExternalDomainRef = useRef(externalDomain);
+  const latestExternalFollowDomainRef = useRef(externalFollowDomain);
+  const followingRef = useRef(externalFollowDomain !== null);
   const previousResetKeyRef = useRef(resetKey);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const suppressClickRef = useRef(false);
   const viewportRef = useRef<HTMLElement | null>(null);
   const wheelHandlerRef = useRef<(event: WheelEvent) => void>(() => undefined);
   const wheelListenerRef = useRef<((event: WheelEvent) => void) | null>(null);
-  const zoomLevels = useMemo(
-    () => timeDiagramZoomLevelsForSpan(timeDomainSpan(baseDomain), minimumVisibleSpanMs),
-    [baseDomain, minimumVisibleSpanMs],
-  );
+  const zoomLevels = useMemo(() => {
+    const levels = [
+      ...timeDiagramZoomLevelsForSpan(timeDomainSpan(baseDomain), minimumVisibleSpanMs),
+    ];
+    if (!levels.includes(zoom)) levels.push(zoom);
+    return levels.sort((left, right) => left - right);
+  }, [baseDomain, minimumVisibleSpanMs, zoom]);
   const zoomLevelsRef = useRef(zoomLevels);
   const zoomRef = useRef(zoom);
 
   insetsRef.current = insets;
   insetRatiosRef.current = insetRatios;
   latestExternalDomainRef.current = externalDomain;
+  latestExternalFollowDomainRef.current = externalFollowDomain;
   zoomLevelsRef.current = zoomLevels;
 
   const updateViewport = useCallback((nextDomain: TimeDomain, nextZoom: number) => {
@@ -238,6 +276,11 @@ export function useTimeDiagramViewport({
     zoomRef.current = nextZoom;
     setVisibleDomain(nextDomain);
     setZoom(nextZoom);
+  }, []);
+
+  const updateFollowing = useCallback((nextFollowing: boolean) => {
+    followingRef.current = nextFollowing;
+    setFollowing(nextFollowing);
   }, []);
 
   const finishDrag = useCallback((releaseCapture: boolean) => {
@@ -258,7 +301,21 @@ export function useTimeDiagramViewport({
     baseDomainRef.current = nextBaseDomain;
     setBaseDomain(nextBaseDomain);
     updateViewport(nextBaseDomain, 1);
-  }, [finishDrag, updateViewport]);
+    updateFollowing(false);
+  }, [finishDrag, updateFollowing, updateViewport]);
+
+  const resumeFollowing = useCallback(() => {
+    const nextFollowDomain = latestExternalFollowDomainRef.current;
+    if (!nextFollowDomain) return;
+    finishDrag(true);
+    suppressClickRef.current = false;
+    const nextBaseDomain = latestExternalDomainRef.current;
+    const nextVisibleDomain = clampTimeDomain(nextBaseDomain, nextFollowDomain);
+    baseDomainRef.current = nextBaseDomain;
+    setBaseDomain(nextBaseDomain);
+    updateViewport(nextVisibleDomain, zoomForDomains(nextBaseDomain, nextVisibleDomain));
+    updateFollowing(true);
+  }, [finishDrag, updateFollowing, updateViewport]);
 
   const anchorRatioForClientX = useCallback((clientX?: number) => {
     if (clientX === undefined) return 0.5;
@@ -275,6 +332,7 @@ export function useTimeDiagramViewport({
 
   const changeZoom = useCallback(
     (nextZoom: number, anchorClientX?: number) => {
+      updateFollowing(false);
       const levels = zoomLevelsRef.current;
       const nextIndex = levels.reduce(
         (nearest, level, index) =>
@@ -294,7 +352,7 @@ export function useTimeDiagramViewport({
       });
       updateViewport(nextDomain, normalizedZoom);
     },
-    [anchorRatioForClientX, finishDrag, updateViewport],
+    [anchorRatioForClientX, finishDrag, updateFollowing, updateViewport],
   );
 
   wheelHandlerRef.current = (event: WheelEvent) => {
@@ -310,6 +368,7 @@ export function useTimeDiagramViewport({
       return;
     }
     if (event.altKey || event.metaKey || event.shiftKey || zoomRef.current <= 1) return;
+    updateFollowing(false);
     const viewport = viewportRef.current;
     if (!viewport) return;
     const delta = wheelDeltaInPixels(event, viewport.clientHeight);
@@ -374,22 +433,26 @@ export function useTimeDiagramViewport({
     viewport.setPointerCapture(event.pointerId);
   }, []);
 
-  const onPointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-    const drag = dragRef.current;
-    if (drag?.pointerId !== event.pointerId) return;
-    const distance = event.clientX - drag.startClientX;
-    if (!drag.moved && Math.abs(distance) < DRAG_THRESHOLD_PX) return;
-    drag.moved = true;
-    setDragging(true);
-    const nextDomain = panTimeDomain({
-      baseDomain: baseDomainRef.current,
-      currentDomain: drag.domain,
-      deltaRatio: -distance / drag.plotWidth,
-    });
-    visibleDomainRef.current = nextDomain;
-    setVisibleDomain(nextDomain);
-    event.preventDefault();
-  }, []);
+  const onPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      const drag = dragRef.current;
+      if (drag?.pointerId !== event.pointerId) return;
+      const distance = event.clientX - drag.startClientX;
+      if (!drag.moved && Math.abs(distance) < DRAG_THRESHOLD_PX) return;
+      drag.moved = true;
+      updateFollowing(false);
+      setDragging(true);
+      const nextDomain = panTimeDomain({
+        baseDomain: baseDomainRef.current,
+        currentDomain: drag.domain,
+        deltaRatio: -distance / drag.plotWidth,
+      });
+      visibleDomainRef.current = nextDomain;
+      setVisibleDomain(nextDomain);
+      event.preventDefault();
+    },
+    [updateFollowing],
+  );
 
   const onPointerUp = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
@@ -417,14 +480,35 @@ export function useTimeDiagramViewport({
   useLayoutEffect(() => {
     const resetKeyChanged = !Object.is(previousResetKeyRef.current, resetKey);
     previousResetKeyRef.current = resetKey;
-    if (resetKeyChanged || zoomRef.current === 1) {
+    if (resetKeyChanged) {
+      const nextVisibleDomain = externalFollowDomain ?? externalDomain;
+      const nextZoom = zoomForDomains(externalDomain, nextVisibleDomain);
       baseDomainRef.current = externalDomain;
-      visibleDomainRef.current = externalDomain;
-      zoomRef.current = 1;
       setBaseDomain(externalDomain);
-      setVisibleDomain(externalDomain);
-      setZoom(1);
-      if (resetKeyChanged) finishDrag(true);
+      updateViewport(nextVisibleDomain, nextZoom);
+      updateFollowing(externalFollowDomain !== null);
+      finishDrag(true);
+      return;
+    }
+    if (externalFollowDomain) {
+      baseDomainRef.current = externalDomain;
+      setBaseDomain(externalDomain);
+      if (followingRef.current) {
+        updateViewport(externalFollowDomain, zoomForDomains(externalDomain, externalFollowDomain));
+        return;
+      }
+      const nextVisibleDomain = panTimeDomain({
+        baseDomain: externalDomain,
+        currentDomain: visibleDomainRef.current,
+        deltaRatio: 0,
+      });
+      updateViewport(nextVisibleDomain, zoomForDomains(externalDomain, nextVisibleDomain));
+      return;
+    }
+    if (zoomRef.current === 1) {
+      baseDomainRef.current = externalDomain;
+      setBaseDomain(externalDomain);
+      updateViewport(externalDomain, 1);
       return;
     }
     if (freezeDomainWhileZoomed) return;
@@ -438,7 +522,15 @@ export function useTimeDiagramViewport({
     visibleDomainRef.current = nextVisibleDomain;
     setBaseDomain(externalDomain);
     setVisibleDomain(nextVisibleDomain);
-  }, [externalDomain, finishDrag, freezeDomainWhileZoomed, resetKey]);
+  }, [
+    externalDomain,
+    externalFollowDomain,
+    finishDrag,
+    freezeDomainWhileZoomed,
+    resetKey,
+    updateFollowing,
+    updateViewport,
+  ]);
 
   useLayoutEffect(
     () => () => {
@@ -453,12 +545,14 @@ export function useTimeDiagramViewport({
   return {
     changeZoom,
     dragging,
+    following,
     onClickCapture,
     onPointerCancel,
     onPointerDown,
     onPointerMove,
     onPointerUp,
     reset,
+    resumeFollowing,
     setViewportRef,
     viewportWidth,
     visibleDomain,
