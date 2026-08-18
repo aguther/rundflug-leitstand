@@ -102,6 +102,34 @@ seedübergreifenden Mediane der wichtigsten Baselinewerte lauten:
 Der Vergleich läuft abbrechbar in einem lokalen Browser-Worker. Er bewertet keine Variante
 automatisch als Gewinner.
 
+## Mehrfachlauf desselben Szenarios
+
+Der von A/B unabhängige Dialog **Mehrfachlauf** berechnet dasselbe vollständige Szenario mit 5 bis
+100 fortlaufenden Seeds. Die lokale Anzahl startet mit `forecastTuning.comparisonRuns`, verändert die
+Szenariokonfiguration aber nicht. Start-Seed, sämtliche übrigen Konfigurationswerte und manuelle
+Ereignisse bleiben je Lauf gleich; nur der Seed wird fortgeschaltet und läuft nach `4.294.967.295`
+bei `1` weiter. Abbruch, Dialogschließen, Szenario-/Seed-Wechsel oder geänderte manuelle Ereignisse
+terminieren den separaten Worker und verhindern die Übernahme verspäteter Ergebnisse. Wiedergabezeit,
+Geschwindigkeit und Zoom invalidieren ein fertiges Ergebnis nicht.
+
+Der Tab **Betrieb** vergleicht abgeschlossene Umläufe, Passagiere pro Stunde,
+P90-Passagierwartezeit, Überzeit, Trefferquote des letzten Boardingfensters und
+Flugzeugauslastung. Sachliche Extremhinweise nennen höchsten Durchsatz, längste P90-Wartezeit und
+meiste Überzeit; bei Gleichstand dient der kleinste Seed als Repräsentant und die Zahl der
+Gleichstände wird ausgewiesen. Ein Gesamtgewinner wird nicht bestimmt.
+
+Der Tab **Prognose** trennt Genauigkeit und Stabilität. Erstprognose ist der früheste verfügbare
+DRAFT-Snapshot vor dem tatsächlichen Boarding, letzte Prognose der letzte geeignete DRAFT-Snapshot
+davor. Ein Stabilitätssprung ist die absolute Änderung zwischen zwei chronologisch
+aufeinanderfolgenden verfügbaren DRAFT-Boardingprognosen derselben Fluggruppe. Ausgewiesen werden
+Median und P90 beider Genauigkeitsbasen sowie Anzahl, Durchschnitt und Maximum der Änderungen und
+Sprünge über 15 beziehungsweise 30 Minuten. Der Einzellauf-Detaildialog ergänzt dieselben
+Stabilitätswerte, die größte Fensterbreite und ein fokussierbares SVG-Histogramm mit 15-/30-Minuten-
+Schwellen.
+
+Für jede sichtbare Kennzahl enthält das Ergebnis `sampleCount`, Minimum, Q1, Median, Q3 und Maximum.
+`null`-Werte gehen nicht in diese Aggregate ein und erscheinen in Einzelläufen als `–`.
+
 ## Operative Simulationsgrundlage und Szenario
 
 Unter **Administration → Auswertung** erzeugt
@@ -188,6 +216,11 @@ stellt denselben Ausgangszustand wieder her. Die Auswahl einer Fluggruppe bleibt
 ihre Prognose, Ist-Boardingzeit, Prognosequalität und ein möglicher systemseitiger Voraufruf werden
 platzsparend in einem Hover- und Fokus-Tooltip außerhalb des Queue-Scrollbereichs erläutert.
 
+Bei Simulationsanfang und -ende bleiben Linie und Zeitlabel der Jetzt-Markierung innerhalb des
+Plotbereichs. Die Timeline-Lanes scrollen ausschließlich vertikal und clippen X-Overflow; die Queue
+behält ihren eigenen horizontalen Scrollbereich. Dadurch erzeugt **Gesamt** am Simulationsende auf
+Desktopbreiten keinen Timeline- oder Workspace-Scrollbalken.
+
 Der Editor **Simulierte Realität → Betriebsereignisse** trennt wiederkehrende Standards von
 zufälligen Pausen und Defekten. Bei importierten Stammdaten erscheinen zielbezogene Tank- und
 Pausenregeln im selben Abschnitt. Gemäß ADR-0028 ersetzt eine solche Regel nur für das gewählte
@@ -204,8 +237,14 @@ Beide Diagramme besitzen getrennte, symmetrische und auf Fünf-Minuten-Schritte 
 Die X-Achsen ergänzen Anfang und Ende abhängig von Zeitraum, Zoom und verfügbarer Breite um
 beschriftete volle Zeitmarken; kurze Tickmarken ersetzen zusätzliche vertikale Vollrasterlinien.
 Die fünf Kennzahlen bleiben mit Label, Wert und Stichprobenhinweis in einer 82 Pixel hohen Zeile.
-Die vier Auswertungsaktionen stehen gestapelt in der Sidebar, damit unterhalb der Kennzahlen keine
-weitere Aktionszeile Höhe belegt.
+Die Sidebar gruppiert alle 40-Pixel-Aktionen mit Lucide-Icon und sichtbarer Beschriftung unter
+**Szenario**, **Bearbeiten & Dateien**, **Läufe** und **Auswertung**. Sie darf bei niedriger Höhe intern
+vertikal scrollen; unterhalb der Kennzahlen existiert keine weitere Aktionszeile.
+
+Die Wiedergabe bietet `1×`, `2×`, `5×`, `10×`, `30×`, `60×`, `120×`, `300×` und `600×`.
+**Bis Ende berechnen** stoppt eine laufende Wiedergabe, setzt die virtuelle Zeit auf das bereits
+berechnete Simulationsende, aktualisiert den simulierten FIDS-Zustand wie jede normale Zeitänderung
+und ist am Ende deaktiviert.
 
 ## Korrektur der falschen Unterdrückung
 
@@ -255,7 +294,9 @@ festgeschriebenen Preset- und 25-Seed-Werte.
 - Exportiert werden nur Szenario, Seed, synthetisches Ereignisledger, Flugzeuge, Umläufe,
   Prognosesnapshots und Kennzahlen. Ticketcodes, Namen, Telefonnummern, PINs und Secrets sind weder
   Teil des Modells noch des Exports. Das Format trägt die Kennung
-  `rundflug-forecast-simulation/v7`.
+  `rundflug-forecast-simulation/v8`. Das nullable Feld `seedBatch` enthält bei vorhandenem
+  Mehrfachlauf vollständige Metriken je Seed und deren Verteilungen; `batchComparison` bleibt
+  unverändert erhalten.
 
 ## Simuliertes Live-FIDS
 

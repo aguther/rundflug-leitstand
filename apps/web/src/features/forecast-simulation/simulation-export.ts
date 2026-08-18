@@ -1,12 +1,14 @@
 import type { BatchComparisonResult } from "./comparison";
 import type { ManualIncident, SimulationResult } from "./model";
+import type { SeedBatchResult } from "./seed-batch";
 
-export const SIMULATION_EXPORT_SCHEMA = "rundflug-forecast-simulation/v7" as const;
+export const SIMULATION_EXPORT_SCHEMA = "rundflug-forecast-simulation/v8" as const;
 
 export function createSimulationExport(
   result: SimulationResult,
   manualIncidents: readonly ManualIncident[],
   comparison: BatchComparisonResult | null,
+  seedBatch: SeedBatchResult | null = null,
 ) {
   return {
     schema: SIMULATION_EXPORT_SCHEMA,
@@ -24,5 +26,6 @@ export function createSimulationExport(
     rotations: result.rotations,
     metrics: result.metrics,
     batchComparison: comparison,
+    seedBatch,
   };
 }

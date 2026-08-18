@@ -9,6 +9,7 @@ import {
   Fuel,
   Gauge,
   GitCompareArrows,
+  Layers3,
   Monitor,
   Pause,
   Plane,
@@ -29,6 +30,7 @@ import {
   useTimeDiagramViewport,
 } from "../../shared/time-diagram-viewport";
 import { calculateSimulationMetrics, runSimulation } from "./engine";
+import { ForecastStabilityHistogram } from "./ForecastStabilityHistogram";
 import { ForecastTimeline } from "./ForecastTimeline";
 import {
   calculateSimulationDemandSummary,
@@ -44,18 +46,21 @@ import { ScenarioEditor } from "./ScenarioEditor";
 import { SimulationComparisonDialog } from "./SimulationComparisonDialog";
 import { SimulationImportDialog, type SimulationImportResult } from "./SimulationFoundationDialog";
 import { SimulationHistoryDialog } from "./SimulationHistoryDialog";
+import { SimulationSeedBatchDialog } from "./SimulationSeedBatchDialog";
 import {
   type BoardingErrorTrendBasis,
   buildBoardingErrorTrendPoints,
 } from "./simulation-error-trend";
 import { createSimulationExport } from "./simulation-export";
 import { useSimulationFidsPublisher } from "./simulation-fids-channel";
+import { boardingForecastAbsoluteChanges } from "./simulation-metric-sections";
 import {
   createSimulationScenarioTemplate,
   simulationScenarioTemplateFileName,
 } from "./simulation-scenario-template";
 import { useSimulationComparison } from "./useSimulationComparison";
 import { useSimulationPlayback } from "./useSimulationPlayback";
+import { useSimulationSeedBatch } from "./useSimulationSeedBatch";
 import "../../design-system/switch-field.css";
 import "./forecast-simulation.css";
 
@@ -369,6 +374,7 @@ export function ForecastSimulationView() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const comparison = useSimulationComparison();
+  const seedBatch = useSimulationSeedBatch(config, manualIncidents);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const editorErrors = validateSimulationConfig(editorConfig);
   const simulationEnd = Date.parse(result.runWindow.endAt);
@@ -435,6 +441,10 @@ export function ForecastSimulationView() {
       }),
     [visibleEvents, visibleRotations, visibleSnapshots],
   );
+  const visibleForecastChanges = useMemo(
+    () => boardingForecastAbsoluteChanges(visibleSnapshots),
+    [visibleSnapshots],
+  );
   const latestVisibleSnapshotByRotation = useMemo(() => {
     const snapshots = new Map<string, SimulationForecastSnapshot>();
     for (const snapshot of visibleSnapshots) snapshots.set(snapshot.rotationId, snapshot);
@@ -499,7 +509,13 @@ export function ForecastSimulationView() {
 
   const exportResult = () => {
     const blob = new Blob(
-      [JSON.stringify(createSimulationExport(result, manualIncidents, comparison.result), null, 2)],
+      [
+        JSON.stringify(
+          createSimulationExport(result, manualIncidents, comparison.result, seedBatch.result),
+          null,
+          2,
+        ),
+      ],
       {
         type: "application/json;charset=utf-8",
       },
@@ -631,6 +647,9 @@ export function ForecastSimulationView() {
             <h2 id="sim-sidebar-runs">
               <RotateCcw aria-hidden="true" /> Läufe
             </h2>
+            <Button className="sim-full-button" onClick={seedBatch.openDialog}>
+              <Layers3 aria-hidden="true" /> Mehrfachlauf
+            </Button>
             <Button className="sim-full-button" onClick={() => restart(config)} variant="primary">
               <RotateCcw aria-hidden="true" /> Neu starten
             </Button>
@@ -906,6 +925,44 @@ export function ForecastSimulationView() {
             );
           })}
         </div>
+        <section className="sim-stability-details" aria-labelledby="sim-stability-title">
+          <header>
+            <div>
+              <h3 id="sim-stability-title">Prognosestabilität</h3>
+              <p>
+                Absolute Änderung zwischen aufeinanderfolgenden verfügbaren DRAFT-Boardingprognosen
+                derselben Fluggruppe.
+              </p>
+            </div>
+          </header>
+          <dl>
+            <div>
+              <dt>Anzahl Änderungen</dt>
+              <dd>{visibleMetrics.stability.changes}</dd>
+            </div>
+            <div>
+              <dt>Durchschnitt</dt>
+              <dd>{metric(visibleMetrics.stability.averageAbsoluteChangeMinutes, " Min.")}</dd>
+            </div>
+            <div>
+              <dt>Maximum</dt>
+              <dd>{metric(visibleMetrics.stability.maximumJumpMinutes, " Min.")}</dd>
+            </div>
+            <div>
+              <dt>Sprünge &gt;15 Min.</dt>
+              <dd>{visibleMetrics.stability.jumpsOver15Minutes}</dd>
+            </div>
+            <div>
+              <dt>Sprünge &gt;30 Min.</dt>
+              <dd>{visibleMetrics.stability.jumpsOver30Minutes}</dd>
+            </div>
+            <div>
+              <dt>Größte Fensterbreite</dt>
+              <dd>{metric(visibleMetrics.stability.maximumWindowWidthMinutes, " Min.")}</dd>
+            </div>
+          </dl>
+          <ForecastStabilityHistogram values={visibleForecastChanges} />
+        </section>
         {selectedSnapshot ? (
           <section className="sim-raw-forecast" aria-label="Diagnostischer Prognose-Snapshot">
             <header>
@@ -1054,6 +1111,19 @@ export function ForecastSimulationView() {
         progress={comparison.progress}
         result={comparison.result}
         running={comparison.running}
+      />
+      <SimulationSeedBatchDialog
+        defaultRunCount={config.forecastTuning.comparisonRuns}
+        error={seedBatch.error}
+        onCancel={seedBatch.cancel}
+        onClose={seedBatch.close}
+        onExport={exportResult}
+        onStart={seedBatch.start}
+        open={seedBatch.open}
+        progress={seedBatch.progress}
+        result={seedBatch.result}
+        running={seedBatch.running}
+        seedStart={config.seed}
       />
     </div>
   );

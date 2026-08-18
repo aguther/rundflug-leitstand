@@ -417,11 +417,7 @@ export function ForecastTimeline({
         >
           {showNow ? (
             <div className="sim-now-track">
-              <div
-                className="sim-now-line"
-                data-edge={nowEdge}
-                style={{ left: `${nowPosition}%` }}
-              >
+              <div className="sim-now-line" data-edge={nowEdge} style={{ left: `${nowPosition}%` }}>
                 <time>{formatTime(currentMs)}</time>
               </div>
             </div>

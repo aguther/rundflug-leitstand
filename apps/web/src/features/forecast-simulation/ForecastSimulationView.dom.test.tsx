@@ -187,6 +187,23 @@ describe("forecast simulation view", () => {
         name: /^(Szenario|Bearbeiten & Dateien|Läufe|Auswertung)$/,
       }),
     ).toHaveLength(4);
+    const sidebarActions = [
+      ...document.querySelectorAll<HTMLButtonElement>(".sim-sidebar .ds-button"),
+    ];
+    expect(sidebarActions.map((button) => button.textContent?.trim().replace(/\s+/g, " "))).toEqual(
+      [
+        "Konfigurieren",
+        "Importieren …",
+        "Szenario exportieren",
+        "Mehrfachlauf",
+        "Neu starten",
+        "Kennzahlen im Detail",
+        "Lauf auswerten",
+        "Baseline und Kandidat vergleichen",
+        "Ergebnis exportieren",
+      ],
+    );
+    expect(sidebarActions.every((button) => button.querySelector("svg") !== null)).toBe(true);
 
     await user.click(screen.getByRole("button", { name: "Importieren …" }));
     await user.click(screen.getByRole("button", { name: "Szenario übernehmen" }));
@@ -219,8 +236,19 @@ describe("forecast simulation view", () => {
 
     await user.click(screen.getByRole("button", { name: "Kennzahlen im Detail" }));
     expect(screen.getByRole("dialog", { name: "Prognosegüte im Detail" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Prognosestabilität" })).toBeTruthy();
+    expect(
+      screen.getByRole("img", { name: "Histogramm der absoluten Boarding-Prognoseänderungen" }),
+    ).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Schließen" }));
     expect(screen.queryByRole("dialog", { name: "Prognosegüte im Detail" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Mehrfachlauf" }));
+    expect(screen.getByRole("dialog", { name: "Mehrfachlauf vergleichen" })).toBeTruthy();
+    expect(screen.getByRole("spinbutton", { name: "Anzahl Läufe" })).toBeTruthy();
+    expect((screen.getByLabelText("Start-Seed") as HTMLInputElement).readOnly).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Schließen" }));
+    expect(screen.queryByRole("dialog", { name: "Mehrfachlauf vergleichen" })).toBeNull();
   });
 
   it("renders adaptive time ticks and symmetric minute scales in both error charts", () => {

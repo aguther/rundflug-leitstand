@@ -8,16 +8,18 @@ const SIMULATION_TIMEOUT_MS = 60_000;
 
 describe("forecast simulation export", () => {
   it(
-    "writes the v7 metrics, schedule, demand profile, resource model, and actual run window",
+    "writes the v8 metrics, nullable seed batch, schedule, demand profile, and run window",
     () => {
       const result = runSimulation(simulationConfigForPreset("NORMAL"));
       const exported = createSimulationExport(result, [], null);
 
-      expect(exported.schema).toBe(SIMULATION_EXPORT_SCHEMA);
+      expect(SIMULATION_EXPORT_SCHEMA).toBe("rundflug-forecast-simulation/v8");
+      expect(exported.schema).toBe("rundflug-forecast-simulation/v8");
       expect(exported.schedule).toEqual(result.config.schedule);
       expect(exported.realityModel.demand).toEqual(result.config.realityModel.demand);
       expect(exported.runWindow).toEqual(result.runWindow);
       expect(exported.metrics.initialBoarding).toEqual(result.metrics.initialBoarding);
+      expect(exported.seedBatch).toBeNull();
       expect(Date.parse(exported.runWindow.endAt)).toBeGreaterThanOrEqual(
         Date.parse(exported.schedule.operationsEndAt),
       );

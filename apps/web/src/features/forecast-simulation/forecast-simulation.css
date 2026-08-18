@@ -2335,6 +2335,232 @@
   font-size: 12px;
 }
 
+.sim-batch-parameters {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(150px, 220px) minmax(220px, 1fr);
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.sim-batch-parameters label {
+  display: grid;
+  gap: 5px;
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+
+.sim-batch-parameters input,
+.sim-batch-panel select {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--ui-text);
+  background: var(--ui-control);
+}
+
+.sim-batch-parameters input[readonly] {
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+}
+
+.sim-batch-parameters small {
+  align-self: center;
+  color: var(--ui-muted);
+}
+
+.sim-batch-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 4px 0 16px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.sim-batch-tabs button {
+  min-height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--ui-muted);
+  background: transparent;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sim-batch-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--ui-accent);
+  color: var(--ui-accent);
+}
+
+.sim-batch-cards {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.sim-batch-cards article,
+.sim-batch-extremes article {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  padding: 11px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface-subtle);
+}
+
+.sim-batch-cards span,
+.sim-batch-extremes span,
+.sim-batch-cards small,
+.sim-batch-extremes small {
+  color: var(--ui-muted);
+  font-size: 10px;
+}
+
+.sim-batch-cards strong,
+.sim-batch-extremes strong {
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-batch-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sim-batch-panel {
+  min-width: 0;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+
+.sim-batch-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sim-batch-panel h3,
+.sim-batch-table-wrap + h3 {
+  margin: 0;
+}
+
+.sim-batch-panel select {
+  max-width: 240px;
+}
+
+.sim-batch-distribution {
+  width: 100%;
+  min-height: 88px;
+  margin-top: 4px;
+}
+
+.sim-batch-whisker,
+.sim-batch-median {
+  stroke: var(--ui-text);
+  stroke-width: 2;
+}
+
+.sim-batch-quartile {
+  fill: color-mix(in srgb, var(--ui-accent) 28%, var(--ui-surface));
+  stroke: var(--ui-accent);
+}
+
+.sim-batch-endpoint {
+  fill: var(--ui-accent);
+}
+
+.sim-batch-distribution text {
+  fill: var(--ui-muted);
+  font-size: 9px;
+}
+
+.sim-batch-empty {
+  min-height: 88px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--ui-muted);
+}
+
+.sim-batch-extremes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sim-batch-table-wrap {
+  max-height: 300px;
+  overflow: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+}
+
+.sim-batch-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sim-batch-table :is(th, td) {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ui-border);
+  text-align: right;
+}
+
+.sim-batch-table :is(th, td):first-child {
+  text-align: left;
+}
+
+.sim-batch-table thead th {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  background: var(--ui-surface);
+}
+
+.sim-batch-table thead button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sim-batch-table thead svg {
+  width: 12px;
+  height: 12px;
+}
+
+@media (max-width: 900px) {
+  .sim-batch-parameters,
+  .sim-batch-panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sim-batch-cards {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+
+  .sim-batch-extremes {
+    grid-template-columns: 1fr;
+  }
+}
+
 .sim-comparison-summary {
   margin-bottom: 12px;
 }
@@ -2385,6 +2611,94 @@
 
 .sim-detail-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.sim-stability-details {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface-subtle);
+}
+
+.sim-stability-details h3,
+.sim-stability-details p {
+  margin: 0;
+}
+
+.sim-stability-details header p {
+  margin-top: 4px;
+  color: var(--ui-muted);
+  font-size: 11px;
+}
+
+.sim-stability-details dl {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(100px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.sim-stability-details dl > div {
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-surface);
+}
+
+.sim-stability-details dt {
+  color: var(--ui-muted);
+  font-size: 10px;
+}
+
+.sim-stability-details dd {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-stability-histogram-wrap p {
+  color: var(--ui-muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.sim-stability-histogram {
+  width: 100%;
+  min-height: 160px;
+}
+
+.sim-stability-bin {
+  fill: color-mix(in srgb, var(--ui-accent) 62%, var(--ui-surface));
+  outline: none;
+}
+
+.sim-stability-bin:is(:focus, [data-active="true"]) {
+  fill: var(--ui-accent);
+  stroke: var(--ui-text);
+  stroke-width: 2;
+}
+
+.sim-stability-threshold line {
+  stroke: var(--ui-warning);
+  stroke-dasharray: 4 3;
+}
+
+.sim-stability-threshold text {
+  fill: var(--ui-warning-text);
+  font-size: 9px;
+}
+
+.sim-stability-tooltip rect {
+  fill: var(--ui-text);
+}
+
+.sim-stability-tooltip text {
+  fill: var(--ui-bg);
+  font-size: 10px;
 }
 
 .sim-detail-diagnostics {

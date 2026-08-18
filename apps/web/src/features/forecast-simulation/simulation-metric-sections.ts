@@ -228,23 +228,7 @@ export function calculatePrecallMetrics(
 export function calculateStabilityMetrics(
   snapshots: readonly SimulationForecastSnapshot[],
 ): SimulationMetrics["stability"] {
-  const changes: number[] = [];
-  for (const rotationSnapshots of groupSnapshotsByRotation(snapshots).values()) {
-    const draftSnapshots = rotationSnapshots.filter(
-      (snapshot) => snapshot.status === "DRAFT" && snapshot.forecastState !== "UNAVAILABLE",
-    );
-    for (let index = 1; index < draftSnapshots.length; index += 1) {
-      const previous = draftSnapshots[index - 1];
-      const current = draftSnapshots[index];
-      if (!previous || !current) continue;
-      changes.push(
-        Math.abs(
-          (Date.parse(current.predictedBoardingAt) - Date.parse(previous.predictedBoardingAt)) /
-            MINUTE_MS,
-        ),
-      );
-    }
-  }
+  const changes = boardingForecastAbsoluteChanges(snapshots);
   const averageChange = average(changes);
   return {
     changes: changes.length,
@@ -257,6 +241,29 @@ export function calculateStabilityMetrics(
       ...snapshots.map((snapshot) => snapshot.upperMinutes - snapshot.lowerMinutes),
     ),
   };
+}
+
+export function boardingForecastAbsoluteChanges(
+  snapshots: readonly SimulationForecastSnapshot[],
+): number[] {
+  const changes: number[] = [];
+  for (const rotationSnapshots of groupSnapshotsByRotation(snapshots).values()) {
+    const draftSnapshots = rotationSnapshots
+      .filter((snapshot) => snapshot.status === "DRAFT" && snapshot.forecastState !== "UNAVAILABLE")
+      .sort((left, right) => Date.parse(left.capturedAt) - Date.parse(right.capturedAt));
+    for (let index = 1; index < draftSnapshots.length; index += 1) {
+      const previous = draftSnapshots[index - 1];
+      const current = draftSnapshots[index];
+      if (!previous || !current) continue;
+      changes.push(
+        Math.abs(
+          (Date.parse(current.predictedBoardingAt) - Date.parse(previous.predictedBoardingAt)) /
+            MINUTE_MS,
+        ),
+      );
+    }
+  }
+  return changes;
 }
 
 export function calculateOperationalMetrics(input: {

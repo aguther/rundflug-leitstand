@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { SimulationForecastSnapshot, SimulationRotation } from "./model";
-import { calculateForecastAccuracyMetrics } from "./simulation-metric-sections";
+import {
+  boardingForecastAbsoluteChanges,
+  calculateForecastAccuracyMetrics,
+  calculateStabilityMetrics,
+} from "./simulation-metric-sections";
 import { findFirstAvailableDraftForecastSnapshot } from "./simulation-snapshot";
 
 function rotation(
@@ -124,5 +128,32 @@ describe("initial boarding forecast accuracy", () => {
       p90AbsoluteErrorMinutes: null,
       biasMinutes: null,
     });
+  });
+});
+
+describe("boarding forecast stability", () => {
+  it("measures consecutive available draft forecasts chronologically", () => {
+    const snapshots = [
+      snapshot("rotation-1", "2026-08-18T10:20:00.000Z", "2026-08-18T10:50:00.000Z"),
+      snapshot("rotation-1", "2026-08-18T09:30:00.000Z", "2026-08-18T11:00:00.000Z", {
+        forecastState: "UNAVAILABLE",
+      }),
+      snapshot("rotation-1", "2026-08-18T09:00:00.000Z", "2026-08-18T10:10:00.000Z"),
+      snapshot("rotation-1", "2026-08-18T10:00:00.000Z", "2026-08-18T10:40:00.000Z"),
+      snapshot("rotation-1", "2026-08-18T10:30:00.000Z", "2026-08-18T11:30:00.000Z", {
+        status: "CALLED",
+      }),
+    ];
+
+    expect(boardingForecastAbsoluteChanges(snapshots)).toEqual([30, 10]);
+    expect(calculateStabilityMetrics(snapshots)).toEqual(
+      expect.objectContaining({
+        changes: 2,
+        averageAbsoluteChangeMinutes: 20,
+        maximumJumpMinutes: 30,
+        jumpsOver15Minutes: 1,
+        jumpsOver30Minutes: 0,
+      }),
+    );
   });
 });

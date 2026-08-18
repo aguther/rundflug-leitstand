@@ -1,6 +1,7 @@
 import { DEFAULT_FORECAST_TUNING_PROFILE, DEFAULT_PRECALL_TUNING_PROFILE } from "@rundflug/domain";
 import { runSimulation } from "./engine";
 import type { ManualIncident, SimulationConfig, SimulationMetrics } from "./model";
+import { advanceSimulationSeed, simulationQuantile } from "./simulation-statistics";
 
 export interface ComparisonMetricDefinition {
   id: string;
@@ -418,20 +419,6 @@ const METRIC_DEFINITIONS: readonly (ComparisonMetricDefinition & {
   },
 ];
 
-function median(values: readonly number[]): number | null {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((left, right) => left - right);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1
-    ? (sorted[middle] ?? null)
-    : ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
-}
-
-function nextSeed(seedStart: number, offset: number): number {
-  const maximumSeed = 4_294_967_295;
-  return ((seedStart - 1 + offset) % maximumSeed) + 1;
-}
-
 function sameValues<T extends object>(left: T, right: T): boolean {
   const keys = Object.keys(left) as Array<keyof T>;
   return keys.length === Object.keys(right).length && keys.every((key) => left[key] === right[key]);
@@ -469,7 +456,7 @@ export function runBatchComparisonWithRunner(
     config.forecastTuning.availabilityModel === baselineConfig.forecastTuning.availabilityModel;
 
   for (let index = 0; index < runCount; index += 1) {
-    const seed = nextSeed(config.seed, index);
+    const seed = advanceSimulationSeed(config.seed, index);
     baselineConfig.seed = seed;
     const baselineMetrics = simulationRunner(baselineConfig, manualIncidents).metrics;
     let candidateMetrics = baselineMetrics;
@@ -499,8 +486,8 @@ export function runBatchComparisonWithRunner(
     seedStart: config.seed,
     runCount,
     rows: METRIC_DEFINITIONS.map(({ read: _read, ...definition }) => {
-      const baseline = median(baselineValues.get(definition.id) ?? []);
-      const candidate = median(candidateValues.get(definition.id) ?? []);
+      const baseline = simulationQuantile(baselineValues.get(definition.id) ?? [], 0.5);
+      const candidate = simulationQuantile(candidateValues.get(definition.id) ?? [], 0.5);
       return {
         ...definition,
         baseline,
