@@ -344,13 +344,13 @@ werden dadurch nicht in Familiendienste dupliziert; deren D1-Batches bleiben die
 
 Der vollständige Gesamtnachweis ist `npm run check`. Jeder Branch-Push führt Basisprüfung/Coverage,
 Worker-Runtime, vier serielle V1-Shards, Forecast-Vergleichsbaseline, Backup-Restore, Dokumentation und
-Mutation parallel aus; danach folgt die SonarQube-Branch-Analyse. Interne Pull Requests erhalten eine
-zusätzliche native PR-Analyse, ohne die übrigen Branch-Prüfungen zu duplizieren. Testfehler werden
-nicht wiederholt; nur klar transiente Cloudflare-Infrastrukturfehler besitzen höchstens drei Versuche.
-Der Mutationstest läuft zusätzlich wöchentlich und manuell.
-HTML-, JSON- und Incremental-Berichte werden als CI-Artefakte veröffentlicht. ADR-0046 begründet
-Auswahl und verhaltensbasierte Grenzen; ADR-0056 begründet das Standard-Gate sowie die globalen und
-modulbezogenen Ratchets.
+Mutation parallel aus; die SonarQube-Branch-Analyse läuft anschließend im selben Quality-Job.
+Interne Pull Requests erhalten dort eine native PR-Analyse, ohne die übrigen Branch-Prüfungen zu
+duplizieren. Testfehler werden nicht wiederholt; nur klar transiente Cloudflare-Infrastrukturfehler
+besitzen höchstens drei Versuche. HTML-, JSON- und Incremental-Mutationsberichte werden ausschließlich
+aus diesem CI-Gate als Artefakte veröffentlicht. ADR-0046 begründet Auswahl und verhaltensbasierte
+Grenzen; ADR-0056 begründet das Standard-Gate sowie die globalen und modulbezogenen Ratchets,
+ADR-0058 die konsolidierte Workflow-Topologie.
 
 ## 8.13 Betrieb, Sicherung und Wiederherstellung
 

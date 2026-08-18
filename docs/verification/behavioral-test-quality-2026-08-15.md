@@ -84,9 +84,10 @@ Absenkung erfordert eine ausdrückliche Architekturentscheidung.
 - `npm run test:mutation` führt den vollständigen fokussierten Stryker-Lauf und anschließend das
   globale sowie modulbezogene Report-Ratchet aus.
 - `npm run test:mutation:dry` validiert Konfiguration und Testauswahl ohne Mutation.
-- `.github/workflows/mutation-tests.yml` läuft für jeden Pull Request, jeden Push nach `main`,
-  wöchentlich und manuell und veröffentlicht HTML-, JSON- sowie Incremental-Berichte als
-  CI-Artefakte.
+- Der Mutation-Job in `.github/workflows/ci.yml` läuft mit der vollständigen Branch-CI und
+  veröffentlicht HTML-, JSON- sowie Incremental-Berichte als CI-Artefakte. Einen zusätzlichen
+  geplanten oder manuellen Mutation-Workflow gibt es nicht.
 
 Der Mutationstest ist damit ein allgemeines Integrationsgate und läuft parallel zu den übrigen
-PR-Prüfungen. ADR-0056 dokumentiert die Fortschreibung der ursprünglichen Entscheidung aus ADR-0046.
+Branch-CI-Prüfungen. ADR-0056 dokumentiert die Fortschreibung der ursprünglichen Entscheidung aus
+ADR-0046; ADR-0058 entfernt ausschließlich den zusätzlichen Zeitplan- und manuellen Workflow.

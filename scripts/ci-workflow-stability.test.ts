@@ -32,11 +32,14 @@ describe("CI workflow dependency stability", () => {
     expect(workflow).not.toContain("  sonar-branch:");
   });
 
-  it("uses the lockfile-installed SonarQube scanner for pull requests", () => {
-    const pullRequestJob = workflowJob("sonar-pull-request", "deploy-cloudflare");
+  it("uses the quality job for branch and pull request scans", () => {
+    const qualityJob = workflowJob("check", "worker-runtime");
 
-    expect(pullRequestJob).toContain("uses: ./.github/actions/setup-project");
-    expect(pullRequestJob).toContain("npm run sonar:scan --");
+    expect(qualityJob).toContain("-Dsonar.branch.name=$" + "{{ github.ref_name }}");
+    expect(qualityJob).toContain(
+      "-Dsonar.pullrequest.key=$" + "{{ github.event.pull_request.number }}",
+    );
+    expect(workflow).not.toContain("  sonar-pull-request:");
   });
 
   it("does not depend on the separately downloaded SonarSource action", () => {

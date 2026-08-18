@@ -84,9 +84,9 @@ oder Testfixtures auftauchen.
 ```mermaid
 flowchart TB
     PUSH["Push auf jeden Branch"] --> CI["parallele Gates:<br/>Coverage, Runtime, Shards,<br/>Restore, Doku, Mutation"]
-    CI --> SONAR["SonarQube Branch Quality Gate"]
-    PR["Pull Request"] --> PRSONAR["zusätzliche SonarQube-PR-Analyse"]
-    SONAR --> MAIN{"Commit auf main?"}
+    CI --> QUALITY["Quality-Job:<br/>Coverage + SonarQube Branch Gate"]
+    PR["Pull Request"] --> QUALITYPR["derselbe Quality-Job:<br/>Coverage + SonarQube PR Gate"]
+    QUALITY --> MAIN{"Commit auf main?"}
     MAIN -->|"nein"| DONE["Prüfergebnis für Arbeitsbranch"]
     MAIN -->|"ja"| BUILD["commitgebundener Build"]
     BUILD --> PREFLIGHT["Preflight: vorhandener Worker,<br/>D1-ID, EU-R2, Bindings, Secrets;<br/>Auto-Create aus"]
@@ -96,14 +96,14 @@ flowchart TB
     BACKUP --> APPLY["freigegebene Migrationen anwenden"]
     APPLY --> DEP
     DEP --> VERIFY["Health, Migrationen, Secrets<br/>und SOURCE_REVISION zweimal stabil prüfen"]
-    MON["monatlich: Cloudflare-Maintenance"]
-    MON --> RUNTIME["Compatibility-Date, Toolchain,<br/>Bindings, Runtime, Logs, Health/Meta"]
 ```
 
 GitHub Actions ist die einzige automatische Deployment-Autorität. Jeder Branch wird unabhängig von
 einem Pull Request geprüft. `main` wird erst nach allen Gates automatisch ausgerollt; der manuelle
 Workflow bleibt als Wiederanlauf mit Bestätigung `DEPLOY` verfügbar. Native automatische
-Cloudflare-Git-Builds sind nach erfolgreicher Inbetriebnahme dieses Pfads deaktiviert.
+Cloudflare-Git-Builds sind nach erfolgreicher Inbetriebnahme dieses Pfads deaktiviert. Die
+SonarQube-PR-Analyse ist ein ereignisabhängiger Schritt desselben Quality-Jobs und erzeugt deshalb
+auf `main` keinen separaten übersprungenen Job.
 
 Im normalen Rollout aktiviert `--secrets-file` Code, `SOURCE_REVISION` und den Backup-Token-Hash in
 einer Version. Der Abschlusscheck verlangt mit Cache-Busting zwei aufeinanderfolgende
@@ -113,4 +113,5 @@ Der Preflight legt niemals Ressourcen an. Er verlangt den vorhandenen Worker, di
 den vorhandenen EU-R2-Bucket. Nur unveränderte, per SHA-256 geprüfte und ausdrücklich online-sichere
 Folgemigrationen werden nach D1-Bookmark und portablem Backup automatisch angewendet. Der einmalige
 inkompatible Neustart auf `0001_v1_12_baseline.sql` bleibt ausschließlich dem vollständigen Neuaufbau
-aus ADR-0045 vorbehalten. Details: ADR-0057 und `docs/operations/ci-cd-stabilitaet.md`.
+aus ADR-0045 vorbehalten. Details: ADR-0057, ADR-0058 und
+`docs/operations/ci-cd-stabilitaet.md`.

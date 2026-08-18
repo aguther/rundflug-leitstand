@@ -1,4 +1,4 @@
-name: Cloudflare deployment
+name: Cloudflare Deployment
 
 on:
   workflow_call:

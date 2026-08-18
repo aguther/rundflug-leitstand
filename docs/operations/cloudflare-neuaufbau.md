@@ -167,17 +167,17 @@ bleiben direkt am Worker und werden nicht nach GitHub kopiert. Der vollständige
 [`ci-cd-stabilitaet.md`](ci-cd-stabilitaet.md) und ADR-0057.
 
 Die harte Performance-SLO ist bewusst kein Bestandteil dieses allgemeinen GitHub-Checks. Für eine
-isolierte Abnahmeumgebung steht der manuelle Workflow `Cloudflare-Performance-SLO` bereit. Er erhält
-Environment, HTTPS-Origin und die ID einer vorbereiteten synthetischen `perf-*`-Veranstaltung als
-Eingaben und startet erst nach der Bestätigung `PERFORMANCE`. Der Lauf führt ausschließlich lesende
-öffentliche Board-Abfragen und WebSocket-Verbindungen aus; Produktionsumgebungen, andere
-Veranstaltungs-IDs sowie HTTP-Ziele werden vom Skript abgelehnt. Details und Datensatzanforderungen
-sind in `docs/verification/scale-performance-v1.md` dokumentiert.
+isolierte Abnahmeumgebung bleibt `npm run test:cloudflare-scale-performance` als bewusst gestarteter
+read-only Prüflauf verfügbar. Er erhält HTTPS-Origin und die ID einer vorbereiteten synthetischen
+`perf-*`-Veranstaltung über Prozessvariablen und startet erst nach der Bestätigung `PERFORMANCE`.
+Der Lauf führt ausschließlich lesende öffentliche Board-Abfragen und WebSocket-Verbindungen aus;
+Produktionsumgebungen, andere Veranstaltungs-IDs sowie HTTP-Ziele werden vom Skript abgelehnt.
+Details und Datensatzanforderungen sind in `docs/verification/scale-performance-v1.md` dokumentiert.
 
-## 8. Monatliche Runtime-Wartung
+## 8. Runtime-Wartung
 
-Der geplante Workflow `Cloudflare-Maintenance` prüft am ersten Tag jedes Monats zusätzlich zum
-manuellen Start:
+`npm run cloudflare:maintenance -- --enforce-compatibility-age` kann für einen bewussten
+Wartungstermin zusätzlich zum normalen CI-Check ausgeführt werden und prüft:
 
 - ein Höchstalter von 45 Tagen für die Compatibility-Date,
 - den gemeinsamen Stand von Wrangler, workerd, Worker-Typen und Worker-Testpool,
@@ -187,9 +187,9 @@ manuellen Start:
 - sowie durch Verhaltenstests, dass freie Fehlerdetails mit PINs, Tokens, Telefonnummern,
   Push-Endpunkten und öffentlichen Ticketcodes nicht in Worker-Logs gelangen.
 
-Der normale Build prüft dieselbe Konfiguration, wird aber nicht allein durch das Kalenderalter der
-Compatibility-Date instabil. Für das GitHub-Environment `rundflug-leitstand` wird zusätzlich die
-Variable `CLOUDFLARE_DEPLOYMENT_URL` gepflegt.
+Der normale Build prüft dieselbe lokale Konfiguration ohne das kalenderabhängige 45-Tage-Limit.
+Remote-Health, Deployment-Revision, Migrationen und Secrets werden weiterhin nach jedem Deployment
+mit `npm run cloudflare:verify` geprüft. Einen geplanten GitHub-Maintenance-Workflow gibt es nicht.
 
 ## 9. Einmaliger D1-Baseline-Neuaufbau
 

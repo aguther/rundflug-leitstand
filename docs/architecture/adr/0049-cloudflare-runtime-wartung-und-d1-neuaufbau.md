@@ -2,7 +2,8 @@
 
 ## Status
 
-Angenommen am 15. August 2026.
+Teilweise ersetzt durch ADR-0058 am 18. August 2026. Die Runtime-Prüfungen und der abgesicherte
+D1-Neuaufbau gelten fort; der monatliche GitHub-Maintenance-Workflow entfällt.
 
 ## Kontext
 

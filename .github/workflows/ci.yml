@@ -1,4 +1,4 @@
-name: CI
+name: Continuous Integration
 
 on:
   push:
@@ -24,7 +24,10 @@ env:
 jobs:
   check:
     name: Quality and coverage
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name != github.repository ||
+      github.actor != 'dependabot[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -35,12 +38,27 @@ jobs:
       - name: Test coverage
         run: npm run test:coverage
       - name: CI check
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
         run: npm run check:ci
       - name: SonarQube branch scan
         if: github.event_name == 'push' && github.actor != 'dependabot[bot]'
         run: >-
           npm run sonar:scan --
           -Dsonar.branch.name=${{ github.ref_name }}
+          -Dsonar.qualitygate.wait=true
+          -Dsonar.qualitygate.timeout=300
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: SonarQube pull request scan
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.actor != 'dependabot[bot]'
+        run: >-
+          npm run sonar:scan --
+          -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
+          -Dsonar.pullrequest.branch=${{ github.head_ref }}
+          -Dsonar.pullrequest.base=${{ github.base_ref }}
           -Dsonar.qualitygate.wait=true
           -Dsonar.qualitygate.timeout=300
         env:
@@ -152,32 +170,6 @@ jobs:
           path: reports/mutation
           if-no-files-found: error
           retention-days: 30
-
-  sonar-pull-request:
-    name: SonarQube pull request quality gate
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.actor != 'dependabot[bot]'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-      - uses: ./.github/actions/setup-project
-      - name: Test coverage
-        run: npm run test:coverage
-      - name: SonarQube pull request scan
-        run: >-
-          npm run sonar:scan --
-          -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
-          -Dsonar.pullrequest.branch=${{ github.head_ref }}
-          -Dsonar.pullrequest.base=${{ github.base_ref }}
-          -Dsonar.qualitygate.wait=true
-          -Dsonar.qualitygate.timeout=300
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   deploy-cloudflare:
     name: Deploy verified main revision

@@ -60,15 +60,16 @@ verlinkt bleiben.
 | [0046](../adr/0046-verhaltensbasierte-testarchitektur.md) | Verhaltensbasierte Testarchitektur und Qualitätsratchets | keine Produktions-Quelltextorakel in TS/TSX/JS/MJS oder Python; SQL-Orakel nur mit Behavior-Evidence und eigenem Ratchet; getrennte Coverage- und Mutation-Ratchets |
 | [0047](../adr/0047-operative-ui-shell-und-bewusste-pwa-updates.md) | Operative UI-Shell und bewusste PWA-Updates | persistente Inline-Hinweise, mobile Sticky-Geometrie, expliziter Update-Reload und sicherer Routing-Fallback |
 | [0048](../adr/0048-rollenbezogene-web-chunks-und-precache.md) | Rollenbezogene Web-Chunks und begrenzter PWA-Precache | dünne Route-Shells, getrennte Flight-Line-/Flight-Director-Styles und Online-only-Administration im Precache |
-| [0049](../adr/0049-cloudflare-runtime-wartung-und-d1-neuaufbau.md) | Cloudflare-Runtime-Wartung und abgesicherter D1-Neuaufbau | monatliches 45-Tage-Ratchet, abgestimmte Runtime-Artefakte und manifestgesicherter Baseline-Neuaufbau |
+| [0049](../adr/0049-cloudflare-runtime-wartung-und-d1-neuaufbau.md) | Cloudflare-Runtime-Wartung und abgesicherter D1-Neuaufbau | abgestimmte Runtime-Artefakte und manifestgesicherter Baseline-Neuaufbau; der monatliche GitHub-Lauf wurde durch ADR-0058 aufgehoben |
 | [0050](../adr/0050-wiederaufnehmbarer-d1-werksreset.md) | Wiederaufnehmbarer D1-Werksreset in begrenzten Transaktionen | große Historientabellen phasenweise löschen; Identität und Wurzeln bis zum finalen Beleg erhalten |
 | [0051](../adr/0051-online-only-operational-commands.md) | Onlinepflicht für operative Kommandos und lokale reversible Entwürfe | kein unbestätigter Parallelzustand; Offlineentwürfe werden bewusst gegen den aktuellen Serverstand bestätigt |
 | [0052](../adr/0052-event-archive-delete-reset-lifecycle.md) | Koexistenz von Veranstaltungsarchiv, Löschung und Werksreset | getrennte fachliche, destruktive und Wiederherstellungssemantik für drei unterschiedliche Lebenszykluspfade |
 | [0053](../adr/0053-planning-history-compaction.md) | Verifizierte Kompaktion der Planungshistorie in R2 | 24-Stunden-Heißfenster in D1, autoritative verifizierte Kaltsegmente in R2, Workflows und isolierter Restore |
 | [0054](../adr/0054-einheitliche-forecast-und-dispatch-pipeline.md) | Einheitliche Forecast- und Dispatch-Pipeline | aktive Ressourcenprojektion und DRAFT-Scheduler in einem Lauf, eine Dauerbasis, korrigierte Zielordnung und eine operative Simulationsengine |
 | [0055](../adr/0055-web-asset-headroom-and-native-svg.md) | Dauerhafter Web-Asset-Spielraum und native SVG-Diagramme | zehn Prozent Pflichtreserve, rollenbezogene CSS-/Precache-Grenzen und dependency-freie Zeitreihen |
-| [0056](../adr/0056-mutationstests-als-standard-integrationsgate.md) | Mutationstests als Standard-Integrationsgate | 87-Prozent-Gesamtratchet, mindestens 80 Prozent je Modul und vollständiger PR-/Main-Lauf ohne Mutator-Ausschlüsse |
+| [0056](../adr/0056-mutationstests-als-standard-integrationsgate.md) | Mutationstests als Standard-Integrationsgate | 87-Prozent-Gesamtratchet, mindestens 80 Prozent je Modul und vollständiger Branch-CI-Lauf ohne Mutator-Ausschlüsse |
 | [0057](../adr/0057-stabile-ci-und-automatisches-cloudflare-deployment.md) | Stabile Branch-CI und abgesichertes automatisches Cloudflare-Deployment | eine Deployment-Autorität, feste Toolchain, serielle Shards, Backup vor freigegebenen Migrationen und exakte Revisionsprüfung |
+| [0058](../adr/0058-konsolidierte-github-workflows.md) | Konsolidierte GitHub-Workflows | zwei Repository-Workflows, Mutation nur als CI-Gate und ereignisabhängige SonarQube-PR-Analyse im Quality-Job |
 
 ## Entscheidungsstatus und Nachfolger
 
@@ -86,7 +87,9 @@ verlinkt bleiben.
 | 0041 | ersetzt | ADR-0054 schaltet den Legacy-Vergleichspfad und die Worker-Konvergenz ab |
 | 0042 | teilweise ersetzt | ADR-0054 ersetzt die Zwei-Engine-Entscheidung; deterministische Primitive, Tick-Reihenfolge und modulare operative Phasen gelten fort |
 | 0046 | teilweise ersetzt | ADR-0056 ersetzt ausschließlich die Trennung der Mutationstests vom allgemeinen PR-Gate und hebt die Ratchets an |
-| 0056 | teilweise ersetzt | ADR-0057 verschiebt den Standardlauf vom doppelten PR-/Main-Trigger auf jeden Branch-Push; Ratchets und fachliche Mutationsfläche gelten fort |
+| 0049 | teilweise ersetzt | ADR-0058 entfernt ausschließlich den monatlichen GitHub-Maintenance-Workflow; Runtime-Prüfung und D1-Neuaufbau gelten fort |
+| 0056 | teilweise ersetzt | ADR-0057 verschiebt den Standardlauf auf jeden Branch-Push; ADR-0058 entfernt den zusätzlichen Zeitplan- und manuellen Workflow; Ratchets und fachliche Mutationsfläche gelten fort |
+| 0057 | teilweise ersetzt | ADR-0058 integriert die PR-Analyse in den Quality-Job und konsolidiert die sichtbaren Workflows; Deployment-Pfad und übrige CI-Entscheidungen gelten fort |
 
 Historische Begriffe wie „Supervisor“ oder „Assist“ bleiben in den ursprünglichen ADR-Texten
 erhalten. Die aktuelle Architektur verwendet die Rollen und Oberflächen „Flight Director“ und

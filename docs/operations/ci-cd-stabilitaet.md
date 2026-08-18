@@ -11,8 +11,9 @@
    wartet auf das Quality Gate. Der Scanner stammt aus der mit `package-lock.json` installierten
    Projektabhängigkeit. Dadurch entfallen ein zusätzlicher Runner sowie weitere Downloads von
    `checkout`, `setup-node`, `download-artifact` und einer SonarSource-Action.
-5. Ein Pull Request aus demselben Repository erhält zusätzlich eine PR-Analyse. Die bereits für den
-   Branch-Commit ausgeführten übrigen Jobs werden im PR-Ereignis übersprungen.
+5. Ein Pull Request aus demselben Repository erhält im selben Quality-Job zusätzlich eine
+   PR-Analyse. Der vollständige CI-Check und die übrigen Jobs werden im PR-Ereignis nicht doppelt
+   ausgeführt; auf `main` existiert kein separater übersprungener PR-Job.
 6. Test-, Lint-, Typ-, Coverage-, Migrations- und Sonarfehler werden nicht automatisch wiederholt.
    Nur erkannte Infrastrukturfehler in Cloudflare-Kommandos dürfen höchstens dreimal versucht werden.
 
@@ -69,14 +70,14 @@ Migration verändert nur das Schema der zuvor eindeutig verifizierten D1.
   Inbetriebnahme deployfähig, obwohl der Backup-Endpunkt dort bis zum ersten GitHub-Deployment noch
   nicht autorisierbar ist.
 - `CLOUDFLARE_DEPLOYMENT_URL` muss auf den bereits vorhandenen Worker zeigen.
-- Zuerst wird der manuelle Workflow `Cloudflare deployment` mit Bestätigung `DEPLOY` vollständig
+- Zuerst wird der manuelle Workflow `Cloudflare Deployment` mit Bestätigung `DEPLOY` vollständig
   einschließlich Revisionsprüfung ausgeführt.
 - Danach wird die Repository-Variable `CLOUDFLARE_AUTOMATIC_DEPLOYMENT_ENABLED` auf `true` gesetzt und
   ein automatischer `main`-Lauf erfolgreich geprüft.
 - Erst danach werden native automatische Git-Builds im Cloudflare-Dashboard deaktiviert. So besteht zu
   keinem Zeitpunkt eine Lücke ohne funktionierenden Deployment-Pfad. Bei einer Rücknahme wird zuerst
   der native Pfad wieder aktiviert und danach die Repository-Variable entfernt oder auf `false` gesetzt.
-- Bei einem manuellen Wiederanlauf wird `Cloudflare deployment` mit demselben Environment und der
+- Bei einem manuellen Wiederanlauf wird `Cloudflare Deployment` mit demselben Environment und der
   Bestätigung `DEPLOY` gestartet; es gelten dieselben Sicherheitsprüfungen.
 
 ## Rotation des Deployment-Backup-Tokens

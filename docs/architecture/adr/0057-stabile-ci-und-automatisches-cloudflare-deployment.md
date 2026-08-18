@@ -1,6 +1,6 @@
 # ADR-0057: Stabile CI und automatisches Cloudflare-Deployment
 
-- Status: Akzeptiert
+- Status: Teilweise ersetzt durch ADR-0058
 - Datum: 2026-08-17
 - Entscheidung: Auftraggeber
 - Betroffene Anforderungen: V1120-QA-010, V1110-QA-010, Q-ZUV-020, Q-ZUV-050

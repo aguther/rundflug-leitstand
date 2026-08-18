@@ -2,7 +2,6 @@ import { commandEnvelopeSchema } from "@rundflug/contracts/operations-dispatch";
 import { describe, expect, it } from "vitest";
 import setupProjectAction from "../../../.github/actions/setup-project/action.yml?raw";
 import ciWorkflow from "../../../.github/workflows/ci.yml?raw";
-import cloudflarePerformanceWorkflow from "../../../.github/workflows/cloudflare-performance.yml?raw";
 import deployCloudflareWorkflow from "../../../.github/workflows/deploy-cloudflare.yml?raw";
 import nodeVersion from "../../../.nvmrc?raw";
 import architectureConcepts from "../../../docs/architecture/arc42/08-querschnittliche-konzepte.md?raw";
@@ -112,7 +111,7 @@ describe("V1 maintainability and portability boundaries", () => {
       "vitest run apps/worker/src/maintainability-coverage.test.ts packages/contracts/src/index.test.ts packages/domain/src/index.test.ts apps/web/src/api.test.ts",
     );
     expect(ciWorkflow).toContain("npm run check:ci");
-    for (const workflow of [ciWorkflow, deployCloudflareWorkflow, cloudflarePerformanceWorkflow]) {
+    for (const workflow of [ciWorkflow, deployCloudflareWorkflow]) {
       expect(workflow).toContain("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1");
       expect(workflow).toContain("uses: ./.github/actions/setup-project");
       expect(workflow).toContain("runs-on: ubuntu-24.04");

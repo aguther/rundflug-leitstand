@@ -38,9 +38,8 @@ GitHub-`check` nicht mehr als unveränderter Zwei-Sekunden-Produktionsgrenzwert 
 ## Getrennte Cloudflare-SLO-Messung
 
 Die harte Zwei-Sekunden-Grenze für das Mengengerüst wird separat gegen eine bereitgestellte
-Cloudflare-Abnahmeumgebung gemessen. Der manuelle Workflow `Cloudflare-Performance-SLO` verlangt:
+Cloudflare-Abnahmeumgebung gemessen. Der bewusst gestartete Kommandozeilenlauf verlangt:
 
-- eine geschützte GitHub-Environment der Abnahme,
 - die HTTPS-Origin eines Workers mit `APP_ENV=acceptance`,
 - eine ausschließlich synthetische Veranstaltung mit einer ID beginnend mit `perf-`,
 - das vollständige Q-PER-020-Mengengerüst und mindestens 20 sichtbare Board-Zeilen sowie
@@ -53,7 +52,7 @@ Cloudflare und nicht die CPU-Leistung des GitHub-Runners. Sowohl die initiale Pr
 p95 aller serverseitigen Parallelmessungen müssen unter 2.000 ms bleiben. Die zusätzliche
 Client-p95-Zeit wird nur diagnostisch ausgegeben.
 
-Der gleiche read-only Lauf kann außerhalb von GitHub gestartet werden:
+Der read-only Lauf wird mit den erforderlichen Prozessvariablen gestartet:
 
 ```bash
 CLOUDFLARE_SCALE_TARGET_ORIGIN=https://example.workers.dev \
