@@ -3,7 +3,12 @@ import {
   ArrowLeft,
   Coffee,
   Download,
+  FastForward,
+  FileChartColumn,
+  Files,
   Fuel,
+  Gauge,
+  GitCompareArrows,
   Monitor,
   Pause,
   Plane,
@@ -56,7 +61,7 @@ import "./forecast-simulation.css";
 
 const MINUTE_MS = 60_000;
 const TICK_MS = 30_000;
-const SPEEDS = [1, 10, 60, 300] as const;
+export const SIMULATION_SPEEDS = [1, 2, 5, 10, 30, 60, 120, 300, 600] as const;
 const HOSTED_SIMULATOR = import.meta.env.MODE !== "simulator";
 
 const timeFormatter = new Intl.DateTimeFormat("de-DE", {
@@ -352,7 +357,7 @@ export function ForecastSimulationView() {
       Date.parse(initialConfig.schedule.operationsStartAt),
     ),
   );
-  const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(10);
+  const [speed, setSpeed] = useState<(typeof SIMULATION_SPEEDS)[number]>(10);
   const [running, setRunning] = useState(false);
   const [selectedRotationId, setSelectedRotationId] = useState<string | null>(null);
   const [selectedAircraftId, setSelectedAircraftId] = useState("aircraft-1");
@@ -508,6 +513,10 @@ export function ForecastSimulationView() {
   };
 
   const startComparison = () => comparison.start(config, manualIncidents);
+  const calculateToEnd = () => {
+    setRunning(false);
+    setCurrentMs(simulationEnd);
+  };
   const closeComparison = () => {
     comparison.cancel();
     comparison.setOpen(false);
@@ -544,81 +553,107 @@ export function ForecastSimulationView() {
       </header>
       <main className="sim-layout">
         <aside className="sim-sidebar">
-          <section className="sim-current-scenario" aria-labelledby="sim-current-scenario-title">
-            <h2 id="sim-current-scenario-title">Aktuelles Szenario</h2>
-            <strong>{scenarioName}</strong>
-            <small>Nicht gespeichert</small>
+          <section className="sim-sidebar-group" aria-labelledby="sim-sidebar-scenario">
+            <h2 id="sim-sidebar-scenario">
+              <Plane aria-hidden="true" /> Szenario
+            </h2>
+            <article className="sim-current-scenario" aria-labelledby="sim-current-scenario-title">
+              <h3 id="sim-current-scenario-title">Aktuelles Szenario</h3>
+              <strong>{scenarioName}</strong>
+              <small>Nicht gespeichert</small>
+            </article>
+            <article className="sim-scenario-summary">
+              <h3>Szenarioübersicht</h3>
+              <dl>
+                <div>
+                  <dt>Flugzeuge</dt>
+                  <dd>
+                    <strong>
+                      {config.operationalModel
+                        ? config.operationalModel.aircraft.length
+                        : config.adminParameters.aircraftCount}
+                    </strong>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Gruppen / Produkte</dt>
+                  <dd>
+                    <strong>
+                      {config.operationalModel
+                        ? `${config.operationalModel.resourceGroups.length} / ${config.operationalModel.products.length}`
+                        : "1 / 1"}
+                    </strong>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Nachfrage</dt>
+                  <dd>
+                    <strong>Ø {metric(demandSummary.averagePersonsPerHour)}/h</strong>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Modelle</dt>
+                  <dd>
+                    <strong>4 Phasen · 4 Ereignisse</strong>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Seed</dt>
+                  <dd>
+                    <strong>{config.seed}</strong>
+                  </dd>
+                </div>
+              </dl>
+            </article>
           </section>
-          <section className="sim-scenario-summary">
-            <h2>Szenarioübersicht</h2>
-            <dl>
-              <div>
-                <dt>Flugzeuge</dt>
-                <dd>
-                  <strong>
-                    {config.operationalModel
-                      ? config.operationalModel.aircraft.length
-                      : config.adminParameters.aircraftCount}
-                  </strong>
-                </dd>
-              </div>
-              <div>
-                <dt>Gruppen / Produkte</dt>
-                <dd>
-                  <strong>
-                    {config.operationalModel
-                      ? `${config.operationalModel.resourceGroups.length} / ${config.operationalModel.products.length}`
-                      : "1 / 1"}
-                  </strong>
-                </dd>
-              </div>
-              <div>
-                <dt>Nachfrage</dt>
-                <dd>
-                  <strong>Ø {metric(demandSummary.averagePersonsPerHour)}/h</strong>
-                </dd>
-              </div>
-              <div>
-                <dt>Modelle</dt>
-                <dd>
-                  <strong>4 Phasen · 4 Ereignisse</strong>
-                </dd>
-              </div>
-              <div>
-                <dt>Seed</dt>
-                <dd>
-                  <strong>{config.seed}</strong>
-                </dd>
-              </div>
-            </dl>
-          </section>
-          <Button
-            aria-label="Szenario konfigurieren"
-            className="sim-full-button"
-            onClick={() => {
-              setEditorConfig(structuredClone(config));
-              setEditorOpen(true);
-            }}
-          >
-            <Settings2 aria-hidden="true" /> Konfigurieren
-          </Button>
-          <Button className="sim-full-button" onClick={() => setImportOpen(true)}>
-            <Upload aria-hidden="true" /> Importieren …
-          </Button>
-          <Button className="sim-full-button" onClick={exportScenario}>
-            <Download aria-hidden="true" /> Szenario exportieren
-          </Button>
-          <Button className="sim-full-button" onClick={() => restart(config)} variant="primary">
-            <RotateCcw aria-hidden="true" /> Neu starten
-          </Button>
-          <nav aria-label="Simulationsauswertung" className="sim-sidebar-analysis-actions">
-            <Button onClick={() => setDetailsOpen(true)}>Kennzahlen im Detail</Button>
-            <Button onClick={() => setHistoryOpen(true)}>Lauf auswerten</Button>
-            <Button onClick={startComparison}>Baseline und Kandidat vergleichen</Button>
-            <Button onClick={exportResult}>
-              <Download aria-hidden="true" /> Ergebnis exportieren
+          <section className="sim-sidebar-group" aria-labelledby="sim-sidebar-files">
+            <h2 id="sim-sidebar-files">
+              <Files aria-hidden="true" /> Bearbeiten &amp; Dateien
+            </h2>
+            <Button
+              aria-label="Szenario konfigurieren"
+              className="sim-full-button"
+              onClick={() => {
+                setEditorConfig(structuredClone(config));
+                setEditorOpen(true);
+              }}
+            >
+              <Settings2 aria-hidden="true" /> Konfigurieren
             </Button>
-          </nav>
+            <Button className="sim-full-button" onClick={() => setImportOpen(true)}>
+              <Upload aria-hidden="true" /> Importieren …
+            </Button>
+            <Button className="sim-full-button" onClick={exportScenario}>
+              <Download aria-hidden="true" /> Szenario exportieren
+            </Button>
+          </section>
+          <section className="sim-sidebar-group" aria-labelledby="sim-sidebar-runs">
+            <h2 id="sim-sidebar-runs">
+              <RotateCcw aria-hidden="true" /> Läufe
+            </h2>
+            <Button className="sim-full-button" onClick={() => restart(config)} variant="primary">
+              <RotateCcw aria-hidden="true" /> Neu starten
+            </Button>
+          </section>
+          <section className="sim-sidebar-group" aria-labelledby="sim-sidebar-analysis">
+            <h2 id="sim-sidebar-analysis">
+              <Gauge aria-hidden="true" /> Auswertung
+            </h2>
+            <nav aria-label="Simulationsauswertung" className="sim-sidebar-analysis-actions">
+              <Button onClick={() => setDetailsOpen(true)}>
+                <Gauge aria-hidden="true" /> Kennzahlen im Detail
+              </Button>
+              <Button onClick={() => setHistoryOpen(true)}>
+                <FileChartColumn aria-hidden="true" /> Lauf auswerten
+              </Button>
+              <Button onClick={startComparison}>
+                <GitCompareArrows aria-hidden="true" /> Baseline und Kandidat vergleichen
+              </Button>
+              <Button onClick={exportResult}>
+                <Download aria-hidden="true" /> Ergebnis exportieren
+              </Button>
+            </nav>
+          </section>
           {importMessage ? <output className="sim-import-message">{importMessage}</output> : null}
         </aside>
 
@@ -638,14 +673,17 @@ export function ForecastSimulationView() {
               >
                 <Plus aria-hidden="true" /> +5 Min.
               </Button>
+              <Button disabled={currentMs >= simulationEnd} onClick={calculateToEnd}>
+                <FastForward aria-hidden="true" /> Bis Ende berechnen
+              </Button>
               <select
                 aria-label="Simulationsgeschwindigkeit"
                 onChange={(event) =>
-                  setSpeed(Number(event.currentTarget.value) as (typeof SPEEDS)[number])
+                  setSpeed(Number(event.currentTarget.value) as (typeof SIMULATION_SPEEDS)[number])
                 }
                 value={speed}
               >
-                {SPEEDS.map((entry) => (
+                {SIMULATION_SPEEDS.map((entry) => (
                   <option key={entry} value={entry}>
                     {entry}×
                   </option>

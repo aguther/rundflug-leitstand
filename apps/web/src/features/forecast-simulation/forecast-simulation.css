@@ -203,14 +203,14 @@
   overflow: hidden;
 }
 
-.sim-current-scenario h2,
+.sim-current-scenario h3,
 .sim-current-scenario strong,
 .sim-current-scenario small {
   margin: 0;
   padding-inline: 12px;
 }
 
-.sim-current-scenario h2 {
+.sim-current-scenario h3 {
   padding-top: 11px;
   color: var(--ui-muted);
   font-size: 11px;
@@ -237,7 +237,7 @@
   background: var(--ui-surface);
 }
 
-.sim-scenario-summary h2 {
+.sim-scenario-summary h3 {
   margin: 0;
   padding: 9px 10px;
   border-bottom: 1px solid var(--ui-border);
@@ -307,7 +307,7 @@
 .sim-full-button {
   width: 100%;
   min-height: 40px;
-  justify-content: center;
+  justify-content: flex-start;
   padding-inline: 12px;
   white-space: nowrap;
 }
@@ -322,19 +322,46 @@
 .sim-sidebar-analysis-actions {
   display: grid;
   gap: 6px;
-  margin-top: 2px;
-  padding-top: 10px;
-  border-top: 1px solid var(--ui-border);
 }
 
 .sim-sidebar-analysis-actions .ds-button {
   width: 100%;
-  min-height: 34px;
+  min-height: 40px;
   justify-content: flex-start;
-  padding: 5px 9px;
+  padding: 7px 11px;
   font-size: 11px;
   line-height: 1.2;
   text-align: left;
+}
+
+.sim-sidebar-group {
+  display: grid;
+  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.sim-sidebar-group:last-of-type {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.sim-sidebar-group > h2 {
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sim-sidebar-group > h2 svg {
+  width: 15px;
+  height: 15px;
 }
 
 .sim-import-message {
@@ -356,7 +383,7 @@
 }
 
 .sim-controls {
-  min-width: 940px;
+  min-width: 1040px;
   min-height: 92px;
   display: grid;
   grid-template-columns: auto minmax(130px, 0.35fr) minmax(500px, 1fr);
@@ -380,7 +407,7 @@
 }
 
 .sim-playback select {
-  width: 70px;
+  width: 76px;
 }
 
 .sim-clock {

@@ -7,6 +7,7 @@ import { ForecastSimulationView } from "./ForecastSimulationView";
 import type { SimulationConfig } from "./model";
 
 const mocks = vi.hoisted(() => ({
+  fidsInputs: [] as Array<{ clockMs: number; running: boolean; speed: number; visibleAt: number }>,
   workers: [] as MockWorker[],
 }));
 
@@ -115,14 +116,23 @@ vi.mock("./SimulationFoundationDialog", () => ({
   ),
 }));
 vi.mock("./simulation-fids-channel", () => ({
-  useSimulationFidsPublisher: () => ({
-    fidsHref: "/simulation/fids?source=synthetic-source",
-    sourceId: "synthetic-source",
-  }),
+  useSimulationFidsPublisher: (input: {
+    clockMs: number;
+    running: boolean;
+    speed: number;
+    visibleAt: number;
+  }) => {
+    mocks.fidsInputs.push(input);
+    return {
+      fidsHref: "/simulation/fids?source=synthetic-source",
+      sourceId: "synthetic-source",
+    };
+  },
 }));
 
 beforeEach(() => {
   mocks.workers.length = 0;
+  mocks.fidsInputs.length = 0;
   vi.stubGlobal("Worker", MockWorker);
   vi.stubGlobal("crypto", { randomUUID: vi.fn(() => "synthetic-uuid") });
   URL.createObjectURL = vi.fn(() => "blob:synthetic-export");
@@ -172,6 +182,11 @@ describe("forecast simulation view", () => {
     expect(screen.queryByRole("button", { name: /duplizieren|löschen/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /Ein Flugzeug hinzufügen|entfernen/ })).toBeNull();
     expect(screen.queryByRole("spinbutton", { name: "Seed" })).toBeNull();
+    expect(
+      screen.getAllByRole("heading", {
+        name: /^(Szenario|Bearbeiten & Dateien|Läufe|Auswertung)$/,
+      }),
+    ).toHaveLength(4);
 
     await user.click(screen.getByRole("button", { name: "Importieren …" }));
     await user.click(screen.getByRole("button", { name: "Szenario übernehmen" }));
@@ -289,7 +304,19 @@ describe("forecast simulation view", () => {
     const user = userEvent.setup();
     render(<ForecastSimulationView />);
 
-    await user.selectOptions(screen.getByLabelText("Simulationsgeschwindigkeit"), "60");
+    const speedSelect = screen.getByLabelText("Simulationsgeschwindigkeit");
+    expect([...speedSelect.querySelectorAll("option")].map((option) => option.value)).toEqual([
+      "1",
+      "2",
+      "5",
+      "10",
+      "30",
+      "60",
+      "120",
+      "300",
+      "600",
+    ]);
+    await user.selectOptions(speedSelect, "600");
     for (let index = 0; index < 12; index += 1) {
       await user.click(screen.getByRole("button", { name: "+5 Min." }));
     }
@@ -304,6 +331,13 @@ describe("forecast simulation view", () => {
     await user.click(pauseButtons[1] as HTMLButtonElement);
     await user.click(screen.getByRole("button", { name: "Start" }));
     await user.click(pauseButtons[0] as HTMLButtonElement);
+    const calculateToEnd = screen.getByRole("button", { name: "Bis Ende berechnen" });
+    await user.click(calculateToEnd);
+    expect((calculateToEnd as HTMLButtonElement).disabled).toBe(true);
+    expect(mocks.fidsInputs.at(-1)).toEqual(
+      expect.objectContaining({ running: false, speed: 600 }),
+    );
+    expect(mocks.fidsInputs.at(-1)?.clockMs).toBe(mocks.fidsInputs.at(-1)?.visibleAt);
     await user.click(screen.getByRole("button", { name: /Neu starten/ }));
   });
 
