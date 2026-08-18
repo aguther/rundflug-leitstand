@@ -14,6 +14,7 @@ describe("forecast comparison golden baseline", () => {
       const candidate = Object.fromEntries(result.rows.map((row) => [row.id, row.candidate]));
 
       expect({
+        initialBoardingMedian: baseline["boarding-initial-median"],
         boardingMedian: baseline["boarding-median"],
         boardingP90: baseline["boarding-p90"],
         boardingBias: baseline["boarding-bias"],
@@ -28,6 +29,7 @@ describe("forecast comparison golden baseline", () => {
         precallMedian: baseline["precall-median"],
         precallP90: baseline["precall-p90"],
       }).toEqual({
+        initialBoardingMedian: 128,
         boardingMedian: 1,
         boardingP90: 2,
         boardingBias: 1.3,
@@ -43,6 +45,7 @@ describe("forecast comparison golden baseline", () => {
         precallP90: 203.5,
       });
       expect({
+        candidateInitialBoardingMedian: candidate["boarding-initial-median"],
         baselineCoverage: baseline["boarding-coverage"],
         candidateCoverage: candidate["boarding-coverage"],
         candidateP90: candidate["boarding-p90"],
@@ -57,6 +60,7 @@ describe("forecast comparison golden baseline", () => {
         baselineThroughput: baseline["operations-throughput"],
         candidateThroughput: candidate["operations-throughput"],
       }).toEqual({
+        candidateInitialBoardingMedian: 35.25,
         baselineCoverage: 100,
         candidateCoverage: 95.65,
         candidateP90: 2.5,

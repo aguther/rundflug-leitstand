@@ -1,6 +1,6 @@
 # Verifikation Prognose-Simulator V1
 
-Stand: 16. August 2026
+Stand: 18. August 2026
 
 ## Zweck und Ausführung
 
@@ -29,17 +29,23 @@ importierte Modelle. Die Preset-Baseline ist als exakter Testwert fixiert.
 
 ## Baseline-Ergebnis
 
-| Preset | erzeugte / abgeschlossene Umläufe | Boarding-Fenster getroffen | Median absolut | P90 absolut | Ø Fensterbreite | max. Reaktion |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Normalbetrieb | 35 / 22 | 95,45 % | 2,0 Min. | 2,5 Min. | 4,45 Min. | 0 Sek. |
-| Stoßlast | 88 / 22 | 100 % | 2,0 Min. | 2,45 Min. | 4,50 Min. | 0 Sek. |
-| Flugzeugausfall | 35 / 22 | 95,45 % | 2,0 Min. | 2,5 Min. | 4,45 Min. | 0 Sek. |
-| Betriebsunterbrechung | 34 / 22 | 86,36 % | 2,0 Min. | 16,0 Min. | 4,59 Min. | 0 Sek. |
+| Preset | erzeugte / abgeschlossene Umläufe | letztes Boardingfenster getroffen | Erstprognose Median absolut | Median absolut letzter Snapshot | P90 absolut letzter Snapshot | Ø Fensterbreite | max. Reaktion |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Normalbetrieb | 35 / 22 | 95,45 % | 35,25 Min. | 2,0 Min. | 2,5 Min. | 4,45 Min. | 0 Sek. |
+| Stoßlast | 88 / 22 | 100 % | 91,0 Min. | 2,0 Min. | 2,45 Min. | 4,50 Min. | 0 Sek. |
+| Flugzeugausfall | 35 / 22 | 95,45 % | 35,25 Min. | 2,0 Min. | 2,5 Min. | 4,45 Min. | 0 Sek. |
+| Betriebsunterbrechung | 34 / 22 | 86,36 % | 38,25 Min. | 2,0 Min. | 16,0 Min. | 4,59 Min. | 0 Sek. |
 
 Diese Werte sind bewusst eine neue Vergleichsbasis: Die früheren Presets liefen durch eine separate
 Legacy-Engine und sind nicht unmittelbar vergleichbar. Fensterbreite und Trefferquote entstehen nun
 aus derselben Dauerbasis und Schedulerprojektion wie im operativen Modell. Die Unterbrechungsbaseline
 zeigt weiterhin sichtbar die größere Unsicherheit außergewöhnlicher Betriebsphasen.
+
+Die Fensterabdeckung und die bisherigen Boardingfehler verwenden je aufgerufener Fluggruppe den
+letzten verfügbaren DRAFT-Snapshot vor dem tatsächlichen Boarding. Die Erstprognose-Kennzahl verwendet
+dagegen genau den frühesten verfügbaren DRAFT-Snapshot und verwirft Snapshots ohne veröffentlichbare
+Prognose. Ihr Tageswert ist der Median der absoluten Abweichungen; im Gruppenverlauf bleibt das
+Vorzeichen sichtbar, wobei positive Werte eine gegenüber dem Ist spätere Prognose bedeuten.
 
 Alle vier Presets weisen `0` dargestellte Countdowns während `UNCERTAIN` aus. Ereignisbedingte
 Neuberechnungen erfolgen im 30-Sekunden-Raster und liegen mit maximal 29,648 Sekunden innerhalb des
@@ -81,6 +87,7 @@ seedübergreifenden Mediane der wichtigsten Baselinewerte lauten:
 
 | Kennzahl | Baseline |
 | --- | ---: |
+| Boarding Erstprognose Median absolut | 128,0 Min. |
 | Boarding Median absolut | 1,0 Min. |
 | Boarding P90 absolut | 2,0 Min. |
 | Boarding Bias | +1,3 Min. |
@@ -229,7 +236,7 @@ festgeschriebenen Preset- und 25-Seed-Werte.
 - Exportiert werden nur Szenario, Seed, synthetisches Ereignisledger, Flugzeuge, Umläufe,
   Prognosesnapshots und Kennzahlen. Ticketcodes, Namen, Telefonnummern, PINs und Secrets sind weder
   Teil des Modells noch des Exports. Das Format trägt die Kennung
-  `rundflug-forecast-simulation/v6`.
+  `rundflug-forecast-simulation/v7`.
 
 ## Simuliertes Live-FIDS
 
@@ -272,6 +279,10 @@ Vite-Modus mit dem In-App-Browser gegen die gerenderte Anwendung verglichen. Die
 erfolgte bei 1280×720; ergänzende Headless-Aufnahmen belegen das Layout bei 1536×1024 und 1280×800.
 Light und Dark Mode wurden jeweils im In-App-Browser geprüft:
 
+- die ergänzende Erstprognoseabnahme vom 18. August 2026 prüft mit Headless Chromium die fünf
+  Kennzahlenkarten bei 1600×1000 im Dark Mode und 1280×900 im Light Mode. Alle Karten und Werte
+  bleiben innerhalb ihrer Gridspalten; der Gruppenverlauf zeigt ersten Snapshot, erste
+  Boardingprognose, Boarding-Ist und signierte Abweichung ohne Überlauf oder Konsolenmeldung;
 - die ergänzende Nachfrageabnahme vom 26. Juli 2026 prüft das freigegebene Konzept
   die Nachfrageansicht nativ bei 1536×1024 und 1280×800, jeweils in
   Light und Dark Mode;

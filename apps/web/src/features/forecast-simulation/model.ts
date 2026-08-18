@@ -306,6 +306,7 @@ export interface SimulationMetrics {
     windowCoveragePercent: number | null;
     averageWindowWidthMinutes: number | null;
   };
+  initialBoarding: ForecastMetricSummary;
   departure: ForecastMetricSummary;
   landing: ForecastMetricSummary;
   completion: ForecastMetricSummary;

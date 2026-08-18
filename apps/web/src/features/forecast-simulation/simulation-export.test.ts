@@ -8,7 +8,7 @@ const SIMULATION_TIMEOUT_MS = 60_000;
 
 describe("forecast simulation export", () => {
   it(
-    "writes the v6 schedule, demand profile, resource model, and actual run window",
+    "writes the v7 metrics, schedule, demand profile, resource model, and actual run window",
     () => {
       const result = runSimulation(simulationConfigForPreset("NORMAL"));
       const exported = createSimulationExport(result, [], null);
@@ -17,6 +17,7 @@ describe("forecast simulation export", () => {
       expect(exported.schedule).toEqual(result.config.schedule);
       expect(exported.realityModel.demand).toEqual(result.config.realityModel.demand);
       expect(exported.runWindow).toEqual(result.runWindow);
+      expect(exported.metrics.initialBoarding).toEqual(result.metrics.initialBoarding);
       expect(Date.parse(exported.runWindow.endAt)).toBeGreaterThanOrEqual(
         Date.parse(exported.schedule.operationsEndAt),
       );

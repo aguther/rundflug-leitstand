@@ -280,7 +280,7 @@ function ErrorChart({
             <strong>Fluggruppe {activePoint.communicationNumber}</strong>
             <dl>
               <div>
-                <dt>Snapshot</dt>
+                <dt>Letzter Snapshot</dt>
                 <dd>{formatTime(activePoint.capturedAt)}</dd>
               </div>
               <div>
@@ -708,8 +708,8 @@ export function ForecastSimulationView() {
           <section className="sim-analysis">
             <div className="sim-chart-panel">
               <header>
-                <strong>Prognosefehler über den Tagesverlauf</strong>
-                <span>Boarding · Fehler in Minuten · Werte mit Maus anzeigen</span>
+                <strong>Letzter Boarding-Prognosefehler vor Ist</strong>
+                <span>Je Fluggruppe · letzter auswertbarer Snapshot · signierter Fehler</span>
               </header>
               <ErrorChart
                 resetKey={result}
@@ -719,9 +719,14 @@ export function ForecastSimulationView() {
             </div>
             <div className="sim-metrics-grid">
               <MetricCard
-                hint={`${visibleMetrics.boarding.samples} Vergleiche`}
-                label="Zeitfenster getroffen"
+                hint={`${visibleMetrics.boarding.samples} Fluggruppen · letzter Snapshot`}
+                label="Letztes Boardingfenster getroffen"
                 value={metric(visibleMetrics.boarding.windowCoveragePercent, " %")}
+              />
+              <MetricCard
+                hint={`${visibleMetrics.initialBoarding.samples} Fluggruppen · Median absolut`}
+                label="Erstprognose Boarding"
+                value={metric(visibleMetrics.initialBoarding.medianAbsoluteErrorMinutes, " Min.")}
               />
               <MetricCard
                 hint="Median absolut"
@@ -802,7 +807,8 @@ export function ForecastSimulationView() {
       >
         <div className="sim-detail-grid">
           {[
-            ["Boarding", visibleMetrics.boarding],
+            ["Boarding (letzter Snapshot)", visibleMetrics.boarding],
+            ["Boarding (Erstprognose)", visibleMetrics.initialBoarding],
             ["Start", visibleMetrics.departure],
             ["Landung", visibleMetrics.landing],
             ["Abschluss", visibleMetrics.completion],

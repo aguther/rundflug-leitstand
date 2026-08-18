@@ -16,6 +16,7 @@ import {
   type SimulationResult,
   type SimulationRotation,
 } from "./model";
+import { findFirstAvailableDraftForecastSnapshot } from "./simulation-snapshot";
 
 const MINUTE_MS = 60_000;
 type TimestampValue = string | number | null;
@@ -25,6 +26,10 @@ const timeFormatter = new Intl.DateTimeFormat("de-DE", {
   minute: "2-digit",
   hour12: false,
   timeZone: "Europe/Berlin",
+});
+const signedMinuteFormatter = new Intl.NumberFormat("de-DE", {
+  maximumFractionDigits: 1,
+  signDisplay: "exceptZero",
 });
 
 function formatTime(value: TimestampValue): string {
@@ -37,6 +42,12 @@ function formatDuration(minutes: number): string {
   const hours = Math.floor(minutes / 60);
   const remainder = Math.round(minutes % 60);
   return `${hours}:${String(remainder).padStart(2, "0")} h`;
+}
+
+function formatSignedMinutes(minutes: number | null): string {
+  return minutes === null
+    ? "Noch nicht auswertbar"
+    : `${signedMinuteFormatter.format(minutes)} Min.`;
 }
 
 function visibleMilestone(value: string | null, visibleAt: number): string | null {
@@ -602,6 +613,19 @@ export function SimulationHistoryDialog({
   const selectedSnapshots = selectedRotation
     ? (snapshotsByRotation.get(selectedRotation.id) ?? [])
     : [];
+  const initialBoardingSnapshot = selectedRotation
+    ? findFirstAvailableDraftForecastSnapshot(
+        selectedSnapshots,
+        selectedRotation.id,
+        selectedRotation.calledAt ?? undefined,
+      )
+    : undefined;
+  const initialBoardingErrorMinutes =
+    initialBoardingSnapshot && selectedRotation?.calledAt
+      ? (Date.parse(initialBoardingSnapshot.predictedBoardingAt) -
+          Date.parse(selectedRotation.calledAt)) /
+        MINUTE_MS
+      : null;
   const filteredRotations = visibleRotations.filter((rotation) =>
     `${rotation.communicationNumber} ${rotation.aircraftId ?? ""}`
       .toLocaleLowerCase("de-DE")
@@ -749,6 +773,40 @@ export function SimulationHistoryDialog({
                       </li>
                     ))}
                   </ol>
+
+                  <section
+                    aria-label="Vergleich der ersten Boardingprognose"
+                    className="sim-history-initial-forecast"
+                  >
+                    <header>
+                      <h4>Erste Boardingprognose</h4>
+                      <p>
+                        Interne Diagnose · positiv bedeutet später als das tatsächliche Boarding
+                      </p>
+                    </header>
+                    <dl>
+                      <div>
+                        <dt>Erster Snapshot</dt>
+                        <dd>{formatTime(initialBoardingSnapshot?.capturedAt ?? null)}</dd>
+                      </div>
+                      <div>
+                        <dt>Erste Boardingprognose</dt>
+                        <dd>{formatTime(initialBoardingSnapshot?.predictedBoardingAt ?? null)}</dd>
+                      </div>
+                      <div>
+                        <dt>Boarding (Ist)</dt>
+                        <dd>
+                          {selectedRotation.calledAt
+                            ? formatTime(selectedRotation.calledAt)
+                            : "Noch nicht erfolgt"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Abweichung</dt>
+                        <dd>{formatSignedMinutes(initialBoardingErrorMinutes)}</dd>
+                      </div>
+                    </dl>
+                  </section>
 
                   <section className="sim-history-section sim-history-chart-section">
                     <h4>Verlauf jeder einzelnen Prognose</h4>

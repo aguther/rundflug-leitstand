@@ -29,6 +29,7 @@ describe("local forecast A/B comparison", () => {
       expect(result.rows.length).toBeGreaterThan(0);
       expect(result.rows).toEqual(
         expect.arrayContaining([
+          expect.objectContaining({ id: "boarding-initial-median" }),
           expect.objectContaining({ id: "departure-mae" }),
           expect.objectContaining({ id: "landing-median" }),
           expect.objectContaining({ id: "completion-bias" }),

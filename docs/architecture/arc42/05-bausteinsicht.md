@@ -234,7 +234,9 @@ flowchart LR
 
 Die Tick-Reihenfolge ist Teil des reproduzierbaren Simulationsvertrags. Die Engine-Grenze bildet
 einfache Eingaben ausschließlich auf das operative Modell ab und übernimmt keine fachliche
-Phasenlogik; Golden-Seed-Tests sichern diese Grenze.
+Phasenlogik; Golden-Seed-Tests sichern diese Grenze. Die Prognosegüte trennt den frühesten verfügbaren
+Boarding-Snapshot als Maß der initialen Gastinformation vom letzten Snapshot vor dem tatsächlichen
+Boarding als Maß der kurzfristigen Fensterabdeckung.
 
 Das simulierte FIDS läuft gemäß ADR-0044 als eigenständiger Tab und eigener React-Baum. Es verwendet
 dieselben FIDS-Komponenten wie der Livebetrieb, erhält seinen flüchtigen Zustand aber ausschließlich

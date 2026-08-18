@@ -18,13 +18,13 @@ beforeAll(() => {
 
 afterEach(cleanup);
 
-function renderHistory() {
+function renderHistory(initialRotationId = result.rotations[0]?.id ?? null) {
   const onClose = vi.fn();
   const onExport = vi.fn();
   render(
     <SimulationHistoryDialog
       initialAircraftId={result.aircraft[0]?.id ?? null}
-      initialRotationId={result.rotations[0]?.id ?? null}
+      initialRotationId={initialRotationId}
       onClose={onClose}
       onExport={onExport}
       open
@@ -47,6 +47,16 @@ describe("simulation history dialog", () => {
       screen.getByRole("heading", { name: `Fluggruppe ${firstRotation?.communicationNumber}` }),
     ).toBeTruthy();
     expect(screen.getByText("Alle Prognose-Snapshots")).toBeTruthy();
+    const initialForecast = screen.getByRole("region", {
+      name: "Vergleich der ersten Boardingprognose",
+    });
+    expect(within(initialForecast).getByText("Erster Snapshot")).toBeTruthy();
+    expect(
+      within(initialForecast).getByText("Erste Boardingprognose", { selector: "dt" }),
+    ).toBeTruthy();
+    expect(within(initialForecast).getByText("Boarding (Ist)")).toBeTruthy();
+    expect(within(initialForecast).getByText("Abweichung")).toBeTruthy();
+    expect(initialForecast.textContent).toContain("Min.");
 
     const search = screen.getByPlaceholderText("Fluggruppe suchen");
     expect(search.closest(".ds-search-field")?.parentElement?.className).toContain(
@@ -56,6 +66,19 @@ describe("simulation history dialog", () => {
     const rail = screen.getByRole("heading", { name: "Fluggruppen" }).parentElement;
     expect(rail).not.toBeNull();
     expect(within(rail as HTMLElement).queryAllByRole("button")).toHaveLength(0);
+  });
+
+  it("keeps the initial forecast comparison explicit before boarding", () => {
+    const waitingRotation = result.rotations.find((rotation) => !rotation.calledAt);
+    expect(waitingRotation).toBeDefined();
+
+    renderHistory(waitingRotation?.id);
+
+    const initialForecast = screen.getByRole("region", {
+      name: "Vergleich der ersten Boardingprognose",
+    });
+    expect(within(initialForecast).getByText("Noch nicht erfolgt")).toBeTruthy();
+    expect(within(initialForecast).getByText("Noch nicht auswertbar")).toBeTruthy();
   });
 
   it("navigates from a bound group to the aircraft timeline and back", async () => {

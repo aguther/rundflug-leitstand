@@ -152,6 +152,8 @@ describe("forecast simulation view", () => {
     expect(screen.getByText("Normalbetrieb")).toBeTruthy();
     expect(screen.getByText("Nicht gespeichert")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Szenarioübersicht" })).toBeTruthy();
+    expect(screen.getByText("Letztes Boardingfenster getroffen")).toBeTruthy();
+    expect(screen.getByText("Erstprognose Boarding")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Szenario konfigurieren" }).textContent).toContain(
       "Konfigurieren",
     );

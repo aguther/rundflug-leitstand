@@ -10,10 +10,11 @@ import {
   SIMULATION_MINUTE_MS as MINUTE_MS,
   roundSimulationValue as rounded,
 } from "./simulation-primitives";
+import { findFirstAvailableDraftForecastSnapshot } from "./simulation-snapshot";
 
 type AccuracyMetrics = Pick<
   SimulationMetrics,
-  "boarding" | "departure" | "landing" | "completion" | "horizons"
+  "boarding" | "initialBoarding" | "departure" | "landing" | "completion" | "horizons"
 >;
 type QualityMetrics = Pick<
   SimulationMetrics,
@@ -22,6 +23,7 @@ type QualityMetrics = Pick<
 type OperationalMetrics = Pick<SimulationMetrics, "operations" | "dispatch">;
 type AccuracyAccumulator = {
   boardingErrors: number[];
+  initialBoardingErrors: number[];
   departureErrors: number[];
   landingErrors: number[];
   completionErrors: number[];
@@ -38,6 +40,7 @@ export function calculateForecastAccuracyMetrics(
   const snapshotsByRotation = groupSnapshotsByRotation(snapshots);
   const metrics: AccuracyAccumulator = {
     boardingErrors: [],
+    initialBoardingErrors: [],
     departureErrors: [],
     landingErrors: [],
     completionErrors: [],
@@ -61,6 +64,7 @@ export function calculateForecastAccuracyMetrics(
           : rounded((metrics.boardingWindowsHit / metrics.boardingWindowSamples) * 100),
       averageWindowWidthMinutes: averageWindowWidth === null ? null : rounded(averageWindowWidth),
     },
+    initialBoarding: metricSummary(metrics.initialBoardingErrors),
     departure: metricSummary(metrics.departureErrors),
     landing: metricSummary(metrics.landingErrors),
     completion: metricSummary(metrics.completionErrors),
@@ -90,6 +94,16 @@ function collectBoardingAccuracy(
   metrics: AccuracyAccumulator,
 ): void {
   if (!rotation.calledAt) return;
+  const initialBoarding = findFirstAvailableDraftForecastSnapshot(
+    snapshots,
+    rotation.id,
+    rotation.calledAt,
+  );
+  if (initialBoarding) {
+    metrics.initialBoardingErrors.push(
+      snapshotError(initialBoarding, rotation.calledAt, "predictedBoardingAt"),
+    );
+  }
   const boarding = latestSnapshotBefore(snapshots, rotation.calledAt, "DRAFT");
   if (boarding) {
     metrics.boardingErrors.push(snapshotError(boarding, rotation.calledAt, "predictedBoardingAt"));

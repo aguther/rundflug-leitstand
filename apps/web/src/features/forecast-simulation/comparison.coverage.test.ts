@@ -33,6 +33,7 @@ describe("coverage-safe forecast comparison", () => {
     expect(new Set(result.rows.map((row) => row.id)).size).toBe(result.rows.length);
     expect(result.rows).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({ id: "boarding-initial-median" }),
         expect.objectContaining({ id: "boarding-median" }),
         expect.objectContaining({ id: "dispatch-passengers-per-hour" }),
         expect.objectContaining({ id: "precall-coverage" }),

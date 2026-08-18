@@ -3,7 +3,7 @@ import {
   type ForecastRotationStatus,
   type ForecastTimelineProjection,
 } from "@rundflug/domain";
-import type { SimulationConfig, SimulationForecastSnapshot } from "./model";
+import type { SimulationConfig, SimulationForecastSnapshot, SimulationRotation } from "./model";
 import { toSimulationIso as iso } from "./simulation-primitives";
 
 type SimulationResourceGroupStatus = "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
@@ -14,6 +14,31 @@ interface MutableForecastRotation {
   predictedDepartureAt: string | null;
   predictedLandingAt: string | null;
   predictedCompletionAt: string | null;
+}
+
+export function findFirstAvailableDraftForecastSnapshot(
+  snapshots: readonly SimulationForecastSnapshot[],
+  rotationId: SimulationRotation["id"],
+  before?: string,
+): SimulationForecastSnapshot | undefined {
+  const beforeMs = before ? Date.parse(before) : Number.POSITIVE_INFINITY;
+  let firstSnapshot: SimulationForecastSnapshot | undefined;
+  for (const snapshot of snapshots) {
+    const capturedAtMs = Date.parse(snapshot.capturedAt);
+    if (
+      snapshot.rotationId !== rotationId ||
+      snapshot.status !== "DRAFT" ||
+      snapshot.forecastState === "UNAVAILABLE" ||
+      !Number.isFinite(capturedAtMs) ||
+      capturedAtMs >= beforeMs
+    ) {
+      continue;
+    }
+    if (!firstSnapshot || capturedAtMs < Date.parse(firstSnapshot.capturedAt)) {
+      firstSnapshot = snapshot;
+    }
+  }
+  return firstSnapshot;
 }
 
 export function captureSimulationForecastSnapshots<

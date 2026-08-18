@@ -41,9 +41,16 @@ const METRIC_DEFINITIONS: readonly (ComparisonMetricDefinition & {
   {
     id: "boarding-coverage",
     category: "Boarding",
-    label: "Zeitfenster getroffen",
+    label: "Letztes Boardingfenster getroffen",
     unit: "%",
     read: (metrics) => metrics.boarding.windowCoveragePercent,
+  },
+  {
+    id: "boarding-initial-median",
+    category: "Boarding",
+    label: "Erstprognose Median absolut",
+    unit: "Min.",
+    read: (metrics) => metrics.initialBoarding.medianAbsoluteErrorMinutes,
   },
   {
     id: "boarding-median",
