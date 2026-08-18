@@ -88,8 +88,7 @@ function progressBasisChanged(
   existing: StoredRecurringRule | null,
 ): boolean {
   return (
-    !existing ||
-    existing.scope_type !== command.payload.rule.scopeType ||
+    existing?.scope_type !== command.payload.rule.scopeType ||
     existing.scope_id !== command.payload.rule.scopeId ||
     existing.operation_kind !== command.payload.rule.kind ||
     existing.trigger_metric !== command.payload.rule.triggerMetric
@@ -144,7 +143,7 @@ export class RecurringOperationalRuleMutationPlanner {
     if (
       (command.payload.ruleExpectedVersion === null && existing) ||
       (command.payload.ruleExpectedVersion !== null &&
-        (!existing || existing.version !== command.payload.ruleExpectedVersion)) ||
+        existing?.version !== command.payload.ruleExpectedVersion) ||
       existing?.status === "DISABLED"
     ) {
       return ruleVersionConflict(existing);

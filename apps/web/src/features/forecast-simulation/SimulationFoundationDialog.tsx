@@ -6,7 +6,7 @@ import {
   TableProperties,
   Upload,
 } from "lucide-react";
-import { type KeyboardEvent, type RefObject, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, type RefObject, useRef, useState } from "react";
 
 import { Button, ModalDialog } from "../../design-system/components";
 import { CalibrationCsvError, calibrateFromCsv } from "./csv-calibration";
@@ -82,6 +82,13 @@ function prepareImportedConfig(
     return excludeUnresolvedPlannedOperations(preview);
   }
   return preview.config;
+}
+
+function nextImportTabIndex(key: string, currentIndex: number): number {
+  if (key === "Home") return 0;
+  if (key === "End") return IMPORT_TABS.length - 1;
+  const offset = key === "ArrowRight" ? 1 : -1;
+  return (currentIndex + offset + IMPORT_TABS.length) % IMPORT_TABS.length;
 }
 
 function SimulationScenarioPanel({
@@ -462,6 +469,11 @@ export function SimulationImportDialog({
   const scenarioTabRef = useRef<HTMLButtonElement>(null);
   const jsonTabRef = useRef<HTMLButtonElement>(null);
   const csvTabRef = useRef<HTMLButtonElement>(null);
+  const tabRefs = {
+    SCENARIO: scenarioTabRef,
+    JSON: jsonTabRef,
+    CSV: csvTabRef,
+  } as const;
   const selectedScenarioConfig = simulationConfigForPreset(selectedPreset);
   const preparedImportedConfig = prepareImportedConfig(preview, excludeUnresolvedPlans);
   const validationErrors = preparedImportedConfig
@@ -485,22 +497,14 @@ export function SimulationImportDialog({
 
   const selectAndFocusTab = (nextTab: ImportTab) => {
     selectTab(nextTab);
-    const target =
-      nextTab === "SCENARIO" ? scenarioTabRef : nextTab === "JSON" ? jsonTabRef : csvTabRef;
-    target.current?.focus();
+    tabRefs[nextTab].current?.focus();
   };
 
   const navigateTabs = (event: KeyboardEvent<HTMLButtonElement>, currentTab: ImportTab) => {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
     const currentIndex = IMPORT_TABS.findIndex(({ id }) => id === currentTab);
-    const nextIndex =
-      event.key === "Home"
-        ? 0
-        : event.key === "End"
-          ? IMPORT_TABS.length - 1
-          : (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + IMPORT_TABS.length) %
-            IMPORT_TABS.length;
+    const nextIndex = nextImportTabIndex(event.key, currentIndex);
     const nextTab = IMPORT_TABS[nextIndex]?.id;
     if (nextTab) selectAndFocusTab(nextTab);
   };
@@ -602,6 +606,42 @@ export function SimulationImportDialog({
     openFilePicker();
   };
 
+  let activePanel: ReactNode;
+  if (tab === "SCENARIO") {
+    activePanel = (
+      <SimulationScenarioPanel
+        onDownload={downloadSelectedScenario}
+        onSelectPreset={setSelectedPreset}
+        selectedPreset={selectedPreset}
+      />
+    );
+  } else if (tab === "JSON") {
+    activePanel = (
+      <SimulationJsonPanel
+        excludeUnresolvedPlans={excludeUnresolvedPlans}
+        fileInputRef={fileInputRef}
+        importError={importError}
+        onChangeFile={changeFile}
+        onExcludeUnresolvedPlans={setExcludeUnresolvedPlans}
+        onOpenFilePicker={openFilePicker}
+        onSelectFile={selectFile}
+        preview={preview}
+        selectedFile={selectedFile}
+        validationErrors={validationErrors}
+      />
+    );
+  } else {
+    activePanel = (
+      <SimulationCsvPanel
+        fileInputRef={fileInputRef}
+        importError={importError}
+        onOpenFilePicker={openFilePicker}
+        onSelectFile={selectFile}
+        selectedFile={selectedFile}
+      />
+    );
+  }
+
   return (
     <ModalDialog
       bodyClassName="sim-foundation-dialog"
@@ -637,7 +677,7 @@ export function SimulationImportDialog({
             key={id}
             onClick={() => selectTab(id)}
             onKeyDown={(event) => navigateTabs(event, id)}
-            ref={id === "SCENARIO" ? scenarioTabRef : id === "JSON" ? jsonTabRef : csvTabRef}
+            ref={tabRefs[id]}
             role="tab"
             tabIndex={tab === id ? 0 : -1}
             type="button"
@@ -648,34 +688,7 @@ export function SimulationImportDialog({
         ))}
       </div>
 
-      {tab === "SCENARIO" ? (
-        <SimulationScenarioPanel
-          onDownload={downloadSelectedScenario}
-          onSelectPreset={setSelectedPreset}
-          selectedPreset={selectedPreset}
-        />
-      ) : tab === "JSON" ? (
-        <SimulationJsonPanel
-          excludeUnresolvedPlans={excludeUnresolvedPlans}
-          fileInputRef={fileInputRef}
-          importError={importError}
-          onChangeFile={changeFile}
-          onExcludeUnresolvedPlans={setExcludeUnresolvedPlans}
-          onOpenFilePicker={openFilePicker}
-          onSelectFile={selectFile}
-          preview={preview}
-          selectedFile={selectedFile}
-          validationErrors={validationErrors}
-        />
-      ) : (
-        <SimulationCsvPanel
-          fileInputRef={fileInputRef}
-          importError={importError}
-          onOpenFilePicker={openFilePicker}
-          onSelectFile={selectFile}
-          selectedFile={selectedFile}
-        />
-      )}
+      {activePanel}
       <p className="sim-import-effect">
         {tab === "CSV"
           ? "Die Kalibrierung aktualisiert die Phasen des aktuellen Szenarios. Manuelle Ereignisse und der laufende Simulationsstand werden zurückgesetzt."

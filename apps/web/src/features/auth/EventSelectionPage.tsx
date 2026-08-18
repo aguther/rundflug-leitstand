@@ -33,7 +33,7 @@ export function EventSelectionPage({
     }
   }
 
-  function openEvent(event: React.FormEvent) {
+  function openEvent(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const selected = events.find((entry) => entry.eventId === eventId);
     if (!selected) return;

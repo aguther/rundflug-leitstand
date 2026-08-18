@@ -411,9 +411,8 @@ export function FlightLineSupervisorConsole({
           .toLocaleLowerCase("de-DE")
           .includes(query);
       });
-    return filteredRows
-      .sort((left, right) => compareTicketRows(left, right, ticketSort))
-      .slice(0, 30);
+    filteredRows.sort((left, right) => compareTicketRows(left, right, ticketSort));
+    return filteredRows.slice(0, 30);
   }, [
     board.queueGroups,
     board.resourceGroups,

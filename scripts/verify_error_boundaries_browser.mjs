@@ -105,7 +105,10 @@ try {
       throw new Error("The Vite error overlay obscures the handled fallback.");
     }
 
-    await Promise.all([page.waitForNavigation({ waitUntil: "networkidle" }), reloadButton.click()]);
+    const navigation = page.waitForEvent("framenavigated", (frame) => frame === page.mainFrame());
+    await reloadButton.click();
+    await navigation;
+    await page.waitForLoadState("networkidle");
     await page.getByRole("heading", { name: "Arbeitsbereich wiederhergestellt" }).waitFor({
       state: "visible",
     });

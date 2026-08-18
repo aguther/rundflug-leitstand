@@ -31,7 +31,7 @@ describe("V1 integration suite scheduling", () => {
       shardName: "synthetic",
       runSuite: async (suite: string, shard: string) => {
         started.push(suite);
-        expect(started.length).toBe(completed.length + 1);
+        expect(started).toHaveLength(completed.length + 1);
         completed.push(suite);
         return { suite, shard };
       },

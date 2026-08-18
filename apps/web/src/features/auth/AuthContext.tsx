@@ -14,7 +14,7 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-export function AuthProvider({ children }: PropsWithChildren) {
+export function AuthProvider({ children }: Readonly<PropsWithChildren>) {
   const [session, setSession] = useState<OperatorSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);

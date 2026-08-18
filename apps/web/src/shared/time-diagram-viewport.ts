@@ -333,9 +333,7 @@ export function useTimeDiagramViewport({
     setVisibleDomain(nextDomain);
   };
 
-  if (!wheelListenerRef.current) {
-    wheelListenerRef.current = (event) => wheelHandlerRef.current(event);
-  }
+  wheelListenerRef.current ??= (event) => wheelHandlerRef.current(event);
 
   const setViewportRef = useCallback((viewport: HTMLElement | null) => {
     const listener = wheelListenerRef.current;
@@ -378,7 +376,7 @@ export function useTimeDiagramViewport({
 
   const onPointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag?.pointerId !== event.pointerId) return;
     const distance = event.clientX - drag.startClientX;
     if (!drag.moved && Math.abs(distance) < DRAG_THRESHOLD_PX) return;
     drag.moved = true;

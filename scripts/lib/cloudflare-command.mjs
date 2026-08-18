@@ -34,9 +34,10 @@ export function runWrangler(argumentsList, options = {}) {
         return;
       }
       const diagnostic = `${stdout}\n${stderr}`.trim().slice(-4_000);
+      const diagnosticSuffix = diagnostic ? ` ${diagnostic}` : "";
       reject(
         new Error(
-          `${options.label ?? "Wrangler command"} failed with exit code ${code}.${diagnostic ? ` ${diagnostic}` : ""}`,
+          `${options.label ?? "Wrangler command"} failed with exit code ${code}.${diagnosticSuffix}`,
         ),
       );
     });

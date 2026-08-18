@@ -83,4 +83,15 @@ describe("deployment revision verification", () => {
       `/api/meta did not stably report expected revision ${EXPECTED_REVISION} after 3 attempts. Last observed revision: ${PREVIOUS_REVISION}.`,
     );
   });
+
+  it("describes non-Error request failures without default object stringification", async () => {
+    await expect(
+      waitForExpectedRevision({
+        baseUrl: "https://worker.example",
+        expectedRevision: EXPECTED_REVISION,
+        fetchImplementation: vi.fn().mockRejectedValue({ code: "ECONNRESET" }),
+        maxAttempts: 1,
+      }),
+    ).rejects.toThrow('Last request failed: {"code":"ECONNRESET"}');
+  });
 });

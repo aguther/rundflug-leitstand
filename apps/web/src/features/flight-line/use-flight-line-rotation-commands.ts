@@ -1,5 +1,5 @@
 import type { CommandResult, OperationBoard } from "@rundflug/contracts";
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import type { Dispatch, RefObject, SetStateAction } from "react";
 import { ApiCommandError, sendCommand } from "../../api";
 import type { DispatchRecommendationLeaseController } from "../../dispatch-recommendation-lease";
 import {
@@ -13,7 +13,7 @@ type TurnaroundNextState = "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE";
 
 interface RotationCommandOptions {
   board: OperationBoard | null | undefined;
-  busyRotationIdsRef: MutableRefObject<Set<string>>;
+  busyRotationIdsRef: RefObject<Set<string>>;
   callDeviationReason: string;
   confirmEvent: (event: CommandResult["event"]) => void;
   deviceId: string;

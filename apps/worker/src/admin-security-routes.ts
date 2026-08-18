@@ -85,7 +85,7 @@ export function registerAdminSecurityRoutes(
       (!actor &&
         !(await dependencies.verifyCredential(
           parsed.data.adminPin,
-          context.env.ADMIN_PIN_HASH ?? null,
+          Reflect.get(context.env, "ADMIN_PIN_HASH") ?? null,
         )))
     ) {
       return context.json(

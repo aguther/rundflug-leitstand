@@ -15,6 +15,16 @@ function revisionCheckUrl(baseUrl, expectedRevision, attempt) {
   return url;
 }
 
+function describeError(error) {
+  if (error instanceof Error) return String(error);
+  if (typeof error === "string") return error;
+  try {
+    return JSON.stringify(error) ?? "Unknown error";
+  } catch {
+    return "Unknown error";
+  }
+}
+
 export async function waitForExpectedRevision({
   baseUrl,
   expectedRevision,
@@ -53,7 +63,7 @@ export async function waitForExpectedRevision({
   }
 
   const observation = lastError
-    ? ` Last request failed: ${String(lastError)}`
+    ? ` Last request failed: ${describeError(lastError)}`
     : ` Last observed revision: ${lastObservedRevision ?? "unknown"}.`;
   throw new Error(
     `/api/meta did not stably report expected revision ${expectedRevision} after ${maxAttempts} attempts.${observation}`,

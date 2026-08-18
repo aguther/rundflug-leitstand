@@ -17,6 +17,15 @@ function themeToggleLabel(
     : "Helle Darstellung aktiv. Zu Dunkel wechseln";
 }
 
+function themeIconName(
+  binary: boolean,
+  preference: keyof typeof LABEL,
+  resolved: "light" | "dark",
+): "system" | "moon" | "sun" {
+  if (!binary && preference === "system") return "system";
+  return resolved === "dark" ? "moon" : "sun";
+}
+
 function ThemeIcon({
   binary,
   preference,
@@ -48,7 +57,7 @@ function ThemeIcon({
 export function ThemeToggle({ binary = false }: Readonly<{ binary?: boolean }>) {
   const { preference, resolved, cycle, setPreference } = useTheme();
   const label = themeToggleLabel(binary, preference, resolved);
-  const icon = !binary && preference === "system" ? "system" : resolved === "dark" ? "moon" : "sun";
+  const icon = themeIconName(binary, preference, resolved);
   return (
     <button
       aria-label={label}

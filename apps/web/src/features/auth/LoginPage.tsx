@@ -34,7 +34,7 @@ export function LoginPage() {
     if (accountId) pinRef.current?.focus();
   }, [accountId]);
 
-  async function submit(event: React.FormEvent) {
+  async function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!accountId || !/^\d{6,12}$/.test(pin) || busy) return;
     setBusy(true);

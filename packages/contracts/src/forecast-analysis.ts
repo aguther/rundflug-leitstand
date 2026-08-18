@@ -787,21 +787,21 @@ const analysisUiEventSchema = z.discriminatedUnion("type", [
   z
     .object({
       type: z.literal("AIRCRAFT_SELECTED"),
-      occurredAt: z.string().datetime(),
+      occurredAt: z.iso.datetime(),
       aircraftId: z.string().nullable(),
     })
     .strict(),
   z
     .object({
       type: z.literal("ASSIGNMENT_DIALOG_OPENED"),
-      occurredAt: z.string().datetime(),
+      occurredAt: z.iso.datetime(),
       rotationId: z.string().nullable(),
     })
     .strict(),
   z
     .object({
       type: z.literal("DISPATCH_RECOMMENDATION_APPLIED"),
-      occurredAt: z.string().datetime(),
+      occurredAt: z.iso.datetime(),
       planRevision: z.string(),
       batchId: z.string(),
       groupIds: z.array(z.string()).max(50),
@@ -810,32 +810,32 @@ const analysisUiEventSchema = z.discriminatedUnion("type", [
   z
     .object({
       type: z.literal("QUEUE_GROUP_SELECTION_CHANGED"),
-      occurredAt: z.string().datetime(),
+      occurredAt: z.iso.datetime(),
       groupIds: z.array(z.string()).max(50),
     })
     .strict(),
   z
     .object({
       type: z.literal("ASSIGNMENT_DIALOG_CLOSED"),
-      occurredAt: z.string().datetime(),
+      occurredAt: z.iso.datetime(),
     })
     .strict(),
   z
     .object({
       type: z.literal("ANALYSIS_EXPORT_STARTED"),
-      occurredAt: z.string().datetime(),
+      occurredAt: z.iso.datetime(),
     })
     .strict(),
   z
     .object({
       type: z.literal("ANALYSIS_EXPORT_COMPLETED"),
-      occurredAt: z.string().datetime(),
+      occurredAt: z.iso.datetime(),
     })
     .strict(),
   z
     .object({
       type: z.literal("ANALYSIS_EXPORT_FAILED"),
-      occurredAt: z.string().datetime(),
+      occurredAt: z.iso.datetime(),
     })
     .strict(),
 ]);
@@ -843,7 +843,7 @@ export type AnalysisUiEvent = z.infer<typeof analysisUiEventSchema>;
 
 export const analysisClientContextSchema = z
   .object({
-    capturedAt: z.string().datetime(),
+    capturedAt: z.iso.datetime(),
     route: z
       .string()
       .max(256)
@@ -916,7 +916,7 @@ const analysisForecastSnapshotSchema = z
     id: z.string(),
     planningRunId: z.string(),
     rotationId: z.string(),
-    capturedAt: z.string().datetime(),
+    capturedAt: z.iso.datetime(),
     quality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
     lowerMinutes: z.number().nonnegative(),
     upperMinutes: z.number().nonnegative(),
@@ -931,7 +931,7 @@ const analysisForecastSnapshotSchema = z
 export const analysisSnapshotManifestSchema = z
   .object({
     exportId: z.string(),
-    capturedAt: z.string().datetime(),
+    capturedAt: z.iso.datetime(),
     applicationVersion: z.string(),
     requirementsVersion: z.string(),
     sourceRevision: z.string(),
@@ -971,8 +971,8 @@ export const analysisSnapshotSchema = z
           .object({
             id: z.string(),
             eventVersion: z.number().int().nonnegative(),
-            calculationNow: z.string().datetime(),
-            capturedAt: z.string().datetime(),
+            calculationNow: z.iso.datetime(),
+            capturedAt: z.iso.datetime(),
             trigger: z.string(),
             sourceRevision: z.string(),
             dispatchPlanRevision: z.string(),
@@ -992,8 +992,8 @@ export const analysisSnapshotSchema = z
                 contextId: z.string(),
                 eventVersion: z.number().int().nonnegative(),
                 replayDistance: z.number().int().min(0).max(10),
-                calculationNow: z.string().datetime(),
-                capturedAt: z.string().datetime(),
+                calculationNow: z.iso.datetime(),
+                capturedAt: z.iso.datetime(),
                 trigger: z.string(),
                 mode: z.enum(["REFERENCE", "CHANGE", "ANCHOR"]),
                 sourceRevision: z.string(),
@@ -1071,10 +1071,10 @@ export const analysisArchiveSchema = z
     privacyProfile: analysisPrivacyProfileSchema,
     formatVersion: z.union([z.literal(1), z.literal(2)]),
     status: analysisArchiveStatusSchema,
-    requestedAt: z.string().datetime(),
-    startedAt: z.string().datetime().nullable(),
-    completedAt: z.string().datetime().nullable(),
-    expiresAt: z.string().datetime(),
+    requestedAt: z.iso.datetime(),
+    startedAt: z.iso.datetime().nullable(),
+    completedAt: z.iso.datetime().nullable(),
+    expiresAt: z.iso.datetime(),
     sizeBytes: z.number().int().nonnegative().nullable(),
     failureCode: z.string().nullable(),
   })

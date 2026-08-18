@@ -160,7 +160,7 @@ export class PlannedOperationValidator {
     const expectedVersion = command.payload.planExpectedVersion;
     if (
       (expectedVersion === null && existing) ||
-      (expectedVersion !== null && (!existing || existing.version !== expectedVersion))
+      (expectedVersion !== null && existing?.version !== expectedVersion)
     ) {
       return this.errorResponse(
         "PLANNED_OPERATION_VERSION_CONFLICT",
@@ -169,7 +169,7 @@ export class PlannedOperationValidator {
         existing?.version,
       );
     }
-    if (existing && existing.status !== "PLANNED") {
+    if (existing?.status !== undefined && existing.status !== "PLANNED") {
       return this.errorResponse(
         "PLANNED_OPERATION_NOT_EDITABLE",
         "Nur noch nicht gestartete Planeinträge können bearbeitet werden.",

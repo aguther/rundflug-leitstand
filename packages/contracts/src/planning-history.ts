@@ -39,7 +39,7 @@ export const planningHistoryPackageManifestSchema = z
   .object({
     format: z.literal("rundflug-planning-history"),
     formatVersion: z.literal(1),
-    createdAt: z.string().datetime(),
+    createdAt: z.iso.datetime(),
     privacyProfile: z.literal("SUPPORT_SAFE"),
     applicationVersion: z.string().min(1),
     requirementsVersion: z.string().min(1),
@@ -54,9 +54,9 @@ export const planningHistoryPackageManifestSchema = z
       .object({
         compactionId: z.string().min(1),
         startRunId: z.string().min(1),
-        startCapturedAt: z.string().datetime(),
+        startCapturedAt: z.iso.datetime(),
         endRunId: z.string().min(1),
-        endCapturedAt: z.string().datetime(),
+        endCapturedAt: z.iso.datetime(),
         terminal: z.boolean(),
       })
       .strict(),
