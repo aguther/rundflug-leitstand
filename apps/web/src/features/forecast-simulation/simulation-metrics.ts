@@ -25,9 +25,14 @@ export function calculateSimulationMetrics(input: {
   const accuracy = calculateForecastAccuracyMetrics(input.rotations, input.snapshots);
   const quality = calculateForecastQualityMetrics(input.snapshots);
   const operational = calculateOperationalMetrics(input);
-  const reactionSeconds = input.events.map(
-    (event) => (Date.parse(event.forecastRecalculatedAt) - Date.parse(event.occurredAt)) / 1_000,
-  );
+  let maximumEventReactionSeconds: number | null = null;
+  for (const event of input.events) {
+    const reactionSeconds =
+      (Date.parse(event.forecastRecalculatedAt) - Date.parse(event.occurredAt)) / 1_000;
+    if (maximumEventReactionSeconds === null || reactionSeconds > maximumEventReactionSeconds) {
+      maximumEventReactionSeconds = reactionSeconds;
+    }
+  }
 
   return {
     ...accuracy,
@@ -35,6 +40,6 @@ export function calculateSimulationMetrics(input: {
     precall: calculatePrecallMetrics(input.rotations),
     stability: calculateStabilityMetrics(input.snapshots),
     ...operational,
-    maximumEventReactionSeconds: reactionSeconds.length === 0 ? 0 : Math.max(...reactionSeconds),
+    maximumEventReactionSeconds: maximumEventReactionSeconds ?? 0,
   };
 }

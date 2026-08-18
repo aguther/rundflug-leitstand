@@ -255,8 +255,7 @@ describe("forecast simulation view", () => {
 
   it("renders adaptive time ticks and symmetric minute scales in both error charts", () => {
     const { container } = render(<ForecastSimulationView />);
-    const advance = screen.getByRole("button", { name: "+5 Min." });
-    for (let index = 0; index < 200; index += 1) fireEvent.click(advance);
+    fireEvent.click(screen.getByRole("button", { name: "Bis Ende berechnen" }));
 
     const charts = container.querySelectorAll(".sim-error-chart");
     expect(charts).toHaveLength(2);

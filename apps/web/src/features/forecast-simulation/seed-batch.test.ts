@@ -200,13 +200,17 @@ describe("seed batch statistics", () => {
     expect(() => runSeedBatchWithRunner(config, [], 101, undefined, runner)).toThrow(/5 und 100/);
   });
 
-  it("repeats five complete simulation runs deterministically", () => {
+  it("repeats twenty-five compact simulation runs deterministically", () => {
     const config = simulationConfigForPreset("NORMAL");
-    const first = runSeedBatch(config, [], 5);
-    const second = runSeedBatch(config, [], 5);
+    config.realityModel.demand.windows = config.realityModel.demand.windows.map((window) => ({
+      ...window,
+      personsPerHour: 4,
+    }));
+    const first = runSeedBatch(config, [], 25);
+    const second = runSeedBatch(config, [], 25);
 
     expect(second).toEqual(first);
-    expect(first.runs).toHaveLength(5);
+    expect(first.runs).toHaveLength(25);
     expect(first.runs.every((run) => run.metrics.operations.completedRotations > 0)).toBe(true);
   }, 60_000);
 });

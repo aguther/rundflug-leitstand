@@ -230,16 +230,28 @@ export function calculateStabilityMetrics(
 ): SimulationMetrics["stability"] {
   const changes = boardingForecastAbsoluteChanges(snapshots);
   const averageChange = average(changes);
+  let maximumJumpMinutes = 0;
+  let jumpsOver15Minutes = 0;
+  let jumpsOver30Minutes = 0;
+  for (const change of changes) {
+    maximumJumpMinutes = Math.max(maximumJumpMinutes, change);
+    if (change > 15) jumpsOver15Minutes += 1;
+    if (change > 30) jumpsOver30Minutes += 1;
+  }
+  let maximumWindowWidthMinutes = 0;
+  for (const snapshot of snapshots) {
+    maximumWindowWidthMinutes = Math.max(
+      maximumWindowWidthMinutes,
+      snapshot.upperMinutes - snapshot.lowerMinutes,
+    );
+  }
   return {
     changes: changes.length,
     averageAbsoluteChangeMinutes: averageChange === null ? null : rounded(averageChange),
-    maximumJumpMinutes: rounded(Math.max(0, ...changes)),
-    jumpsOver15Minutes: changes.filter((value) => value > 15).length,
-    jumpsOver30Minutes: changes.filter((value) => value > 30).length,
-    maximumWindowWidthMinutes: Math.max(
-      0,
-      ...snapshots.map((snapshot) => snapshot.upperMinutes - snapshot.lowerMinutes),
-    ),
+    maximumJumpMinutes: rounded(maximumJumpMinutes),
+    jumpsOver15Minutes,
+    jumpsOver30Minutes,
+    maximumWindowWidthMinutes,
   };
 }
 
@@ -372,13 +384,15 @@ function calculateProductServiceMetrics(
         occupiedSeats === 0 ? 0 : rounded((passengers / occupiedSeats) * 100),
       ]),
   );
-  const deficits = [...productWaits.values()].map((waits) =>
-    Math.max(0, (average(waits) ?? 0) - (averagePassengerWaitMinutes ?? 0)),
-  );
+  let maximumDeficitMinutes: number | null = null;
+  for (const waits of productWaits.values()) {
+    const deficit = Math.max(0, (average(waits) ?? 0) - (averagePassengerWaitMinutes ?? 0));
+    maximumDeficitMinutes = Math.max(maximumDeficitMinutes ?? deficit, deficit);
+  }
   return {
     waitMinutesByProduct,
     serviceSharePercentByProduct,
-    maximumDeficitMinutes: deficits.length === 0 ? null : rounded(Math.max(...deficits)),
+    maximumDeficitMinutes: maximumDeficitMinutes === null ? null : rounded(maximumDeficitMinutes),
   };
 }
 
@@ -391,7 +405,9 @@ function collectProductRotation(
   const productId = rotation.productId ?? "DEFAULT";
   const waits = productWaits.get(productId) ?? [];
   const waitMinutes = (Date.parse(rotation.calledAt) - Date.parse(rotation.createdAt)) / MINUTE_MS;
-  waits.push(...Array.from({ length: Math.max(1, rotation.passengerCount) }, () => waitMinutes));
+  for (let index = 0; index < Math.max(1, rotation.passengerCount); index += 1) {
+    waits.push(waitMinutes);
+  }
   productWaits.set(productId, waits);
   servedPassengers.set(productId, (servedPassengers.get(productId) ?? 0) + rotation.passengerCount);
 }
@@ -421,10 +437,10 @@ function buildOperationsMetrics(input: OperationsInput): SimulationMetrics["oper
       ? [(rotation.passengerCount / rotation.dispatchCapacity) * 100]
       : [],
   );
-  const latestCompletionMs = Math.max(
-    0,
-    ...input.completedRotations.map((rotation) => Date.parse(rotation.completedAt ?? "")),
-  );
+  let latestCompletionMs = 0;
+  for (const rotation of input.completedRotations) {
+    latestCompletionMs = Math.max(latestCompletionMs, Date.parse(rotation.completedAt ?? ""));
+  }
   return {
     completedRotations: input.completedRotations.length,
     overtimeMinutes:

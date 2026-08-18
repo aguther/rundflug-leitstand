@@ -156,4 +156,22 @@ describe("boarding forecast stability", () => {
       }),
     );
   });
+
+  it("handles snapshot volumes above the JavaScript argument limit", () => {
+    const repeatedSnapshot = snapshot(
+      "rotation-large",
+      "2026-08-18T09:00:00.000Z",
+      "2026-08-18T10:00:00.000Z",
+    );
+    const snapshots = Array.from({ length: 125_000 }, () => repeatedSnapshot);
+
+    expect(calculateStabilityMetrics(snapshots)).toEqual({
+      changes: 124_999,
+      averageAbsoluteChangeMinutes: 0,
+      maximumJumpMinutes: 0,
+      jumpsOver15Minutes: 0,
+      jumpsOver30Minutes: 0,
+      maximumWindowWidthMinutes: 10,
+    });
+  });
 });
