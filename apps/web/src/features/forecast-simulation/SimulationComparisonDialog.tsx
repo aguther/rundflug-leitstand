@@ -5,11 +5,13 @@ interface SimulationComparisonDialogProps {
   error: string | null;
   onCancel: () => void;
   onClose: () => void;
-  onRestart: () => void;
+  onStart: () => void;
   open: boolean;
   progress: { completed: number; total: number };
   result: BatchComparisonResult | null;
+  runCount: number;
   running: boolean;
+  seedStart: number;
 }
 
 function metric(value: number | null, unit = ""): string {
@@ -28,12 +30,15 @@ export function SimulationComparisonDialog({
   error,
   onCancel,
   onClose,
-  onRestart,
+  onStart,
   open,
   progress,
   result,
+  runCount,
   running,
+  seedStart,
 }: Readonly<SimulationComparisonDialogProps>) {
+  const hasCompletedAttempt = result !== null || error !== null;
   return (
     <ModalDialog
       description="Produktions-Baseline und lokaler Kandidat verwenden dieselben Seeds und Szenarien."
@@ -42,9 +47,11 @@ export function SimulationComparisonDialog({
           {running ? (
             <Button onClick={onCancel}>Vergleich abbrechen</Button>
           ) : (
-            <Button onClick={onRestart}>Erneut ausführen</Button>
+            <Button onClick={onStart} variant={hasCompletedAttempt ? "secondary" : "primary"}>
+              {hasCompletedAttempt ? "Erneut ausführen" : "A/B-Vergleich starten"}
+            </Button>
           )}
-          <Button onClick={onClose} variant="primary">
+          <Button onClick={onClose} variant={hasCompletedAttempt ? "primary" : "secondary"}>
             Schließen
           </Button>
         </>
@@ -54,6 +61,17 @@ export function SimulationComparisonDialog({
       size="wide"
       title="A/B-Prognosevergleich"
     >
+      <div className="sim-batch-parameters">
+        <label>
+          Anzahl Läufe
+          <input aria-label="Anzahl Vergleichsläufe" readOnly value={runCount} />
+        </label>
+        <label>
+          Start-Seed
+          <input aria-label="Start-Seed des Vergleichs" readOnly value={seedStart} />
+        </label>
+        <small>Baseline und Kandidat verwenden dieselben fortlaufenden Seeds.</small>
+      </div>
       {running ? (
         <section className="sim-comparison-progress" aria-live="polite">
           <strong>

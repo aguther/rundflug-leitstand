@@ -74,5 +74,15 @@ export function useSimulationComparison() {
     });
   };
 
-  return { cancel, error, open, progress, result, running, setOpen, start };
+  return {
+    cancel,
+    error,
+    open,
+    openDialog: () => setOpen(true),
+    progress,
+    result,
+    running,
+    setOpen,
+    start,
+  };
 }

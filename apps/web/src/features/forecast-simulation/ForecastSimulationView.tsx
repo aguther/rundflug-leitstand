@@ -64,6 +64,17 @@ const MINUTE_MS = 60_000;
 const TICK_MS = 30_000;
 export const SIMULATION_SPEEDS = [1, 2, 5, 10, 30, 60, 120, 300, 600] as const;
 const HOSTED_SIMULATOR = import.meta.env.MODE !== "simulator";
+
+function waitForNextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof globalThis.requestAnimationFrame === "function") {
+      globalThis.requestAnimationFrame(() => resolve());
+      return;
+    }
+    globalThis.setTimeout(resolve, 0);
+  });
+}
+
 const ForecastStabilityHistogram = lazy(() =>
   import("./ForecastStabilityHistogram").then((module) => ({
     default: module.ForecastStabilityHistogram,
@@ -378,6 +389,7 @@ export function ForecastSimulationView() {
   );
   const [speed, setSpeed] = useState<(typeof SIMULATION_SPEEDS)[number]>(10);
   const [running, setRunning] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [selectedRotationId, setSelectedRotationId] = useState<string | null>(null);
   const [selectedAircraftId, setSelectedAircraftId] = useState("aircraft-1");
   const [editorOpen, setEditorOpen] = useState(false);
@@ -422,6 +434,16 @@ export function ForecastSimulationView() {
 
   const restart = (nextConfig = config, incidents: readonly ManualIncident[] = []) => {
     loadSimulation(nextConfig, incidents);
+  };
+  const resetSimulation = async () => {
+    setResetting(true);
+    setRunning(false);
+    try {
+      await waitForNextPaint();
+      restart(config);
+    } finally {
+      setResetting(false);
+    }
   };
   const visibleAt = Math.floor(currentMs / TICK_MS) * TICK_MS;
   const { fidsHref } = useSimulationFidsPublisher({
@@ -644,6 +666,7 @@ export function ForecastSimulationView() {
             <Button
               aria-label="Szenario konfigurieren"
               className="sim-full-button"
+              disabled={resetting}
               onClick={() => {
                 setEditorConfig(structuredClone(config));
                 setEditorOpen(true);
@@ -651,10 +674,14 @@ export function ForecastSimulationView() {
             >
               <Settings2 aria-hidden="true" /> Konfigurieren
             </Button>
-            <Button className="sim-full-button" onClick={() => setImportOpen(true)}>
+            <Button
+              className="sim-full-button"
+              disabled={resetting}
+              onClick={() => setImportOpen(true)}
+            >
               <Upload aria-hidden="true" /> Importieren …
             </Button>
-            <Button className="sim-full-button" onClick={exportScenario}>
+            <Button className="sim-full-button" disabled={resetting} onClick={exportScenario}>
               <Download aria-hidden="true" /> Szenario exportieren
             </Button>
           </section>
@@ -662,10 +689,14 @@ export function ForecastSimulationView() {
             <h2 id="sim-sidebar-runs">
               <RotateCcw aria-hidden="true" /> Läufe
             </h2>
-            <Button className="sim-full-button" onClick={seedBatch.openDialog}>
+            <Button className="sim-full-button" disabled={resetting} onClick={seedBatch.openDialog}>
               <Layers3 aria-hidden="true" /> Mehrfachlauf
             </Button>
-            <Button className="sim-full-button" onClick={startComparison}>
+            <Button
+              className="sim-full-button"
+              disabled={resetting}
+              onClick={comparison.openDialog}
+            >
               <GitCompareArrows aria-hidden="true" /> A/B-Vergleich
             </Button>
           </section>
@@ -674,13 +705,13 @@ export function ForecastSimulationView() {
               <Gauge aria-hidden="true" /> Auswertung
             </h2>
             <nav aria-label="Simulationsauswertung" className="sim-sidebar-analysis-actions">
-              <Button onClick={() => setDetailsOpen(true)}>
+              <Button disabled={resetting} onClick={() => setDetailsOpen(true)}>
                 <Gauge aria-hidden="true" /> Kennzahlen im Detail
               </Button>
-              <Button onClick={() => setHistoryOpen(true)}>
+              <Button disabled={resetting} onClick={() => setHistoryOpen(true)}>
                 <FileChartColumn aria-hidden="true" /> Lauf auswerten
               </Button>
-              <Button onClick={exportResult}>
+              <Button disabled={resetting} onClick={exportResult}>
                 <Download aria-hidden="true" /> Ergebnis exportieren
               </Button>
             </nav>
@@ -694,29 +725,35 @@ export function ForecastSimulationView() {
               <Button
                 aria-pressed={running}
                 className="sim-playback-toggle"
-                disabled={simulationEnded}
+                disabled={resetting || simulationEnded}
                 onClick={() => setRunning((current) => !current)}
                 variant={running ? "secondary" : "primary"}
               >
                 {running ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
                 {simulationEnded ? "Beendet" : running ? "Pause" : "Start"}
               </Button>
-              <Button className="sim-playback-reset" onClick={() => restart(config)}>
+              <Button
+                busy={resetting}
+                busyLabel="Simulation wird neu gestartet"
+                className="sim-playback-reset"
+                onClick={resetSimulation}
+              >
                 <RotateCcw aria-hidden="true" /> Neu starten
               </Button>
               <Button
-                disabled={simulationEnded}
+                disabled={resetting || simulationEnded}
                 onClick={() =>
                   setCurrentMs((value) => Math.min(simulationEnd, value + 5 * MINUTE_MS))
                 }
               >
                 <Plus aria-hidden="true" /> +5 Min.
               </Button>
-              <Button disabled={currentMs >= simulationEnd} onClick={calculateToEnd}>
+              <Button disabled={resetting || currentMs >= simulationEnd} onClick={calculateToEnd}>
                 <FastForward aria-hidden="true" /> Bis Ende berechnen
               </Button>
               <select
                 aria-label="Simulationsgeschwindigkeit"
+                disabled={resetting}
                 onChange={(event) =>
                   setSpeed(Number(event.currentTarget.value) as (typeof SIMULATION_SPEEDS)[number])
                 }
@@ -737,6 +774,7 @@ export function ForecastSimulationView() {
               <div>
                 <label htmlFor="sim-aircraft-select">Ereignis für</label>
                 <select
+                  disabled={resetting}
                   id="sim-aircraft-select"
                   onChange={(event) => setSelectedAircraftId(event.currentTarget.value)}
                   value={selectedAircraftId}
@@ -749,7 +787,7 @@ export function ForecastSimulationView() {
                 </select>
               </div>
               <Button
-                disabled={!operationsAvailableNow}
+                disabled={resetting || !operationsAvailableNow}
                 onClick={() =>
                   inject("UNPLANNED_PAUSE", {
                     durationMinutes: config.realityModel.incidents.unplannedPause.duration.typical,
@@ -759,7 +797,7 @@ export function ForecastSimulationView() {
                 <Coffee aria-hidden="true" /> Pause
               </Button>
               <Button
-                disabled={!operationsAvailableNow}
+                disabled={resetting || !operationsAvailableNow}
                 onClick={() =>
                   inject("REFUELING", {
                     durationMinutes: config.realityModel.incidents.refueling.duration.typical,
@@ -769,7 +807,7 @@ export function ForecastSimulationView() {
                 <Fuel aria-hidden="true" /> Tanken
               </Button>
               <Button
-                disabled={!operationsAvailableNow}
+                disabled={resetting || !operationsAvailableNow}
                 onClick={() =>
                   inject("TECHNICAL_DEFECT", {
                     durationMinutes: config.realityModel.incidents.technicalDefect.duration.typical,
@@ -779,13 +817,13 @@ export function ForecastSimulationView() {
                 <Wrench aria-hidden="true" /> Defekt
               </Button>
               <Button
-                disabled={!operationsAvailableNow}
+                disabled={resetting || !operationsAvailableNow}
                 onClick={() => inject("TECHNICAL_DEFECT", { dayOutage: true, durationMinutes: 0 })}
               >
                 <Plane aria-hidden="true" /> Flugzeugausfall
               </Button>
               <Button
-                disabled={!operationsAvailableNow}
+                disabled={resetting || !operationsAvailableNow}
                 onClick={() => inject("EVENT_INTERRUPTION", { durationMinutes: 30 })}
               >
                 <Square aria-hidden="true" /> Betrieb unterbrechen
@@ -1134,11 +1172,13 @@ export function ForecastSimulationView() {
             error={comparison.error}
             onCancel={comparison.cancel}
             onClose={closeComparison}
-            onRestart={startComparison}
+            onStart={startComparison}
             open={comparison.open}
             progress={comparison.progress}
             result={comparison.result}
+            runCount={config.forecastTuning.comparisonRuns}
             running={comparison.running}
+            seedStart={config.seed}
           />
         </Suspense>
       ) : null}

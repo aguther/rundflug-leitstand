@@ -101,7 +101,9 @@ seedübergreifenden Mediane der wichtigsten Baselinewerte lauten:
 
 Der Vergleich läuft abbrechbar in einem lokalen Browser-Worker. Er bewertet keine Variante
 automatisch als Gewinner. Der sichtbare Einstieg **A/B-Vergleich** steht gemeinsam mit dem
-**Mehrfachlauf** im Sidebar-Abschnitt **Läufe**; die reine Auswertung bleibt davon getrennt.
+**Mehrfachlauf** im Sidebar-Abschnitt **Läufe**; die reine Auswertung bleibt davon getrennt. Beide
+Einstiege öffnen zunächst ihren Dialog und starten die lokale Berechnung erst nach einer ausdrücklichen
+Bestätigung.
 
 ## Mehrfachlauf desselben Szenarios
 

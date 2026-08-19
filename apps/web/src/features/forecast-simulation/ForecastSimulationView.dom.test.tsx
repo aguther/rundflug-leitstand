@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runSimulation } from "./engine";
@@ -251,6 +251,14 @@ describe("forecast simulation view", () => {
     expect((screen.getByLabelText("Start-Seed") as HTMLInputElement).readOnly).toBe(true);
     await user.click(screen.getByRole("button", { name: "Schließen" }));
     expect(screen.queryByRole("dialog", { name: "Mehrfachlauf vergleichen" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "A/B-Vergleich" }));
+    expect(await screen.findByRole("dialog", { name: "A/B-Prognosevergleich" })).toBeTruthy();
+    expect(screen.getByLabelText("Anzahl Vergleichsläufe")).toBeTruthy();
+    expect(screen.getByLabelText("Start-Seed des Vergleichs")).toBeTruthy();
+    expect(mocks.workers[0]?.postMessage).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Schließen" }));
+    expect(screen.queryByRole("dialog", { name: "A/B-Prognosevergleich" })).toBeNull();
   });
 
   it("renders adaptive time ticks and symmetric minute scales in both error charts", () => {
@@ -277,6 +285,8 @@ describe("forecast simulation view", () => {
     expect(worker).toBeDefined();
 
     await user.click(screen.getByRole("button", { name: "A/B-Vergleich" }));
+    expect(worker?.postMessage).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "A/B-Vergleich starten" }));
     expect(worker?.postMessage).toHaveBeenCalledOnce();
 
     worker?.onmessage?.(
@@ -379,7 +389,19 @@ describe("forecast simulation view", () => {
       expect.objectContaining({ running: false, speed: 600 }),
     );
     expect(mocks.fidsInputs.at(-1)?.clockMs).toBe(mocks.fidsInputs.at(-1)?.visibleAt);
-    await user.click(screen.getByRole("button", { name: "Neu starten" }));
+    fireEvent.click(screen.getByRole("button", { name: "Neu starten" }));
+    const resetButton = screen.getByRole("button", { name: "Simulation wird neu gestartet" });
+    expect(resetButton.getAttribute("aria-busy")).toBe("true");
+    expect((playbackToggle as HTMLButtonElement).disabled).toBe(true);
+    expect((calculateToEnd as HTMLButtonElement).disabled).toBe(true);
+    expect((speedSelect as HTMLSelectElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "Mehrfachlauf" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect((screen.getByLabelText("Ereignis für") as HTMLSelectElement).disabled).toBe(true);
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Simulation wird neu gestartet" })).toBeNull(),
+    );
     expect((screen.getByRole("button", { name: "Start" }) as HTMLButtonElement).disabled).toBe(
       false,
     );
@@ -406,6 +428,8 @@ describe("forecast simulation view", () => {
     const firstWorker = mocks.workers[0];
 
     await user.click(screen.getByRole("button", { name: "A/B-Vergleich" }));
+    expect(firstWorker?.postMessage).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "A/B-Vergleich starten" }));
     firstWorker?.onmessage?.(
       new MessageEvent("message", {
         data: { type: "error", message: "Synthetischer Vergleichsfehler" },
