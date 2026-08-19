@@ -100,7 +100,8 @@ seedübergreifenden Mediane der wichtigsten Baselinewerte lauten:
 | GO TO GATE → Boarding Median / P90 | 100,75 / 203,0 Min. |
 
 Der Vergleich läuft abbrechbar in einem lokalen Browser-Worker. Er bewertet keine Variante
-automatisch als Gewinner.
+automatisch als Gewinner. Der sichtbare Einstieg **A/B-Vergleich** steht gemeinsam mit dem
+**Mehrfachlauf** im Sidebar-Abschnitt **Läufe**; die reine Auswertung bleibt davon getrennt.
 
 ## Mehrfachlauf desselben Szenarios
 
@@ -405,8 +406,9 @@ Light und Dark Mode wurden jeweils im In-App-Browser geprüft:
 - die Flugzeugansicht zeigt gebundene Umläufe mit Boarding, Off-Block, On-Block und Abschluss sowie
   Tanken, geplante Pause und jeweils das bestätigte Rückkehrereignis;
 - kein horizontaler Dokument- oder Arbeitsbereichsüberlauf in den geprüften Viewports;
-- der eigenständige FIDS-Tab folgt Start, Pause, `+5 Min.`, Szenariowechsel und
-  Betriebsunterbrechung, ohne die Bedienung oder den Lebenszyklus des Simulator-Tabs zu verändern;
+- der eigenständige FIDS-Tab folgt dem gemeinsamen Start/Pause-Umschalter, `Neu starten`,
+  `+5 Min.`, Szenariowechsel und Betriebsunterbrechung, ohne die Bedienung oder den Lebenszyklus des
+  Simulator-Tabs zu verändern;
 - ein Direktaufruf von `/simulation/fids` wartet ohne eigenen Standardlauf und verbindet sich nach
   dem Öffnen von `/simulation` automatisch; mehrere FIDS-Tabs dürfen dieselbe Quelle beobachten;
 - Reload, Navigation und Schließen eines FIDS-Tabs beenden oder pausieren die Simulation nicht;

@@ -47,7 +47,7 @@ interface FlightLineOperationalConsoleProps {
   onStartRecall: (ticketGroupId: string) => Promise<void>;
   onToggleGroup: (ticketGroupId: string, selected: boolean, selectRotation: boolean) => void;
   operationalSummary: string;
-  operationalSummaryTone: "critical" | "warning" | "notice" | "normal";
+  operationalSummaryTone: "critical" | "warning" | "notice" | "normal" | "neutral";
   selectedAircraft: Aircraft | null | undefined;
   selectedGroupIds: string[];
   turnaroundNextState: TurnaroundNextState;

@@ -18,15 +18,28 @@ import {
 
 type CashierProduct = OperationBoard["products"][number];
 
+const activeEvent = {
+  emergencyMode: false,
+  operationalInterrupted: false,
+  saleOpensAt: null,
+  status: "ACTIVE",
+} as OperationBoard["event"];
+
 function product(
   capacityStatus: CashierProduct["capacityStatus"],
   saleRecommended: boolean,
 ): CashierProduct {
   return {
     capacityStatus,
+    resourceGroupStatus: "ACTIVE",
+    saleClosesAt: null,
     saleEnabled: true,
     saleRecommended,
   } as CashierProduct;
+}
+
+function board(products: CashierProduct[], event = activeEvent): OperationBoard {
+  return { event, products } as OperationBoard;
 }
 
 describe("cashier presentation behavior", () => {
@@ -34,7 +47,7 @@ describe("cashier presentation behavior", () => {
 
   it("presents the most restrictive status without turning a recommendation into a hard guard", () => {
     expect(
-      cashierCapacityGuidance([product("AVAILABLE", true), product("MANUAL_REVIEW", false)]),
+      cashierCapacityGuidance(board([product("AVAILABLE", true), product("MANUAL_REVIEW", false)])),
     ).toEqual({
       label: "Kapazität manuell prüfen",
       recommendation: "Verkauf derzeit nicht empfohlen · bewusster Verkauf bleibt möglich",
@@ -43,7 +56,7 @@ describe("cashier presentation behavior", () => {
   });
 
   it("reserves stable copy while capacity is loading", () => {
-    expect(cashierCapacityGuidance(undefined)).toEqual({
+    expect(cashierCapacityGuidance(null)).toEqual({
       label: "Kapazität wird geladen",
       recommendation: "Verkaufsempfehlung wird ermittelt",
       tone: "loading",
@@ -51,25 +64,37 @@ describe("cashier presentation behavior", () => {
   });
 
   it("distinguishes unavailable products and every limiting capacity status", () => {
-    expect(cashierCapacityGuidance([product("AVAILABLE", true)])).toEqual({
+    expect(cashierCapacityGuidance(board([product("AVAILABLE", true)]))).toEqual({
       label: "Kapazität verfügbar",
       recommendation: "Verkauf empfohlen",
       tone: "positive",
     });
-    expect(cashierCapacityGuidance([product("LIMITED", true)])).toMatchObject({
+    expect(cashierCapacityGuidance(board([product("LIMITED", true)]))).toMatchObject({
       label: "Kapazität begrenzt",
     });
-    expect(cashierCapacityGuidance([product("SOLD_OUT", false)])).toMatchObject({
+    expect(cashierCapacityGuidance(board([product("SOLD_OUT", false)]))).toMatchObject({
       label: "Keine prognostizierte Kapazität",
       tone: "warning",
     });
     expect(
-      cashierCapacityGuidance([{ ...product("AVAILABLE", true), saleEnabled: false }]),
+      cashierCapacityGuidance(board([{ ...product("AVAILABLE", true), saleEnabled: false }])),
     ).toEqual({
-      label: "Keine Verkaufsprodukte aktiv",
-      recommendation: "Verkauf nicht verfügbar",
+      label: "Produktverkauf gesperrt",
+      recommendation: "Verkauf nicht möglich",
       tone: "warning",
     });
+  });
+
+  it("presents a closed event as a hard sale block without changing product configuration", () => {
+    const configuredProduct = product("AVAILABLE", true);
+    expect(
+      cashierCapacityGuidance(board([configuredProduct], { ...activeEvent, status: "CLOSED" })),
+    ).toEqual({
+      label: "Betrieb geschlossen",
+      recommendation: "Verkauf nicht möglich",
+      tone: "warning",
+    });
+    expect(configuredProduct.saleEnabled).toBe(true);
   });
 
   it("filters ticket list states and reports stable empty and pagination labels", () => {

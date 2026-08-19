@@ -392,6 +392,7 @@ export function ForecastSimulationView() {
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const editorErrors = validateSimulationConfig(editorConfig);
   const simulationEnd = Date.parse(result.runWindow.endAt);
+  const simulationEnded = currentMs >= simulationEnd;
 
   useEffect(() => {
     document.title = "Prognose-Simulation · Rundflug-Leitstand";
@@ -664,8 +665,8 @@ export function ForecastSimulationView() {
             <Button className="sim-full-button" onClick={seedBatch.openDialog}>
               <Layers3 aria-hidden="true" /> Mehrfachlauf
             </Button>
-            <Button className="sim-full-button" onClick={() => restart(config)} variant="primary">
-              <RotateCcw aria-hidden="true" /> Neu starten
+            <Button className="sim-full-button" onClick={startComparison}>
+              <GitCompareArrows aria-hidden="true" /> A/B-Vergleich
             </Button>
           </section>
           <section className="sim-sidebar-group" aria-labelledby="sim-sidebar-analysis">
@@ -679,9 +680,6 @@ export function ForecastSimulationView() {
               <Button onClick={() => setHistoryOpen(true)}>
                 <FileChartColumn aria-hidden="true" /> Lauf auswerten
               </Button>
-              <Button onClick={startComparison}>
-                <GitCompareArrows aria-hidden="true" /> Baseline und Kandidat vergleichen
-              </Button>
               <Button onClick={exportResult}>
                 <Download aria-hidden="true" /> Ergebnis exportieren
               </Button>
@@ -693,13 +691,21 @@ export function ForecastSimulationView() {
         <div className="sim-workspace">
           <section className="sim-controls">
             <div className="sim-playback">
-              <Button onClick={() => setRunning(true)} variant="primary">
-                <Play aria-hidden="true" /> Start
+              <Button
+                aria-pressed={running}
+                className="sim-playback-toggle"
+                disabled={simulationEnded}
+                onClick={() => setRunning((current) => !current)}
+                variant={running ? "secondary" : "primary"}
+              >
+                {running ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+                {simulationEnded ? "Beendet" : running ? "Pause" : "Start"}
               </Button>
-              <Button onClick={() => setRunning(false)}>
-                <Pause aria-hidden="true" /> Pause
+              <Button className="sim-playback-reset" onClick={() => restart(config)}>
+                <RotateCcw aria-hidden="true" /> Neu starten
               </Button>
               <Button
+                disabled={simulationEnded}
                 onClick={() =>
                   setCurrentMs((value) => Math.min(simulationEnd, value + 5 * MINUTE_MS))
                 }

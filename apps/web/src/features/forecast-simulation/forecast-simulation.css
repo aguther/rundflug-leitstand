@@ -406,6 +406,14 @@
   white-space: nowrap;
 }
 
+.sim-playback-toggle {
+  min-width: 92px;
+}
+
+.sim-playback-reset {
+  min-width: 118px;
+}
+
 .sim-playback select {
   width: 76px;
 }

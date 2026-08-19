@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runSimulation } from "./engine";
 import { ForecastSimulationView } from "./ForecastSimulationView";
 import type { SimulationConfig } from "./model";
 
@@ -196,10 +197,9 @@ describe("forecast simulation view", () => {
         "Importieren …",
         "Szenario exportieren",
         "Mehrfachlauf",
-        "Neu starten",
+        "A/B-Vergleich",
         "Kennzahlen im Detail",
         "Lauf auswerten",
-        "Baseline und Kandidat vergleichen",
         "Ergebnis exportieren",
       ],
     );
@@ -276,7 +276,7 @@ describe("forecast simulation view", () => {
     const worker = mocks.workers[0];
     expect(worker).toBeDefined();
 
-    await user.click(screen.getByRole("button", { name: "Baseline und Kandidat vergleichen" }));
+    await user.click(screen.getByRole("button", { name: "A/B-Vergleich" }));
     expect(worker?.postMessage).toHaveBeenCalledOnce();
 
     worker?.onmessage?.(
@@ -333,6 +333,15 @@ describe("forecast simulation view", () => {
     const user = userEvent.setup();
     render(<ForecastSimulationView />);
 
+    const playbackToggle = screen.getByRole("button", { name: "Start" });
+    expect(playbackToggle.getAttribute("aria-pressed")).toBe("false");
+    await user.click(playbackToggle);
+    expect(playbackToggle.textContent).toContain("Pause");
+    expect(playbackToggle.getAttribute("aria-pressed")).toBe("true");
+    await user.click(playbackToggle);
+    expect(playbackToggle.textContent).toContain("Start");
+    expect(playbackToggle.getAttribute("aria-pressed")).toBe("false");
+
     const speedSelect = screen.getByLabelText("Simulationsgeschwindigkeit");
     expect([...speedSelect.querySelectorAll("option")].map((option) => option.value)).toEqual([
       "1",
@@ -350,24 +359,32 @@ describe("forecast simulation view", () => {
       await user.click(screen.getByRole("button", { name: "+5 Min." }));
     }
 
-    for (const action of ["Tanken", "Defekt", "Flugzeugausfall", "Betrieb unterbrechen"]) {
+    for (const action of ["Pause", "Tanken", "Defekt", "Flugzeugausfall", "Betrieb unterbrechen"]) {
       const button = screen.getByRole("button", { name: action });
       expect((button as HTMLButtonElement).disabled).toBe(false);
       await user.click(button);
     }
-    const pauseButtons = screen.getAllByRole("button", { name: "Pause" });
-    expect(pauseButtons).toHaveLength(2);
-    await user.click(pauseButtons[1] as HTMLButtonElement);
-    await user.click(screen.getByRole("button", { name: "Start" }));
-    await user.click(pauseButtons[0] as HTMLButtonElement);
+    await user.click(playbackToggle);
+    await user.click(playbackToggle);
     const calculateToEnd = screen.getByRole("button", { name: "Bis Ende berechnen" });
     await user.click(calculateToEnd);
     expect((calculateToEnd as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Beendet" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect((screen.getByRole("button", { name: "+5 Min." }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
     expect(mocks.fidsInputs.at(-1)).toEqual(
       expect.objectContaining({ running: false, speed: 600 }),
     );
     expect(mocks.fidsInputs.at(-1)?.clockMs).toBe(mocks.fidsInputs.at(-1)?.visibleAt);
-    await user.click(screen.getByRole("button", { name: /Neu starten/ }));
+    await user.click(screen.getByRole("button", { name: "Neu starten" }));
+    expect((screen.getByRole("button", { name: "Start" }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+    expect((calculateToEnd as HTMLButtonElement).disabled).toBe(false);
+    expect(vi.mocked(runSimulation)).toHaveBeenLastCalledWith(expect.anything(), []);
   });
 
   it("applies an edited scenario without replacing the standalone FIDS link", async () => {
@@ -388,7 +405,7 @@ describe("forecast simulation view", () => {
     render(<ForecastSimulationView />);
     const firstWorker = mocks.workers[0];
 
-    await user.click(screen.getByRole("button", { name: "Baseline und Kandidat vergleichen" }));
+    await user.click(screen.getByRole("button", { name: "A/B-Vergleich" }));
     firstWorker?.onmessage?.(
       new MessageEvent("message", {
         data: { type: "error", message: "Synthetischer Vergleichsfehler" },

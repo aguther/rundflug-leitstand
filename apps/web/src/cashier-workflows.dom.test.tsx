@@ -125,7 +125,9 @@ const activeTicket: TicketSearchResult = {
 function operationBoard(
   overrides: {
     emergencyMode?: boolean;
+    eventStatus?: OperationBoard["event"]["status"];
     includeSecondProduct?: boolean;
+    operationalInterrupted?: boolean;
     remainingSellableSeats?: number;
     saleEnabled?: boolean;
   } = {},
@@ -133,8 +135,10 @@ function operationBoard(
   return {
     event: {
       emergencyMode: overrides.emergencyMode ?? false,
-      operationalInterrupted: false,
+      operationalInterrupted: overrides.operationalInterrupted ?? false,
       operationalNote: null,
+      saleOpensAt: null,
+      status: overrides.eventStatus ?? "ACTIVE",
       timeZone: "Europe/Berlin",
       version: 41,
     },
@@ -278,6 +282,40 @@ describe("cashier workflows", () => {
       name: /1 Ticket für Panoramaflug verkaufen/,
     });
     expect((saleAction as HTMLButtonElement).disabled).toBe(true);
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      label: "a closed event",
+      overrides: { eventStatus: "CLOSED" as const },
+      reason: "Betrieb geschlossen",
+    },
+    {
+      label: "an event in preparation",
+      overrides: { eventStatus: "PREPARATION" as const },
+      reason: "Betrieb nicht freigegeben",
+    },
+    {
+      label: "emergency mode",
+      overrides: { emergencyMode: true },
+      reason: "Not-Halt aktiv",
+    },
+    {
+      label: "an operational interruption",
+      overrides: { operationalInterrupted: true },
+      reason: "Betrieb unterbrochen",
+    },
+  ])("blocks sales during $label and explains the reason", async ({ overrides, reason }) => {
+    workspace.state.board = operationBoard(overrides);
+    renderCashier();
+
+    const saleAction = await screen.findByRole("button", {
+      name: /1 Ticket für Panoramaflug verkaufen/,
+    });
+    expect((saleAction as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(reason)).toBeTruthy();
+    expect(screen.getByText("Verkauf nicht möglich")).toBeTruthy();
     expect(api.sendCommand).not.toHaveBeenCalled();
   });
 

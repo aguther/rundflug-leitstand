@@ -3,6 +3,7 @@ import { AlertTriangle, Ticket } from "lucide-react";
 import { Button } from "../../design-system/components";
 import { oversizeSplitPreview } from "../../operational-exceptions";
 import { formatAbsoluteTimeWindow } from "../../time-window";
+import { productSaleBlockReason } from "../operations/sale-availability";
 
 type CashierProduct = OperationBoard["products"][number];
 
@@ -21,6 +22,7 @@ export function CashierProductList({
   serverConfirmed: boolean;
   size: number;
 }>) {
+  const evaluatedAt = Date.now();
   return (
     <div className="cashier-products">
       {board?.products.map((product) => {
@@ -28,10 +30,7 @@ export function CashierProductList({
         const splitDescriptionId = `cashier-split-${product.id}`;
         const saleDisabled =
           !serverConfirmed ||
-          !product.saleEnabled ||
-          product.resourceGroupStatus !== "ACTIVE" ||
-          board.event.emergencyMode ||
-          board.event.operationalInterrupted ||
+          productSaleBlockReason(board.event, product, evaluatedAt) !== null ||
           busyProductId !== null;
         return (
           <article className="cashier-product" key={product.id}>

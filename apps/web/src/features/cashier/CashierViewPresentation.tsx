@@ -9,6 +9,7 @@ import {
   OperationalNotice,
 } from "../operations/operation-notices";
 import type { TicketReceipt } from "../operations/operation-types";
+import { productSaleBlockReason } from "../operations/sale-availability";
 import { TicketPaper } from "./CashierTicketPresentation";
 
 export type TicketListTab = TicketSearchRequest["status"];
@@ -28,23 +29,31 @@ const capacityLabels: Record<CashierProduct["capacityStatus"], string> = {
   SOLD_OUT: "Keine prognostizierte Kapazität",
 };
 
-export function cashierCapacityGuidance(products: CashierProduct[] | undefined): {
+export function cashierCapacityGuidance(
+  board: OperationBoard | null,
+  nowMs = Date.now(),
+): {
   label: string;
   recommendation: string;
   tone: "loading" | "positive" | "warning";
 } {
-  if (!products) {
+  if (!board) {
     return {
       label: "Kapazität wird geladen",
       recommendation: "Verkaufsempfehlung wird ermittelt",
       tone: "loading",
     };
   }
-  const saleProducts = products.filter((product) => product.saleEnabled);
+  const saleProducts = board.products.filter(
+    (product) => productSaleBlockReason(board.event, product, nowMs) === null,
+  );
   if (saleProducts.length === 0) {
+    const blockingReason = board.products
+      .map((product) => productSaleBlockReason(board.event, product, nowMs))
+      .find((reason) => reason !== null);
     return {
-      label: "Keine Verkaufsprodukte aktiv",
-      recommendation: "Verkauf nicht verfügbar",
+      label: blockingReason?.label ?? "Keine Verkaufsprodukte aktiv",
+      recommendation: "Verkauf nicht möglich",
       tone: "warning",
     };
   }
@@ -67,10 +76,8 @@ export function cashierCapacityGuidance(products: CashierProduct[] | undefined):
   };
 }
 
-export function CashierCapacityGuidance({
-  products,
-}: Readonly<{ products: CashierProduct[] | undefined }>) {
-  const guidance = cashierCapacityGuidance(products);
+export function CashierCapacityGuidance({ board }: Readonly<{ board: OperationBoard | null }>) {
+  const guidance = cashierCapacityGuidance(board);
   let Icon = Gauge;
   if (guidance.tone === "positive") Icon = CircleCheck;
   if (guidance.tone === "warning") Icon = AlertTriangle;

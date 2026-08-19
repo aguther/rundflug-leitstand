@@ -238,7 +238,7 @@ export function compareTicketRows(left: TicketRow, right: TicketRow, sort: Ticke
 }
 
 function operationalStatusTone(
-  tone: "critical" | "warning" | "notice" | "normal",
+  tone: "critical" | "warning" | "notice" | "normal" | "neutral",
 ): "danger" | "warning" | "info" | "neutral" {
   switch (tone) {
     case "critical":
@@ -299,7 +299,7 @@ export function FlightLineSupervisorConsole({
   selectedAircraft: Aircraft | undefined;
   selectedQueueGroupIds: string[];
   operationalSummary: string;
-  operationalSummaryTone: "critical" | "warning" | "notice" | "normal";
+  operationalSummaryTone: "critical" | "warning" | "notice" | "normal" | "neutral";
   canManageOperations: boolean;
   dispatchLease: DispatchRecommendationLeaseController;
   onOpenOperations: (section: FlightDirectorOperationsSection) => void;

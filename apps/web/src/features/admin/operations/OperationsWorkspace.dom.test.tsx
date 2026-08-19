@@ -13,9 +13,15 @@ const board = {
     aerodrome: "EDXX",
     timeZone: "Europe/Berlin",
     status: "ACTIVE",
+    emergencyMode: false,
+    operationalInterrupted: false,
+    saleOpensAt: null,
   },
   metrics: { activeRotations: 2, openTickets: 4, completedRotations: 7 },
-  products: [{ saleEnabled: true }, { saleEnabled: false }],
+  products: [
+    { resourceGroupStatus: "ACTIVE", saleClosesAt: null, saleEnabled: true },
+    { resourceGroupStatus: "ACTIVE", saleClosesAt: null, saleEnabled: false },
+  ],
 } as OperationBoard;
 
 describe("OperationsWorkspace", () => {
@@ -33,5 +39,23 @@ describe("OperationsWorkspace", () => {
     expect(screen.queryByRole("tab")).toBeNull();
     expect(document.querySelector(".operations-workspace-content")).not.toBeNull();
     expect(document.querySelector(".operations-workspace-controls")).not.toBeNull();
+    expect(
+      screen.getByText((_, element) => element?.textContent === "1 Produkte verkaufbar"),
+    ).not.toBeNull();
+  });
+
+  it("shows no effectively sellable products after operations close", () => {
+    render(
+      <OperationsWorkspace
+        board={{ ...board, event: { ...board.event, status: "CLOSED" } }}
+        emergency={<p>Notfallinhalt</p>}
+        release={<p>Freigabeinhalt</p>}
+      />,
+    );
+
+    expect(
+      screen.getByText((_, element) => element?.textContent === "0 Produkte verkaufbar"),
+    ).not.toBeNull();
+    expect(board.products[0]?.saleEnabled).toBe(true);
   });
 });

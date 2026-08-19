@@ -74,6 +74,7 @@ describe("Flight Line presentation behavior", () => {
         emergencyMode: true,
         operationalInterrupted: true,
         operationalNote: "Event-Hinweis",
+        status: "ACTIVE",
       },
     } as OperationBoard;
     expect(operationalSummaryPresentation(board, undefined)).toEqual({
@@ -86,6 +87,33 @@ describe("Flight Line presentation behavior", () => {
         undefined,
       ),
     ).toEqual({ summary: "Betrieb unterbrochen", tone: "warning" });
+    expect(
+      operationalSummaryPresentation(
+        {
+          ...board,
+          event: { ...board.event, emergencyMode: false, status: "PREPARATION" },
+        },
+        undefined,
+      ),
+    ).toEqual({ summary: "Betrieb nicht freigegeben", tone: "warning" });
+    expect(
+      operationalSummaryPresentation(
+        { ...board, event: { ...board.event, emergencyMode: false, status: "CLOSED" } },
+        undefined,
+      ),
+    ).toEqual({ summary: "Betrieb geschlossen", tone: "neutral" });
+    expect(
+      operationalSummaryPresentation(
+        { ...board, event: { ...board.event, emergencyMode: false, status: "ARCHIVED" } },
+        undefined,
+      ),
+    ).toEqual({ summary: "Veranstaltung archiviert", tone: "neutral" });
+    expect(
+      operationalSummaryPresentation(
+        { ...board, event: { ...board.event, emergencyMode: true, status: "CLOSED" } },
+        undefined,
+      ),
+    ).toEqual({ summary: "Not-Halt aktiv", tone: "critical" });
     expect(
       operationalSummaryPresentation(
         {
@@ -116,8 +144,8 @@ describe("Flight Line presentation behavior", () => {
       ),
     ).toEqual({ summary: "Ressourcengruppen-Hinweis", tone: "notice" });
     expect(operationalSummaryPresentation(null, undefined)).toEqual({
-      summary: "Betrieb normal",
-      tone: "normal",
+      summary: "Stand wird geladen",
+      tone: "neutral",
     });
   });
 

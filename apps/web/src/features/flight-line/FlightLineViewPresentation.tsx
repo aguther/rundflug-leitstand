@@ -16,17 +16,27 @@ function queuedSegmentPresentCount(group: QueueGroup): number {
   return group.nextSegmentPresentCount ?? group.presentCount;
 }
 
-type OperationalSummaryTone = "critical" | "warning" | "notice" | "normal";
+type OperationalSummaryTone = "critical" | "warning" | "notice" | "normal" | "neutral";
 
 export function operationalSummaryPresentation(
   board: OperationBoard | null | undefined,
   resourceGroup: OperationBoard["resourceGroups"][number] | undefined,
 ): { summary: string; tone: OperationalSummaryTone } {
-  if (board?.event.emergencyMode) return { summary: "Not-Halt aktiv", tone: "critical" };
-  if (board?.event.operationalInterrupted) {
+  if (!board) return { summary: "Stand wird geladen", tone: "neutral" };
+  if (board.event.emergencyMode) return { summary: "Not-Halt aktiv", tone: "critical" };
+  if (board.event.status === "PREPARATION") {
+    return { summary: "Betrieb nicht freigegeben", tone: "warning" };
+  }
+  if (board.event.status === "CLOSED") {
+    return { summary: "Betrieb geschlossen", tone: "neutral" };
+  }
+  if (board.event.status === "ARCHIVED") {
+    return { summary: "Veranstaltung archiviert", tone: "neutral" };
+  }
+  if (board.event.operationalInterrupted) {
     return { summary: "Betrieb unterbrochen", tone: "warning" };
   }
-  const notice = board?.event.operationalNote || resourceGroup?.operationalNote;
+  const notice = board.event.operationalNote || resourceGroup?.operationalNote;
   if (notice) return { summary: notice, tone: "notice" };
   return { summary: "Betrieb normal", tone: "normal" };
 }

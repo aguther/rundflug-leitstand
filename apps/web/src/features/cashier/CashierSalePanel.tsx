@@ -107,7 +107,7 @@ export function CashierSalePanel(props: Readonly<CashierSalePanelProps>) {
           </div>
         ) : null}
       </div>
-      {!order.editing ? <CashierCapacityGuidance products={board?.products} /> : null}
+      {!order.editing ? <CashierCapacityGuidance board={board} /> : null}
       {order.editing ? (
         <CashierProductOrderEditor
           changed={order.changed}
