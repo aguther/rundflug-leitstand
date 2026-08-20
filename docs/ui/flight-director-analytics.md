@@ -57,10 +57,12 @@ ausschließlich mit ihrem anonymen operativen Code dargestellt.
 Prognose-, Flugzeug- und Pilotendiagramme verwenden denselben festen äußeren Viewport. Nur die
 innere Zeichenfläche wird vergrößert und horizontal bewegt; Rahmen, rechte Außenkante,
 Zoomsteuerung und Scrollbereich bleiben dadurch stabil. Das Mausrad zoomt an der Zeigerposition,
-Ziehen mit der primären Maustaste verschiebt die Zeitachse, und **Gesamt** setzt Zoom,
-Scrollposition und Ziehzustand gemeinsam zurück. Auswahl- und Reiterwechsel beginnen ebenfalls
-immer in der Gesamtansicht. Auch ein Ziehbeginn auf Pausen, Sperren oder Achsenbeschriftungen
-markiert keinen Text.
+Ziehen mit der primären Maustaste verschiebt die Zeitachse, und das Maximize-Symbol setzt Zoom,
+Scrollposition und Ziehzustand gemeinsam zurück. Die kompakte Steuerung besteht anwendungsweit aus
+genau drei quadratischen Symbolbuttons für Verkleinern, Vergrößern und Gesamtansicht; eine sichtbare
+Zoomstufen- oder Zeitspannenanzeige entfällt. Zugängliche Namen und Tooltips bleiben erhalten.
+Auswahl- und Reiterwechsel beginnen weiterhin in der Gesamtansicht. Auch ein Ziehbeginn auf Pausen,
+Sperren oder Achsenbeschriftungen markiert keinen Text.
 
 Die X-Achsen verwenden explizit berechnete, an lokalen Zeitgrenzen der Veranstaltungszeitzone
 ausgerichtete Ticks. Abhängig von Zeitspanne, Viewportbreite und Zoom werden ausschließlich die

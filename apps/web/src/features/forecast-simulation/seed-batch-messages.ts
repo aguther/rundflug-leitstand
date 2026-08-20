@@ -10,5 +10,5 @@ export interface SeedBatchWorkerRequest {
 
 export type SeedBatchWorkerMessage =
   | { type: "progress"; requestId: number; completedRuns: number; totalRuns: number }
-  | { type: "result"; requestId: number; result: SeedBatchResult }
+  | { type: "result"; requestId: number; result: SeedBatchResult; archive: ArrayBuffer }
   | { type: "error"; requestId: number; message: string };

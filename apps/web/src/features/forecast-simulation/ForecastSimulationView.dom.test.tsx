@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runSimulation } from "./engine";
 import { ForecastSimulationView } from "./ForecastSimulationView";
 import type { SimulationConfig } from "./model";
+import { runSeedBatchWithRunner } from "./seed-batch";
 
 const mocks = vi.hoisted(() => ({
   fidsInputs: [] as Array<{ clockMs: number; running: boolean; speed: number; visibleAt: number }>,
@@ -276,6 +277,10 @@ describe("forecast simulation view", () => {
       expect(yLabels[2]).toMatch(/^−\d+ Min\.$/);
       expect(chart.querySelectorAll(".sim-chart-x-tick text").length).toBeGreaterThan(2);
     }
+    const zoomGroups = screen.getAllByRole("group", { name: "Diagramm-Zoom" });
+    expect(zoomGroups).toHaveLength(2);
+    expect(zoomGroups.every((group) => group.querySelectorAll("button").length === 3)).toBe(true);
+    expect(screen.queryByText("Gesamt")).toBeNull();
   }, 15_000);
 
   it("reports comparison progress and presents a completed result", async () => {
@@ -337,6 +342,47 @@ describe("forecast simulation view", () => {
     await user.click(screen.getByRole("button", { name: /Ergebnis exportieren/ }));
     expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
     expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledTimes(2);
+  });
+
+  it("downloads the completed seed batch as a ZIP archive", async () => {
+    const user = userEvent.setup();
+    let downloadedFileName = "";
+    vi.mocked(HTMLAnchorElement.prototype.click).mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      downloadedFileName = this.download;
+    });
+    render(<ForecastSimulationView />);
+
+    await user.click(screen.getByRole("button", { name: "Mehrfachlauf" }));
+    await user.click(screen.getByRole("button", { name: "Mehrfachlauf starten" }));
+    const worker = mocks.workers.at(-1);
+    const request = worker?.postMessage.mock.calls[0]?.[0];
+    const batchResult = runSeedBatchWithRunner(
+      request.config,
+      request.manualIncidents,
+      request.runCount,
+      undefined,
+      (runConfig) => ({ metrics: runSimulation(runConfig).metrics }),
+    );
+    worker?.onmessage?.(
+      new MessageEvent("message", {
+        data: {
+          type: "result",
+          requestId: request.requestId,
+          result: batchResult,
+          archive: new ArrayBuffer(16),
+        },
+      }),
+    );
+
+    await user.click(await screen.findByRole("button", { name: "ZIP exportieren" }));
+    const archiveBlob = vi.mocked(URL.createObjectURL).mock.calls.at(-1)?.[0] as Blob;
+    expect(archiveBlob.type).toBe("application/zip");
+    expect(downloadedFileName).toBe(
+      `prognose-simulation-mehrfachlauf-${batchResult.seedStart}-${batchResult.runCount}.zip`,
+    );
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:synthetic-export");
   });
 
   it("applies playback controls and injects only synthetic operational incidents", async () => {

@@ -13,6 +13,7 @@ export function useSimulationSeedBatch(
 ) {
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<SeedBatchResult | null>(null);
+  const [archive, setArchive] = useState<ArrayBuffer | null>(null);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -33,6 +34,7 @@ export function useSimulationSeedBatch(
     manualIncidentsRef.current = manualIncidents;
     terminate();
     setResult(null);
+    setArchive(null);
     setError(null);
   }, [config, manualIncidents, terminate]);
 
@@ -46,6 +48,7 @@ export function useSimulationSeedBatch(
       workerRef.current = worker;
       setOpen(true);
       setResult(null);
+      setArchive(null);
       setError(null);
       setProgress({ completed: 0, total: runCount });
       setRunning(true);
@@ -55,14 +58,20 @@ export function useSimulationSeedBatch(
           setProgress({ completed: event.data.completedRuns, total: event.data.totalRuns });
           return;
         }
-        if (event.data.type === "result") setResult(event.data.result);
-        else setError(event.data.message);
+        if (event.data.type === "result") {
+          setResult(event.data.result);
+          setArchive(event.data.archive);
+        } else {
+          setArchive(null);
+          setError(event.data.message);
+        }
         worker.terminate();
         workerRef.current = null;
         setRunning(false);
       };
       worker.onerror = () => {
         if (requestIdRef.current !== requestId) return;
+        setArchive(null);
         setError("Der lokale Mehrfachlauf ist fehlgeschlagen.");
         worker.terminate();
         workerRef.current = null;
@@ -85,6 +94,7 @@ export function useSimulationSeedBatch(
   }, [terminate]);
 
   return {
+    archive,
     cancel: terminate,
     close,
     error,

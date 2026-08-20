@@ -1,5 +1,10 @@
 import { runSimulation } from "./engine";
-import type { ManualIncident, SimulationConfig, SimulationMetrics } from "./model";
+import type {
+  ManualIncident,
+  SimulationConfig,
+  SimulationMetrics,
+  SimulationResult,
+} from "./model";
 import { advanceSimulationSeed, simulationQuantile } from "./simulation-statistics";
 
 export type SeedBatchMetricId =
@@ -200,8 +205,19 @@ export function runSeedBatch(
   manualIncidents: readonly ManualIncident[],
   runCount: number,
   onProgress?: (completedRuns: number, totalRuns: number) => void,
+  onRunCompleted?: (result: SimulationResult) => void,
 ): SeedBatchResult {
-  return runSeedBatchWithRunner(config, manualIncidents, runCount, onProgress, runSimulation);
+  return runSeedBatchWithRunner(
+    config,
+    manualIncidents,
+    runCount,
+    onProgress,
+    (runConfig, incidents) => {
+      const result = runSimulation(runConfig, incidents);
+      onRunCompleted?.(result);
+      return result;
+    },
+  );
 }
 
 export function runSeedBatchWithRunner(

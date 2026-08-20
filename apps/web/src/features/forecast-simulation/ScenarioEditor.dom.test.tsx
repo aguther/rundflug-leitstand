@@ -143,6 +143,9 @@ describe("product demand editor", () => {
 
     const total = screen.getByRole("region", { name: "Gesamtnachfrage" });
     expect(within(total).getByText(/Ø 18 Pers\.\/Std\./)).toBeTruthy();
+    const zoomGroup = screen.getByRole("group", { name: "Diagramm-Zoom" });
+    expect(within(zoomGroup).getAllByRole("button")).toHaveLength(3);
+    expect(screen.queryByText("Gesamt")).toBeNull();
     expect(screen.getByText("KA · Kurze Rundflüge")).toBeTruthy();
     expect(screen.getByText("LB · Lange Rundflüge")).toBeTruthy();
 

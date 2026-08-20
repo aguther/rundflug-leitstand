@@ -217,7 +217,6 @@ function GroupForecastChart({
         onChange={changeZoom}
         onReset={reset}
         value={zoom}
-        visibleSpanMs={visibleDomain.until - visibleDomain.from}
         zoomLevels={zoomLevels}
       />
       <div
@@ -440,7 +439,6 @@ function AircraftTimeline({
         onChange={changeZoom}
         onReset={reset}
         value={zoom}
-        visibleSpanMs={visibleDomain.until - visibleDomain.from}
         zoomLevels={zoomLevels}
       />
       <section

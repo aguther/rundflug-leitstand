@@ -47,6 +47,9 @@ describe("simulation history dialog", () => {
       screen.getByRole("heading", { name: `Fluggruppe ${firstRotation?.communicationNumber}` }),
     ).toBeTruthy();
     expect(screen.getByText("Alle Prognose-Snapshots")).toBeTruthy();
+    const groupZoom = screen.getByRole("group", { name: "Diagramm-Zoom" });
+    expect(within(groupZoom).getAllByRole("button")).toHaveLength(3);
+    expect(screen.queryByText("Gesamt")).toBeNull();
     const initialForecast = screen.getByRole("region", {
       name: "Vergleich der ersten Boardingprognose",
     });
@@ -94,6 +97,9 @@ describe("simulation history dialog", () => {
     expect(screen.getByRole("heading", { name: aircraft.registration })).toBeTruthy();
     expect(screen.getByText("Realisierte Umläufe")).toBeTruthy();
     expect(screen.getByText("Sperren und Rückkehrereignisse")).toBeTruthy();
+    const aircraftZoom = screen.getByRole("group", { name: "Diagramm-Zoom" });
+    expect(within(aircraftZoom).getAllByRole("button")).toHaveLength(3);
+    expect(screen.queryByText("Gesamt")).toBeNull();
 
     const groupButtons = screen.getAllByRole("button", { name: "Gruppe öffnen" });
     expect(groupButtons.length).toBeGreaterThan(0);

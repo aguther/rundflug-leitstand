@@ -295,6 +295,7 @@ export function ForecastTimeline({
   } = useTimeDiagramViewport({
     domain: { from: simulationStart, until: simulationEnd },
     followDomain: { from: windowStart, until: windowEnd },
+    initialView: "full",
     insets: { left: 112, right: 0 },
     resetKey: result,
   });
@@ -390,7 +391,6 @@ export function ForecastTimeline({
         onResumeFollowing={resumeFollowing}
         onReset={reset}
         value={zoom}
-        visibleSpanMs={visibleDomain.until - visibleDomain.from}
         zoomLevels={zoomLevels}
       />
       <div

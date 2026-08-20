@@ -233,6 +233,8 @@ flowchart LR
     BATCHUI["Mehrfachlauf-Dialog"] --> BATCHWORKER["separater Browser-Worker<br/>5–100 Seed-Läufe"]
     BATCHWORKER --> LIFE
     METRICS --> DISTRIBUTIONS["Seed-Verteilungen<br/>Min · Q1 · Median · Q3 · Max"]
+    BATCHWORKER --> ARCHIVE["inkrementelles ZIP<br/>Übersicht + vollständige V8-Läufe"]
+    ARCHIVE --> BATCHUI
 ```
 
 Die Tick-Reihenfolge ist Teil des reproduzierbaren Simulationsvertrags. Die Engine-Grenze bildet
@@ -244,18 +246,22 @@ Boarding als Maß der kurzfristigen Fensterabdeckung.
 Der unabhängige Mehrfachlauf kopiert den vollständigen Szenariozustand und die manuellen Ereignisse in
 einen erst beim Start erzeugten Browser-Worker. Jeder Lauf verwendet ausschließlich den nächsten
 uint32-Seed; nach `4.294.967.295` folgt wieder Seed `1`. Der Worker führt für jeden Seed dieselbe
-Lifecycle-, Forecast-, Dispatch-, Snapshot- und Metrikpipeline aus wie der Einzellauf. Die React-Seite
-übernimmt nur Fortschritt und fertige Ergebnisse der aktuellen Request-ID; Abbruch, Dialogschließen
-oder eine Änderung von Szenario, Seed beziehungsweise manuellen Ereignissen terminieren den Worker
-und entwerten verspätete Nachrichten. Das bereits bestehende A/B-Labor bleibt ein separater Worker
-mit eigener Zuständigkeit.
+Lifecycle-, Forecast-, Dispatch-, Snapshot- und Metrikpipeline aus wie der Einzellauf. Jedes
+vollständige Resultat wird noch im Worker als V8-JSON in ein inkrementell komprimiertes ZIP geschrieben
+und danach freigegeben. Die React-Seite übernimmt nur Fortschritt, das kompakte Kennzahlergebnis und
+den übertragbaren Archivpuffer der aktuellen Request-ID; Abbruch, Dialogschließen oder eine Änderung
+von Szenario, Seed beziehungsweise manuellen Ereignissen terminieren den Worker und entwerten
+verspätete Nachrichten. Das bereits bestehende A/B-Labor bleibt ein separater Worker mit eigener
+Zuständigkeit.
 
 Die browserlokale Aggregation schließt fehlende Kennzahlwerte aus und weist je dargestellter Kennzahl
 Stichprobengröße, Minimum, Q1, Median, Q3 und Maximum aus. Der V8-Ergebnisexport kann das vollständige
 Mehrfachlaufergebnis nullable als `seedBatch` aufnehmen; `batchComparison` und die übrigen Felder
-bleiben erhalten. Damit entstehen weder neue Transportverträge noch Zugriffe auf HTTP, D1, Durable
-Objects oder R2. Gruppierte Sidebar, zusätzliche Wiedergabestufen, geclippter Timeline-X-Overflow und
-kantenfeste Zeitmarkierung sind reine UI-Anpassungen und ändern die Systemgrenzen nicht.
+bleiben erhalten. Das zusätzliche Archivschema `rundflug-forecast-simulation-seed-batch/v1` beschreibt
+nur die browserlokale ZIP-Übersicht. Damit entstehen weder neue Transportverträge noch Zugriffe auf
+HTTP, D1, Durable Objects oder R2. Gruppierte Sidebar, kompakte ikonische Zeitdiagrammsteuerungen,
+zusätzliche Wiedergabestufen, geclippter Timeline-X-Overflow und kantenfeste Zeitmarkierung sind reine
+UI-Anpassungen und ändern die Systemgrenzen nicht.
 
 Das simulierte FIDS läuft gemäß ADR-0044 als eigenständiger Tab und eigener React-Baum. Es verwendet
 dieselben FIDS-Komponenten wie der Livebetrieb, erhält seinen flüchtigen Zustand aber ausschließlich

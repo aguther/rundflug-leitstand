@@ -55,11 +55,22 @@ describe("admin event flow chart", () => {
       },
     });
 
+    const zoomGroup = screen.getByRole("group", { name: "Diagramm-Zoom" });
+    expect(zoomGroup.querySelectorAll("button")).toHaveLength(3);
+    expect(screen.queryByText("Gesamt")).toBeNull();
     fireEvent.wheel(viewport, { clientX: 500, ctrlKey: true, deltaY: -1 });
-    expect(screen.getByText("8 Std.")).not.toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "Gesamten Zeitverlauf anzeigen" })
+        .hasAttribute("disabled"),
+    ).toBe(false);
 
     fireEvent.click(screen.getByRole("button", { name: "Gesamten Zeitverlauf anzeigen" }));
-    expect(screen.getByTitle("Sichtbarer Zeitraum: Gesamt")).not.toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "Gesamten Zeitverlauf anzeigen" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
     expect(viewport.querySelector(".admin-flow-svg")?.getAttribute("tabindex") ?? null).toBeNull();
   });
 

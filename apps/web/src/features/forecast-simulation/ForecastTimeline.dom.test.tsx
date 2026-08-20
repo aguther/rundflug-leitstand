@@ -223,7 +223,7 @@ describe("forecast timeline", () => {
     expect(container.querySelector(".sim-plan-lane")).toBeNull();
   });
 
-  it("follows playback, navigates to the day start, and resumes the rolling window", () => {
+  it("starts on the full day and follows playback only after explicit activation", () => {
     const renderTimeline = (playbackTime: number) => (
       <ForecastTimeline
         currentMs={playbackTime}
@@ -246,32 +246,33 @@ describe("forecast timeline", () => {
       },
     });
 
-    expect(screen.getByRole("button", { name: "Aktuell folgen" }).hasAttribute("disabled")).toBe(
-      true,
-    );
-    const initialRange = headingRange();
-    rerender(renderTimeline(currentMs + 30 * 60_000));
-    expect(headingRange()).not.toBe(initialRange);
-
-    fireEvent.wheel(viewport, { deltaY: -100_000 });
-    expect(headingRange()).toContain("10:00");
-    const frozenRange = headingRange();
+    const zoomGroup = screen.getByRole("group", { name: "Diagramm-Zoom" });
+    expect(zoomGroup.querySelectorAll("button")).toHaveLength(3);
+    expect(screen.queryByText("Gesamt")).toBeNull();
+    expect(screen.getByRole("button", { name: "Aktuell folgen" }).textContent).toBe("");
     expect(screen.getByRole("button", { name: "Aktuell folgen" }).hasAttribute("disabled")).toBe(
       false,
     );
-
-    rerender(renderTimeline(Date.parse(result.runWindow.endAt)));
-    expect(headingRange()).toBe(frozenRange);
-
-    fireEvent.click(screen.getByRole("button", { name: "Gesamten Zeitverlauf anzeigen" }));
-    expect(screen.getByTitle("Sichtbarer Zeitraum: Gesamt")).not.toBeNull();
-    expect(headingRange()).not.toBe(frozenRange);
+    const initialRange = headingRange();
+    expect(initialRange).toContain("10:00");
+    expect(initialRange).toContain("16:00");
+    rerender(renderTimeline(currentMs + 30 * 60_000));
+    expect(headingRange()).toBe(initialRange);
 
     fireEvent.click(screen.getByRole("button", { name: "Aktuell folgen" }));
-    expect(headingRange()).toContain("13:00");
-    expect(headingRange()).toContain("16:00");
+    expect(headingRange()).not.toBe(initialRange);
     expect(screen.getByRole("button", { name: "Aktuell folgen" }).hasAttribute("disabled")).toBe(
       true,
+    );
+
+    rerender(renderTimeline(Date.parse(result.runWindow.endAt)));
+    expect(headingRange()).toContain("13:00");
+    expect(headingRange()).toContain("16:00");
+    fireEvent.click(screen.getByRole("button", { name: "Gesamten Zeitverlauf anzeigen" }));
+    expect(headingRange()).toContain("10:00");
+    expect(headingRange()).toContain("16:00");
+    expect(screen.getByRole("button", { name: "Aktuell folgen" }).hasAttribute("disabled")).toBe(
+      false,
     );
   });
 

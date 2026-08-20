@@ -209,6 +209,9 @@ describe("FlightDirectorAnalyticsContent resource timeline", () => {
 
     const viewport = container.querySelector(".flight-director-chart-viewport");
     expect(viewport).not.toBeNull();
+    const resourceZoomGroup = screen.getByRole("group", { name: "Diagramm-Zoom" });
+    expect(resourceZoomGroup.querySelectorAll("button")).toHaveLength(3);
+    expect(screen.queryByText("Gesamt")).toBeNull();
     if (!(viewport instanceof HTMLDivElement)) return;
     Object.assign(viewport, {
       hasPointerCapture: vi.fn(() => true),
@@ -313,6 +316,9 @@ describe("FlightDirectorAnalyticsContent resource timeline", () => {
     expect(screen.getByText("Flugzeug + Produkt / Produkt / Veranstaltung")).not.toBeNull();
     expect(screen.getByText(/\+5 Min\./)).not.toBeNull();
     expect(screen.getByRole("img", { name: /Prognosediagramm/ })).not.toBeNull();
+    const forecastZoomGroup = screen.getByRole("group", { name: "Diagramm-Zoom" });
+    expect(forecastZoomGroup.querySelectorAll("button")).toHaveLength(3);
+    expect(screen.queryByText("Gesamt")).toBeNull();
     expect(container.querySelectorAll(".flight-director-forecast-svg [data-series]")).toHaveLength(
       4,
     );

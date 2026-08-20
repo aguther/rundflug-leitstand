@@ -30,6 +30,7 @@ interface UseTimeDiagramViewportOptions {
   domain: TimeDomain;
   followDomain?: TimeDomain;
   freezeDomainWhileZoomed?: boolean;
+  initialView?: "follow" | "full";
   insets?: Partial<TimeDiagramInsets>;
   insetRatios?: Partial<TimeDiagramInsets>;
   minimumVisibleSpanMs?: number;
@@ -77,14 +78,6 @@ function zoomForDomains(baseDomain: TimeDomain, visibleDomain: TimeDomain): numb
 
 export function timeDomainSpan(domain: TimeDomain): number {
   return Math.max(1, domain.until - domain.from);
-}
-
-export function formatTimeDiagramVisibleSpan(spanMs: number): string {
-  const totalMinutes = Math.max(1, Math.round(spanMs / MINUTE_MS));
-  if (totalMinutes < 60) return `${totalMinutes} Min.`;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return minutes === 0 ? `${hours} Std.` : `${hours} Std. ${minutes} Min.`;
 }
 
 export function timeDiagramAxisTickValues({
@@ -197,6 +190,7 @@ export function useTimeDiagramViewport({
   domain,
   followDomain,
   freezeDomainWhileZoomed = false,
+  initialView = "follow",
   insetRatios: partialInsetRatios,
   insets: partialInsets,
   minimumVisibleSpanMs = DEFAULT_TIME_DIAGRAM_MINIMUM_VISIBLE_SPAN_MS,
@@ -234,11 +228,14 @@ export function useTimeDiagramViewport({
     }),
     [partialInsetRatios?.left, partialInsetRatios?.right],
   );
-  const initialVisibleDomain = externalFollowDomain ?? externalDomain;
+  const initiallyFollowing = initialView === "follow" && externalFollowDomain !== null;
+  const initialVisibleDomain = initiallyFollowing
+    ? (externalFollowDomain ?? externalDomain)
+    : externalDomain;
   const [baseDomain, setBaseDomain] = useState(externalDomain);
   const [visibleDomain, setVisibleDomain] = useState(initialVisibleDomain);
   const [dragging, setDragging] = useState(false);
-  const [following, setFollowing] = useState(externalFollowDomain !== null);
+  const [following, setFollowing] = useState(initiallyFollowing);
   const [viewportWidth, setViewportWidth] = useState(0);
   const [zoom, setZoom] = useState(() => zoomForDomains(externalDomain, initialVisibleDomain));
   const baseDomainRef = useRef(baseDomain);
@@ -248,7 +245,7 @@ export function useTimeDiagramViewport({
   const insetRatiosRef = useRef(insetRatios);
   const latestExternalDomainRef = useRef(externalDomain);
   const latestExternalFollowDomainRef = useRef(externalFollowDomain);
-  const followingRef = useRef(externalFollowDomain !== null);
+  const followingRef = useRef(initiallyFollowing);
   const previousResetKeyRef = useRef(resetKey);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const suppressClickRef = useRef(false);
@@ -481,12 +478,15 @@ export function useTimeDiagramViewport({
     const resetKeyChanged = !Object.is(previousResetKeyRef.current, resetKey);
     previousResetKeyRef.current = resetKey;
     if (resetKeyChanged) {
-      const nextVisibleDomain = externalFollowDomain ?? externalDomain;
+      const nextFollowing = initialView === "follow" && externalFollowDomain !== null;
+      const nextVisibleDomain = nextFollowing
+        ? (externalFollowDomain ?? externalDomain)
+        : externalDomain;
       const nextZoom = zoomForDomains(externalDomain, nextVisibleDomain);
       baseDomainRef.current = externalDomain;
       setBaseDomain(externalDomain);
       updateViewport(nextVisibleDomain, nextZoom);
-      updateFollowing(externalFollowDomain !== null);
+      updateFollowing(nextFollowing);
       finishDrag(true);
       return;
     }
@@ -527,6 +527,7 @@ export function useTimeDiagramViewport({
     externalFollowDomain,
     finishDrag,
     freezeDomainWhileZoomed,
+    initialView,
     resetKey,
     updateFollowing,
     updateViewport,

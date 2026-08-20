@@ -363,7 +363,6 @@ function DemandProfileChart({
         onChange={changeZoom}
         onReset={reset}
         value={zoom}
-        visibleSpanMs={visibleDomain.until - visibleDomain.from}
         zoomLevels={zoomLevels}
       />
       <div

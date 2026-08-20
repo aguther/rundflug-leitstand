@@ -232,7 +232,6 @@ function ErrorChart({
         onReset={reset}
         showInteractionHint={false}
         value={zoom}
-        visibleSpanMs={visibleDomain.until - visibleDomain.from}
         zoomLevels={zoomLevels}
       />
       <div
@@ -561,6 +560,17 @@ export function ForecastSimulationView() {
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = `prognose-simulation-${config.seed}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportSeedBatchArchive = () => {
+    if (!seedBatch.archive || !seedBatch.result) return;
+    const blob = new Blob([seedBatch.archive], { type: "application/zip" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `prognose-simulation-mehrfachlauf-${seedBatch.result.seedStart}-${seedBatch.result.runCount}.zip`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -1189,7 +1199,7 @@ export function ForecastSimulationView() {
             error={seedBatch.error}
             onCancel={seedBatch.cancel}
             onClose={seedBatch.close}
-            onExport={exportResult}
+            onExport={exportSeedBatchArchive}
             onStart={seedBatch.start}
             open={seedBatch.open}
             progress={seedBatch.progress}

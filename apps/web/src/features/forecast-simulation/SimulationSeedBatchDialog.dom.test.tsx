@@ -79,7 +79,7 @@ describe("SimulationSeedBatchDialog", () => {
     expect(screen.getByRole("button", { name: "Erneut berechnen" })).toBeTruthy();
   });
 
-  it("switches tabs and metrics, sorts individual runs, exports JSON, and shows nulls as dashes", async () => {
+  it("switches tabs and metrics, sorts individual runs, exports ZIP, and shows nulls as dashes", async () => {
     const user = userEvent.setup();
     const { props } = renderDialog({ result });
     expect(screen.getByRole("tab", { name: "Betrieb" }).getAttribute("aria-selected")).toBe("true");
@@ -107,7 +107,7 @@ describe("SimulationSeedBatchDialog", () => {
     expect(screen.getByRole("img", { name: /Sprünge über 30 Minuten/ })).toBeTruthy();
     expect(screen.getAllByText("–").length).toBeGreaterThan(0);
 
-    await user.click(screen.getByRole("button", { name: /JSON exportieren/ }));
+    await user.click(screen.getByRole("button", { name: /ZIP exportieren/ }));
     expect(props.onExport).toHaveBeenCalledOnce();
     await user.keyboard("{Tab}");
     expect(document.activeElement).not.toBe(document.body);

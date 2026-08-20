@@ -338,7 +338,7 @@ export function SimulationSeedBatchDialog(props: Readonly<SimulationSeedBatchDia
       )}
       {props.result ? (
         <Button onClick={props.onExport}>
-          <Download aria-hidden="true" /> JSON exportieren
+          <Download aria-hidden="true" /> ZIP exportieren
         </Button>
       ) : null}
       <Button onClick={props.onClose} variant={props.result ? "primary" : "secondary"}>

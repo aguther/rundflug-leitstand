@@ -7,7 +7,6 @@
   gap: 5px;
   margin: 0;
   padding: 0;
-  border: 0;
 }
 
 .time-diagram-zoom > small {
@@ -16,10 +15,21 @@
   font-size: 0.68rem;
 }
 
+.time-diagram-zoom-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 .time-diagram-zoom .ds-button {
+  width: 30px;
+  min-width: 30px;
   min-height: 30px;
-  gap: 4px;
-  padding: 3px 8px;
+  justify-content: center;
+  padding: 3px;
   font-size: 0.68rem;
 }
 
@@ -28,12 +38,8 @@
   height: 14px;
 }
 
-.time-diagram-zoom > span {
-  min-width: 76px;
-  color: var(--ui-muted);
-  font-size: 0.7rem;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
+.time-diagram-zoom > .time-diagram-follow {
+  margin-left: 3px;
 }
 
 .time-diagram-viewport {
@@ -66,7 +72,7 @@
     display: none;
   }
 
-  .time-diagram-zoom > span {
-    min-width: 64px;
+  .time-diagram-zoom-actions {
+    gap: 3px;
   }
 }

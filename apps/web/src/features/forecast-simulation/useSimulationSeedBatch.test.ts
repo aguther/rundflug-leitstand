@@ -48,11 +48,45 @@ describe("useSimulationSeedBatch", () => {
     act(() =>
       worker?.onmessage?.(
         new MessageEvent("message", {
-          data: { type: "result", requestId: request.requestId, result: { runCount: 5 } },
+          data: {
+            type: "result",
+            requestId: request.requestId,
+            result: { runCount: 5 },
+            archive: new ArrayBuffer(0),
+          },
         }),
       ),
     );
     expect(result.current.result).toBeNull();
+    expect(result.current.archive).toBeNull();
+  });
+
+  it("stores a completed result together with its transferable archive", () => {
+    const config = simulationConfigForPreset("NORMAL");
+    const incidents: never[] = [];
+    const { result } = renderHook(() => useSimulationSeedBatch(config, incidents));
+    act(() => result.current.start(5));
+    const worker = workers[0];
+    const request = worker?.postMessage.mock.calls[0]?.[0];
+    const archive = new ArrayBuffer(16);
+
+    act(() =>
+      worker?.onmessage?.(
+        new MessageEvent("message", {
+          data: {
+            type: "result",
+            requestId: request.requestId,
+            result: { runCount: 5, seedStart: config.seed },
+            archive,
+          },
+        }),
+      ),
+    );
+
+    expect(result.current.result).toEqual({ runCount: 5, seedStart: config.seed });
+    expect(result.current.archive).toBe(archive);
+    expect(result.current.running).toBe(false);
+    expect(worker?.terminate).toHaveBeenCalledOnce();
   });
 
   it("retries after errors and invalidates work when scenario input changes", () => {

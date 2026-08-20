@@ -115,6 +115,14 @@ bei `1` weiter. Abbruch, Dialogschließen, Szenario-/Seed-Wechsel oder geändert
 terminieren den separaten Worker und verhindern die Übernahme verspäteter Ergebnisse. Wiedergabezeit,
 Geschwindigkeit und Zoom invalidieren ein fertiges Ergebnis nicht.
 
+Nach einem erfolgreichen Mehrfachlauf erzeugt derselbe Browser-Worker inkrementell ein ZIP-Archiv.
+`summary.json` verwendet das Schema `rundflug-forecast-simulation-seed-batch/v1` und enthält
+Start-Seed, Laufanzahl, Kennzahlverteilungen sowie die Zuordnung der Seeds zu den enthaltenen Dateien.
+Unter `runs/prognose-simulation-<seed>.json` liegt für jeden Seed ein vollständiger V8-Einzelexport;
+`seedBatch` und `batchComparison` bleiben darin `null`, damit die Aggregate nicht je Lauf dupliziert
+werden. Die React-Seite übernimmt nur das kompakte Mehrfachlaufergebnis und den übertragbaren
+ZIP-Puffer. Abbruch oder ungültig gewordene Eingaben verwerfen beides gemeinsam.
+
 Der Tab **Betrieb** vergleicht abgeschlossene Umläufe, Passagiere pro Stunde,
 P90-Passagierwartezeit, Überzeit, Trefferquote des letzten Boardingfensters und
 Flugzeugauslastung. Sachliche Extremhinweise nennen höchsten Durchsatz, längste P90-Wartezeit und
@@ -209,15 +217,20 @@ erscheinen auf der jeweiligen Flugzeugspur; globale Unterbrechungen erscheinen a
 gemeinsamen Betriebsspur. Eine noch offene Sperre endet in der Darstellung an der aktuell
 sichtbaren Simulationszeit, sodass kein zukünftiges Rückkehrereignis vorweggenommen wird.
 
-Der navigierbare Zeitbereich entspricht dem vollständigen Simulationsfenster. Standardmäßig folgt
-ein an den Tagesgrenzen geklemmter 180-Minuten-Ausschnitt der virtuellen Zeit. Der erste manuelle
-Drag-, Rad- oder Zoomeingriff friert den Ausschnitt ein; er kann anschließend bis exakt zum
-Simulationsanfang und -ende verschoben werden. **Gesamt** zeigt den ganzen Tag ohne automatisches
-Folgen. **Aktuell folgen** verwirft den manuellen Zoom, springt unmittelbar zum rollenden
-180-Minuten-Ausschnitt und aktiviert das Folgen erneut. Ein Neustart oder neu berechnetes Ergebnis
-stellt denselben Ausgangszustand wieder her. Die Auswahl einer Fluggruppe bleibt per Klick erhalten;
-ihre Prognose, Ist-Boardingzeit, Prognosequalität und ein möglicher systemseitiger Voraufruf werden
-platzsparend in einem Hover- und Fokus-Tooltip außerhalb des Queue-Scrollbereichs erläutert.
+Der navigierbare Zeitbereich entspricht dem vollständigen Simulationsfenster. Die Hauptzeitleiste
+startet über den ganzen Tag ohne automatisches Folgen; ein Neustart oder neu berechnetes Ergebnis
+stellt diese Gesamtansicht wieder her. Das separat stehende Symbol **Aktuell folgen** springt
+unmittelbar zum an den Tagesgrenzen geklemmten 180-Minuten-Ausschnitt und aktiviert das Folgen der
+virtuellen Zeit. Der erste manuelle Drag-, Rad- oder Zoomeingriff friert den Ausschnitt wieder ein; er
+kann anschließend bis exakt zum Simulationsanfang und -ende verschoben werden. Das Maximize-Symbol
+stellt jederzeit die Gesamtansicht ohne Folgen her. Die Auswahl einer Fluggruppe bleibt per Klick
+erhalten; ihre Prognose, Ist-Boardingzeit, Prognosequalität und ein möglicher systemseitiger Voraufruf
+werden platzsparend in einem Hover- und Fokus-Tooltip außerhalb des Queue-Scrollbereichs erläutert.
+
+Alle Zeitdiagramme verwenden dieselbe kompakte Zoomsteuerung ohne Wertanzeige aus drei quadratischen
+Symbolbuttons für Verkleinern, Vergrößern und Gesamtansicht. Eine sichtbare Zoomstufen- oder
+Zeitraumanzeige existiert nicht. Nur die Hauptzeitleiste besitzt zusätzlich das separat gruppierte
+Follow-Symbol; die Initialansichten aller übrigen Simulator-Diagramme bleiben unverändert.
 
 Bei Simulationsanfang und -ende bleiben Linie und Zeitlabel der Jetzt-Markierung innerhalb des
 Plotbereichs. Die Timeline-Lanes scrollen ausschließlich vertikal und clippen X-Overflow; die Queue
@@ -299,7 +312,9 @@ festgeschriebenen Preset- und 25-Seed-Werte.
   Teil des Modells noch des Exports. Das Format trägt die Kennung
   `rundflug-forecast-simulation/v8`. Das nullable Feld `seedBatch` enthält bei vorhandenem
   Mehrfachlauf vollständige Metriken je Seed und deren Verteilungen; `batchComparison` bleibt
-  unverändert erhalten.
+  unverändert erhalten. Die Aktion im Mehrfachlauf lädt stattdessen
+  `prognose-simulation-mehrfachlauf-<start-seed>-<anzahl>.zip` mit der Übersicht und allen
+  vollständigen Einzelexporten herunter; der normale Ergebnisexport bleibt eine einzelne V8-JSON-Datei.
 
 ## Simuliertes Live-FIDS
 

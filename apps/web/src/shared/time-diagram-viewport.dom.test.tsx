@@ -18,12 +18,14 @@ function DiagramViewportHarness({
   followFrom,
   followUntil,
   freezeDomainWhileZoomed = false,
+  initialView,
   resetKey = "one",
 }: {
   domainUntil?: number;
   followFrom?: number;
   followUntil?: number;
   freezeDomainWhileZoomed?: boolean;
+  initialView?: "follow" | "full";
   resetKey?: string;
 }) {
   const viewport = useTimeDiagramViewport({
@@ -32,6 +34,7 @@ function DiagramViewportHarness({
       ? {}
       : { followDomain: { from: followFrom, until: followUntil } }),
     freezeDomainWhileZoomed,
+    ...(initialView === undefined ? {} : { initialView }),
     insets: { left: 40, right: 20 },
     resetKey,
   });
@@ -272,6 +275,46 @@ describe("time diagram viewport", () => {
     fireEvent.pointerUp(viewport, { clientX: 560, pointerId: 9, pointerType: "mouse" });
     expect(screen.getByLabelText("Folgt").textContent).toBe("false");
     expect(renderedDomain().from).toBeLessThan(9 * HOUR_MS);
+  });
+
+  it("can start on the full domain while retaining an explicit follow action", () => {
+    const { rerender } = render(
+      <DiagramViewportHarness
+        followFrom={6 * HOUR_MS}
+        followUntil={9 * HOUR_MS}
+        initialView="full"
+        resetKey="one"
+      />,
+    );
+
+    expect(renderedDomain()).toEqual({ from: 0, until: 24 * HOUR_MS });
+    expect(screen.getByLabelText("Zoom").textContent).toBe("1");
+    expect(screen.getByLabelText("Folgt").textContent).toBe("false");
+
+    rerender(
+      <DiagramViewportHarness
+        followFrom={7 * HOUR_MS}
+        followUntil={10 * HOUR_MS}
+        initialView="full"
+        resetKey="one"
+      />,
+    );
+    expect(renderedDomain()).toEqual({ from: 0, until: 24 * HOUR_MS });
+
+    fireEvent.click(screen.getByRole("button", { name: "Aktuell folgen" }));
+    expect(renderedDomain()).toEqual({ from: 7 * HOUR_MS, until: 10 * HOUR_MS });
+    expect(screen.getByLabelText("Folgt").textContent).toBe("true");
+
+    rerender(
+      <DiagramViewportHarness
+        followFrom={8 * HOUR_MS}
+        followUntil={11 * HOUR_MS}
+        initialView="full"
+        resetKey="two"
+      />,
+    );
+    expect(renderedDomain()).toEqual({ from: 0, until: 24 * HOUR_MS });
+    expect(screen.getByLabelText("Folgt").textContent).toBe("false");
   });
 
   it("stops rolling following when a zoom control changes the viewport", () => {
