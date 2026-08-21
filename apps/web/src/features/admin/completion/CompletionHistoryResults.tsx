@@ -70,9 +70,9 @@ function OperationalHistoryTable({
                 Anonymes Ticket
                 <details className="history-row-details">
                   <summary>Technische Details</summary>
-                  <code>{entry.ticketId}</code>
-                  <code>{entry.ticketGroupId}</code>
-                  {entry.rotationId && <code>{entry.rotationId}</code>}
+                  <code className="ui-select-all">{entry.ticketId}</code>
+                  <code className="ui-select-all">{entry.ticketGroupId}</code>
+                  {entry.rotationId && <code className="ui-select-all">{entry.rotationId}</code>}
                 </details>
               </td>
               <td>{ticketStatusLabels[entry.ticketStatus] ?? entry.ticketStatus}</td>
@@ -115,8 +115,8 @@ function ForecastHistoryTable({
                 {entry.communicationLabel}
                 <details className="history-row-details">
                   <summary>Technische Details</summary>
-                  <code>{entry.rotationId}</code>
-                  <code>{entry.snapshotId}</code>
+                  <code className="ui-select-all">{entry.rotationId}</code>
+                  <code className="ui-select-all">{entry.snapshotId}</code>
                 </details>
               </td>
               <td>{eventLabels[entry.triggerEventType] ?? entry.triggerEventType}</td>
@@ -175,7 +175,7 @@ function AuditHistoryList({
             <span>
               {entry.aggregateType} · Version {entry.aggregateVersion}
             </span>
-            <code>{entry.aggregateId}</code>
+            <code className="ui-select-all">{entry.aggregateId}</code>
           </details>
         </div>
       ))}

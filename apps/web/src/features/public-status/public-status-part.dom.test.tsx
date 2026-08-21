@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { PublicStatusPart } from "./PublicStatusContent";
+import { PublicStatusIdentity, PublicStatusPart } from "./PublicStatusContent";
 
 beforeAll(() => {
   class TestResizeObserver {
@@ -29,6 +29,12 @@ const part = {
 };
 
 describe("V18-GRP-010 public booking group part header", () => {
+  it("marks the public booking group label as a copy target", () => {
+    render(<PublicStatusIdentity bookingGroupLabel="SYN-0042" productName="Synthetic flight" />);
+
+    expect(screen.getByText("Gruppe SYN-0042").classList.contains("ui-select-all")).toBe(true);
+  });
+
   it("renders the canonical header for the second part in the shared status component", () => {
     render(
       <PublicStatusPart

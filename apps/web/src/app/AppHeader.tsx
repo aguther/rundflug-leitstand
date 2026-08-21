@@ -428,7 +428,7 @@ export function AppHeader({
           <div className="app-about-revision">
             <span>Source Revision</span>
             <div className="app-about-revision-value">
-              <code>{sourceRevision.short}</code>
+              <code className="ui-select-all">{sourceRevision.short}</code>
               {sourceRevision.known ? (
                 <IconButton
                   label={

@@ -8,7 +8,7 @@ export function PrivacyView() {
       titleId="privacy-title"
       variant="reading"
     >
-      <div className="access-page-reading-content">
+      <div className="access-page-reading-content ui-select-text">
         <p>
           Der Rundflug-Leitstand erfasst keine Namen und keine Telefonnummern. Der Ticketstatus ist
           ausschließlich über einen zufälligen Ticketcode erreichbar.

@@ -8,9 +8,47 @@ body {
   margin: 0;
   color: var(--ui-text);
   background: var(--ui-bg);
+  cursor: default;
   font-family: var(--font-ui);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Application surfaces behave like software chrome by default. Reading and copy targets opt in. */
+/* biome-ignore format: Keep the global exception list compact for the guarded CSS budget. */
+:where(
+  input,
+  textarea,
+  [contenteditable="true"],
+  pre,
+  code,
+  [role="alert"],
+  .page-notification-content,
+  .ui-select-text
+) {
+  cursor: text;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.ui-select-all {
+  cursor: text;
+  -webkit-user-select: all;
+  user-select: all;
+}
+
+:where(a[href], button, select, input[type="checkbox"], input[type="radio"]) {
+  cursor: pointer;
+}
+
+:is(:disabled, [aria-disabled="true"]) {
+  cursor: not-allowed;
+}
+
+[aria-busy="true"] {
+  cursor: wait;
 }
 
 .visually-hidden {

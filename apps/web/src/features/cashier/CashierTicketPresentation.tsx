@@ -14,7 +14,7 @@ export function TicketPaper({
   return (
     <article className={compact ? "ticket-paper ticket-paper-preview" : "ticket-paper"}>
       <strong>{ticket.eventName}</strong>
-      <b>{ticket.code}</b>
+      <b className="ui-select-all">{ticket.code}</b>
       <img src={ticket.qrDataUrl} alt={`QR-Code der Gruppe ${ticket.communicationLabel}`} />
       <dl>
         <div>
@@ -88,7 +88,7 @@ export function QrScanDialog({
           <header>
             <div>
               <span id="qr-scan-dialog-title">Gruppenstatus scannen</span>
-              <strong>{ticket.code}</strong>
+              <strong className="ui-select-all">{ticket.code}</strong>
             </div>
             <button
               aria-label="Gruppen-QR-Code schließen"

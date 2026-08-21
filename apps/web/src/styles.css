@@ -522,7 +522,6 @@
   color: var(--ui-muted);
   font-size: 0.76rem;
   overflow-wrap: anywhere;
-  user-select: all;
 }
 .history-pagination {
   display: flex;
@@ -848,27 +847,11 @@
   box-sizing: border-box;
 }
 body {
-  margin: 0;
-  min-width: 320px;
   min-height: 100vh;
-  color: var(--ui-text);
-  background: var(--ui-bg);
-}
-button,
-input,
-select,
-textarea {
-  font: inherit;
 }
 button,
 a {
   -webkit-tap-highlight-color: transparent;
-}
-button:focus-visible,
-a:focus-visible,
-input:focus-visible {
-  outline: 3px solid #2f80ed;
-  outline-offset: 2px;
 }
 .app-shell {
   min-height: 100vh;
@@ -1055,16 +1038,6 @@ input:focus-visible {
   .page-notification {
     animation: none;
   }
-}
-.app-header {
-  min-height: 68px;
-  padding: 12px clamp(18px, 3vw, 42px);
-  background: #fff;
-  border-bottom: 1px solid #cbd5e1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
 }
 @media (max-width: 760px) {
   .page-notification-region {

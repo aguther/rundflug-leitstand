@@ -207,6 +207,7 @@ describe("completion history panel", () => {
     expect(screen.getByText("SYNTHETIC_STATUS")).toBeTruthy();
     expect(screen.getByText("Noch offen")).toBeTruthy();
     expect(screen.getByText("51–75 von 75")).toBeTruthy();
+    expect(screen.getByText("ticket-1").classList.contains("ui-select-all")).toBe(true);
 
     fireEvent.change(screen.getByLabelText("Von"), { target: { value: "2026-08-13T07:00" } });
     fireEvent.change(screen.getByLabelText("Bis"), { target: { value: "2026-08-13T11:00" } });
@@ -260,6 +261,7 @@ describe("completion history panel", () => {
     expect(screen.getByText("SYNTHETIC_EVENT")).toBeTruthy();
     expect(screen.getByText(/Boarding 2/)).toBeTruthy();
     expect(screen.getAllByText(/Abschluss –/)).toHaveLength(2);
+    expect(screen.getByText("snapshot-1").classList.contains("ui-select-all")).toBe(true);
     fireEvent.change(screen.getByLabelText("Flugzeug"), { target: { value: "aircraft-1" } });
     fireEvent.change(screen.getByLabelText("Pilotencode"), { target: { value: "pilot-1" } });
     fireEvent.change(screen.getAllByRole("textbox").at(-1) as HTMLInputElement, {
@@ -287,6 +289,7 @@ describe("completion history panel", () => {
     expect(screen.getByText("Fluggruppe aufgerufen")).toBeTruthy();
     expect(screen.queryByText("SYNTHETIC_EVENT")).toBeNull();
     expect(screen.getByText("ROTATION_CALLED")).toBeTruthy();
+    expect(screen.getByText("rotation-1").classList.contains("ui-select-all")).toBe(true);
     expect(screen.queryByRole("button", { name: "Weiter" })).toBeNull();
     fireEvent.change(screen.getByLabelText("Ereignis oder Objekt suchen"), {
       target: { value: "rotation" },

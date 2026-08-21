@@ -138,7 +138,7 @@ export function PublicStatusIdentity({
       <div className="public-status-identity">
         <Ticket aria-hidden="true" />
         <div>
-          <span>Gruppe {bookingGroupLabel}</span>
+          <span className="ui-select-all">Gruppe {bookingGroupLabel}</span>
           <h1>{productName}</h1>
           {passengerCount ? (
             <small>
@@ -306,7 +306,7 @@ export function PublicStatusFooter({
         size="compact"
         title="Datenschutz"
       >
-        <div className="public-privacy-copy">
+        <div className="public-privacy-copy ui-select-text">
           <p>
             Für den Abruf dieser Statusseite werden keine Namen, Telefonnummern oder sonstigen
             Kontaktdaten von Gästen erfasst oder gespeichert. Der Zugriff erfolgt ausschließlich
