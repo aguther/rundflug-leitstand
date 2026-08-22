@@ -167,18 +167,3 @@ docs/operations/          Konto-, Deployment-, Backup- und Notfallhinweise
 docs/roles/               aktuelle Rollenblätter und synthetische Screenshots
 scripts/                   lokale Prüf- und Hilfsskripte
 ```
-
-## Empfohlener Codex-Ablauf
-
-1. `AGENTS.md` und die Anforderungen lesen lassen.
-2. Aktuelle Traceability und offene Fragen prüfen.
-3. Offene Fragen und ADRs fachlich freigeben.
-4. Je Pull Request genau einen vertikalen, testbaren Baustein umsetzen.
-5. Anforderungs-IDs in Issue, Commit, Test und Pull Request referenzieren.
-6. Vor jedem Merge `npm run check` und ein unabhängiges Review durchführen.
-
-## Vertraulichkeit
-
-Die Lastenhefte sind als vertrauliche Projektunterlagen zu behandeln. Das Repository sollte zunächst
-privat geführt werden. Produktionsdaten, Telefonnummern, öffentliche Ticket-Tokens, PINs und
-Cloudflare-Secrets dürfen niemals committed werden.
